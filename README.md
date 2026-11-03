@@ -91,3 +91,6 @@ Deleting a word also deletes its locked overrides, and Undo does not bring those
 - Graphs tab: divergence between languages over time (average edit distance, or share of identical words).
 - Word popup: evolution tree (branches at each split, rule on each step).
 - Cross-references: a word whose form is `see "wind"` (or `see #12`) now uses the forms of the word it points to, in the dictionary, the sentence builder and the word popup.
+
+## v0.14.0
+- Rebuild group / Rebuild all (per form) now also offers to remove existing forms that no longer fit any rule of their type (wrong word type, condition no longer matches). A list is shown first; forms whose type has no rule at all are never touched.

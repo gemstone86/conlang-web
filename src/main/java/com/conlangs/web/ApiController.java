@@ -476,8 +476,10 @@ public class ApiController {
         String label = str(b, "label");
         boolean overwrite = b != null && Boolean.parseBoolean(String.valueOf(b.get("overwrite")));
         String group = b != null && b.get("group") != null ? b.get("group").toString().trim() : null;
-        Map<String, Object> res = new LinkedHashMap<>(forms.generate(id, null, label == null || label.isBlank() ? null : label, group, overwrite));
-        applog.info("edit", uidG, "Generated forms in language #" + id + (label == null || label.isBlank() ? "" : " (" + label + ")") + (overwrite ? " with overwrite" : "") + ": " + res);
+        boolean prune = b != null && Boolean.parseBoolean(String.valueOf(b.get("prune")));
+        boolean dry = b != null && Boolean.parseBoolean(String.valueOf(b.get("dryRun")));
+        Map<String, Object> res = new LinkedHashMap<>(forms.rebuild(id, label == null || label.isBlank() ? null : label, group, overwrite, prune, dry));
+        applog.info("edit", uidG, "Generated forms in language #" + id + (label == null || label.isBlank() ? "" : " (" + label + ")") + (overwrite ? " with overwrite" : "") + (prune ? " with removal" : "") + (dry ? " (dry run)" : "") + ": created=" + res.get("created") + ", updated=" + res.get("updated") + ", removed=" + res.get("removed"));
         return res;
     }
 

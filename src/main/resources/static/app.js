@@ -465,8 +465,9 @@ async function showWord() {
   let h = `<button class="modalx" data-act="closeModal">✕</button><h2>${esc(w.gloss)} <span class="badge">#${w.id}</span> <span class="badge">${esc(w.pos)}</span> <span class="badge">${esc(w.build)}</span></h2>
     <p class="muted small">${S.lang && w.language_id !== S.lang.id ? 'Coined in another language; ' + esc(S.lang.name) + "'s own version is shown in the branch table below. " : ''}Coined ${w.year}${w.notes ? ' · ' + esc(w.notes) : ''}</p>
     <h3>Forms</h3><table><tr><th>Type</th><th>Entered</th><th>Latest per branch</th><th></th></tr>
-    <tr><td>word</td><td class="form">${esc(w.form)} <span class="muted small">(${w.year})</span></td><td>${lines(lastPerLang(r.history))}</td><td></td></tr>`;
-  for (const f of r.forms) h += `<tr><td>${esc(f.label)}</td><td class="form">${esc(f.form)} <span class="muted small">(${f.year ?? w.year})</span></td><td>${lines(lastPerLang(f.history))}</td>
+    <tr><td>word</td><td class="form">${ce ? `<a data-act="editWordForm" data-id="${w.id}" data-form="${esc(w.form)}" style="cursor:pointer" title="Click to edit">${esc(w.form)}</a>` : esc(w.form)} <span class="muted small">(${w.year})</span></td><td>${lines(lastPerLang(r.history))}</td>
+    <td>${ce ? `<button data-act="editWordForm" data-id="${w.id}" data-form="${esc(w.form)}">Edit</button>` : ''}</td></tr>`;
+  for (const f of r.forms) h += `<tr><td>${esc(f.label)}</td><td class="form">${ce ? `<a data-act="editForm" data-id="${f.id}" data-form="${esc(f.form)}" style="cursor:pointer" title="Click to edit">${esc(f.form)}</a>` : esc(f.form)} <span class="muted small">(${f.year ?? w.year})</span></td><td>${lines(lastPerLang(f.history))}</td>
     <td>${ce ? `<button data-act="editForm" data-id="${f.id}" data-form="${esc(f.form)}">Edit</button> <button class="danger" data-act="delForm" data-id="${f.id}">✕</button>` : ''}</td></tr>`;
   h += '</table>';
   if (ce) h += `<div class="row"><input id="f_label" list="f_labels" placeholder="form type (e.g. plural)" size="18"><datalist id="f_labels"><option>definite</option><option>plural</option><option>definite plural</option><option>past</option><option>future</option><option>object</option></datalist>
@@ -511,6 +512,18 @@ async function showSentence() {
   let m = $('#modal');
   if (!m) { m = document.createElement('div'); m.id = 'modal'; m.className = 'modal'; document.body.appendChild(m); }
   m.innerHTML = '<div class="modalbox">' + h + '</div>'; m.hidden = false;
+}
+async function rebuildFlow(what, body) {
+  if (!confirm('Recompute ' + what + ' for EVERY word? Hand-edited forms will be overwritten.')) return;
+  const dry = await api('POST', base() + '/forms/generate', { ...body, overwrite: true, prune: true, dryRun: true });
+  let prune = false;
+  if (dry.stale && dry.stale.length) {
+    const lst = dry.stale.slice(0, 12).map(x => `${x.gloss} (${x.label}: ${x.form})`).join('\n');
+    prune = confirm(dry.stale.length + ' existing forms no longer fit any rule (wrong word type, or the condition no longer matches):\n\n' + lst + (dry.stale.length > 12 ? '\n… and ' + (dry.stale.length - 12) + ' more' : '') +
+      '\n\nOK = remove them as part of the rebuild.\nCancel = keep them.');
+  }
+  const r = await api('POST', base() + '/forms/generate', { ...body, overwrite: true, prune });
+  say('Added ' + r.created + ', updated ' + r.updated + ', removed ' + (r.removed || 0) + ' forms.'); renderPanel();
 }
 async function afterWordChange() { await refreshDict(); if (S.openId && $('#modal') && !$('#modal').hidden) await showWord(); }
 const TPL = {
@@ -585,6 +598,11 @@ const A = {
     const r = await api('POST', wbase() + '/edit', { entity: 'form', action: 'CREATE', payload: p });
     say(r.status === 'pending' ? 'Submitted for the owner to approve.' : 'Form added.'); await afterWordChange();
   },
+  editWordForm: async d => {
+    const f = prompt('New form of the word (the form it had when coined):', d.form); if (f == null || !f.trim() || f.trim() === d.form) return;
+    const r = await api('POST', wbase() + '/edit', { entity: 'word', action: 'UPDATE', entityId: Number(d.id), payload: { form: f.trim() } });
+    say(r.status === 'pending' ? 'Submitted for the owner to approve.' : 'Saved. Undo is available.'); await afterWordChange();
+  },
   editForm: async d => {
     const f = prompt('New form:', d.form); if (f == null || !f.trim()) return;
     const r = await api('POST', wbase() + '/edit', { entity: 'form', action: 'UPDATE', entityId: Number(d.id), payload: { form: f.trim() } });
@@ -635,14 +653,8 @@ const A = {
   genForms: async () => {
     const r = await api('POST', base() + '/forms/generate', {}); say('Added ' + r.created + ' forms.'); renderPanel();
   },
-  rebuildGroup: async d => {
-    if (!confirm('Recompute every form in ' + (d.g ? 'the group "' + d.g + '"' : 'the ungrouped forms') + ' for EVERY word? Hand-edited forms will be overwritten.')) return;
-    const r = await api('POST', base() + '/forms/generate', { group: d.g || '', overwrite: true }); say('Added ' + r.created + ', updated ' + r.updated + ' forms.'); renderPanel();
-  },
-  rebuildForm: async d => {
-    if (!confirm('Recompute the "' + d.l + '" form of EVERY word from the rule? Hand-edited forms will be overwritten.')) return;
-    const r = await api('POST', base() + '/forms/generate', { label: d.l, overwrite: true }); say('Added ' + r.created + ', updated ' + r.updated + ' forms.'); renderPanel();
-  },
+  rebuildGroup: async d => { await rebuildFlow(d.g ? 'every form in the group "' + d.g + '"' : 'every ungrouped form', { group: d.g || '' }); },
+  rebuildForm: async d => { await rebuildFlow('the "' + d.l + '" form', { label: d.l }); },
   rowToForm: async d => {
     const e = S.grammar.entries.find(x => x.id === Number(d.id));
     S.prefill = { label: e.name, hint: [e.c1, e.c2].filter(Boolean).join(' · ') }; S.tab = 'forms'; await renderPanel();

@@ -71,15 +71,34 @@ public class FormGenerator {
 
     /** onlyGroup: null = all groups; "" = rules without a group; otherwise that group's name. */
     public Map<String, Integer> generate(long langId, Long wordId, String onlyLabel, String onlyGroup, boolean overwrite) {
+        return run(langId, wordId, onlyLabel, onlyGroup, overwrite, false, false, null);
+    }
+
+    /**
+     * Owner rebuild. With prune, forms whose word no longer fits any rule of that form type (wrong word type, condition no longer
+     * matches, no affix) are removed; forms with no rule at all are never touched. With dryRun nothing is changed, the stale forms are only listed.
+     */
+    public Map<String, Object> rebuild(long langId, String onlyLabel, String onlyGroup, boolean overwrite, boolean prune, boolean dryRun) {
+        List<Map<String, Object>> stale = new ArrayList<>();
+        Map<String, Integer> counts = run(langId, null, onlyLabel, onlyGroup, overwrite, prune, dryRun, stale);
+        Map<String, Object> out = new LinkedHashMap<>(counts);
+        out.put("stale", stale);
+        return out;
+    }
+
+    private Map<String, Integer> run(long langId, Long wordId, String onlyLabel, String onlyGroup, boolean overwrite, boolean prune, boolean dryRun, List<Map<String, Object>> staleOut) {
         Map<String, Integer> out = new LinkedHashMap<>();
         out.put("created", 0);
         out.put("updated", 0);
+        out.put("removed", 0);
         List<Map<String, Object>> rules = new ArrayList<>();
         for (Map<String, Object> r : db.rows("select * from form_rules where language_id=? order by ord, id", langId)) {
             String grp = r.get("grp") == null ? "" : ((String) r.get("grp")).trim();
             if ((onlyLabel == null || onlyLabel.equalsIgnoreCase((String) r.get("label"))) && (onlyGroup == null || onlyGroup.equalsIgnoreCase(grp))) rules.add(r);
         }
         if (rules.isEmpty()) return out;
+        Set<String> ruleKeys = new HashSet<>();
+        for (Map<String, Object> rr : rules) ruleKeys.add(((String) rr.get("label")).toLowerCase());
         Map<String, String> classes = classesOf(langId);
         String vowels = classes.getOrDefault("V", "aeiouy");
         Map<Long, Pattern> conds = new HashMap<>();
@@ -106,8 +125,8 @@ public class FormGenerator {
         Map<Long, Map<String, Object>> affixWords = new HashMap<>();
 
         List<Map<String, Object>> words = wordId == null
-                ? db.rows("select id, pos, form, year from words where language_id=?", langId)
-                : db.rows("select id, pos, form, year from words where id=? and language_id=?", wordId, langId);
+                ? db.rows("select id, gloss, pos, form, year from words where language_id=?", langId)
+                : db.rows("select id, gloss, pos, form, year from words where id=? and language_id=?", wordId, langId);
         Map<Long, Map<String, Map<String, Object>>> existing = new HashMap<>();
         for (Map<String, Object> f : db.rows("select f.id, f.word_id, f.label, f.form from word_forms f join words w on w.id=f.word_id where w.language_id=?", langId)) {
             existing.computeIfAbsent(Db.num(f.get("word_id")), k -> new HashMap<>()).put(((String) f.get("label")).toLowerCase(), f);
@@ -153,11 +172,27 @@ public class FormGenerator {
                 Integer formYear = start != wyear ? Integer.valueOf(start) : null;
                 Map<String, Object> ex = existing.getOrDefault(id, Map.of()).get(key);
                 if (ex == null) {
-                    db.insert("insert into word_forms(word_id, label, form, year) values (?,?,?,?)", id, label, form, formYear);
+                    if (!dryRun) db.insert("insert into word_forms(word_id, label, form, year) values (?,?,?,?)", id, label, form, formYear);
                     out.merge("created", 1, Integer::sum);
-                } else if (overwrite && !form.equals(ex.get("form"))) {
+                } else if (overwrite && !form.equals(ex.get("form")) && !dryRun) {
                     db.update("update word_forms set form=?, year=? where id=?", form, formYear, ex.get("id"));
                     out.merge("updated", 1, Integer::sum);
+                }
+            }
+            if (prune) {
+                for (Map.Entry<String, Map<String, Object>> e : existing.getOrDefault(id, Map.of()).entrySet()) {
+                    if (!ruleKeys.contains(e.getKey()) || handled.contains(e.getKey())) continue;
+                    Map<String, Object> stale = new LinkedHashMap<>();
+                    stale.put("form_id", e.getValue().get("id"));
+                    stale.put("word_id", id);
+                    stale.put("gloss", w.get("gloss"));
+                    stale.put("label", e.getValue().get("label"));
+                    stale.put("form", e.getValue().get("form"));
+                    if (staleOut != null) staleOut.add(stale);
+                    if (!dryRun) {
+                        db.update("delete from word_forms where id=?", e.getValue().get("id"));
+                        out.merge("removed", 1, Integer::sum);
+                    }
                 }
             }
         }
