@@ -69,7 +69,7 @@ public final class Evolver {
     public static boolean isLiteral(String f) {
         if (f == null) return false;
         String t = f.trim();
-        return t.startsWith("=") || t.toLowerCase().startsWith("see ") || t.indexOf('"') >= 0 || t.indexOf('#') >= 0;
+        return t.startsWith("=") || Refs.parse(t) != null;
     }
 
     private void walk(Lang lang, String form, int from, List<Row> rows, Map<Long, List<Override>> ovr) {

@@ -140,6 +140,7 @@ public class DictService {
             m.put("length", t.get("length"));
             m.put("pronunciation", t.get("pronunciation"));
             m.put("latest", t.get("latest"));
+            m.put("forms", t.get("forms"));
         }
     }
 
@@ -279,10 +280,12 @@ public class DictService {
             rows = ev.evolve(Db.num(target.get("language_id")), (String) target.get("form"), ((Number) target.get("year")).intValue(), overridesOf(Db.num(target.get("id"))));
         }
         List<Map<String, Object>> forms = new ArrayList<>();
-        for (Map<String, Object> f : db.rows("select * from word_forms where word_id=? order by id", wordId)) {
+        Map<String, Object> formOwner = target != null ? target : w;   // a cross-reference shows the forms of the word it points to
+        long formLang = Db.num(formOwner.get("language_id"));
+        for (Map<String, Object> f : db.rows("select * from word_forms where word_id=? order by id", Db.num(formOwner.get("id")))) {
             Map<String, Object> fm = new LinkedHashMap<>(f);
-            int fy = f.get("year") == null ? ((Number) w.get("year")).intValue() : ((Number) f.get("year")).intValue();
-            fm.put("history", historyMaps(ev.evolve(langId, (String) f.get("form"), fy, List.of())));
+            int fy = f.get("year") == null ? ((Number) formOwner.get("year")).intValue() : ((Number) f.get("year")).intValue();
+            fm.put("history", historyMaps(ev.evolve(formLang, (String) f.get("form"), fy, List.of())));
             forms.add(fm);
         }
         Map<String, Object> out = new LinkedHashMap<>();

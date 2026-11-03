@@ -143,7 +143,7 @@ const TAB = {
     let h = '';
     if (canEdit()) h += `<div class="card"><div class="row">
       <input id="w_gloss" placeholder="gloss" size="14"><input id="w_pos" placeholder="type" size="8"><input id="w_build" placeholder="build" size="8">
-      <input id="w_form" placeholder="form" size="14" class="form"><input id="w_year" placeholder="year" size="6" type="number">
+      <input id="w_form" placeholder="form" size="14" class="form"><input id="w_ref" list="w_refs" placeholder="refers to which word?" size="22" hidden><datalist id="w_refs">${S.words.filter(x => !x.ref_to).map(x => `<option value="${esc(x.gloss)} #${x.id}">${esc(x.form)}</option>`).join('')}</datalist><label style="display:inline;margin:0" title="The word has no form of its own: it shows the forms of another word"><input type="checkbox" id="w_isref" data-isref="1"> reference to another word</label><input id="w_year" placeholder="year" size="6" type="number">
       <input id="w_notes" placeholder="notes" size="20"><input id="w_id" type="hidden">
       <button class="primary" data-act="saveWord" id="w_btn">Add word</button></div>
       <div class="muted small">New words get their forms automatically from the rules on the Word forms tab. Click a word to see and edit all its forms.</div></div>`;
@@ -429,7 +429,7 @@ function wordRow(w) {
   const inh = w.inherited ? ` <span class="badge" title="Coined in ${esc(w.origin_lang)} as ${esc(w.origin_form)}">from ${esc(w.origin_lang)}</span>` : '';
   const act = w.inherited ? `<button data-act="goOrigin" data-id="${w.id}" data-lang="${w.origin_lang_id}">Open in ${esc(w.origin_lang)}</button>`
     : (canEdit() ? `<button data-act="editWord" data-id="${w.id}">Edit</button> <button class="danger" data-act="delWord" data-id="${w.id}">✕</button>` : '');
-  return `<tr class="${w.inherited ? 'inherited' : ''}"><td class="muted small">${w.id}</td><td><a data-act="openWord" data-id="${w.id}" style="cursor:pointer"><strong>${esc(w.gloss)}</strong></a>${inh}${w.meaning_changed ? `<div class="small muted">means: ${esc(w.meaning)}</div>` : ''}${w.ref_text ? `<div class="small muted">${esc(w.ref_text)}</div>` : ''}${w.ref_missing ? '<div class="small gap">refers to a word that was not found</div>' : ''}</td><td>${esc(w.pos)}</td><td>${esc(w.build)}</td><td>${w.year}</td>
+  return `<tr class="${w.inherited ? 'inherited' : ''}"><td class="muted small">${w.id}</td><td><a data-act="openWord" data-id="${w.id}" style="cursor:pointer"><strong>${esc(w.gloss)}</strong></a>${inh}${w.meaning_changed ? `<div class="small muted">means: ${esc(w.meaning)}</div>` : ''}${w.ref_to ? `<div class="small muted">→ same as <strong>${esc(w.ref_gloss)}</strong> (#${w.ref_to})</div>` : ''}${w.ref_missing ? '<div class="small gap">refers to a word that was not found</div>' : ''}</td><td>${esc(w.pos)}</td><td>${esc(w.build)}</td><td>${w.year}</td>
     <td class="form">${esc(w.form)}</td><td>${d ? lines(d.latest) : '<span class="muted">—</span>'}${more ? ` <span class="badge">+${more}</span>` : ''}</td>
     <td>${w.length}</td><td>${esc(w.pronunciation)}</td><td>${esc((w.exists_in || []).join(', '))}</td>
     <td>${lines(w.latest)}${w.has_overrides ? ' <span class="badge">locked</span>' : ''}</td>
@@ -465,12 +465,12 @@ async function showWord() {
   let h = `<button class="modalx" data-act="closeModal">✕</button><h2>${esc(w.gloss)} <span class="badge">#${w.id}</span> <span class="badge">${esc(w.pos)}</span> <span class="badge">${esc(w.build)}</span></h2>
     <p class="muted small">${S.lang && w.language_id !== S.lang.id ? 'Coined in another language; ' + esc(S.lang.name) + "'s own version is shown in the branch table below. " : ''}Coined ${w.year}${w.notes ? ' · ' + esc(w.notes) : ''}</p>
     <h3>Forms</h3><table><tr><th>Type</th><th>Entered</th><th>Latest per branch</th><th></th></tr>
-    <tr><td>word</td><td class="form">${ce ? `<a data-act="editWordForm" data-id="${w.id}" data-form="${esc(w.form)}" style="cursor:pointer" title="Click to edit">${esc(w.form)}</a>` : esc(w.form)} <span class="muted small">(${w.year})</span></td><td>${lines(lastPerLang(r.history))}</td>
-    <td>${ce ? `<button data-act="editWordForm" data-id="${w.id}" data-form="${esc(w.form)}">Edit</button>` : ''}</td></tr>`;
-  for (const f of r.forms) h += `<tr><td>${esc(f.label)}</td><td class="form">${ce ? `<a data-act="editForm" data-id="${f.id}" data-form="${esc(f.form)}" style="cursor:pointer" title="Click to edit">${esc(f.form)}</a>` : esc(f.form)} <span class="muted small">(${f.year ?? w.year})</span></td><td>${lines(lastPerLang(f.history))}</td>
-    <td>${ce ? `<button data-act="editForm" data-id="${f.id}" data-form="${esc(f.form)}">Edit</button> <button class="danger" data-act="delForm" data-id="${f.id}">✕</button>` : ''}</td></tr>`;
+    <tr><td>word</td><td class="form">${r.ref ? `reference to <strong>${esc(r.ref.gloss)}</strong> <span class="muted small">(#${r.ref.id}, ${w.year})</span>` : ''}${r.ref ? '' : ce ? `<a data-act="editWordForm" data-id="${w.id}" data-form="${esc(w.form)}" style="cursor:pointer" title="Click to edit">${esc(w.form)}</a>` : esc(w.form)}${r.ref ? '' : ` <span class="muted small">(${w.year})</span>`}</td><td>${lines(lastPerLang(r.history))}</td>
+    <td>${ce ? (r.ref ? `<button data-act="popupEdit" data-id="${w.id}">Edit</button>` : `<button data-act="editWordForm" data-id="${w.id}" data-form="${esc(w.form)}">Edit</button>`) : ''}</td></tr>`;
+  for (const f of r.forms) h += `<tr><td>${esc(f.label)}</td><td class="form">${ce && !r.ref ? `<a data-act="editForm" data-id="${f.id}" data-form="${esc(f.form)}" style="cursor:pointer" title="Click to edit">${esc(f.form)}</a>` : esc(f.form)} <span class="muted small">(${f.year ?? w.year})</span></td><td>${lines(lastPerLang(f.history))}</td>
+    <td>${ce && !r.ref ? `<button data-act="editForm" data-id="${f.id}" data-form="${esc(f.form)}">Edit</button> <button class="danger" data-act="delForm" data-id="${f.id}">✕</button>` : ''}</td></tr>`;
   h += '</table>';
-  if (ce) h += `<div class="row"><input id="f_label" list="f_labels" placeholder="form type (e.g. plural)" size="18"><datalist id="f_labels"><option>definite</option><option>plural</option><option>definite plural</option><option>past</option><option>future</option><option>object</option></datalist>
+  if (ce && !r.ref) h += `<div class="row"><input id="f_label" list="f_labels" placeholder="form type (e.g. plural)" size="18"><datalist id="f_labels"><option>definite</option><option>plural</option><option>definite plural</option><option>past</option><option>future</option><option>object</option></datalist>
     <input id="f_form" placeholder="form" class="form"><input id="f_year" type="number" placeholder="year" size="8" value="${w.year}" data-yearcheck="form"><span id="f_warn" class="gap small"></span><button class="primary" data-act="addForm">Add form</button></div>
     <p class="muted small">Every form is run through the sound changes on its own, so it can end up different from the base word.</p>`;
   if (r.ref) h += `<p class="small">Cross-reference: this word uses the forms of <strong>${esc(r.ref.gloss)}</strong> (#${r.ref.id}).</p>`;
@@ -512,6 +512,11 @@ async function showSentence() {
   let m = $('#modal');
   if (!m) { m = document.createElement('div'); m.id = 'modal'; m.className = 'modal'; document.body.appendChild(m); }
   m.innerHTML = '<div class="modalbox">' + h + '</div>'; m.hidden = false;
+}
+function syncRefBox() {
+  const on = $('#w_isref') && $('#w_isref').checked;
+  if ($('#w_ref')) $('#w_ref').hidden = !on;
+  if ($('#w_form')) $('#w_form').hidden = !!on;
 }
 async function rebuildFlow(what, body) {
   if (!confirm('Recompute ' + what + ' for EVERY word? Hand-edited forms will be overwritten.')) return;
@@ -556,13 +561,20 @@ const A = {
   saveWord: async () => {
     const p = { gloss: val('w_gloss'), pos: val('w_pos'), build: val('w_build'), form: val('w_form'), notes: val('w_notes') };
     if (val('w_year') !== '') p.year = Number(val('w_year'));
+    if ($('#w_isref') && $('#w_isref').checked) {
+      const t = val('w_ref').trim(), m = t.match(/#(\d+)\s*$/);
+      let target = m ? Number(m[1]) : null;
+      if (target == null) { const c = S.words.filter(x => !x.ref_to && x.gloss.toLowerCase() === t.toLowerCase()); if (c.length === 1) target = c[0].id; else { say(c.length ? 'Several words are called "' + t + '": pick one from the list.' : 'Pick the word to refer to from the list.', true); return; } }
+      p.ref_word_id = target; delete p.form;
+    } else if (val('w_id')) p.ref_word_id = null;
     const id = val('w_id');
     const r = await api('POST', base() + '/edit', { entity: 'word', action: id ? 'UPDATE' : 'CREATE', entityId: id ? Number(id) : null, payload: p });
     say(r.status === 'pending' ? 'Submitted for the owner to approve.' : 'Saved.'); renderPanel();
   },
   editWord: async d => {
     const w = S.words.find(x => x.id === Number(d.id));
-    for (const [k, v] of [['gloss', w.gloss], ['pos', w.pos], ['build', w.build], ['form', w.form], ['year', w.year], ['notes', w.notes]]) $('#w_' + k).value = v ?? '';
+    for (const [k, v] of [['gloss', w.gloss], ['pos', w.pos], ['build', w.build], ['form', w.ref_to ? '' : w.form], ['year', w.year], ['notes', w.notes]]) $('#w_' + k).value = v ?? '';
+    $('#w_isref').checked = !!w.ref_to; $('#w_ref').value = w.ref_to ? w.ref_gloss + ' #' + w.ref_to : ''; syncRefBox();
     $('#w_id').value = w.id; $('#w_btn').textContent = 'Save changes'; window.scrollTo(0, 0);
   },
   delWord: async d => {
@@ -597,6 +609,10 @@ const A = {
     if (p.year != null && S.openWordYear != null && p.year < S.openWordYear && !confirm('The year ' + p.year + ' is older than the word itself (' + S.openWordYear + '). Add the form anyway?')) return;
     const r = await api('POST', wbase() + '/edit', { entity: 'form', action: 'CREATE', payload: p });
     say(r.status === 'pending' ? 'Submitted for the owner to approve.' : 'Form added.'); await afterWordChange();
+  },
+  popupEdit: async d => {
+    const m = $('#modal'); if (m) m.hidden = true; S.openId = null;
+    if (S.tab === 'dict' && S.words.some(x => x.id === Number(d.id) && !x.inherited)) await A.editWord(d); else say('Open the word in its own language to edit it.', true);
   },
   editWordForm: async d => {
     const f = prompt('New form of the word (the form it had when coined):', d.form); if (f == null || !f.trim() || f.trim() === d.form) return;
@@ -842,6 +858,7 @@ document.addEventListener('change', e => {
   if (e.target.dataset.logauto) { stopLogTimer(); if (e.target.checked) S.logTimer = setInterval(() => { if (S.page === 'log') loadLog(true); else stopLogTimer(); }, 10000); return; }
   if (e.target.id === 'gr_cat') { applyHeadings(); return; }
   if (e.target.dataset.soundyear) { S.soundYear = e.target.value === '' ? '' : Number(e.target.value); renderPanel(); return; }
+  if (e.target.dataset.isref) { syncRefBox(); return; }
   if (e.target.dataset.gmetric) { drawDivergence(); return; }
   if (e.target.dataset.inh) { S.showInherited = e.target.checked; S.page = 0; drawDict(); return; }
   if (e.target.dataset.psize) { S.pageSize = Number(e.target.value); try { localStorage.setItem('pageSize', String(S.pageSize)); } catch (x) { /* ignore */ } S.page = 0; drawDict(); return; }

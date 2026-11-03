@@ -134,11 +134,11 @@ public class FormGenerator {
         for (Map<String, Object> w : words) {
             long id = Db.num(w.get("id"));
             String base = (String) w.get("form");
-            if (Evolver.isLiteral(base)) continue;   // notes and cross-references have no forms of their own
+            boolean literal = Evolver.isLiteral(base);   // cross-references have no forms of their own: they show the target's
             int wyear = ((Number) w.get("year")).intValue();
             List<Evolver.Row> baseRows = null;
             Set<String> handled = new HashSet<>();
-            for (Map<String, Object> r : rules) {
+            for (Map<String, Object> r : literal ? List.<Map<String, Object>>of() : rules) {
                 String label = (String) r.get("label"), key = label.toLowerCase();
                 if (handled.contains(key) || !posMatches((String) r.get("pos"), (String) w.get("pos"))) continue;
                 long rid = Db.num(r.get("id"));

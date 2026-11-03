@@ -94,3 +94,8 @@ Deleting a word also deletes its locked overrides, and Undo does not bring those
 
 ## v0.14.0
 - Rebuild group / Rebuild all (per form) now also offers to remove existing forms that no longer fit any rule of their type (wrong word type, condition no longer matches). A list is shown first; forms whose type has no rule at all are never touched.
+
+## v0.15.0
+- References are now explicit: tick "reference to another word" when adding or editing a word and pick the word it stands for. The word then shows the forms (definite, plural …) of that word, in the dictionary, popup and sentences, and has no forms of its own. Stored as `see #id`, so it survives renaming the target. Old words written as `see "word"` keep working; edit and tick the box to convert them.
+- Only `see …` and `=…` count as notes now; other text containing quotes or `#` is sound-changed as normal.
+- Rebuild with removal also clears leftover forms of reference words.

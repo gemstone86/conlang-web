@@ -19,7 +19,7 @@ public class Store {
     private static final Map<String, String> TABLE = Map.of("word", "words", "rule", "rules", "override", "word_overrides", "form", "word_forms",
             "gsection", "grammar_sections", "grammar", "grammar_entries", "phoneme", "phonemes", "formrule", "form_rules", "meaning", "word_meanings");
     private static final Map<String, List<String>> FIELDS = Map.of(
-            "word", List.of("gloss", "pos", "build", "form", "year", "notes"),
+            "word", List.of("gloss", "pos", "build", "form", "year", "notes", "ref_word_id"),
             "rule", List.of("year", "ord", "name", "pattern", "replacement", "note"),
             "override", List.of("word_id", "lang_id", "year", "form"),
             "form", List.of("word_id", "label", "form", "year"),
@@ -29,7 +29,7 @@ public class Store {
             "formrule", List.of("grp", "label", "pos", "placement", "affix", "affix_word_id", "cond_re", "hiatus", "year", "ord"),
             "meaning", List.of("word_id", "lang_id", "year", "mode", "meaning"));
     private static final Set<String> LANG_OWNED = Set.of("word", "rule", "gsection", "grammar", "phoneme", "formrule");
-    private static final Set<String> INTS = Set.of("year", "ord", "word_id", "lang_id", "year_to", "hiatus", "affix_word_id");
+    private static final Set<String> INTS = Set.of("year", "ord", "word_id", "lang_id", "year_to", "hiatus", "affix_word_id", "ref_word_id");
     private static final TypeReference<Map<String, Object>> MAP = new TypeReference<>() {};
 
     private final Db db;
@@ -98,6 +98,27 @@ public class Store {
             Map<String, Object> p = payload == null ? Map.of() : payload;
             for (String f : FIELDS.get(entity)) {
                 if (p.containsKey(f)) clean.put(f, coerce(f, p.get(f)));
+            }
+        }
+        if (entity.equals("word") && clean.containsKey("ref_word_id") && !action.equals("DELETE")) {
+            Object rid = clean.get("ref_word_id");
+            if (rid != null) {
+                long target = ((Number) rid).longValue();
+                Map<String, Object> tw = db.one("select id, language_id, ref_word_id from words where id=?", target);
+                if (tw == null) throw new ApiException(404, "The word to refer to doesn't exist.");
+                List<Long> reach = new ArrayList<>();
+                reach.add(langId);
+                reach.addAll(access.ancestors(langId));
+                if (!reach.contains(Db.num(tw.get("language_id")))) throw new ApiException(400, "A reference must point to a word in this language or one of its ancestors.");
+                Map<String, Object> cur = tw;
+                for (int hop = 0; hop < 20 && cur != null; hop++) {
+                    if (entityId != null && Db.num(cur.get("id")) == entityId) throw new ApiException(400, "A word can't refer to itself, directly or through other references.");
+                    cur = cur.get("ref_word_id") == null ? null : db.one("select id, ref_word_id from words where id=?", Db.num(cur.get("ref_word_id")));
+                }
+                clean.put("form", "see #" + target);
+            } else if (action.equals("UPDATE") && !clean.containsKey("form")) {
+                Map<String, Object> cw = entityId == null ? null : db.one("select form from words where id=?", entityId);
+                if (cw != null && Refs.parse((String) cw.get("form")) != null) throw new ApiException(400, "Give the word its own form when it stops being a reference.");
             }
         }
         if (!action.equals("CREATE")) {
