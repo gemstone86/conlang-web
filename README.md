@@ -112,3 +112,6 @@ Deleting a word also deletes its locked overrides, and Undo does not bring those
 
 ## v0.18.0
 - Graphs tab: "Mergers" check. For the language and each branch: how many words had different forms at the split but are identical now, which sound changes merge the most forms, and the biggest groups of words that now sound the same. Locked overrides are not counted in the per-rule numbers.
+
+## v0.18.1
+- Sound changes: the "show rules for" dropdown is now three visible buttons (only this language / this language + all branches / full path) with a rule count, and the choice is remembered.

@@ -157,11 +157,13 @@ const TAB = {
     return h;
   },
   async rules() {
-    const scope = S.ruleScope || 'branches';
+    if (!S.ruleScope) { try { S.ruleScope = localStorage.getItem('ruleScope') || 'branches'; } catch (x) { S.ruleScope = 'branches'; } }
+    const scope = S.ruleScope;
     const rules = S.rules = await api('GET', base() + '/rules?scope=' + scope);
     const targets = [S.lang, ...descendants(S.lang)].filter(l => l.level >= 2);
-    const opt = (v, t) => `<option value="${v}" ${scope === v ? 'selected' : ''}>${t}</option>`;
-    let h = `<div class="row"><label style="margin:0">Show rules for</label><select data-scope="1">${opt('self', 'this language only')}${opt('branches', 'this language + its branches')}${opt('path', 'full path (ancestors + this language)')}</select></div>`;
+    const seg = (v, t) => `<button data-act="ruleScope" data-v="${v}" class="${scope === v ? 'primary' : ''}">${t}</button>`;
+    let h = `<div class="row"><span class="small muted">Show</span> ${seg('self', 'only ' + esc(S.lang.name))} ${seg('branches', esc(S.lang.name) + ' + all its branches')} ${seg('path', 'full path (ancestors + ' + esc(S.lang.name) + ')')}
+      <span class="small muted">${rules.length} rule${rules.length === 1 ? '' : 's'}</span></div>`;
     h += `<div class="card"><div class="row"><a href="/api/languages/${S.lang.id}/rules/export.json?scope=${scope}"><button>Export these sound changes (JSON)</button></a>
       ${canEdit() ? `<input type="file" id="ri_file" accept=".json,application/json"><label style="display:inline;margin:0"><input type="checkbox" id="ri_rm"> remove rules that are missing from the file</label>
       <button data-act="ruleImportCheck">Check file</button>` : ''}</div>
@@ -647,6 +649,7 @@ const A = {
     say('Imported: ' + res.added + ' added, ' + res.changed + ' changed, ' + res.removed + ' removed' + (res.pending ? ' (' + res.pending + ' waiting for the owner to approve)' : '') + '. Undo is available.');
     renderPanel();
   },
+  ruleScope: async d => { S.ruleScope = d.v; try { localStorage.setItem('ruleScope', d.v); } catch (x) { /* ignore */ } renderPanel(); },
   toggleProblems: async () => { S.onlyProblems = !S.onlyProblems; S.page = 0; drawDict(); },
   popupEdit: async d => {
     const m = $('#modal'); if (m) m.hidden = true; S.openId = null;
@@ -918,7 +921,7 @@ document.addEventListener('change', e => {
   if (e.target.dataset.tpl && TPL[e.target.value]) { $('#r_pat').value = TPL[e.target.value][0]; $('#r_rep').value = TPL[e.target.value][1]; $('#r_name').value = e.target.selectedOptions[0].textContent; }
 });
 document.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.id === 'p') wrap(A.login)(); });
-const UI_VERSION = '0.18.0';   // keep equal to the version in pom.xml
+const UI_VERSION = '0.18.1';   // keep equal to the version in pom.xml
 api('GET', '/api/version').then(v => {
   $('#ver').textContent = 'v' + v.version + (v.built ? ' · built ' + v.built.replace('T', ' ').replace('Z', ' UTC') : '');
   if (v.version !== UI_VERSION) {
