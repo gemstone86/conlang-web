@@ -103,3 +103,6 @@ Deleting a word also deletes its locked overrides, and Undo does not bring those
 ## v0.15.1
 - References to words coined after a branch split off now resolve (shown with the ancestor's form) instead of "refers to a word that was not found".
 - A red banner appears when the page and the running server have different versions (stale backend). Keep `UI_VERSION` in app.js equal to the pom version.
+
+## v0.16.0
+- Dictionary: "Show only words with problems" button (with a count). A word has a problem when: no year is set (0), the form is empty, a sound change fails on it, a form starts before the word itself, or it refers to a word that doesn't exist. Problems are listed in red under the gloss.

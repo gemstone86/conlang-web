@@ -266,6 +266,13 @@ public class DictService {
                 if (inherited) also.removeAll(ancestorNames);
                 m.put("exists_in", also);
                 m.put("latest", latest);
+                List<String> problems = new ArrayList<>();
+                if (wyear == 0) problems.add("no year set (the year is 0)");
+                if (form == null || form.isBlank()) problems.add("the form is empty");
+                for (Evolver.Row er : rows) {
+                    if (er.source().equals("ERROR") && branchSet.contains(er.langId())) problems.add("sound change error in " + er.langName() + ": " + er.rule());
+                }
+                m.put("problems", problems);
                 m.put("has_overrides", ovr.containsKey(id));
                 List<String> senses = Meanings.senses((String) w.get("gloss"), meaningsByWord.getOrDefault(id, List.of()), subPath, cuts, null);
                 m.put("meaning", String.join("; ", senses));
@@ -274,6 +281,7 @@ public class DictService {
                 for (Map<String, Object> f : formsByWord.getOrDefault(id, List.of())) {
                     Map<String, Object> fm = new LinkedHashMap<>(f);
                     int fy = f.get("year") == null ? wyear : ((Number) f.get("year")).intValue();
+                    if (fy < wyear) problems.add("form '" + f.get("label") + "' starts in " + fy + ", before the word itself (" + wyear + ")");
                     fm.put("latest", latestPerBranch(ev.evolve(src, (String) f.get("form"), fy, List.of()), branchSet));
                     fs.add(fm);
                 }
@@ -282,6 +290,13 @@ public class DictService {
             }
         }
         resolveRefs(out, late);
+        for (Map<String, Object> m : out) {
+            if (Boolean.TRUE.equals(m.get("ref_missing"))) {
+                @SuppressWarnings("unchecked")
+                List<String> pl = (List<String>) m.get("problems");
+                pl.add("refers to a word that doesn't exist: " + m.get("ref_text"));
+            }
+        }
         out.sort(Comparator.comparing((Map<String, Object> m) -> ((String) m.get("gloss")).toLowerCase())
                 .thenComparingInt(m -> ((Number) m.get("year")).intValue())
                 .thenComparingLong(m -> Db.num(m.get("id"))));

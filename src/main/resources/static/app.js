@@ -148,6 +148,7 @@ const TAB = {
       <button class="primary" data-act="saveWord" id="w_btn">Add word</button></div>
       <div class="muted small">New words get their forms automatically from the rules on the Word forms tab. Click a word to see and edit all its forms.</div></div>`;
     h += `<div class="row"><input id="q" placeholder="Search (word, form, id)…" data-filter="1" value="${esc(S.q)}">
+      <button data-act="toggleProblems" id="probbtn"></button>
       <label style="display:inline;margin:0"><input type="checkbox" data-inh="1" ${S.showInherited === false ? '' : 'checked'}> Show inherited words</label>
       <label style="display:inline;margin:0 0 0 10px">Per page</label> <select data-psize="1">${[25, 50, 100, 250].map(n => `<option ${n === S.pageSize ? 'selected' : ''}>${n}</option>`).join('')}</select>
       <span class="pager"></span></div>
@@ -420,7 +421,8 @@ function sentView(b) {
 }
 function filteredWords() {
   const q = (S.q || '').toLowerCase();
-  const all = S.showInherited === false ? S.words.filter(w => !w.inherited) : S.words;
+  let all = S.showInherited === false ? S.words.filter(w => !w.inherited) : S.words;
+  if (S.onlyProblems) all = all.filter(w => (w.problems || []).length);
   if (!q) return all;
   return all.filter(w => [w.id, w.gloss, w.meaning, w.form, w.pos, w.notes, ...(w.forms || []).map(f => f.form)].join(' ').toLowerCase().includes(q));
 }
@@ -429,7 +431,7 @@ function wordRow(w) {
   const inh = w.inherited ? ` <span class="badge" title="Coined in ${esc(w.origin_lang)} as ${esc(w.origin_form)}">from ${esc(w.origin_lang)}</span>` : '';
   const act = w.inherited ? `<button data-act="goOrigin" data-id="${w.id}" data-lang="${w.origin_lang_id}">Open in ${esc(w.origin_lang)}</button>`
     : (canEdit() ? `<button data-act="editWord" data-id="${w.id}">Edit</button> <button class="danger" data-act="delWord" data-id="${w.id}">✕</button>` : '');
-  return `<tr class="${w.inherited ? 'inherited' : ''}"><td class="muted small">${w.id}</td><td><a data-act="openWord" data-id="${w.id}" style="cursor:pointer"><strong>${esc(w.gloss)}</strong></a>${inh}${w.meaning_changed ? `<div class="small muted">means: ${esc(w.meaning)}</div>` : ''}${w.ref_to ? `<div class="small muted">→ same as <strong>${esc(w.ref_gloss)}</strong> (#${w.ref_to})</div>` : ''}${w.ref_missing ? '<div class="small gap">refers to a word that was not found</div>' : ''}</td><td>${esc(w.pos)}</td><td>${esc(w.build)}</td><td>${w.year}</td>
+  return `<tr class="${w.inherited ? 'inherited' : ''}"><td class="muted small">${w.id}</td><td><a data-act="openWord" data-id="${w.id}" style="cursor:pointer"><strong>${esc(w.gloss)}</strong></a>${inh}${w.meaning_changed ? `<div class="small muted">means: ${esc(w.meaning)}</div>` : ''}${w.ref_to ? `<div class="small muted">→ same as <strong>${esc(w.ref_gloss)}</strong> (#${w.ref_to})</div>` : ''}${(w.problems || []).map(p => `<div class="small gap">⚠ ${esc(p)}</div>`).join('')}</td><td>${esc(w.pos)}</td><td>${esc(w.build)}</td><td>${w.year}</td>
     <td class="form">${esc(w.form)}</td><td>${d ? lines(d.latest) : '<span class="muted">—</span>'}${more ? ` <span class="badge">+${more}</span>` : ''}</td>
     <td>${w.length}</td><td>${esc(w.pronunciation)}</td><td>${esc((w.exists_in || []).join(', '))}</td>
     <td>${lines(w.latest)}${w.has_overrides ? ' <span class="badge">locked</span>' : ''}</td>
@@ -437,6 +439,8 @@ function wordRow(w) {
 }
 function drawDict() {
   const body = $('#wbody'); if (!body) return;
+  const nProb = S.words.filter(w => (w.problems || []).length).length, pb = $('#probbtn');
+  if (pb) { pb.textContent = (S.onlyProblems ? 'Show all words' : 'Show only words with problems') + ' (' + nProb + ')'; pb.className = S.onlyProblems ? 'primary' : ''; }
   const list = filteredWords(), size = S.pageSize, pages = Math.max(1, Math.ceil(list.length / size));
   S.page = Math.min(S.page, pages - 1);
   body.innerHTML = list.slice(S.page * size, (S.page + 1) * size).map(wordRow).join('') || '<tr><td colspan="12" class="muted">No words.</td></tr>';
@@ -610,6 +614,7 @@ const A = {
     const r = await api('POST', wbase() + '/edit', { entity: 'form', action: 'CREATE', payload: p });
     say(r.status === 'pending' ? 'Submitted for the owner to approve.' : 'Form added.'); await afterWordChange();
   },
+  toggleProblems: async () => { S.onlyProblems = !S.onlyProblems; S.page = 0; drawDict(); },
   popupEdit: async d => {
     const m = $('#modal'); if (m) m.hidden = true; S.openId = null;
     if (S.tab === 'dict' && S.words.some(x => x.id === Number(d.id) && !x.inherited)) await A.editWord(d); else say('Open the word in its own language to edit it.', true);
@@ -866,7 +871,7 @@ document.addEventListener('change', e => {
   if (e.target.dataset.tpl && TPL[e.target.value]) { $('#r_pat').value = TPL[e.target.value][0]; $('#r_rep').value = TPL[e.target.value][1]; $('#r_name').value = e.target.selectedOptions[0].textContent; }
 });
 document.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.id === 'p') wrap(A.login)(); });
-const UI_VERSION = '0.15.1';   // keep equal to the version in pom.xml
+const UI_VERSION = '0.16.0';   // keep equal to the version in pom.xml
 api('GET', '/api/version').then(v => {
   $('#ver').textContent = 'v' + v.version + (v.built ? ' · built ' + v.built.replace('T', ' ').replace('Z', ' UTC') : '');
   if (v.version !== UI_VERSION) {
