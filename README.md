@@ -105,7 +105,7 @@ Deleting a word also deletes its locked overrides, and Undo does not bring those
 - A red banner appears when the page and the running server have different versions (stale backend). Keep `UI_VERSION` in app.js equal to the pom version.
 
 ## v0.16.0
-- Dictionary: "Show only words with problems" button (with a count). A word has a problem when: no year is set (0), the form is empty, a sound change fails on it, a form starts before the word itself, or it refers to a word that doesn't exist. Problems are listed in red under the gloss.
+- Dictionary: "Show only words with problems" button (with a count). A word has a problem when: no year is set (0), the form is empty, a sound change fails on it, or it refers to a word that doesn't exist. Problems are listed in red under the gloss.
 
 ## v0.17.0
 - Sound changes: export as JSON and import it again. A rule with its id is adjusted, a rule without an id (or an unknown one) is added, `"delete": true` removes one; "remove rules that are missing from the file" removes the rest in the languages the file covers. The file is checked first (bad regexes, unknown languages, missing rights) and nothing is changed until you press Apply. Goes through the normal edit pipeline (approval and undo).
@@ -115,3 +115,6 @@ Deleting a word also deletes its locked overrides, and Undo does not bring those
 
 ## v0.18.1
 - Sound changes: the "show rules for" dropdown is now three visible buttons (only this language / this language + all branches / full path) with a rule count, and the choice is remembered.
+
+## v0.18.2
+- A form that starts earlier than its word is no longer reported as a problem: the word simply uses the form as it has evolved by the word's own year.

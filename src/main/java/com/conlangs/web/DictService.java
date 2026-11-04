@@ -281,7 +281,6 @@ public class DictService {
                 for (Map<String, Object> f : formsByWord.getOrDefault(id, List.of())) {
                     Map<String, Object> fm = new LinkedHashMap<>(f);
                     int fy = f.get("year") == null ? wyear : ((Number) f.get("year")).intValue();
-                    if (fy < wyear) problems.add("form '" + f.get("label") + "' starts in " + fy + ", before the word itself (" + wyear + ")");
                     fm.put("latest", latestPerBranch(ev.evolve(src, (String) f.get("form"), fy, List.of()), branchSet));
                     fs.add(fm);
                 }
