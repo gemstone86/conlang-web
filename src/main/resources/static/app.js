@@ -291,6 +291,10 @@ const TAB = {
       <div class="row">${sel('g_a')} ↔ ${sel('g_b')}
       <select id="g_metric" data-gmetric="1"><option value="avg_distance">average difference</option><option value="identical">words with identical forms</option></select>
       <input id="g_from" type="number" placeholder="from year" size="8"><input id="g_to" type="number" placeholder="to year" size="8"><button class="primary" data-act="drawGraph">Draw</button></div><div id="g_out">Loading…</div>
+      <h3>Mergers: words that end up sounding the same</h3>
+      <p class="muted small">For this language and each of its branches: how many words had different forms when the language began (at its split) but are identical now, which sound change causes the most, and the biggest groups of words that now sound alike.
+      Mergers make a language hard to decode, so this is the number to watch when you want a language that is readable but hard to hear.</p>
+      <div class="row"><button class="primary" data-act="mergersGo">Calculate</button></div><div id="m_out"></div>
       <p class="muted small">The evolution tree of a single word is in the word popup: click a word in the dictionary.</p>`;
   },
   async bulk() {
@@ -800,6 +804,20 @@ const A = {
     await api('PUT', '/api/sentences/' + S.openSent, { source: val('e_src'), year: Number(val('e_year') || 0), translation: val('e_tr'), notes: val('e_notes'), kind: val('e_kind'), group: val('e_group'), sub: val('e_sub') });
     say('Saved.'); await showSentence(); renderPanel();
   },
+  mergersGo: async () => {
+    const o = $('#m_out'); o.textContent = 'Calculating…';
+    const res = await api('GET', base() + '/mergers');
+    let h = '<table><tr><th>Language</th><th>Words</th><th>Different forms at start</th><th>Different forms now</th><th>Merged</th><th>Words sharing a form: start</th><th>now</th></tr>' +
+      res.map(m => `<tr><td><strong>${esc(m.language)}</strong></td><td>${m.words}</td><td>${m.distinct_start}</td><td>${m.distinct_now}</td><td><strong>${m.merged}</strong> (${m.distinct_start ? Math.round(m.merged / m.distinct_start * 100) : 0}%)</td><td>${m.homophone_words_start}</td><td>${m.homophone_words_now}</td></tr>`).join('') + '</table>';
+    for (const m of res) {
+      if (!m.rules.length && !m.groups.length) continue;
+      h += `<details><summary>${esc(m.language)}: rules that merge the most, and words that now sound alike</summary>`;
+      if (m.rules.length) h += '<table><tr><th>Year</th><th>Rule</th><th>Words changed</th><th>Forms merged</th></tr>' + m.rules.map(r => `<tr><td>${r.year}</td><td class="form">${esc(r.rule)}</td><td>${r.changed}</td><td>${r.merged}</td></tr>`).join('') + '</table>';
+      if (m.groups.length) h += '<p class="small"><strong>Biggest groups of words with the same form now:</strong></p><ul class="small">' + m.groups.map(g => `<li><span class="form">${esc(g.form)}</span>: ${g.words.map(esc).join(', ')}</li>`).join('') + '</ul>';
+      h += '</details>';
+    }
+    o.innerHTML = h;
+  },
   drawGraph: async () => {
     const q = new URLSearchParams();
     for (const [k, id] of [['a', 'g_a'], ['b', 'g_b'], ['from', 'g_from'], ['to', 'g_to']]) if (val(id) !== '') q.set(k, val(id));
@@ -900,7 +918,7 @@ document.addEventListener('change', e => {
   if (e.target.dataset.tpl && TPL[e.target.value]) { $('#r_pat').value = TPL[e.target.value][0]; $('#r_rep').value = TPL[e.target.value][1]; $('#r_name').value = e.target.selectedOptions[0].textContent; }
 });
 document.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.id === 'p') wrap(A.login)(); });
-const UI_VERSION = '0.17.0';   // keep equal to the version in pom.xml
+const UI_VERSION = '0.18.0';   // keep equal to the version in pom.xml
 api('GET', '/api/version').then(v => {
   $('#ver').textContent = 'v' + v.version + (v.built ? ' · built ' + v.built.replace('T', ' ').replace('Z', ' UTC') : '');
   if (v.version !== UI_VERSION) {

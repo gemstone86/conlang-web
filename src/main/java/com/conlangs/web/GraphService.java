@@ -137,4 +137,106 @@ public class GraphService {
         out.put("step", step);
         return out;
     }
+
+    /**
+     * How much the sound changes of each language merge words: forms that were different when the language began (at its split)
+     * but are identical now, which rule causes how many mergers, and the biggest groups of words that now sound the same.
+     * Locked overrides are not part of the per-rule count.
+     */
+    public List<Map<String, Object>> mergers(long uid, long langId) {
+        Map<String, Object> lang = access.need(uid, langId, Access.VIEWER);
+        long worldId = Db.num(lang.get("world_id"));
+        Map<Long, String> names = new LinkedHashMap<>();
+        for (Map<String, Object> l : db.rows("select id, name from languages where world_id=? order by id", worldId)) names.put(Db.num(l.get("id")), (String) l.get("name"));
+        List<Long> subtree = new ArrayList<>();
+        subtree.add(langId);
+        for (long d : access.descendants(langId)) if (access.level(uid, d) >= Access.VIEWER) subtree.add(d);
+
+        Map<Long, List<Evolver.Override>> ovr = new HashMap<>();
+        for (Map<String, Object> o : db.rows("select o.word_id, o.lang_id, o.year, o.form from word_overrides o join words w on w.id=o.word_id join languages l on l.id=w.language_id where l.world_id=?", worldId)) {
+            ovr.computeIfAbsent(Db.num(o.get("word_id")), k -> new ArrayList<>())
+                    .add(new Evolver.Override(Db.num(o.get("lang_id")), ((Number) o.get("year")).intValue(), (String) o.get("form")));
+        }
+        Evolver ev = evolvers.build(worldId, null);
+        List<String> glosses = new ArrayList<>();
+        List<List<Evolver.Row>> allRows = new ArrayList<>();
+        for (Map<String, Object> w : db.rows("select w.id, w.gloss, w.language_id, w.form, w.year from words w join languages l on l.id=w.language_id where l.world_id=?", worldId)) {
+            String form = (String) w.get("form");
+            if (Evolver.isLiteral(form)) continue;
+            glosses.add((String) w.get("gloss"));
+            allRows.add(ev.evolve(Db.num(w.get("language_id")), form, ((Number) w.get("year")).intValue(), ovr.getOrDefault(Db.num(w.get("id")), List.of())));
+        }
+
+        List<Map<String, Object>> out = new ArrayList<>();
+        for (long lid : subtree) {
+            List<String> g = new ArrayList<>(), startForm = new ArrayList<>(), finalForm = new ArrayList<>();
+            List<Map<String, String>> steps = new ArrayList<>();
+            for (int i = 0; i < allRows.size(); i++) {
+                String first = null, last = null;
+                Map<String, String> byKey = new HashMap<>();
+                for (Evolver.Row r : allRows.get(i)) {
+                    if (r.langId() != lid || r.source().equals("ERROR")) continue;
+                    if (first == null) first = r.form();
+                    last = r.form();
+                    if (r.source().equals("RULE")) byKey.put(r.year() + "|" + r.rule(), r.form());
+                }
+                if (first == null) continue;
+                g.add(glosses.get(i));
+                startForm.add(first);
+                finalForm.add(last);
+                steps.add(byKey);
+            }
+            Map<String, Integer> startCount = new HashMap<>();
+            for (String f : startForm) startCount.merge(f, 1, Integer::sum);
+            int distinctStart = startCount.size();
+            int homophoneStart = 0;
+            for (int c : startCount.values()) if (c > 1) homophoneStart += c;
+            List<Map<String, Object>> ruleRows = new ArrayList<>();
+            List<String> keys = new ArrayList<>();
+            for (Map<String, Object> r : db.rows("select year, ord, name, pattern, replacement from rules where language_id=? order by year, ord, id", lid)) {
+                String label = r.get("name") == null || ((String) r.get("name")).isBlank() ? r.get("pattern") + " > " + r.get("replacement") : (String) r.get("name");
+                keys.add(((Number) r.get("year")).intValue() + "|" + label);
+                Map<String, Object> pr = new LinkedHashMap<>();
+                pr.put("year", r.get("year"));
+                pr.put("rule", label);
+                pr.put("pattern", r.get("pattern"));
+                pr.put("replacement", r.get("replacement"));
+                ruleRows.add(pr);
+            }
+            List<int[]> sim = Mergers.simulate(startForm, steps, keys);
+            List<Map<String, Object>> perRule = new ArrayList<>();
+            for (int k = 0; k < ruleRows.size(); k++) {
+                if (sim.get(k)[0] == 0) continue;
+                ruleRows.get(k).put("changed", sim.get(k)[0]);
+                ruleRows.get(k).put("merged", sim.get(k)[1]);
+                perRule.add(ruleRows.get(k));
+            }
+            perRule.sort((a, b) -> Integer.compare((Integer) b.get("merged"), (Integer) a.get("merged")));
+            Map<String, List<String>> groups = new LinkedHashMap<>();
+            for (int i = 0; i < finalForm.size(); i++) groups.computeIfAbsent(finalForm.get(i), k -> new ArrayList<>()).add(g.get(i));
+            List<Map<String, Object>> top = new ArrayList<>();
+            int homophoneNow = 0;
+            List<Map.Entry<String, List<String>>> big = new ArrayList<>();
+            for (Map.Entry<String, List<String>> e : groups.entrySet()) if (e.getValue().size() > 1) { big.add(e); homophoneNow += e.getValue().size(); }
+            big.sort((a, b) -> Integer.compare(b.getValue().size(), a.getValue().size()));
+            for (Map.Entry<String, List<String>> e : big.subList(0, Math.min(12, big.size()))) {
+                Map<String, Object> t = new LinkedHashMap<>();
+                t.put("form", e.getKey());
+                t.put("words", e.getValue());
+                top.add(t);
+            }
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("language", names.get(lid));
+            m.put("words", g.size());
+            m.put("distinct_start", distinctStart);
+            m.put("distinct_now", groups.size());
+            m.put("merged", distinctStart - groups.size());
+            m.put("homophone_words_start", homophoneStart);
+            m.put("homophone_words_now", homophoneNow);
+            m.put("rules", perRule.subList(0, Math.min(15, perRule.size())));
+            m.put("groups", top);
+            out.add(m);
+        }
+        return out;
+    }
 }

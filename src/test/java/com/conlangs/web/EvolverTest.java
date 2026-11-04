@@ -194,4 +194,21 @@ class EvolverTest {
         assertEquals(-750L, ch.get("year"));
         assertEquals("a", ch.get("replacement"));
     }
+
+    @Test
+    void mergerSimulationCountsCollapsedForms() {
+        List<String> start = List.of("tata", "kata", "tapa", "mama");
+        List<Map<String, String>> steps = List.of(
+                Map.of("1|t>k", "kaka", "2|a>o", "koko"),
+                Map.of("1|t>k", "kaka", "2|a>o", "koko"),
+                Map.of("1|t>k", "kapa", "2|a>o", "kopo"),
+                Map.of("2|a>o", "momo"));
+        List<int[]> r = Mergers.simulate(start, steps, List.of("1|t>k", "2|a>o"));
+        // t>k: tata and kata (as kaka) are no longer different: one form lost; tapa -> kapa changes but stays distinct
+        assertEquals(3, r.get(0)[0]);
+        assertEquals(1, r.get(0)[1]);
+        // a>o changes everything and loses nothing
+        assertEquals(4, r.get(1)[0]);
+        assertEquals(0, r.get(1)[1]);
+    }
 }

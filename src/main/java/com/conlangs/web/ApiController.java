@@ -652,4 +652,9 @@ public class ApiController {
         applog.info("edit", uid, "Sound change import in language #" + id + (dry ? " (check)" : "") + ": +" + res.get("added") + " ~" + res.get("changed") + " -" + res.get("removed") + ", errors " + ((List<?>) res.get("errors")).size());
         return res;
     }
+
+    @GetMapping("/languages/{id}/mergers")
+    public List<Map<String, Object>> mergers(@PathVariable long id, HttpSession s) {
+        return graphs.mergers(auth.requireUid(s), id);
+    }
 }
