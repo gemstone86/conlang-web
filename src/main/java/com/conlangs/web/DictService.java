@@ -104,7 +104,7 @@ public class DictService {
     }
 
     /** Words whose form is a cross-reference (see "wind") take over the forms of the word they point to. */
-    private static void resolveRefs(List<Map<String, Object>> out) {
+    private static void resolveRefs(List<Map<String, Object>> out, Map<Long, Map<String, Object>> late) {
         Map<Long, Refs.Ref> refOf = new HashMap<>();
         Map<Long, Map<String, Object>> byId = new HashMap<>();
         for (Map<String, Object> m : out) {
@@ -119,8 +119,10 @@ public class DictService {
             Map<String, Object> t = m;
             for (int hop = 0; hop < 5 && ref != null; hop++) {
                 Map<String, Object> next = null;
-                if (ref.id() != null) next = byId.get(ref.id());
-                else {
+                if (ref.id() != null) {
+                    next = byId.get(ref.id());
+                    if (next == null) next = late.get(ref.id());
+                } else {
                     String want = Refs.norm(ref.gloss());
                     for (Map<String, Object> c : out) {
                         if (c != m && Refs.norm((String) c.get("gloss")).equals(want)) {
@@ -128,12 +130,17 @@ public class DictService {
                         }
                     }
                 }
+                if (next == null) {
+                    String want = ref.gloss() == null ? null : Refs.norm(ref.gloss());
+                    for (Map<String, Object> c : late.values()) if (want != null && Refs.norm((String) c.get("gloss")).equals(want)) { next = c; break; }
+                }
                 if (next == null || next == m) { t = null; break; }
                 t = next;
                 ref = refOf.get(Db.num(t.get("id")));
             }
-            if (t == null || t == m || refOf.containsKey(Db.num(t.get("id")))) { m.put("ref_missing", true); continue; }
+            if (t == null || t == m || refOf.containsKey(Db.num(t.get("id")))) { m.put("ref_missing", true); m.put("ref_text", m.get("form")); continue; }
             m.put("ref_text", m.get("form"));
+            if (late.containsKey(Db.num(t.get("id")))) m.put("ref_late", t.get("origin_lang"));
             m.put("ref_to", t.get("id"));
             m.put("ref_gloss", t.get("gloss"));
             m.put("form", t.get("form"));
@@ -203,6 +210,7 @@ public class DictService {
         Map<Long, Map<String, Object>> langMap = langsOf(worldId);
         List<Long> fullPath = pathRootFirst(langId, langMap);
         List<Map<String, Object>> out = new ArrayList<>();
+        Map<Long, Map<String, Object>> late = new HashMap<>();   // ancestor words coined after this language split off
         for (long src : sources) {
             List<Long> subPath = fullPath.subList(Math.max(0, fullPath.indexOf(src)), fullPath.size());
             List<Integer> cuts = splitsOf(subPath, langMap);
@@ -225,7 +233,19 @@ public class DictService {
                 String form = (String) w.get("form");
                 int wyear = ((Number) w.get("year")).intValue();
                 List<Evolver.Row> rows = ev.evolve(src, form, wyear, ovr.getOrDefault(id, List.of()));
-                if (inherited && rows.stream().noneMatch(r -> r.langId() == langId)) continue;   // coined after the split
+                if (inherited && rows.stream().noneMatch(r -> r.langId() == langId)) {   // coined after the split
+                    String fin = form;
+                    for (Evolver.Row rr : rows) if (rr.langId() == src && !rr.source().equals("ERROR")) fin = rr.form();
+                    Map<String, Object> lv = new LinkedHashMap<>(w);
+                    lv.put("form", fin);
+                    lv.put("origin_lang", names.get(src));
+                    lv.put("length", Patterns.length(fin));
+                    lv.put("pronunciation", ipa(fin, ipaMap));
+                    lv.put("latest", Map.of(names.get(src), fin));
+                    lv.put("forms", List.of());
+                    late.put(id, lv);
+                    continue;
+                }
                 Map<String, Object> latest = latestPerBranch(rows, branchSet);
                 String shown = form;
                 if (inherited) {
@@ -261,7 +281,7 @@ public class DictService {
                 out.add(m);
             }
         }
-        resolveRefs(out);
+        resolveRefs(out, late);
         out.sort(Comparator.comparing((Map<String, Object> m) -> ((String) m.get("gloss")).toLowerCase())
                 .thenComparingInt(m -> ((Number) m.get("year")).intValue())
                 .thenComparingLong(m -> Db.num(m.get("id"))));

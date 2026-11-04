@@ -99,3 +99,7 @@ Deleting a word also deletes its locked overrides, and Undo does not bring those
 - References are now explicit: tick "reference to another word" when adding or editing a word and pick the word it stands for. The word then shows the forms (definite, plural …) of that word, in the dictionary, popup and sentences, and has no forms of its own. Stored as `see #id`, so it survives renaming the target. Old words written as `see "word"` keep working; edit and tick the box to convert them.
 - Only `see …` and `=…` count as notes now; other text containing quotes or `#` is sound-changed as normal.
 - Rebuild with removal also clears leftover forms of reference words.
+
+## v0.15.1
+- References to words coined after a branch split off now resolve (shown with the ancestor's form) instead of "refers to a word that was not found".
+- A red banner appears when the page and the running server have different versions (stale backend). Keep `UI_VERSION` in app.js equal to the pom version.

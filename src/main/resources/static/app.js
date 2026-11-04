@@ -866,5 +866,14 @@ document.addEventListener('change', e => {
   if (e.target.dataset.tpl && TPL[e.target.value]) { $('#r_pat').value = TPL[e.target.value][0]; $('#r_rep').value = TPL[e.target.value][1]; $('#r_name').value = e.target.selectedOptions[0].textContent; }
 });
 document.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.id === 'p') wrap(A.login)(); });
-api('GET', '/api/version').then(v => { $('#ver').textContent = 'v' + v.version + (v.built ? ' · built ' + v.built.replace('T', ' ').replace('Z', ' UTC') : ''); }).catch(() => {});
+const UI_VERSION = '0.15.1';   // keep equal to the version in pom.xml
+api('GET', '/api/version').then(v => {
+  $('#ver').textContent = 'v' + v.version + (v.built ? ' · built ' + v.built.replace('T', ' ').replace('Z', ' UTC') : '');
+  if (v.version !== UI_VERSION) {
+    const b = document.createElement('div');
+    b.style.cssText = 'background:#b3261e;color:#fff;padding:8px 14px;font-size:14px';
+    b.textContent = 'The page is version ' + UI_VERSION + ' but the running server is ' + v.version + '. Stop the app completely, then in Eclipse do Maven > Update Project (Force Update), Project > Clean, and start it again. Until then some features will fail.';
+    document.body.insertBefore(b, document.body.firstChild);
+  }
+}).catch(() => {});
 boot().catch(e => say(e.message, true));
