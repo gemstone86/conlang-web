@@ -434,7 +434,7 @@ function filteredWords() {
   let all = S.showInherited === false ? S.words.filter(w => !w.inherited) : S.words;
   if (S.onlyProblems) all = all.filter(w => (w.problems || []).length);
   if (!q) return all;
-  return all.filter(w => [w.id, w.gloss, w.meaning, w.form, w.pos, w.notes, ...(w.forms || []).map(f => f.form)].join(' ').toLowerCase().includes(q));
+  return all.filter(w => [w.id, w.gloss, w.meaning, w.ref_text, w.ref_gloss, w.ref_to ? 'reference see' : '', w.form, w.pos, w.notes, ...(w.forms || []).map(f => f.form)].join(' ').toLowerCase().includes(q));
 }
 function wordRow(w) {
   const d = defForm(w), more = (w.forms || []).filter(f => f !== d).length;
@@ -921,7 +921,7 @@ document.addEventListener('change', e => {
   if (e.target.dataset.tpl && TPL[e.target.value]) { $('#r_pat').value = TPL[e.target.value][0]; $('#r_rep').value = TPL[e.target.value][1]; $('#r_name').value = e.target.selectedOptions[0].textContent; }
 });
 document.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.id === 'p') wrap(A.login)(); });
-const UI_VERSION = '0.18.2';   // keep equal to the version in pom.xml
+const UI_VERSION = '0.18.3';   // keep equal to the version in pom.xml
 api('GET', '/api/version').then(v => {
   $('#ver').textContent = 'v' + v.version + (v.built ? ' · built ' + v.built.replace('T', ' ').replace('Z', ' UTC') : '');
   if (v.version !== UI_VERSION) {

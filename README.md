@@ -118,3 +118,6 @@ Deleting a word also deletes its locked overrides, and Undo does not bring those
 
 ## v0.18.2
 - A form that starts earlier than its word is no longer reported as a problem: the word simply uses the form as it has evolved by the word's own year.
+
+## v0.18.3
+- Dictionary search also finds reference words: search "see", "reference", or the name of the word they point to.
