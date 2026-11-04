@@ -152,7 +152,8 @@ const TAB = {
       <label style="display:inline;margin:0"><input type="checkbox" data-inh="1" ${S.showInherited === false ? '' : 'checked'}> Show inherited words</label>
       <label style="display:inline;margin:0 0 0 10px">Per page</label> <select data-psize="1">${[25, 50, 100, 250].map(n => `<option ${n === S.pageSize ? 'selected' : ''}>${n}</option>`).join('')}</select>
       <span class="pager"></span></div>
-    <table id="wt"><thead><tr><th>ID</th><th>Gloss</th><th>Type</th><th>Build</th><th>Year</th><th>Form</th><th>Definite</th><th>Len</th><th>IPA</th><th>Also in</th><th>Latest per branch</th><th></th></tr></thead><tbody id="wbody"></tbody></table>
+    <table id="wt"><thead><tr><th>ID</th><th>Gloss</th><th>Type</th><th>Build</th><th>Year</th><th>Form</th><th>Definite</th><th>Len</th><th>IPA</th><th>Also in</th><th>Latest per branch</th><th></th></tr>
+      <tr class="filters">${['id', 'gloss', 'pos', 'build', 'year', 'form'].map(k => `<th><input data-wf="${k}" value="${esc((S.wf || {})[k] || '')}" placeholder="${k === 'year' ? 'year, a..b, <a, >a' : k === 'id' ? 'id' : 'filter'}" style="width:100%;min-width:${k === 'id' ? 3 : 6}rem"></th>`).join('')}<th colspan="6"><button data-act="clearFilters" class="small">Clear filters</button></th></tr></thead><tbody id="wbody"></tbody></table>
     <div class="row"><span class="pager"></span></div>`;
     return h;
   },
@@ -429,10 +430,26 @@ function sentView(b) {
   if (notes.length) h += '<ul class="small">' + notes.map(p => `<li class="${p.ok === false ? 'gap' : 'muted'}"><code>${esc(p.input)}</code>: ${esc(p.reason || p.note)}</li>`).join('') + '</ul>';
   return h;
 }
+function yearMatches(spec, y) {
+  const t = spec.trim(); if (!t) return true;
+  let m;
+  if ((m = t.match(/^(-?\d+)\s*\.\.\s*(-?\d+)$/))) return y >= Math.min(+m[1], +m[2]) && y <= Math.max(+m[1], +m[2]);
+  if ((m = t.match(/^<\s*(-?\d+)$/))) return y < +m[1];
+  if ((m = t.match(/^>\s*(-?\d+)$/))) return y > +m[1];
+  if (/^-?\d+$/.test(t)) return y === +t;
+  return String(y).includes(t);
+}
+function fieldFilter(w) {
+  const f = S.wf || {}, has = (v, q) => !q.trim() || String(v ?? '').toLowerCase().includes(q.trim().toLowerCase());
+  if (f.id && f.id.trim()) { const ids = f.id.split(/[,\s]+/).filter(Boolean); if (!ids.includes(String(w.id))) return false; }
+  return has(w.gloss, f.gloss || '') && has(w.pos, f.pos || '') && has(w.build, f.build || '') && yearMatches(f.year || '', w.year) &&
+    (!(f.form || '').trim() || has(w.form, f.form) || has(w.origin_form, f.form) || has(w.ref_text, f.form));
+}
 function filteredWords() {
   const q = (S.q || '').toLowerCase();
   let all = S.showInherited === false ? S.words.filter(w => !w.inherited) : S.words;
   if (S.onlyProblems) all = all.filter(w => (w.problems || []).length);
+  if (S.wf && Object.values(S.wf).some(v => (v || '').trim())) all = all.filter(fieldFilter);
   if (!q) return all;
   return all.filter(w => [w.id, w.gloss, w.meaning, w.ref_text, w.ref_gloss, w.ref_to ? 'reference see' : '', w.form, w.pos, w.notes, ...(w.forms || []).map(f => f.form)].join(' ').toLowerCase().includes(q));
 }
@@ -650,6 +667,7 @@ const A = {
     renderPanel();
   },
   ruleScope: async d => { S.ruleScope = d.v; try { localStorage.setItem('ruleScope', d.v); } catch (x) { /* ignore */ } renderPanel(); },
+  clearFilters: async () => { S.wf = {}; S.q = ''; S.page = 0; renderPanel(); },
   toggleProblems: async () => { S.onlyProblems = !S.onlyProblems; S.page = 0; drawDict(); },
   popupEdit: async d => {
     const m = $('#modal'); if (m) m.hidden = true; S.openId = null;
@@ -890,6 +908,7 @@ document.addEventListener('click', e => {
 });
 document.addEventListener('input', e => {
   if (e.target.dataset.gfilter) { const q = e.target.value.toLowerCase(); document.querySelectorAll('.gt tr').forEach((tr, i) => { if (tr.querySelector('th')) return; tr.hidden = q && !tr.textContent.toLowerCase().includes(q); }); }
+  if (e.target.dataset.wf) { S.wf = S.wf || {}; S.wf[e.target.dataset.wf] = e.target.value; S.page = 0; drawDict(); return; }
   if (e.target.dataset.filter) { S.q = e.target.value; S.page = 0; drawDict(); }
 });
 document.addEventListener('click', e => { if (e.target.id === 'modal') { e.target.hidden = true; S.openId = null; } });
@@ -921,7 +940,7 @@ document.addEventListener('change', e => {
   if (e.target.dataset.tpl && TPL[e.target.value]) { $('#r_pat').value = TPL[e.target.value][0]; $('#r_rep').value = TPL[e.target.value][1]; $('#r_name').value = e.target.selectedOptions[0].textContent; }
 });
 document.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.id === 'p') wrap(A.login)(); });
-const UI_VERSION = '0.18.3';   // keep equal to the version in pom.xml
+const UI_VERSION = '0.19.0';   // keep equal to the version in pom.xml
 api('GET', '/api/version').then(v => {
   $('#ver').textContent = 'v' + v.version + (v.built ? ' · built ' + v.built.replace('T', ' ').replace('Z', ' UTC') : '');
   if (v.version !== UI_VERSION) {
