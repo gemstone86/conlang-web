@@ -106,3 +106,6 @@ Deleting a word also deletes its locked overrides, and Undo does not bring those
 
 ## v0.16.0
 - Dictionary: "Show only words with problems" button (with a count). A word has a problem when: no year is set (0), the form is empty, a sound change fails on it, a form starts before the word itself, or it refers to a word that doesn't exist. Problems are listed in red under the gloss.
+
+## v0.17.0
+- Sound changes: export as JSON and import it again. A rule with its id is adjusted, a rule without an id (or an unknown one) is added, `"delete": true` removes one; "remove rules that are missing from the file" removes the rest in the languages the file covers. The file is checked first (bad regexes, unknown languages, missing rights) and nothing is changed until you press Apply. Goes through the normal edit pipeline (approval and undo).

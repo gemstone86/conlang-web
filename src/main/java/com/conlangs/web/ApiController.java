@@ -36,8 +36,9 @@ public class ApiController {
     private final AppLog applog;
     private final SentenceService sentences;
     private final GraphService graphs;
+    private final RuleTransferService ruleTransfer;
 
-    public ApiController(Db db, Auth auth, Access access, Store store, DictService dict, ExportService export, ImportService imports, GrammarImportService grammarImport, FormGenerator forms, AppLog applog, SentenceService sentences, GraphService graphs) {
+    public ApiController(Db db, Auth auth, Access access, Store store, DictService dict, ExportService export, ImportService imports, GrammarImportService grammarImport, FormGenerator forms, AppLog applog, SentenceService sentences, GraphService graphs, RuleTransferService ruleTransfer) {
         this.db = db;
         this.auth = auth;
         this.access = access;
@@ -50,6 +51,7 @@ public class ApiController {
         this.applog = applog;
         this.sentences = sentences;
         this.graphs = graphs;
+        this.ruleTransfer = ruleTransfer;
     }
 
     private static String str(Map<String, Object> b, String k) {
@@ -603,5 +605,51 @@ public class ApiController {
     public Map<String, Object> divergence(@PathVariable long id, @RequestParam(required = false) Long a, @RequestParam(required = false) Long b,
                                           @RequestParam(required = false) Integer from, @RequestParam(required = false) Integer to, HttpSession s) {
         return graphs.divergence(auth.requireUid(s), id, a, b, from, to);
+    }
+
+    // ---------------- sound changes as JSON ----------------
+
+    @GetMapping("/languages/{id}/rules/export.json")
+    public ResponseEntity<Map<String, Object>> exportRulesJson(@PathVariable long id, @RequestParam(defaultValue = "branches") String scope, HttpSession s) {
+        long uid = auth.requireUid(s);
+        Map<String, Object> l = access.need(uid, id, Access.VIEWER);
+        List<Map<String, Object>> rules = new ArrayList<>();
+        for (Map<String, Object> r : rules(id, scope, s)) {
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("id", r.get("id"));
+            m.put("language", r.get("lang_name"));
+            m.put("year", r.get("year"));
+            m.put("order", r.get("ord"));
+            m.put("name", r.get("name") == null ? "" : r.get("name"));
+            m.put("pattern", r.get("pattern"));
+            m.put("replacement", r.get("replacement") == null ? "" : r.get("replacement"));
+            if (r.get("note") != null && !r.get("note").toString().isEmpty()) m.put("note", r.get("note"));
+            rules.add(m);
+        }
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("format", "root-and-rune sound changes");
+        body.put("help", "Import adjusts rules that have an id, adds rules without an id (or with an unknown id), and removes rules with \"delete\": true. "
+                + "language is a language name in the same world. Fields: year, order, name, pattern, replacement, note.");
+        body.put("rules", rules);
+        String fn = ((String) l.get("name")).replaceAll("[^A-Za-z0-9_-]", "_") + "-sound-changes.json";
+        return ResponseEntity.ok().header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + fn + "\"").contentType(MediaType.APPLICATION_JSON).body(body);
+    }
+
+    @PostMapping("/languages/{id}/rules/import")
+    public Map<String, Object> importRulesJson(@PathVariable long id, @RequestBody Map<String, Object> b, HttpSession s) {
+        long uid = auth.requireUid(s);
+        if (!(b.get("rules") instanceof List<?> raw)) throw new ApiException(400, "The file needs a \"rules\" list.");
+        List<Map<String, Object>> entries = new ArrayList<>();
+        for (Object o : raw) {
+            if (!(o instanceof Map<?, ?> m)) throw new ApiException(400, "Every entry in \"rules\" must be an object.");
+            @SuppressWarnings("unchecked")
+            Map<String, Object> e = (Map<String, Object>) m;
+            entries.add(e);
+        }
+        boolean removeMissing = Boolean.parseBoolean(String.valueOf(b.get("removeMissing")));
+        boolean dry = !Boolean.FALSE.equals(b.get("dryRun"));
+        Map<String, Object> res = ruleTransfer.importRules(uid, id, entries, removeMissing, dry);
+        applog.info("edit", uid, "Sound change import in language #" + id + (dry ? " (check)" : "") + ": +" + res.get("added") + " ~" + res.get("changed") + " -" + res.get("removed") + ", errors " + ((List<?>) res.get("errors")).size());
+        return res;
     }
 }

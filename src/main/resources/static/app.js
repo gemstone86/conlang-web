@@ -162,6 +162,10 @@ const TAB = {
     const targets = [S.lang, ...descendants(S.lang)].filter(l => l.level >= 2);
     const opt = (v, t) => `<option value="${v}" ${scope === v ? 'selected' : ''}>${t}</option>`;
     let h = `<div class="row"><label style="margin:0">Show rules for</label><select data-scope="1">${opt('self', 'this language only')}${opt('branches', 'this language + its branches')}${opt('path', 'full path (ancestors + this language)')}</select></div>`;
+    h += `<div class="card"><div class="row"><a href="/api/languages/${S.lang.id}/rules/export.json?scope=${scope}"><button>Export these sound changes (JSON)</button></a>
+      ${canEdit() ? `<input type="file" id="ri_file" accept=".json,application/json"><label style="display:inline;margin:0"><input type="checkbox" id="ri_rm"> remove rules that are missing from the file</label>
+      <button data-act="ruleImportCheck">Check file</button>` : ''}</div>
+      <div class="muted small">Edit the exported file and import it again: a rule with its id is adjusted, a rule without an id is added, <code>"delete": true</code> removes it. Nothing is changed until you have seen the check and pressed Apply.</div><div id="ri_out"></div></div>`;
     if (targets.length || rules.some(r => r.level >= 2)) h += `<div class="card"><div class="row"><label style="margin:0">Apply to</label>
       <select id="r_lang">${targets.map(l => `<option value="${l.id}">${esc(l.name)}${l.id === S.lang.id ? '' : ' (branch)'}</option>`).join('')}</select>
       <select id="r_tpl" data-tpl="1"><option value="">Template…</option>
@@ -614,6 +618,31 @@ const A = {
     const r = await api('POST', wbase() + '/edit', { entity: 'form', action: 'CREATE', payload: p });
     say(r.status === 'pending' ? 'Submitted for the owner to approve.' : 'Form added.'); await afterWordChange();
   },
+  ruleImportCheck: async () => {
+    const f = $('#ri_file') && $('#ri_file').files[0];
+    if (!f) { say('Choose a JSON file first.', true); return; }
+    let data;
+    try { data = JSON.parse(await f.text()); } catch (e) { say('That file is not valid JSON: ' + e.message, true); return; }
+    const rules = Array.isArray(data) ? data : data.rules;
+    if (!Array.isArray(rules)) { say('The file needs a "rules" list.', true); return; }
+    S.ruleImport = { rules, removeMissing: $('#ri_rm').checked };
+    const res = await api('POST', base() + '/rules/import', { ...S.ruleImport, dryRun: true });
+    const act = { add: 'add', change: 'change', remove: 'remove', same: 'same', skip: 'skip' };
+    let h = `<p><strong>${res.added}</strong> to add, <strong>${res.changed}</strong> to change, <strong>${res.removed}</strong> to remove, ${res.unchanged} unchanged.</p>`;
+    if (res.errors.length) h += '<div class="gap"><strong>Nothing will be imported until these are fixed:</strong><ul>' + res.errors.map(e => `<li>${esc(e)}</li>`).join('') + '</ul></div>';
+    const shown = res.items.filter(i => i.action !== 'same');
+    if (shown.length) h += '<table><tr><th></th><th>Language</th><th>Year</th><th>Pattern</th><th>Replacement</th><th></th></tr>' +
+      shown.map(i => `<tr class="${i.action === 'remove' ? 'pending' : ''}"><td>${act[i.action]}</td><td>${esc(i.language)}</td><td>${i.year ?? ''}</td><td class="form">${esc(i.pattern)}</td><td class="form">${esc(i.replacement)}</td><td class="small muted">${esc(i.detail)}</td></tr>`).join('') + '</table>';
+    if (!res.errors.length && (res.added || res.changed || res.removed)) h += '<div class="row"><button class="primary" data-act="ruleImportApply">Apply these changes</button></div>';
+    $('#ri_out').innerHTML = h;
+  },
+  ruleImportApply: async () => {
+    if (!S.ruleImport) return;
+    const res = await api('POST', base() + '/rules/import', { ...S.ruleImport, dryRun: false });
+    S.ruleImport = null;
+    say('Imported: ' + res.added + ' added, ' + res.changed + ' changed, ' + res.removed + ' removed' + (res.pending ? ' (' + res.pending + ' waiting for the owner to approve)' : '') + '. Undo is available.');
+    renderPanel();
+  },
   toggleProblems: async () => { S.onlyProblems = !S.onlyProblems; S.page = 0; drawDict(); },
   popupEdit: async d => {
     const m = $('#modal'); if (m) m.hidden = true; S.openId = null;
@@ -871,7 +900,7 @@ document.addEventListener('change', e => {
   if (e.target.dataset.tpl && TPL[e.target.value]) { $('#r_pat').value = TPL[e.target.value][0]; $('#r_rep').value = TPL[e.target.value][1]; $('#r_name').value = e.target.selectedOptions[0].textContent; }
 });
 document.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.id === 'p') wrap(A.login)(); });
-const UI_VERSION = '0.16.0';   // keep equal to the version in pom.xml
+const UI_VERSION = '0.17.0';   // keep equal to the version in pom.xml
 api('GET', '/api/version').then(v => {
   $('#ver').textContent = 'v' + v.version + (v.built ? ' · built ' + v.built.replace('T', ' ').replace('Z', ' UTC') : '');
   if (v.version !== UI_VERSION) {

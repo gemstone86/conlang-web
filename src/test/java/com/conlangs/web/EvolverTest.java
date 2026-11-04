@@ -182,4 +182,16 @@ class EvolverTest {
         assertTrue(Math.abs(Distance.normalized("tiat", "tuat") - 0.25) < 1e-9);
         assertEquals(1.0, Distance.normalized("ab", ""));
     }
+
+    @Test
+    void ruleDiffFindsOnlyRealChanges() {
+        Map<String, Object> stored = new java.util.HashMap<>(Map.of("year", -500, "ord", 1, "name", "", "pattern", "air", "replacement", "ar"));
+        Map<String, Object> same = new java.util.HashMap<>(Map.of("year", -500L, "order", 1, "pattern", "air", "replacement", "ar", "name", ""));
+        assertTrue(RuleDiff.changed(stored, same).isEmpty());
+        Map<String, Object> edit = new java.util.HashMap<>(Map.of("year", -750, "replacement", "a"));
+        Map<String, Object> ch = RuleDiff.changed(stored, edit);
+        assertEquals(2, ch.size());
+        assertEquals(-750L, ch.get("year"));
+        assertEquals("a", ch.get("replacement"));
+    }
 }
