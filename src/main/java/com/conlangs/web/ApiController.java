@@ -653,6 +653,11 @@ public class ApiController {
         return res;
     }
 
+    @GetMapping("/languages/{id}/tree-check")
+    public Map<String, Object> treeCheck(@PathVariable long id, HttpSession s) {
+        return dict.treeCheck(auth.requireUid(s), id);
+    }
+
     @GetMapping("/languages/{id}/mergers")
     public List<Map<String, Object>> mergers(@PathVariable long id, HttpSession s) {
         return graphs.mergers(auth.requireUid(s), id);

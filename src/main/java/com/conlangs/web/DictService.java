@@ -399,6 +399,29 @@ public class DictService {
         return Map.of("wordsAffected", affected, "changes", changes);
     }
 
+    /** Which languages this one inherits from, and whatever stops their words from reaching it. */
+    public Map<String, Object> treeCheck(long uid, long langId) {
+        Map<String, Object> lang = access.need(uid, langId, Access.VIEWER);
+        long worldId = Db.num(lang.get("world_id"));
+        List<TreeCheck.Node> nodes = new ArrayList<>();
+        Map<Long, String> names = new HashMap<>();
+        for (Map<String, Object> l : db.rows("select id, name, parent_id, split_year from languages where world_id=?", worldId)) {
+            nodes.add(new TreeCheck.Node(Db.num(l.get("id")), (String) l.get("name"),
+                    l.get("parent_id") == null ? null : Db.num(l.get("parent_id")),
+                    l.get("split_year") == null ? null : ((Number) l.get("split_year")).intValue()));
+            names.put(Db.num(l.get("id")), (String) l.get("name"));
+        }
+        TreeCheck.Result r = TreeCheck.check(langId, nodes);
+        List<String> problems = new ArrayList<>(r.problems());
+        for (long anc : access.ancestors(langId)) {
+            if (access.level(uid, anc) < Access.VIEWER) problems.add("You don't have access to " + names.get(anc) + ", so its words are not shown here.");
+        }
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("lineage", r.lineage());
+        out.put("problems", problems);
+        return out;
+    }
+
     /** Joins components and runs automatic erosion, returning each intermediate form. */
     public Map<String, Object> compound(long uid, long langId, List<Object> parts) {
         Map<String, Object> lang = access.need(uid, langId, Access.EDITOR);

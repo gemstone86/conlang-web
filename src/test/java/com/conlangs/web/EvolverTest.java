@@ -211,4 +211,25 @@ class EvolverTest {
         assertEquals(4, r.get(1)[0]);
         assertEquals(0, r.get(1)[1]);
     }
+
+    @Test
+    void treeCheckFindsSplitsThatCutOffInheritance() {
+        List<TreeCheck.Node> ok = List.of(new TreeCheck.Node(1, "Elven", null, null), new TreeCheck.Node(2, "High", 1L, -2000),
+                new TreeCheck.Node(3, "Drow", 2L, -2000), new TreeCheck.Node(4, "Orc", 3L, -1800));
+        TreeCheck.Result r = TreeCheck.check(4, ok);
+        assertEquals(List.of("Orc", "Drow", "High", "Elven"), r.lineage());
+        assertTrue(r.problems().isEmpty());
+
+        List<TreeCheck.Node> late = List.of(new TreeCheck.Node(1, "Elven", null, null), new TreeCheck.Node(2, "High", 1L, -2000),
+                new TreeCheck.Node(3, "Drow", 2L, -1500), new TreeCheck.Node(4, "Orc", 3L, -1800));
+        r = TreeCheck.check(4, late);
+        assertEquals(1, r.problems().size());
+        assertTrue(r.problems().get(0).contains("Orc splits from Drow at -1800"));
+
+        List<TreeCheck.Node> none = List.of(new TreeCheck.Node(1, "Elven", null, null), new TreeCheck.Node(2, "High", 1L, null),
+                new TreeCheck.Node(3, "Drow", 2L, -2000), new TreeCheck.Node(4, "Orc", 3L, -1800));
+        r = TreeCheck.check(4, none);
+        assertEquals(1, r.problems().size());
+        assertTrue(r.problems().get(0).startsWith("High has no split year"));
+    }
 }

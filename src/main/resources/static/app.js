@@ -140,6 +140,8 @@ const TAB = {
   async dict() {
     S.words = await api('GET', base() + '/words');
     S.page = 0;
+    let tree = { lineage: [], problems: [] };
+    try { tree = await api('GET', base() + '/tree-check'); } catch (e) { /* the note is optional */ }
     let h = '';
     if (canEdit()) h += `<div class="card"><div class="row">
       <input id="w_gloss" placeholder="gloss" size="14"><input id="w_pos" placeholder="type" size="8"><input id="w_build" placeholder="build" size="8">
@@ -147,6 +149,11 @@ const TAB = {
       <input id="w_notes" placeholder="notes" size="20"><input id="w_id" type="hidden">
       <button class="primary" data-act="saveWord" id="w_btn">Add word</button></div>
       <div class="muted small">New words get their forms automatically from the rules on the Word forms tab. Click a word to see and edit all its forms.</div></div>`;
+    const fromWhere = {};
+    S.words.filter(w => w.inherited).forEach(w => { fromWhere[w.origin_lang] = (fromWhere[w.origin_lang] || 0) + 1; });
+    const anc = tree.lineage.slice(1);
+    if (anc.length) h += `<p class="small muted">Inherits words from ${anc.map(n => `<strong>${esc(n)}</strong> (${fromWhere[n] || 0})`).join(' ← ')}. A word is inherited only if it had been coined when the language split off.</p>`;
+    h += tree.problems.map(p => `<p class="small gap">⚠ ${esc(p)}</p>`).join('');
     h += `<div class="row"><input id="q" placeholder="Search (word, form, id)…" data-filter="1" value="${esc(S.q)}">
       <button data-act="toggleProblems" id="probbtn"></button>
       <label style="display:inline;margin:0"><input type="checkbox" data-inh="1" ${S.showInherited === false ? '' : 'checked'}> Show inherited words</label>
@@ -940,7 +947,7 @@ document.addEventListener('change', e => {
   if (e.target.dataset.tpl && TPL[e.target.value]) { $('#r_pat').value = TPL[e.target.value][0]; $('#r_rep').value = TPL[e.target.value][1]; $('#r_name').value = e.target.selectedOptions[0].textContent; }
 });
 document.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.id === 'p') wrap(A.login)(); });
-const UI_VERSION = '0.19.0';   // keep equal to the version in pom.xml
+const UI_VERSION = '0.20.0';   // keep equal to the version in pom.xml
 api('GET', '/api/version').then(v => {
   $('#ver').textContent = 'v' + v.version + (v.built ? ' · built ' + v.built.replace('T', ' ').replace('Z', ' UTC') : '');
   if (v.version !== UI_VERSION) {
