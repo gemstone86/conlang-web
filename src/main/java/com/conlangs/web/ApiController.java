@@ -447,7 +447,9 @@ public class ApiController {
     public Map<String, Object> edit(@PathVariable long id, @RequestBody Map<String, Object> b, HttpSession s) {
         @SuppressWarnings("unchecked")
         Map<String, Object> payload = b.get("payload") instanceof Map<?, ?> m ? (Map<String, Object>) m : Map.of();
-        return store.submit(auth.requireUid(s), id, str(b, "entity"), str(b, "action"), lng(b, "entityId"), payload);
+        long uidE = auth.requireUid(s);
+        if ("word".equals(str(b, "entity")) && !"DELETE".equals(str(b, "action"))) payload = dict.resolveLoan(uidE, id, payload);
+        return store.submit(uidE, id, str(b, "entity"), str(b, "action"), lng(b, "entityId"), payload);
     }
 
     @GetMapping("/languages/{id}/formrules")
@@ -489,8 +491,20 @@ public class ApiController {
     public Map<String, Object> bulk(@PathVariable long id, @RequestBody Map<String, Object> b, HttpSession s) {
         long uidB = auth.requireUid(s);
         boolean dry = Boolean.parseBoolean(String.valueOf(b.get("dryRun")));
-        Map<String, Object> res = dict.bulk(uidB, id, str(b, "text"), dry);
+        boolean skip = Boolean.parseBoolean(String.valueOf(b.get("skipExisting")));
+        Map<String, Object> res = dict.bulk(uidB, id, str(b, "text"), dry, skip);
         applog.info("edit", uidB, "Bulk entry in language #" + id + ": " + res.get("count") + " words" + (dry ? " (check only)" : ""));
+        return res;
+    }
+
+    @PostMapping("/languages/{id}/phonemes/import")
+    public Map<String, Object> importSounds(@PathVariable long id, @RequestBody Map<String, Object> b, HttpSession s) {
+        long uidP = auth.requireUid(s);
+        boolean dry = Boolean.parseBoolean(String.valueOf(b.get("dryRun")));
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> list = b.get("sounds") instanceof List<?> l ? (List<Map<String, Object>>) l : null;
+        Map<String, Object> res = dict.importSounds(uidP, id, str(b, "text"), list, dry);
+        applog.info("edit", uidP, "Sound import in language #" + id + (dry ? " (check only)" : "") + ": added=" + res.get("added") + ", changed=" + res.get("changed"));
         return res;
     }
 

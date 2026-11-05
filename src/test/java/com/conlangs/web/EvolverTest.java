@@ -232,4 +232,30 @@ class EvolverTest {
         assertEquals(1, r.problems().size());
         assertTrue(r.problems().get(0).startsWith("High has no split year"));
     }
+
+    @Test
+    void soundImportReadsPipeTabAndSemicolonTables() {
+        List<String> errors = new java.util.ArrayList<>();
+        String text = "| Symbol | Kind | Row | Column | Notes | From | Until |\n|---|---|---|---|---|---|---|\n"
+                + "| p | consonant | stop | lips | | | |\n"
+                + "x\tc\tfricative\tvelar\tharsh\t-1800\t500\n"
+                + "a;vowel;open;front;;;\n";
+        List<Map<String, Object>> out = SoundImport.parse(text, errors);
+        assertTrue(errors.isEmpty());
+        assertEquals(3, out.size());
+        assertEquals("p", out.get(0).get("symbol"));
+        assertEquals("stop", out.get(0).get("row_label"));
+        assertEquals("consonant", out.get(1).get("kind"));
+        assertEquals(Long.valueOf(-1800), out.get(1).get("year"));
+        assertEquals(Long.valueOf(500), out.get(1).get("year_to"));
+        assertEquals("vowel", out.get(2).get("kind"));
+    }
+
+    @Test
+    void soundImportReportsBadYears() {
+        List<String> errors = new java.util.ArrayList<>();
+        List<Map<String, Object>> out = SoundImport.parse("k;consonant;stop;velar;;abc;", errors);
+        assertEquals(0, out.size());
+        assertEquals(1, errors.size());
+    }
 }

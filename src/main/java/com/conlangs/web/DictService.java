@@ -296,6 +296,11 @@ public class DictService {
                 pl.add("refers to a word that doesn't exist: " + m.get("ref_text"));
             }
         }
+        for (Map<String, Object> m : out) {
+            if (m.get("loan_word_id") == null) continue;
+            Map<String, Object> lw = db.one("select w.gloss, w.language_id, l.name as lname from words w join languages l on l.id=w.language_id where w.id=?", Db.num(m.get("loan_word_id")));
+            m.put("loan_from", lw == null ? "a word that no longer exists" : lw.get("lname") + ": " + lw.get("gloss"));
+        }
         out.sort(Comparator.comparing((Map<String, Object> m) -> ((String) m.get("gloss")).toLowerCase())
                 .thenComparingInt(m -> ((Number) m.get("year")).intValue())
                 .thenComparingLong(m -> Db.num(m.get("id"))));
@@ -324,6 +329,10 @@ public class DictService {
         }
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("word", w);
+        if (w.get("loan_word_id") != null) {
+            Map<String, Object> lw = db.one("select w.gloss, l.name as lname from words w join languages l on l.id=w.language_id where w.id=?", Db.num(w.get("loan_word_id")));
+            out.put("loan_from", lw == null ? "a word that no longer exists" : lw.get("lname") + ": " + lw.get("gloss"));
+        }
         if (target != null) out.put("ref", Map.of("id", target.get("id"), "gloss", target.get("gloss"), "form", target.get("form")));
         out.put("history", historyMaps(rows));
         out.put("forms", forms);
@@ -451,10 +460,147 @@ public class DictService {
     }
 
     /** Bulk entry: lines of gloss;pos;form;year;notes (tab or semicolon separated). All-or-nothing. */
+    /**
+     * A borrowed word takes the form the source word had in the source language in the year of borrowing. The result is
+     * stored as an ordinary form (the borrowing language's own sound changes then apply from that year), with loan_word_id
+     * remembering where it came from. Without loan_word_id the payload is returned unchanged.
+     */
+    public Map<String, Object> resolveLoan(long uid, long langId, Map<String, Object> payload) {
+        if (!payload.containsKey("loan_word_id")) return payload;
+        Map<String, Object> out = new LinkedHashMap<>(payload);
+        Object lw = payload.get("loan_word_id");
+        if (lw == null || lw.toString().isBlank()) { out.put("loan_word_id", null); return out; }
+        Map<String, Object> lang = access.need(uid, langId, Access.EDITOR);
+        long worldId = Db.num(lang.get("world_id"));
+        long srcId;
+        try { srcId = Long.parseLong(lw.toString().trim()); } catch (NumberFormatException e) { throw new ApiException(400, "Pick the word to borrow."); }
+        Map<String, Object> sw = db.one("select * from words where id=?", srcId);
+        if (sw == null) throw new ApiException(404, "The word to borrow doesn't exist.");
+        long srcLang = Db.num(sw.get("language_id"));
+        Map<String, Object> sl = access.need(uid, srcLang, Access.VIEWER);
+        if (Db.num(sl.get("world_id")) != worldId) throw new ApiException(400, "A word can only be borrowed from a language in the same world.");
+        if (srcLang == langId) throw new ApiException(400, "Pick a word from another language.");
+        Object y = payload.get("year");
+        if (y == null || y.toString().isBlank()) throw new ApiException(400, "Give the year of borrowing.");
+        int year;
+        try { year = (int) Math.round(Double.parseDouble(y.toString().trim())); } catch (NumberFormatException e) { throw new ApiException(400, "The year must be a number."); }
+        Map<String, Object> base = sw;
+        Map<String, Object> target = refTarget((String) sw.get("form"), srcLang);
+        if (target != null) base = target;
+        long baseLang = Db.num(base.get("language_id"));
+        int start = ((Number) base.get("year")).intValue();
+        if (year < start) throw new ApiException(400, "\"" + sw.get("gloss") + "\" doesn't exist in " + sl.get("name") + " until " + start + ", so it can't be borrowed in " + year + ".");
+        Evolver ev = evolverFor(worldId, null);
+        List<Evolver.Row> rows = ev.evolve(baseLang, (String) base.get("form"), start, overridesOf(Db.num(base.get("id"))));
+        List<Long> path = new ArrayList<>();
+        path.add(srcLang);
+        path.addAll(access.ancestors(srcLang));
+        String form = FormMath.formAt(rows, path, year);
+        if (form == null || form.isBlank()) throw new ApiException(400, "That word has no form in " + sl.get("name") + " in " + year + ".");
+        out.put("loan_word_id", srcId);
+        out.put("form", form);
+        if (out.get("ref_word_id") != null) out.put("ref_word_id", null);
+        if (out.get("build") == null || out.get("build").toString().isBlank()) out.put("build", "loan");
+        return out;
+    }
+
+    /** Import sounds from a pasted table (text) or a ready list of maps (sounds); adds new ones, updates ones with the same symbol, kind and years. */
+    public Map<String, Object> importSounds(long uid, long langId, String text, List<Map<String, Object>> sounds, boolean dryRun) {
+        access.need(uid, langId, Access.EDITOR);
+        List<String> errors = new ArrayList<>();
+        List<Map<String, Object>> in = new ArrayList<>();
+        if (sounds != null) {
+            for (Map<String, Object> s : sounds) {
+                Map<String, Object> m = new LinkedHashMap<>();
+                m.put("symbol", String.valueOf(s.getOrDefault("symbol", "")).strip());
+                m.put("kind", String.valueOf(s.getOrDefault("kind", "")).strip().toLowerCase());
+                Object row = s.get("row_label") != null ? s.get("row_label") : s.get("row");
+                Object col = s.get("col_label") != null ? s.get("col_label") : s.get("column") != null ? s.get("column") : s.get("col");
+                m.put("row_label", row == null ? "" : row.toString());
+                m.put("col_label", col == null ? "" : col.toString());
+                m.put("notes", s.get("notes") == null ? "" : s.get("notes").toString());
+                Object from = s.get("year") != null ? s.get("year") : s.get("from");
+                Object until = s.get("year_to") != null ? s.get("year_to") : s.get("until");
+                if (from != null && !from.toString().isBlank()) m.put("year", from);
+                if (until != null && !until.toString().isBlank()) m.put("year_to", until);
+                in.add(m);
+            }
+        } else in = SoundImport.parse(text, errors);
+        List<Map<String, Object>> have = db.rows("select * from phonemes where language_id=?", langId);
+        List<Map<String, Object>> items = new ArrayList<>();
+        List<Object[]> ops = new ArrayList<>();
+        Set<String> seen = new HashSet<>();
+        int added = 0, changed = 0, same = 0, line = 0;
+        for (Map<String, Object> m : in) {
+            line++;
+            String sym = (String) m.get("symbol"), kind = (String) m.get("kind");
+            Object y = m.get("year"), yt = m.get("year_to");
+            String key = sym + "|" + kind + "|" + (y == null ? "" : y.toString()) + "|" + (yt == null ? "" : yt.toString());
+            if (!seen.add(key)) { errors.add("Sound " + line + " (" + sym + "): listed twice."); continue; }
+            Map<String, Object> match = null;
+            for (Map<String, Object> h : have) {
+                if (sym.equals(h.get("symbol")) && kind.equals(String.valueOf(h.get("kind")))
+                        && String.valueOf(y == null ? "" : y).equals(String.valueOf(h.get("year") == null ? "" : h.get("year")))
+                        && String.valueOf(yt == null ? "" : yt).equals(String.valueOf(h.get("year_to") == null ? "" : h.get("year_to")))) { match = h; break; }
+            }
+            Map<String, Object> item = new LinkedHashMap<>();
+            item.put("symbol", sym); item.put("kind", kind); item.put("row", m.get("row_label")); item.put("col", m.get("col_label"));
+            item.put("year", y); item.put("year_to", yt);
+            try {
+                if (match == null) {
+                    store.validate(langId, "phoneme", "CREATE", null, m);
+                    item.put("action", "add"); added++;
+                    ops.add(new Object[]{"CREATE", null, m});
+                } else {
+                    boolean eq = String.valueOf(m.get("row_label")).equals(String.valueOf(match.get("row_label") == null ? "" : match.get("row_label")))
+                            && String.valueOf(m.get("col_label")).equals(String.valueOf(match.get("col_label") == null ? "" : match.get("col_label")))
+                            && String.valueOf(m.get("notes")).equals(String.valueOf(match.get("notes") == null ? "" : match.get("notes")));
+                    if (eq) { item.put("action", "same"); same++; }
+                    else {
+                        store.validate(langId, "phoneme", "UPDATE", Db.num(match.get("id")), m);
+                        item.put("action", "change"); changed++;
+                        ops.add(new Object[]{"UPDATE", Db.num(match.get("id")), m});
+                    }
+                }
+            } catch (ApiException e) {
+                errors.add("Sound " + line + " (" + sym + "): " + e.getMessage());
+                item.put("action", "error");
+            }
+            items.add(item);
+        }
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("added", added); out.put("changed", changed); out.put("unchanged", same);
+        out.put("items", items); out.put("errors", errors); out.put("applied", false);
+        if (!errors.isEmpty() || dryRun) return out;
+        for (Object[] op : ops) store.submit(uid, langId, "phoneme", (String) op[0], (Long) op[1], castMap(op[2]));
+        out.put("applied", true);
+        return out;
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Map<String, Object> castMap(Object o) { return (Map<String, Object>) o; }
+
+    /** True when the language already has a word with this gloss (a comma-separated gloss counts as several senses). */
+    private static boolean glossKnown(String gloss, Set<String> have) {
+        for (String g : gloss.split(",")) if (have.contains(g.trim().toLowerCase())) return true;
+        return false;
+    }
+
     public Map<String, Object> bulk(long uid, long langId, String text, boolean dryRun) {
+        return bulk(uid, langId, text, dryRun, false);
+    }
+
+    public Map<String, Object> bulk(long uid, long langId, String text, boolean dryRun, boolean skipExisting) {
         access.need(uid, langId, Access.EDITOR);
         List<Map<String, Object>> parsed = new ArrayList<>();
         List<String> errors = new ArrayList<>();
+        List<String> skipped = new ArrayList<>();
+        Set<String> have = new HashSet<>();
+        if (skipExisting) {
+            for (Map<String, Object> r : db.rows("select gloss from words where language_id=?", langId)) {
+                for (String g : ((String) r.get("gloss")).split(",")) have.add(g.trim().toLowerCase());
+            }
+        }
         int n = 0;
         for (String line : (text == null ? "" : text).split("\\R")) {
             n++;
@@ -463,6 +609,8 @@ public class DictService {
             if (n == 1 && f[0].trim().equalsIgnoreCase("gloss")) continue;
             Map<String, Object> p = new LinkedHashMap<>();
             p.put("gloss", f[0].trim());
+            if (skipExisting && glossKnown(f[0].trim(), have)) { skipped.add(f[0].trim()); continue; }
+            if (skipExisting) for (String g : f[0].split(",")) have.add(g.trim().toLowerCase());
             if (f.length > 1) p.put("pos", f[1].trim());
             if (f.length > 2) p.put("form", f[2].trim());
             if (f.length > 3 && !f[3].isBlank()) p.put("year", f[3].trim());
@@ -477,6 +625,6 @@ public class DictService {
         if (!dryRun) {
             for (Map<String, Object> p : parsed) store.submit(uid, langId, "word", "CREATE", null, p);
         }
-        return Map.of("count", parsed.size(), "dryRun", dryRun);
+        return Map.of("count", parsed.size(), "dryRun", dryRun, "skipped", skipped);
     }
 }

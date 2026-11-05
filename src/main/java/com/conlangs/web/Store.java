@@ -19,7 +19,7 @@ public class Store {
     private static final Map<String, String> TABLE = Map.of("word", "words", "rule", "rules", "override", "word_overrides", "form", "word_forms",
             "gsection", "grammar_sections", "grammar", "grammar_entries", "phoneme", "phonemes", "formrule", "form_rules", "meaning", "word_meanings");
     private static final Map<String, List<String>> FIELDS = Map.of(
-            "word", List.of("gloss", "pos", "build", "form", "year", "notes", "ref_word_id"),
+            "word", List.of("gloss", "pos", "build", "form", "year", "notes", "ref_word_id", "loan_word_id"),
             "rule", List.of("year", "ord", "name", "pattern", "replacement", "note"),
             "override", List.of("word_id", "lang_id", "year", "form"),
             "form", List.of("word_id", "label", "form", "year"),
@@ -29,7 +29,7 @@ public class Store {
             "formrule", List.of("grp", "label", "pos", "placement", "affix", "affix_word_id", "cond_re", "hiatus", "year", "ord"),
             "meaning", List.of("word_id", "lang_id", "year", "mode", "meaning"));
     private static final Set<String> LANG_OWNED = Set.of("word", "rule", "gsection", "grammar", "phoneme", "formrule");
-    private static final Set<String> INTS = Set.of("year", "ord", "word_id", "lang_id", "year_to", "hiatus", "affix_word_id", "ref_word_id");
+    private static final Set<String> INTS = Set.of("year", "ord", "word_id", "lang_id", "year_to", "hiatus", "affix_word_id", "ref_word_id", "loan_word_id");
     private static final TypeReference<Map<String, Object>> MAP = new TypeReference<>() {};
 
     private final Db db;
@@ -120,6 +120,14 @@ public class Store {
                 Map<String, Object> cw = entityId == null ? null : db.one("select form from words where id=?", entityId);
                 if (cw != null && Refs.parse((String) cw.get("form")) != null) throw new ApiException(400, "Give the word its own form when it stops being a reference.");
             }
+        }
+        if (entity.equals("word") && clean.get("loan_word_id") != null && !action.equals("DELETE")) {
+            long lid = ((Number) clean.get("loan_word_id")).longValue();
+            Map<String, Object> lw = db.one("select w.id, l.world_id from words w join languages l on l.id=w.language_id where w.id=?", lid);
+            Map<String, Object> me = db.one("select world_id from languages where id=?", langId);
+            if (lw == null) throw new ApiException(404, "The word to borrow doesn't exist.");
+            if (me == null || Db.num(lw.get("world_id")) != Db.num(me.get("world_id"))) throw new ApiException(400, "A word can only be borrowed from a language in the same world.");
+            if (entityId != null && lid == entityId) throw new ApiException(400, "A word can't be borrowed from itself.");
         }
         if (!action.equals("CREATE")) {
             if (entityId == null) throw new ApiException(400, "entityId is required.");

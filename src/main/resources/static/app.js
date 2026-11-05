@@ -145,7 +145,9 @@ const TAB = {
     let h = '';
     if (canEdit()) h += `<div class="card"><div class="row">
       <input id="w_gloss" placeholder="gloss" size="14"><input id="w_pos" placeholder="type" size="8"><input id="w_build" placeholder="build" size="8">
-      <input id="w_form" placeholder="form" size="14" class="form"><input id="w_ref" list="w_refs" placeholder="refers to which word?" size="22" hidden><datalist id="w_refs">${S.words.filter(x => !x.ref_to).map(x => `<option value="${esc(x.gloss)} #${x.id}">${esc(x.form)}</option>`).join('')}</datalist><label style="display:inline;margin:0" title="The word has no form of its own: it shows the forms of another word"><input type="checkbox" id="w_isref" data-isref="1"> reference to another word</label><input id="w_year" placeholder="year" size="6" type="number">
+      <input id="w_form" placeholder="form" size="14" class="form"><input id="w_ref" list="w_refs" placeholder="refers to which word?" size="22" hidden><datalist id="w_refs">${S.words.filter(x => !x.ref_to).map(x => `<option value="${esc(x.gloss)} #${x.id}">${esc(x.form)}</option>`).join('')}</datalist><label style="display:inline;margin:0" title="The word has no form of its own: it shows the forms of another word"><input type="checkbox" id="w_isref" data-isref="1"> reference to another word</label>
+      <label style="display:inline;margin:0" title="Take the word from another language, as it sounded there in the year you give"><input type="checkbox" id="w_isloan" data-isloan="1"> borrow</label>
+      <select id="w_loanlang" data-loanlang="1" hidden><option value="">from which language?</option>${loanLangs().map(l => `<option value="${l.id}">${esc(l.name)}</option>`).join('')}</select><input id="w_loanword" list="w_loanwords" placeholder="which word?" size="22" hidden><datalist id="w_loanwords"></datalist><input id="w_year" placeholder="year" size="6" type="number">
       <input id="w_notes" placeholder="notes" size="20"><input id="w_id" type="hidden">
       <button class="primary" data-act="saveWord" id="w_btn">Add word</button></div>
       <div class="muted small">New words get their forms automatically from the rules on the Word forms tab. Click a word to see and edit all its forms.</div></div>`;
@@ -264,6 +266,8 @@ const TAB = {
       <input id="ph_col" list="ph_cols" placeholder="column (place / backness)" size="22"><datalist id="ph_cols">${[...new Set(ph.map(p => p.col_label).filter(Boolean))].map(x => `<option>${esc(x)}</option>`).join('')}</datalist>
       <input id="ph_notes" placeholder="notes" size="18"><input id="ph_from" type="number" placeholder="from year" size="8"><input id="ph_to" type="number" placeholder="until year" size="8"><input id="ph_id" type="hidden"></div>
       <div class="row"><button class="primary" data-act="savePhoneme" id="ph_btn">Add sound</button><button data-act="cancelPhoneme" id="ph_cancel" hidden>Cancel edit</button></div></div>`;
+    if (canEdit()) h += `<h3>Import sounds</h3><div class="card"><p class="muted small">Paste a table with one sound per line: <code>Symbol | Kind | Row | Column | Notes | From | Until</code> (tab, | or ; between cells; the last three are optional), or choose a JSON file with a "sounds" list. Sounds with the same symbol, kind and years are updated.</p>
+      <textarea id="si_text" rows="6" class="form"></textarea><div class="row"><input type="file" id="si_file" accept=".json,.txt,.csv,.tsv"><button data-act="soundImportCheck">Check</button></div><div id="si_out"></div></div>`;
     h += '<h3>All sounds</h3><table><tr><th>Symbol</th><th>Kind</th><th>Row</th><th>Column</th><th>Notes</th><th>From</th><th>Until</th><th></th></tr>' + ph.map(p =>
       `<tr><td class="form">${esc(p.symbol)}</td><td>${esc(p.kind)}</td><td>${esc(p.row_label)}</td><td>${esc(p.col_label)}</td><td>${esc(p.notes)}</td><td>${p.year ?? ''}</td><td>${p.year_to ?? ''}</td>
       <td>${canEdit() ? `<button data-act="editPhoneme" data-id="${p.id}">Edit</button> <button class="danger" data-act="delPhoneme" data-id="${p.id}">✕</button>` : ''}</td></tr>`).join('') + '</table>';
@@ -310,7 +314,7 @@ const TAB = {
   async bulk() {
     if (!canEdit()) return '<p class="muted">Editors only.</p>';
     return `<p class="muted small">One word per line: <code>gloss;type;form;year;notes</code> (tab-separated also works). Nothing is added if any line has an error.</p>
-    <textarea id="b_text" rows="12"></textarea><div class="row"><button data-act="bulkCheck">Check only</button><button class="primary" data-act="bulkGo">Add all</button></div>`;
+    <textarea id="b_text" rows="12"></textarea><div class="row"><label style="display:inline;margin:0"><input type="checkbox" id="b_skip"> skip words that already exist here (same gloss)</label></div><div class="row"><button data-act="bulkCheck">Check only</button><button class="primary" data-act="bulkGo">Add all</button></div><div id="b_out"></div>`;
   },
   async changes() {
     const cs = await api('GET', base() + '/changes');
@@ -465,7 +469,7 @@ function wordRow(w) {
   const inh = w.inherited ? ` <span class="badge" title="Coined in ${esc(w.origin_lang)} as ${esc(w.origin_form)}">from ${esc(w.origin_lang)}</span>` : '';
   const act = w.inherited ? `<button data-act="goOrigin" data-id="${w.id}" data-lang="${w.origin_lang_id}">Open in ${esc(w.origin_lang)}</button>`
     : (canEdit() ? `<button data-act="editWord" data-id="${w.id}">Edit</button> <button class="danger" data-act="delWord" data-id="${w.id}">✕</button>` : '');
-  return `<tr class="${w.inherited ? 'inherited' : ''}"><td class="muted small">${w.id}</td><td><a data-act="openWord" data-id="${w.id}" style="cursor:pointer"><strong>${esc(w.gloss)}</strong></a>${inh}${w.meaning_changed ? `<div class="small muted">means: ${esc(w.meaning)}</div>` : ''}${w.ref_to ? `<div class="small muted">→ same as <strong>${esc(w.ref_gloss)}</strong> (#${w.ref_to})</div>` : ''}${(w.problems || []).map(p => `<div class="small gap">⚠ ${esc(p)}</div>`).join('')}</td><td>${esc(w.pos)}</td><td>${esc(w.build)}</td><td>${w.year}</td>
+  return `<tr class="${w.inherited ? 'inherited' : ''}"><td class="muted small">${w.id}</td><td><a data-act="openWord" data-id="${w.id}" style="cursor:pointer"><strong>${esc(w.gloss)}</strong></a>${inh}${w.meaning_changed ? `<div class="small muted">means: ${esc(w.meaning)}</div>` : ''}${w.loan_from ? `<div class="small muted">borrowed from <strong>${esc(w.loan_from)}</strong></div>` : ''}${w.ref_to ? `<div class="small muted">→ same as <strong>${esc(w.ref_gloss)}</strong> (#${w.ref_to})</div>` : ''}${(w.problems || []).map(p => `<div class="small gap">⚠ ${esc(p)}</div>`).join('')}</td><td>${esc(w.pos)}</td><td>${esc(w.build)}</td><td>${w.year}</td>
     <td class="form">${esc(w.form)}</td><td>${d ? lines(d.latest) : '<span class="muted">—</span>'}${more ? ` <span class="badge">+${more}</span>` : ''}</td>
     <td>${w.length}</td><td>${esc(w.pronunciation)}</td><td>${esc((w.exists_in || []).join(', '))}</td>
     <td>${lines(w.latest)}${w.has_overrides ? ' <span class="badge">locked</span>' : ''}</td>
@@ -501,7 +505,7 @@ async function showWord() {
   const ce = w.language_id === (S.lang && S.lang.id) ? canEdit() : !!(ownLang && ownLang.level >= 2);
   const langs = [...new Map(r.history.map(x => [x.lang_id, x.lang])).entries()];
   let h = `<button class="modalx" data-act="closeModal">✕</button><h2>${esc(w.gloss)} <span class="badge">#${w.id}</span> <span class="badge">${esc(w.pos)}</span> <span class="badge">${esc(w.build)}</span></h2>
-    <p class="muted small">${S.lang && w.language_id !== S.lang.id ? 'Coined in another language; ' + esc(S.lang.name) + "'s own version is shown in the branch table below. " : ''}Coined ${w.year}${w.notes ? ' · ' + esc(w.notes) : ''}</p>
+    <p class="muted small">${S.lang && w.language_id !== S.lang.id ? 'Coined in another language; ' + esc(S.lang.name) + "'s own version is shown in the branch table below. " : ''}Coined ${w.year}${r.loan_from ? ' · borrowed from <strong>' + esc(r.loan_from) + '</strong>' : ''}${w.notes ? ' · ' + esc(w.notes) : ''}</p>
     <h3>Forms</h3><table><tr><th>Type</th><th>Entered</th><th>Latest per branch</th><th></th></tr>
     <tr><td>word</td><td class="form">${r.ref ? `reference to <strong>${esc(r.ref.gloss)}</strong> <span class="muted small">(#${r.ref.id}, ${w.year})</span>` : ''}${r.ref ? '' : ce ? `<a data-act="editWordForm" data-id="${w.id}" data-form="${esc(w.form)}" style="cursor:pointer" title="Click to edit">${esc(w.form)}</a>` : esc(w.form)}${r.ref ? '' : ` <span class="muted small">(${w.year})</span>`}</td><td>${lines(lastPerLang(r.history))}</td>
     <td>${ce ? (r.ref ? `<button data-act="popupEdit" data-id="${w.id}">Edit</button>` : `<button data-act="editWordForm" data-id="${w.id}" data-form="${esc(w.form)}">Edit</button>`) : ''}</td></tr>`;
@@ -551,10 +555,32 @@ async function showSentence() {
   if (!m) { m = document.createElement('div'); m.id = 'modal'; m.className = 'modal'; document.body.appendChild(m); }
   m.innerHTML = '<div class="modalbox">' + h + '</div>'; m.hidden = false;
 }
+function loanLangs() {
+  const w = (S.worlds || []).find(x => (x.languages || []).some(l => S.lang && l.id === S.lang.id));
+  return w ? w.languages.filter(l => l.id !== S.lang.id) : [];
+}
+function syncLoanBox() {
+  const on = $('#w_isloan') && $('#w_isloan').checked;
+  if ($('#w_loanlang')) $('#w_loanlang').hidden = !on;
+  if ($('#w_loanword')) $('#w_loanword').hidden = !on;
+  if (on && $('#w_isref') && $('#w_isref').checked) { $('#w_isref').checked = false; syncRefBox(); }
+  if ($('#w_form') && on) $('#w_form').hidden = true; else if ($('#w_form') && !($('#w_isref') && $('#w_isref').checked)) $('#w_form').hidden = false;
+}
+async function fillLoanWords() {
+  const id = val('w_loanlang'), dl = $('#w_loanwords');
+  if (!dl) return;
+  $('#w_loanword').value = '';
+  if (!id) { dl.innerHTML = ''; return; }
+  try {
+    const ws = await api('GET', '/api/languages/' + id + '/words');
+    dl.innerHTML = ws.map(x => `<option value="${esc(x.gloss)} #${x.id}">${esc(x.form)}</option>`).join('');
+  } catch (e) { say(e.message, true); }
+}
 function syncRefBox() {
   const on = $('#w_isref') && $('#w_isref').checked;
   if ($('#w_ref')) $('#w_ref').hidden = !on;
   if ($('#w_form')) $('#w_form').hidden = !!on;
+  if (on && $('#w_isloan') && $('#w_isloan').checked) { $('#w_isloan').checked = false; syncLoanBox(); $('#w_form').hidden = true; }
 }
 async function rebuildFlow(what, body) {
   if (!confirm('Recompute ' + what + ' for EVERY word? Hand-edited forms will be overwritten.')) return;
@@ -605,6 +631,13 @@ const A = {
       if (target == null) { const c = S.words.filter(x => !x.ref_to && x.gloss.toLowerCase() === t.toLowerCase()); if (c.length === 1) target = c[0].id; else { say(c.length ? 'Several words are called "' + t + '": pick one from the list.' : 'Pick the word to refer to from the list.', true); return; } }
       p.ref_word_id = target; delete p.form;
     } else if (val('w_id')) p.ref_word_id = null;
+    if ($('#w_isloan') && $('#w_isloan').checked) {
+      const t = val('w_loanword').trim(), m = t.match(/#(\d+)\s*$/);
+      if (!m) { say('Pick the language, then the word to borrow from the list.', true); return; }
+      if (val('w_year') === '') { say('Give the year of borrowing.', true); return; }
+      p.loan_word_id = Number(m[1]); delete p.form; delete p.ref_word_id;
+      if (!p.gloss) p.gloss = t.replace(/\s*#\d+\s*$/, '');
+    }
     const id = val('w_id');
     const r = await api('POST', base() + '/edit', { entity: 'word', action: id ? 'UPDATE' : 'CREATE', entityId: id ? Number(id) : null, payload: p });
     say(r.status === 'pending' ? 'Submitted for the owner to approve.' : 'Saved.'); renderPanel();
@@ -891,8 +924,42 @@ const A = {
     const r = await api('POST', base() + '/edit', { entity: 'word', action: 'CREATE', payload: { gloss: S.comp.gloss, build: 'compound', form: s.form, notes: 'compound: ' + S.comp.parts.join(' + ') } });
     say(r.status === 'pending' ? 'Submitted for approval.' : 'Word added.');
   },
-  bulkCheck: async () => { const r = await api('POST', base() + '/bulk', { text: val('b_text'), dryRun: true }); say(r.count + ' lines look good.'); },
-  bulkGo: async () => { const r = await api('POST', base() + '/bulk', { text: val('b_text') }); say('Added ' + r.count + ' words.'); S.tab = 'dict'; renderPanel(); },
+  bulkCheck: async () => {
+    const r = await api('POST', base() + '/bulk', { text: val('b_text'), dryRun: true, skipExisting: $('#b_skip').checked });
+    say(r.count + ' words would be added.' + (r.skipped.length ? ' Already there, skipped: ' + r.skipped.join(', ') + '.' : ''));
+  },
+  bulkGo: async () => {
+    const r = await api('POST', base() + '/bulk', { text: val('b_text'), skipExisting: $('#b_skip').checked });
+    say('Added ' + r.count + ' words.' + (r.skipped.length ? ' Skipped (already there): ' + r.skipped.join(', ') + '.' : '')); S.tab = 'dict'; renderPanel();
+  },
+  soundImportCheck: async () => {
+    const f = $('#si_file') && $('#si_file').files[0];
+    let body = { dryRun: true };
+    if (f) {
+      const t = await f.text();
+      if (/^\s*[\[{]/.test(t)) {
+        let d; try { d = JSON.parse(t); } catch (e) { say('That file is not valid JSON: ' + e.message, true); return; }
+        const list = Array.isArray(d) ? d : (d.sounds || d.phonemes);
+        if (!Array.isArray(list)) { say('The JSON needs a "sounds" list.', true); return; }
+        body.sounds = list;
+      } else body.text = t;
+    } else body.text = val('si_text');
+    if (!body.sounds && !(body.text || '').trim()) { say('Paste a table or choose a file first.', true); return; }
+    S.soundImport = body;
+    const res = await api('POST', base() + '/phonemes/import', body);
+    let h = `<p><strong>${res.added}</strong> to add, <strong>${res.changed}</strong> to change, ${res.unchanged} already the same.</p>`;
+    if (res.errors.length) h += '<div class="gap"><strong>Nothing will be imported until these are fixed:</strong><ul>' + res.errors.map(e => `<li>${esc(e)}</li>`).join('') + '</ul></div>';
+    const shown = res.items.filter(i => i.action === 'add' || i.action === 'change');
+    if (shown.length) h += '<table><tr><th></th><th>Symbol</th><th>Kind</th><th>Row</th><th>Column</th><th>From</th><th>Until</th></tr>' + shown.map(i => `<tr><td>${i.action}</td><td class="form">${esc(i.symbol)}</td><td>${esc(i.kind)}</td><td>${esc(i.row)}</td><td>${esc(i.col)}</td><td>${i.year ?? ''}</td><td>${i.year_to ?? ''}</td></tr>`).join('') + '</table>';
+    if (!res.errors.length && (res.added || res.changed)) h += '<div class="row"><button class="primary" data-act="soundImportApply">Apply these changes</button></div>';
+    $('#si_out').innerHTML = h;
+  },
+  soundImportApply: async () => {
+    if (!S.soundImport) return;
+    const res = await api('POST', base() + '/phonemes/import', { ...S.soundImport, dryRun: false });
+    S.soundImport = null;
+    say('Imported: ' + res.added + ' added, ' + res.changed + ' changed.'); renderPanel();
+  },
   approve: async d => { await api('POST', '/api/changes/' + d.id + '/approve'); say('Approved.'); renderPanel(); },
   deny: async d => { await api('POST', '/api/changes/' + d.id + '/deny'); say('Denied.'); renderPanel(); },
   addShare: async () => {
@@ -940,6 +1007,8 @@ document.addEventListener('change', e => {
   if (e.target.id === 'gr_cat') { applyHeadings(); return; }
   if (e.target.dataset.soundyear) { S.soundYear = e.target.value === '' ? '' : Number(e.target.value); renderPanel(); return; }
   if (e.target.dataset.isref) { syncRefBox(); return; }
+  if (e.target.dataset.isloan) { syncLoanBox(); return; }
+  if (e.target.dataset.loanlang) { fillLoanWords(); return; }
   if (e.target.dataset.gmetric) { drawDivergence(); return; }
   if (e.target.dataset.inh) { S.showInherited = e.target.checked; S.page = 0; drawDict(); return; }
   if (e.target.dataset.psize) { S.pageSize = Number(e.target.value); try { localStorage.setItem('pageSize', String(S.pageSize)); } catch (x) { /* ignore */ } S.page = 0; drawDict(); return; }
@@ -947,7 +1016,7 @@ document.addEventListener('change', e => {
   if (e.target.dataset.tpl && TPL[e.target.value]) { $('#r_pat').value = TPL[e.target.value][0]; $('#r_rep').value = TPL[e.target.value][1]; $('#r_name').value = e.target.selectedOptions[0].textContent; }
 });
 document.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.id === 'p') wrap(A.login)(); });
-const UI_VERSION = '0.20.0';   // keep equal to the version in pom.xml
+const UI_VERSION = '0.21.0';   // keep equal to the version in pom.xml
 api('GET', '/api/version').then(v => {
   $('#ver').textContent = 'v' + v.version + (v.built ? ' · built ' + v.built.replace('T', ' ').replace('Z', ' UTC') : '');
   if (v.version !== UI_VERSION) {
