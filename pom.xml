@@ -13,7 +13,7 @@
 
   <groupId>com.conlangs</groupId>
   <artifactId>conlang-web</artifactId>
-  <version>0.21.0</version>
+  <version>0.21.1</version>
   <name>Root and Rune</name>
   <description>Root and Rune: a multi-user conlang builder with dictionary, sound changes and language families</description>
 

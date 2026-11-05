@@ -67,7 +67,7 @@ public class RuleTransferService {
             n++;
             String where = "Entry " + n + ": ";
             Object ln = e.get("language");
-            Long langId = ln == null || ln.toString().isBlank() ? pathLang : byName.get(ln.toString().trim().toLowerCase());
+            Long langId = ln == null || ln.toString().isBlank() ? Long.valueOf(pathLang) : byName.get(ln.toString().trim().toLowerCase());   // Long.valueOf: a plain long here would unbox a missing language into a NullPointerException
             if (langId == null) { errors.add(where + "unknown language '" + ln + "'."); continue; }
             Long id = lng(e.get("id"));
             boolean del = Boolean.TRUE.equals(e.get("delete")) || Boolean.TRUE.equals(e.get("remove"));
