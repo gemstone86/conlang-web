@@ -316,4 +316,12 @@ class EvolverTest {
         assertTrue(!got.isEmpty());
         for (String w : got) assertTrue(sh.fits(w));
     }
+
+    @Test
+    void shapeAloneCanWriteWordsWithoutAnyExistingWords() {
+        SyllableShape sh = SyllableShape.parse("(V)C(C)V(C)");
+        java.util.Random rnd = new java.util.Random(3);
+        List<String> cons = List.of("b", "t", "k", "g", "r", "m", "n", "ch"), vows = List.of("a", "o", "u");
+        for (int i = 0; i < 50; i++) assertTrue(sh.fits(sh.generate(rnd, 1 + i % 3, cons, List.of("r"), cons, vows)));
+    }
 }

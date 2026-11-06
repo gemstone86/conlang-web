@@ -637,9 +637,9 @@ const A = {
     const [lo, hi] = val('sg_syl').split('-');
     const n = Math.max(1, Math.min(40, Number(val('sg_n')) || 10));
     const r = await api('GET', base() + '/suggest-roots?count=' + n + '&min=' + lo + '&max=' + hi);
-    const shapeNote = r.shape ? `<span class="muted small">Shape ${esc(r.shape)}: </span>` : '';
+    const shapeNote = r.shape ? `<span class="muted small">Shape ${esc(r.shape)}${r.mode === 'shape' ? ' (built from the shape and the Sounds tab, since there are too few words to learn from)' : ''}: </span>` : '';
     $('#sg_out').innerHTML = shapeNote + (r.roots.length ? r.roots.map(x => `<button class="form" data-act="useRoot" data-form="${esc(x)}">${esc(x)}</button>`).join(' ')
-      : '<span class="muted small">Not enough words yet to learn the sound of this language (it needs at least 5), or no free form of that shape was found. Try again, allow more syllables, or check the syllable shape in the Grammar tab.</span>');
+      : `<span class="muted small">${esc(r.reason || 'No free form was found. Try again or allow more syllables.')}</span>`);
   },
   useRoot: async d => {
     if ($('#w_isref') && $('#w_isref').checked) { $('#w_isref').checked = false; syncRefBox(); }
@@ -1080,7 +1080,7 @@ function drawAutoSounds(full) {
 document.addEventListener('input', e => {
   if (e.target.dataset.autoslider) { S.autoYear = Number(e.target.value); drawAutoSounds(false); }
 });
-const UI_VERSION = '0.24.0';   // keep equal to the version in pom.xml
+const UI_VERSION = '0.24.1';   // keep equal to the version in pom.xml
 api('GET', '/api/version').then(v => {
   $('#ver').textContent = 'v' + v.version + (v.built ? ' · built ' + v.built.replace('T', ' ').replace('Z', ' UTC') : '');
   if (v.version !== UI_VERSION) {

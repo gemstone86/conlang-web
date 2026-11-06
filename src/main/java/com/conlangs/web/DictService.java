@@ -7,6 +7,7 @@ import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
 import java.util.Set;
 import java.util.TreeMap;
 import org.springframework.stereotype.Service;
@@ -436,7 +437,42 @@ public class DictService {
         }
         SyllableShape shape = null;
         try { shape = SyllableShape.parse(shapeText); } catch (IllegalArgumentException e) { shapeText = null; }
-        out.put("roots", RootSuggester.suggest(corpus, taken, c, lo, hi, sd, shape));
+        List<String> roots = RootSuggester.suggest(corpus, taken, c, lo, hi, sd, shape);
+        String mode = "learned", reason = null;
+        if (roots.isEmpty() && shape != null) {
+            // too few words to learn from (or none of them fit): write forms straight from the shape and the language's sounds
+            List<String> cons = new ArrayList<>(), vows = new ArrayList<>();
+            for (Map<String, Object> p : db.rows("select symbol, kind from phonemes where language_id=? and year_to is null order by id", langId)) {
+                String sym = p.get("symbol").toString().toLowerCase();
+                if ("vowel".equals(p.get("kind"))) { if (!vows.contains(sym)) vows.add(sym); }
+                else if (!cons.contains(sym)) cons.add(sym);
+            }
+            if (cons.isEmpty() || vows.isEmpty()) {
+                reason = "This language has fewer than 5 usable words and no sounds in its Sounds tab yet, so there is nothing to build forms from. Add the sounds (or some words) and try again.";
+            } else {
+                mode = "shape";
+                List<String> onset = new ArrayList<>(cons), coda = new ArrayList<>(cons), second = new ArrayList<>();
+                onset.remove("ng"); coda.remove("h");
+                for (String x : cons) if (List.of("r", "l", "v", "j", "w").contains(x)) second.add(x);
+                if (second.isEmpty()) second = onset;
+                if (onset.isEmpty()) onset = cons;
+                if (coda.isEmpty()) coda = cons;
+                Random rnd = new Random(sd);
+                Set<String> seen = new HashSet<>();
+                for (int attempt = 0; attempt < c * 300 && roots.size() < c; attempt++) {
+                    String w = shape.generate(rnd, lo + rnd.nextInt(hi - lo + 1), onset, second, coda, vows);
+                    if (w.length() < 2 || !seen.add(w) || !shape.fits(w) || w.matches(".*(.)\\1\\1.*")) continue;
+                    boolean close = false;
+                    for (String t : taken) if (t != null && Math.abs(t.length() - w.length()) <= 2 && Distance.normalized(w, t) < 0.3) { close = true; break; }
+                    if (!close) roots.add(w);
+                }
+            }
+        } else if (roots.isEmpty()) {
+            reason = "Not enough words yet to learn the sound of this language (it needs at least 5), or no free form was found.";
+        }
+        out.put("roots", roots);
+        out.put("mode", mode);
+        out.put("reason", reason);
         out.put("shape", shapeText);
         out.put("learnedFrom", corpus.size());
         return out;
