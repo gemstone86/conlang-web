@@ -150,6 +150,9 @@ const TAB = {
       <select id="w_loanlang" data-loanlang="1" hidden><option value="">from which language?</option>${loanLangs().map(l => `<option value="${l.id}">${esc(l.name)}</option>`).join('')}</select><input id="w_loanword" list="w_loanwords" placeholder="which word?" size="22" hidden><datalist id="w_loanwords"></datalist><input id="w_year" placeholder="year" size="6" type="number">
       <input id="w_notes" placeholder="notes" size="20"><input id="w_id" type="hidden">
       <button class="primary" data-act="saveWord" id="w_btn">Add word</button></div>
+      <div class="row"><button data-act="suggestRoots">Suggest new roots</button> <input id="sg_n" type="number" value="10" min="1" max="40" size="3" title="how many">
+        <select id="sg_syl"><option value="1-1">1 syllable</option><option value="2-2" selected>2 syllables</option><option value="2-3">2-3 syllables</option><option value="3-4">3-4 syllables</option></select>
+        <span class="muted small">New forms that sound like this language and are not close to any existing word. Click one to use it.</span></div><div id="sg_out" class="row"></div>
       <div class="muted small">New words get their forms automatically from the rules on the Word forms tab. Click a word to see and edit all its forms.</div></div>`;
     const fromWhere = {};
     S.words.filter(w => w.inherited).forEach(w => { fromWhere[w.origin_lang] = (fromWhere[w.origin_lang] || 0) + 1; });
@@ -622,6 +625,18 @@ const A = {
   undo: async () => { const r = await api('POST', base() + '/undo'); say('Undid ' + r.undone); renderPanel(); },
   redo: async () => { const r = await api('POST', base() + '/redo'); say('Redid ' + r.redone); renderPanel(); },
 
+  suggestRoots: async () => {
+    const [lo, hi] = val('sg_syl').split('-');
+    const n = Math.max(1, Math.min(40, Number(val('sg_n')) || 10));
+    const r = await api('GET', base() + '/suggest-roots?count=' + n + '&min=' + lo + '&max=' + hi);
+    $('#sg_out').innerHTML = r.roots.length ? r.roots.map(x => `<button class="form" data-act="useRoot" data-form="${esc(x)}">${esc(x)}</button>`).join(' ')
+      : '<span class="muted small">Not enough words yet to learn the sound of this language (it needs at least 5), or no free form was found. Try again or allow more syllables.</span>';
+  },
+  useRoot: async d => {
+    if ($('#w_isref') && $('#w_isref').checked) { $('#w_isref').checked = false; syncRefBox(); }
+    if ($('#w_isloan') && $('#w_isloan').checked) { $('#w_isloan').checked = false; syncLoanBox(); }
+    $('#w_form').hidden = false; $('#w_form').value = d.form; $('#w_gloss').focus();
+  },
   saveWord: async () => {
     const p = { gloss: val('w_gloss'), pos: val('w_pos'), build: val('w_build'), form: val('w_form'), notes: val('w_notes') };
     if (val('w_year') !== '') p.year = Number(val('w_year'));
@@ -1016,7 +1031,7 @@ document.addEventListener('change', e => {
   if (e.target.dataset.tpl && TPL[e.target.value]) { $('#r_pat').value = TPL[e.target.value][0]; $('#r_rep').value = TPL[e.target.value][1]; $('#r_name').value = e.target.selectedOptions[0].textContent; }
 });
 document.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.id === 'p') wrap(A.login)(); });
-const UI_VERSION = '0.21.1';   // keep equal to the version in pom.xml
+const UI_VERSION = '0.22.0';   // keep equal to the version in pom.xml
 api('GET', '/api/version').then(v => {
   $('#ver').textContent = 'v' + v.version + (v.built ? ' · built ' + v.built.replace('T', ' ').replace('Z', ' UTC') : '');
   if (v.version !== UI_VERSION) {

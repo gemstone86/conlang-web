@@ -258,4 +258,19 @@ class EvolverTest {
         assertEquals(0, out.size());
         assertEquals(1, errors.size());
     }
+
+    @Test
+    void rootSuggesterWritesNewFormsInTheStyleOfTheLanguage() {
+        List<String> corpus = List.of("tanak", "tonuk", "kanata", "nokat", "tunaka", "kotan", "nakota", "tokan", "katun", "nutaka", "taka", "kona");
+        List<String> a = RootSuggester.suggest(corpus, corpus, 6, 2, 3, 7L);
+        assertTrue(a.size() > 0 && a.size() <= 6);
+        for (String w : a) {
+            assertTrue(!corpus.contains(w));
+            int syl = RootSuggester.syllables(w);
+            assertTrue(syl >= 2 && syl <= 3);
+            assertTrue(w.matches("[tnkaou]+"));
+        }
+        assertEquals(a, RootSuggester.suggest(corpus, corpus, 6, 2, 3, 7L));
+        assertEquals(0, RootSuggester.suggest(List.of("ab", "ba"), List.of(), 5, 1, 3, 1L).size());
+    }
 }

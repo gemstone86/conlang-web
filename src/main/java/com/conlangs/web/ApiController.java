@@ -667,6 +667,12 @@ public class ApiController {
         return res;
     }
 
+    @GetMapping("/languages/{id}/suggest-roots")
+    public Map<String, Object> suggestRoots(@PathVariable long id, @RequestParam(defaultValue = "10") int count, @RequestParam(defaultValue = "2") int min,
+            @RequestParam(defaultValue = "3") int max, @RequestParam(required = false) Long seed, HttpSession s) {
+        return dict.suggestRoots(auth.requireUid(s), id, count, min, max, seed);
+    }
+
     @GetMapping("/languages/{id}/tree-check")
     public Map<String, Object> treeCheck(@PathVariable long id, HttpSession s) {
         return dict.treeCheck(auth.requireUid(s), id);

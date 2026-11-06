@@ -409,6 +409,26 @@ public class DictService {
     }
 
     /** Which languages this one inherits from, and whatever stops their words from reaching it. */
+    /** New root forms that sound like the language: learned from the forms it has now, never equal to or close to an existing word. */
+    public Map<String, Object> suggestRoots(long uid, long langId, int count, int minSyl, int maxSyl, Long seed) {
+        access.need(uid, langId, Access.VIEWER);
+        List<Map<String, Object>> ws = words(uid, langId);
+        List<String> corpus = new ArrayList<>(), taken = new ArrayList<>();
+        for (Map<String, Object> w : ws) {
+            Object f = w.get("form"), of = w.get("origin_form");
+            if (f != null) { corpus.add(f.toString()); taken.add(f.toString()); }
+            if (of != null) taken.add(of.toString());
+            Object fs = w.get("forms");
+            if (fs instanceof List<?> l) for (Object x : l) if (x instanceof Map<?, ?> fm && fm.get("form") != null) taken.add(fm.get("form").toString());
+        }
+        int c = Math.max(1, Math.min(count, 40)), lo = Math.max(1, Math.min(minSyl, 6)), hi = Math.max(lo, Math.min(maxSyl, 6));
+        long sd = seed == null ? System.nanoTime() : seed;
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("roots", RootSuggester.suggest(corpus, taken, c, lo, hi, sd));
+        out.put("learnedFrom", corpus.size());
+        return out;
+    }
+
     public Map<String, Object> treeCheck(long uid, long langId) {
         Map<String, Object> lang = access.need(uid, langId, Access.VIEWER);
         long worldId = Db.num(lang.get("world_id"));

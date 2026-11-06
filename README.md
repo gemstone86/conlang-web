@@ -122,6 +122,10 @@ Deleting a word also deletes its locked overrides, and Undo does not bring those
 ## v0.18.3
 - Dictionary search also finds reference words: search "see", "reference", or the name of the word they point to.
 
+## v0.22.0
+
+- **Suggest new roots** (Words tab): learns which letters follow which from the words the language already has (including inherited ones) and writes new forms in the same style. Choose how many and how many syllables; forms that already exist, or are very close to an existing word, are never suggested. Click a suggestion to put it in the form field.
+
 ## v0.21.1
 
 - Fixed: importing sound changes whose `language` names a language that doesn't exist in the world crashed with a NullPointerException. It now reports "unknown language 'X'" for that entry.
