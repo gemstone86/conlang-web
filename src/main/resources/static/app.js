@@ -263,6 +263,8 @@ const TAB = {
     let h = `<div class="row"><label style="margin:0">Show inventory as of year</label><input type="number" id="s_year" data-soundyear="1" value="${yr ?? ''}" placeholder="now" size="8">
       <span class="muted small">Blank = sounds currently in the language. Give a sound a "from" / "until" year to make the table change over time.</span></div>
       <h3>Consonants</h3>${grid('consonant')}<h3>Vowels</h3>${grid('vowel')}`;
+    h += `<h3>Build from the word list</h3><div class="card"><p class="muted small">Reads the forms of this language's words at every year one of its own sound changes starts, and lists the sounds they use. Letters you have already placed in the table above keep their place; digraphs (sh, ch, th, ng) and diphthongs (ai, ou) count as one sound.</p>
+      <div class="row"><label style="margin:0">Up to year</label><input type="number" id="as_to" value="${S.autoTo ?? 900}" size="6"><button data-act="autoSoundsLoad">Build table</button></div><div id="as_out"></div></div>`;
     if (canEdit()) h += `<h3>Add / edit a sound</h3><div class="card"><div class="row"><input id="ph_symbol" placeholder="symbol" size="6" class="form">
       <select id="ph_kind"><option>consonant</option><option>vowel</option></select>
       <input id="ph_row" list="ph_rows" placeholder="row (manner / height)" size="18"><datalist id="ph_rows">${[...new Set(ph.map(p => p.row_label).filter(Boolean))].map(x => `<option>${esc(x)}</option>`).join('')}</datalist>
@@ -975,6 +977,17 @@ const A = {
     S.soundImport = null;
     say('Imported: ' + res.added + ' added, ' + res.changed + ' changed.'); renderPanel();
   },
+  autoSoundsLoad: async () => {
+    S.autoTo = Number(val('as_to')) || 900;
+    S.autoData = await api('GET', base() + '/auto-sounds?to=' + S.autoTo);
+    S.autoYear = S.autoData.from;
+    drawAutoSounds(true);
+  },
+  autoSoundsApply: async () => {
+    if (!confirm('Replace the sounds made by an earlier build with these? Sounds you added by hand are not touched.')) return;
+    const res = await api('POST', base() + '/auto-sounds/apply', { to: S.autoTo });
+    say('Sounds saved: ' + res.added + ' added, ' + res.removed + ' earlier ones replaced, ' + res.keptYours + ' of yours kept as they were.'); renderPanel();
+  },
   approve: async d => { await api('POST', '/api/changes/' + d.id + '/approve'); say('Approved.'); renderPanel(); },
   deny: async d => { await api('POST', '/api/changes/' + d.id + '/deny'); say('Denied.'); renderPanel(); },
   addShare: async () => {
@@ -1031,7 +1044,36 @@ document.addEventListener('change', e => {
   if (e.target.dataset.tpl && TPL[e.target.value]) { $('#r_pat').value = TPL[e.target.value][0]; $('#r_rep').value = TPL[e.target.value][1]; $('#r_name').value = e.target.selectedOptions[0].textContent; }
 });
 document.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.id === 'p') wrap(A.login)(); });
-const UI_VERSION = '0.22.0';   // keep equal to the version in pom.xml
+function autoIndex(d, year) { let k = 0; d.events.forEach((e, i) => { if (e.year <= year) k = i; }); return k; }
+function drawAutoSounds(full) {
+  const d = S.autoData; if (!d || !$('#as_out')) return;
+  const k = autoIndex(d, S.autoYear), ev = d.events[k];
+  const here = d.sounds.filter(x => x.counts[k] > 0);
+  const grid = kind => {
+    const all = here.filter(x => x.known && x.kind === kind), rows = [...new Set(all.map(x => x.row))], cols = [...new Set(all.map(x => x.col))];
+    if (!all.length) return '<p class="muted">None.</p>';
+    return '<table><tr><th></th>' + cols.map(c => `<th>${esc(c)}</th>`).join('') + '</tr>' + rows.map(r => `<tr><th>${esc(r)}</th>` + cols.map(c =>
+      `<td class="form">${all.filter(x => x.row === r && x.col === c).map(x => `<span title="/${esc(x.ipa)}/ in ${x.counts[k]} words, e.g. ${esc(x.examples.join(', '))}"${k > 0 && x.counts[k - 1] === 0 ? ' style="font-weight:bold;text-decoration:underline"' : ''}>${esc(x.symbol)}</span>`).join(', ')}</td>`).join('') + '</tr>').join('') + '</table>';
+  };
+  const gained = k > 0 ? d.sounds.filter(x => x.counts[k] > 0 && x.counts[k - 1] === 0).map(x => x.symbol) : [];
+  const lost = k > 0 ? d.sounds.filter(x => x.counts[k] === 0 && x.counts[k - 1] > 0).map(x => x.symbol) : [];
+  const odd = here.filter(x => !x.known).map(x => x.symbol);
+  let h = '';
+  if (full) h += `<div class="row"><input type="range" id="as_slider" data-autoslider="1" min="${d.from}" max="${d.to}" step="1" value="${S.autoYear}" style="flex:1;min-width:200px"><strong id="as_yr"></strong></div>`;
+  h += '<div id="as_table"></div>';
+  if (full && canEdit()) h += '<div class="row"><button class="primary" data-act="autoSoundsApply">Save as the sound table</button><span class="muted small">Saves each sound with the years it is in use (from / until), so the table above changes with its year box.</span></div>';
+  if (full) $('#as_out').innerHTML = h;
+  $('#as_yr').textContent = 'Year ' + S.autoYear + ' · sound-change set of ' + ev.year + ' · ' + ev.words + ' words';
+  $('#as_table').innerHTML = `${ev.rules.length ? `<p class="small muted">Sound changes starting ${ev.year}: ${ev.rules.map(esc).join('; ')}</p>` : ''}
+    ${gained.length ? `<p class="small">New since the previous step: <span class="form">${gained.map(esc).join(', ')}</span></p>` : ''}
+    ${lost.length ? `<p class="small">Gone since the previous step: <span class="form">${lost.map(esc).join(', ')}</span></p>` : ''}
+    <h4>Consonants (${here.filter(x => x.kind === 'consonant' && x.known).length})</h4>${grid('consonant')}<h4>Vowels (${here.filter(x => x.kind === 'vowel' && x.known).length})</h4>${grid('vowel')}
+    ${odd.length ? `<p class="gap small">Not recognised, so not placed: <span class="form">${odd.map(esc).join(', ')}</span>. Add them to the table above and build again.</p>` : ''}`;
+}
+document.addEventListener('input', e => {
+  if (e.target.dataset.autoslider) { S.autoYear = Number(e.target.value); drawAutoSounds(false); }
+});
+const UI_VERSION = '0.23.0';   // keep equal to the version in pom.xml
 api('GET', '/api/version').then(v => {
   $('#ver').textContent = 'v' + v.version + (v.built ? ' · built ' + v.built.replace('T', ' ').replace('Z', ' UTC') : '');
   if (v.version !== UI_VERSION) {

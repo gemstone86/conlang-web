@@ -8,6 +8,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 import org.springframework.stereotype.Service;
 
 /** Read-side logic: computed dictionary fields, word histories, rule previews, compounds, bulk entry. */
@@ -426,6 +427,153 @@ public class DictService {
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("roots", RootSuggester.suggest(corpus, taken, c, lo, hi, sd));
         out.put("learnedFrom", corpus.size());
+        return out;
+    }
+
+    /**
+     * The sounds a language uses over time, worked out from the forms of its words. The forms are taken at the language's split year,
+     * at every year one of its own sound changes starts, and at {@code to}; each of those years lists the sounds in use and how many words use each.
+     */
+    public Map<String, Object> autoSounds(long uid, long langId, Integer to) {
+        Map<String, Object> lang = access.need(uid, langId, Access.VIEWER);
+        long worldId = Db.num(lang.get("world_id"));
+        Evolver ev = evolverFor(worldId, null);
+        Map<Long, Map<String, Object>> langMap = langsOf(worldId);
+        List<Long> nearestFirst = new ArrayList<>(pathRootFirst(langId, langMap));
+        java.util.Collections.reverse(nearestFirst);
+        List<Long> sources = new ArrayList<>();
+        sources.add(langId);
+        for (long anc : access.ancestors(langId)) if (access.level(uid, anc) >= Access.VIEWER) sources.add(anc);
+
+        record W(String form, int year, List<Evolver.Row> rows) {}
+        List<W> ws = new ArrayList<>();
+        Integer minYear = null;
+        for (long src : sources) {
+            Map<Long, List<Evolver.Override>> ovr = new HashMap<>();
+            for (Map<String, Object> o : db.rows("select o.word_id, o.lang_id, o.year, o.form from word_overrides o join words w on w.id=o.word_id where w.language_id=?", src)) {
+                ovr.computeIfAbsent(Db.num(o.get("word_id")), k -> new ArrayList<>())
+                        .add(new Evolver.Override(Db.num(o.get("lang_id")), ((Number) o.get("year")).intValue(), (String) o.get("form")));
+            }
+            for (Map<String, Object> w : db.rows("select id, form, year from words where language_id=?", src)) {
+                String form = (String) w.get("form");
+                if (form == null || form.isBlank() || Evolver.isLiteral(form) || Refs.parse(form) != null) continue;
+                int wy = ((Number) w.get("year")).intValue();
+                List<Evolver.Row> rows = ev.evolve(src, form, wy, ovr.getOrDefault(Db.num(w.get("id")), List.of()));
+                if (src != langId && rows.stream().noneMatch(r -> r.langId() == langId)) continue;   // coined after this language split off
+                ws.add(new W(form, wy, rows));
+                if (src == langId) minYear = minYear == null ? wy : Math.min(minYear, wy);
+            }
+        }
+        Object sy = lang.get("split_year");
+        int from = sy != null ? ((Number) sy).intValue() : minYear != null ? minYear : 0;
+        int end = to == null ? Math.max(900, from) : Math.max(to, from);
+
+        TreeMap<Integer, List<String>> events = new TreeMap<>();
+        events.put(from, new ArrayList<>());
+        events.put(end, new ArrayList<>());
+        for (Map<String, Object> r : db.rows("select year, name, pattern from rules where language_id=? order by year, ord, id", langId)) {
+            int y = ((Number) r.get("year")).intValue();
+            if (y < from || y > end) continue;
+            String nm = r.get("name") == null || r.get("name").toString().isBlank() ? r.get("pattern").toString() : r.get("name").toString();
+            events.computeIfAbsent(y, k -> new ArrayList<>()).add(nm);
+        }
+        List<Integer> years = new ArrayList<>(events.keySet());
+
+        Map<String, InventoryBuilder.Sound> own = new HashMap<>();
+        Set<String> userSymbols = new HashSet<>();
+        for (Map<String, Object> p : db.rows("select symbol, kind, row_label, col_label, notes from phonemes where language_id=?", langId)) {
+            String sym = p.get("symbol").toString().toLowerCase();
+            String notes = p.get("notes") == null ? "" : p.get("notes").toString();
+            if (notes.startsWith(AUTO_SOUND_NOTE)) continue;
+            userSymbols.add(sym);
+            own.put(sym, new InventoryBuilder.Sound(sym, p.get("kind").toString(), p.get("row_label") == null ? "" : p.get("row_label").toString(),
+                    p.get("col_label") == null ? "" : p.get("col_label").toString(), sym, true));
+        }
+
+        Map<String, Map<String, Object>> sounds = new LinkedHashMap<>();
+        List<Integer> wordCounts = new ArrayList<>();
+        for (int yi = 0; yi < years.size(); yi++) {
+            int y = years.get(yi);
+            List<String> forms = new ArrayList<>();
+            for (W w : ws) {
+                if (w.year() > y) continue;
+                String f = FormMath.formAt(w.rows(), nearestFirst, y);
+                if (f != null && !f.isBlank()) forms.add(f);
+            }
+            wordCounts.add(forms.size());
+            for (Map.Entry<String, Object[]> e : InventoryBuilder.inventory(forms, own).entrySet()) {
+                Map<String, Object> s = sounds.get(e.getKey());
+                if (s == null) {
+                    InventoryBuilder.Sound c = InventoryBuilder.classify(e.getKey(), own);
+                    s = new LinkedHashMap<>();
+                    s.put("symbol", c.symbol()); s.put("kind", c.kind()); s.put("row", c.row()); s.put("col", c.col());
+                    s.put("ipa", c.ipa()); s.put("known", c.known()); s.put("own", userSymbols.contains(e.getKey()));
+                    s.put("counts", new ArrayList<>(java.util.Collections.nCopies(years.size(), 0)));
+                    List<String> ex = new ArrayList<>();
+                    if (e.getValue()[1] != null) ex.add((String) e.getValue()[1]);
+                    if (e.getValue()[2] != null) ex.add((String) e.getValue()[2]);
+                    s.put("examples", ex);
+                    sounds.put(e.getKey(), s);
+                }
+                @SuppressWarnings("unchecked")
+                List<Integer> counts = (List<Integer>) s.get("counts");
+                counts.set(yi, (Integer) e.getValue()[0]);
+            }
+        }
+        List<Map<String, Object>> ev2 = new ArrayList<>();
+        for (int i = 0; i < years.size(); i++) {
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("year", years.get(i)); m.put("rules", events.get(years.get(i))); m.put("words", wordCounts.get(i));
+            ev2.add(m);
+        }
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("from", from); out.put("to", end);
+        out.put("events", ev2);
+        out.put("sounds", new ArrayList<>(sounds.values()));
+        out.put("words", ws.size());
+        return out;
+    }
+
+    static final String AUTO_SOUND_NOTE = "auto-built";
+
+    /** Replaces the sounds made by an earlier auto-build with a fresh set, one entry per stretch of years a sound is in use. */
+    public Map<String, Object> applyAutoSounds(long uid, long langId, Integer to) {
+        access.need(uid, langId, Access.EDITOR);
+        Map<String, Object> res = autoSounds(uid, langId, to);
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> events = (List<Map<String, Object>>) res.get("events");
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> sounds = (List<Map<String, Object>>) res.get("sounds");
+        int last = events.size() - 1;
+        int removed = 0, added = 0, kept = 0;
+        for (Map<String, Object> p : db.rows("select id, notes from phonemes where language_id=?", langId)) {
+            if (p.get("notes") != null && p.get("notes").toString().startsWith(AUTO_SOUND_NOTE)) {
+                store.submit(uid, langId, "phoneme", "DELETE", Db.num(p.get("id")), new LinkedHashMap<>());
+                removed++;
+            }
+        }
+        for (Map<String, Object> s : sounds) {
+            if (Boolean.TRUE.equals(s.get("own"))) { kept++; continue; }
+            @SuppressWarnings("unchecked")
+            List<Integer> counts = (List<Integer>) s.get("counts");
+            int i = 0;
+            while (i <= last) {
+                if (counts.get(i) == 0) { i++; continue; }
+                int j = i;
+                while (j + 1 <= last && counts.get(j + 1) > 0) j++;
+                Map<String, Object> p = new LinkedHashMap<>();
+                p.put("symbol", s.get("symbol")); p.put("kind", s.get("kind")); p.put("row_label", s.get("row")); p.put("col_label", s.get("col"));
+                String ipa = String.valueOf(s.get("ipa"));
+                p.put("notes", AUTO_SOUND_NOTE + (ipa.equals(s.get("symbol")) ? "" : ": /" + ipa + "/") + (Boolean.TRUE.equals(s.get("known")) ? "" : " (not recognised – please place it)"));
+                if (i > 0) p.put("year", events.get(i).get("year"));
+                if (j < last) p.put("year_to", events.get(j + 1).get("year"));
+                store.submit(uid, langId, "phoneme", "CREATE", null, p);
+                added++;
+                i = j + 1;
+            }
+        }
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("added", added); out.put("removed", removed); out.put("keptYours", kept);
         return out;
     }
 

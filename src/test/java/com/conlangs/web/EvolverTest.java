@@ -273,4 +273,31 @@ class EvolverTest {
         assertEquals(a, RootSuggester.suggest(corpus, corpus, 6, 2, 3, 7L));
         assertEquals(0, RootSuggester.suggest(List.of("ab", "ba"), List.of(), 5, 1, 3, 1L).size());
     }
+
+    @Test
+    void inventorySplitsDigraphsDiphthongsAndLongVowels() {
+        assertEquals(List.of("sh", "ai", "ng", "ā"), InventoryBuilder.segment("shaingā", Set.of()));
+        assertEquals(List.of("k", "a:", "r"), InventoryBuilder.segment("ka:r", Set.of()));
+        assertEquals(List.of("t", "á", "t"), InventoryBuilder.segment("tát", Set.of()));
+        assertEquals(List.of("d", "o", "r", "u"), InventoryBuilder.segment("dor-u", Set.of()));
+    }
+
+    @Test
+    void inventoryClassifiesLettersAndKeepsOwnPlacement() {
+        InventoryBuilder.Sound sh = InventoryBuilder.classify("sh", Map.of());
+        assertEquals("Postalveolar", sh.col());
+        InventoryBuilder.Sound ll = InventoryBuilder.classify("ā", Map.of());
+        assertEquals("vowel", ll.kind());
+        assertEquals("aː", ll.ipa());
+        assertEquals("Open", ll.row());
+        assertEquals("ø", InventoryBuilder.classify("ö", Map.of()).ipa());
+        assertEquals("Close-mid", InventoryBuilder.classify("ö", Map.of()).row());
+        assertTrue(!InventoryBuilder.classify("@", Map.of()).known());
+        Map<String, InventoryBuilder.Sound> own = Map.of("r", new InventoryBuilder.Sound("r", "consonant", "Tap", "Dental", "r", true));
+        assertEquals("Tap", InventoryBuilder.classify("r", own).row());
+        Map<String, Object[]> inv = InventoryBuilder.inventory(List.of("kata", "kasha", "ta"), Map.of());
+        assertEquals(3, inv.get("a")[0]);
+        assertEquals(1, inv.get("sh")[0]);
+        assertTrue(!inv.containsKey("s"));
+    }
 }

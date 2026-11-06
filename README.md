@@ -122,6 +122,12 @@ Deleting a word also deletes its locked overrides, and Undo does not bring those
 ## v0.18.3
 - Dictionary search also finds reference words: search "see", "reference", or the name of the word they point to.
 
+## v0.23.0
+
+- **Build the sound table from the word list** (Sounds tab, "Build from the word list"): reads the forms of every word at the language's split year, at each year one of its own sound changes starts, and at the chosen end year (default 900), and sorts the letters into the consonant and vowel tables. A slider walks from the split to the end year; sounds that appear (underlined) or disappear are listed with the sound changes that start that year, and hovering a sound shows its IPA, how many words use it and examples. Digraphs (sh, ch, th, ng) and diphthongs (ai, ou ...) count as one sound; long vowels (ā, á, â, a:) and umlauts are recognised. Letters you have already placed in the table keep their row and column.
+- "Save as the sound table" stores each sound with its from / until years, so the normal table's year box shows the same history. A later build replaces the earlier auto-built entries (their notes start with "auto-built"); sounds you added by hand are never touched.
+- New endpoints: `GET /api/languages/{id}/auto-sounds?to=900`, `POST /api/languages/{id}/auto-sounds/apply`.
+
 ## v0.22.0
 
 - **Suggest new roots** (Words tab): learns which letters follow which from the words the language already has (including inherited ones) and writes new forms in the same style. Choose how many and how many syllables; forms that already exist, or are very close to an existing word, are never suggested. Click a suggestion to put it in the form field.

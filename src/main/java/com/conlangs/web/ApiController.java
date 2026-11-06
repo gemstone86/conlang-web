@@ -497,6 +497,20 @@ public class ApiController {
         return res;
     }
 
+    @GetMapping("/languages/{id}/auto-sounds")
+    public Map<String, Object> autoSounds(@PathVariable long id, @RequestParam(required = false) Integer to, HttpSession s) {
+        return dict.autoSounds(auth.requireUid(s), id, to);
+    }
+
+    @PostMapping("/languages/{id}/auto-sounds/apply")
+    public Map<String, Object> applyAutoSounds(@PathVariable long id, @RequestBody Map<String, Object> b, HttpSession s) {
+        long uidA = auth.requireUid(s);
+        Integer to = b.get("to") == null || b.get("to").toString().isBlank() ? null : Integer.valueOf(b.get("to").toString());
+        Map<String, Object> res = dict.applyAutoSounds(uidA, id, to);
+        applog.info("edit", uidA, "Auto-built sounds in language #" + id + ": added=" + res.get("added") + ", removed=" + res.get("removed"));
+        return res;
+    }
+
     @PostMapping("/languages/{id}/phonemes/import")
     public Map<String, Object> importSounds(@PathVariable long id, @RequestBody Map<String, Object> b, HttpSession s) {
         long uidP = auth.requireUid(s);
