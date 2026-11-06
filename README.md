@@ -122,6 +122,10 @@ Deleting a word also deletes its locked overrides, and Undo does not bring those
 ## v0.18.3
 - Dictionary search also finds reference words: search "see", "reference", or the name of the word they point to.
 
+## v0.24.2
+
+- Borrow: the word list is searchable by meaning and by form at the same time (each entry reads "meaning · form"), so you no longer have to look a word up in the other language first.
+
 ## v0.24.1
 
 - Suggest new roots: a language with a syllable shape but fewer than 5 words (or none that fit) now gets forms written straight from the shape and the sounds in its Sounds tab. The message also says what is actually missing (words, or sounds).

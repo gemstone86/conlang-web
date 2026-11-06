@@ -147,7 +147,7 @@ const TAB = {
       <input id="w_gloss" placeholder="gloss" size="14"><input id="w_pos" placeholder="type" size="8"><input id="w_build" placeholder="build" size="8">
       <input id="w_form" placeholder="form" size="14" class="form"><input id="w_ref" list="w_refs" placeholder="refers to which word?" size="22" hidden><datalist id="w_refs">${S.words.filter(x => !x.ref_to).map(x => `<option value="${esc(x.gloss)} #${x.id}">${esc(x.form)}</option>`).join('')}</datalist><label style="display:inline;margin:0" title="The word has no form of its own: it shows the forms of another word"><input type="checkbox" id="w_isref" data-isref="1"> reference to another word</label>
       <label style="display:inline;margin:0" title="Take the word from another language, as it sounded there in the year you give"><input type="checkbox" id="w_isloan" data-isloan="1"> borrow</label>
-      <select id="w_loanlang" data-loanlang="1" hidden><option value="">from which language?</option>${loanLangs().map(l => `<option value="${l.id}">${esc(l.name)}</option>`).join('')}</select><input id="w_loanword" list="w_loanwords" placeholder="which word?" size="22" hidden><datalist id="w_loanwords"></datalist><input id="w_year" placeholder="year" size="6" type="number">
+      <select id="w_loanlang" data-loanlang="1" hidden><option value="">from which language?</option>${loanLangs().map(l => `<option value="${l.id}">${esc(l.name)}</option>`).join('')}</select><input id="w_loanword" list="w_loanwords" placeholder="search by meaning or form" size="28" hidden><datalist id="w_loanwords"></datalist><input id="w_year" placeholder="year" size="6" type="number">
       <input id="w_notes" placeholder="notes" size="20"><input id="w_id" type="hidden">
       <button class="primary" data-act="saveWord" id="w_btn">Add word</button></div>
       <div class="row"><button data-act="suggestRoots">Suggest new roots</button> <input id="sg_n" type="number" value="10" min="1" max="40" size="3" title="how many">
@@ -580,7 +580,7 @@ async function fillLoanWords() {
   if (!id) { dl.innerHTML = ''; return; }
   try {
     const ws = await api('GET', '/api/languages/' + id + '/words');
-    dl.innerHTML = ws.map(x => `<option value="${esc(x.gloss)} #${x.id}">${esc(x.form)}</option>`).join('');
+    dl.innerHTML = ws.map(x => `<option value="${esc(x.gloss)} · ${esc(x.form)} #${x.id}">${esc(x.pos || '')}</option>`).join('');
   } catch (e) { say(e.message, true); }
 }
 function syncRefBox() {
@@ -660,7 +660,7 @@ const A = {
       if (!m) { say('Pick the language, then the word to borrow from the list.', true); return; }
       if (val('w_year') === '') { say('Give the year of borrowing.', true); return; }
       p.loan_word_id = Number(m[1]); delete p.form; delete p.ref_word_id;
-      if (!p.gloss) p.gloss = t.replace(/\s*#\d+\s*$/, '');
+      if (!p.gloss) p.gloss = t.replace(/\s*#\d+\s*$/, '').replace(/\s*·.*$/, '');
     }
     const id = val('w_id');
     const r = await api('POST', base() + '/edit', { entity: 'word', action: id ? 'UPDATE' : 'CREATE', entityId: id ? Number(id) : null, payload: p });
@@ -1080,7 +1080,7 @@ function drawAutoSounds(full) {
 document.addEventListener('input', e => {
   if (e.target.dataset.autoslider) { S.autoYear = Number(e.target.value); drawAutoSounds(false); }
 });
-const UI_VERSION = '0.24.1';   // keep equal to the version in pom.xml
+const UI_VERSION = '0.24.2';   // keep equal to the version in pom.xml
 api('GET', '/api/version').then(v => {
   $('#ver').textContent = 'v' + v.version + (v.built ? ' · built ' + v.built.replace('T', ' ').replace('Z', ' UTC') : '');
   if (v.version !== UI_VERSION) {
