@@ -122,6 +122,11 @@ Deleting a word also deletes its locked overrides, and Undo does not bring those
 ## v0.18.3
 - Dictionary search also finds reference words: search "see", "reference", or the name of the word they point to.
 
+## v0.24.0
+
+- **Syllable shape** (Grammar tab, owners edit it): write the shape of a syllable with C, V and brackets for optional parts, e.g. `C(C)V(C)` or `(V)C(C)V(C)` (a leading `(V)` is an optional vowel at the start of a word only). sh, ch, gh, ng and diphthongs count as one sound. "Suggest new roots" now only proposes forms of that shape and learns from the existing words that fit it (if at least 5 do). A language without its own shape uses its parent's.
+- Long vowels (ā, ī, ū, ō) and ǫ, ą now count as vowels when counting syllables for root suggestions; `gh` is a built-in digraph in the sound table builder.
+
 ## v0.23.0
 
 - **Build the sound table from the word list** (Sounds tab, "Build from the word list"): reads the forms of every word at the language's split year, at each year one of its own sound changes starts, and at the chosen end year (default 900), and sorts the letters into the consonant and vowel tables. A slider walks from the split to the end year; sounds that appear (underlined) or disappear are listed with the sound changes that start that year, and hovering a sound shows its IPA, how many words use it and examples. Digraphs (sh, ch, th, ng) and diphthongs (ai, ou ...) count as one sound; long vowels (ā, á, â, a:) and umlauts are recognised. Letters you have already placed in the table keep their row and column.

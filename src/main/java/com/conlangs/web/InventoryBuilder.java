@@ -37,7 +37,7 @@ public final class InventoryBuilder {
         c("þ", "θ", "Fricative", "Dental"); c("ð", "ð", "Fricative", "Dental"); c("th", "θ", "Fricative", "Dental");
         c("s", "s", "Fricative", "Alveolar"); c("z", "z", "Fricative", "Alveolar");
         c("sh", "ʃ", "Fricative", "Postalveolar"); c("zh", "ʒ", "Fricative", "Postalveolar");
-        c("x", "x", "Fricative", "Velar"); c("h", "h", "Fricative", "Glottal");
+        c("x", "x", "Fricative", "Velar"); c("gh", "ɣ", "Fricative", "Velar"); c("h", "h", "Fricative", "Glottal");
         c("hw", "ʍ", "Fricative", "Labial-velar"); c("hv", "ʍ", "Fricative", "Labial-velar");
         c("ch", "tʃ", "Affricate", "Postalveolar"); c("ts", "ts", "Affricate", "Alveolar");
         c("r", "r", "Trill", "Alveolar"); c("l", "l", "Lateral", "Alveolar");

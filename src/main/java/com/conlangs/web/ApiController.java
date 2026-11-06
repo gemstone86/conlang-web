@@ -315,15 +315,19 @@ public class ApiController {
         if (parent != null && split == null) throw new ApiException(400, "A branch language needs a split year.");
         String name = b.containsKey("name") ? str(b, "name") : (String) l.get("name");
         if (name == null || name.isBlank()) throw new ApiException(400, "A language needs a name.");
+        String shapeText = b.containsKey("syllableShape") ? str(b, "syllableShape") : (String) l.get("syllable_shape");
+        String shapeErr = SyllableShape.check(shapeText);
+        if (shapeErr != null) throw new ApiException(400, "Syllable shape: " + shapeErr);
         Long target = b.containsKey("erosionTarget") ? lng(b, "erosionTarget") : null;
-        db.update("update languages set name=?, parent_id=?, split_year=?, classes=?, erosion=?, erosion_target=?, ipa_map=?, grammar=?, def_suffix=? where id=?",
+        db.update("update languages set name=?, parent_id=?, split_year=?, classes=?, erosion=?, erosion_target=?, ipa_map=?, grammar=?, def_suffix=?, syllable_shape=? where id=?",
                 name.trim(), parent, split,
                 b.containsKey("classes") ? str(b, "classes") : l.get("classes"),
                 b.containsKey("erosion") ? str(b, "erosion") : l.get("erosion"),
                 target != null ? target : l.get("erosion_target"),
                 b.containsKey("ipaMap") ? str(b, "ipaMap") : l.get("ipa_map"),
                 b.containsKey("grammar") ? str(b, "grammar") : l.get("grammar"),
-                b.containsKey("defSuffix") ? str(b, "defSuffix") : l.get("def_suffix"), id);
+                b.containsKey("defSuffix") ? str(b, "defSuffix") : l.get("def_suffix"),
+                shapeText == null || shapeText.isBlank() ? null : shapeText.strip(), id);
         return Map.of("ok", true);
     }
 

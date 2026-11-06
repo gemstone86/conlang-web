@@ -17,7 +17,7 @@ import java.util.Set;
 public final class RootSuggester {
     private RootSuggester() {}
 
-    private static final String VOWELS = "aeiouyäöüåæøáéíóúýâêîôû";
+    private static final String VOWELS = "aeiouyäöüåæøáéíóúýâêîôûāēīōūǫą";
     private static final char START = '\u0002', END = '\u0003';
 
     public static boolean isVowel(char c) {
@@ -69,6 +69,16 @@ public final class RootSuggester {
      * @param seed    makes the result repeatable
      */
     public static List<String> suggest(Collection<String> corpus, Collection<String> taken, int count, int minSyl, int maxSyl, long seed) {
+        return suggest(corpus, taken, count, minSyl, maxSyl, seed, null);
+    }
+
+    /** As above; with a syllable shape only forms that fit it are suggested, and the language is learned from the words that fit it (if at least 5 do). */
+    public static List<String> suggest(Collection<String> corpus, Collection<String> taken, int count, int minSyl, int maxSyl, long seed, SyllableShape shape) {
+        if (shape != null) {
+            List<String> fitting = new ArrayList<>();
+            for (String f : corpus) if (usable(f) && shape.fits(f.strip())) fitting.add(f);
+            if (fitting.size() >= 5) corpus = fitting;
+        }
         Map<String, Map<Character, Integer>> tri = new HashMap<>(), bi = new HashMap<>();
         int learned = 0;
         for (String f : corpus) {
@@ -108,6 +118,7 @@ public final class RootSuggester {
             int syl = syllables(w);
             if (syl < minSyl || syl > maxSyl) continue;
             if (w.matches(".*(.)\\1\\1.*")) continue;
+            if (shape != null && !shape.fits(w)) continue;
             boolean close = false;
             for (String t : takenList) {
                 if (Math.abs(t.length() - w.length()) <= 2 && Distance.normalized(w, t) < 0.3) { close = true; break; }

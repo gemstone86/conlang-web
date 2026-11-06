@@ -300,4 +300,20 @@ class EvolverTest {
         assertEquals(1, inv.get("sh")[0]);
         assertTrue(!inv.containsKey("s"));
     }
+
+    @Test
+    void syllableShapeChecksFormsAndSuggestionsFollowIt() {
+        SyllableShape sh = SyllableShape.parse("(V)C(C)V(C)");
+        assertTrue(sh.fits("barum") && sh.fits("toron") && sh.fits("rokagach") && sh.fits("urka") && sh.fits("grabu"));
+        assertTrue(!sh.fits("barumk"));      // two final consonants
+        assertTrue(!sh.fits("baeru"));       // two vowels in a row inside a word
+        assertTrue(!sh.fits("baruaa"));
+        assertTrue(SyllableShape.parse("CV").fits("kata") && !SyllableShape.parse("CV").fits("kat"));
+        assertTrue(SyllableShape.check("C(C)V(C)") == null);
+        assertTrue(SyllableShape.check("CX") != null && SyllableShape.check("C((C))V") != null && SyllableShape.check("CC") != null);
+        List<String> corpus = List.of("barum", "toron", "rokagach", "garum", "korag", "torum", "bagor", "rogum", "kurag", "dorag", "batum", "grabu");
+        List<String> got = RootSuggester.suggest(corpus, corpus, 8, 2, 3, 7L, sh);
+        assertTrue(!got.isEmpty());
+        for (String w : got) assertTrue(sh.fits(w));
+    }
 }

@@ -425,7 +425,19 @@ public class DictService {
         int c = Math.max(1, Math.min(count, 40)), lo = Math.max(1, Math.min(minSyl, 6)), hi = Math.max(lo, Math.min(maxSyl, 6));
         long sd = seed == null ? System.nanoTime() : seed;
         Map<String, Object> out = new LinkedHashMap<>();
-        out.put("roots", RootSuggester.suggest(corpus, taken, c, lo, hi, sd));
+        String shapeText = null;
+        List<Long> chain = new ArrayList<>();
+        chain.add(langId);
+        chain.addAll(access.ancestors(langId));
+        for (long l : chain) {
+            Map<String, Object> row = db.one("select syllable_shape from languages where id=?", l);
+            Object st = row == null ? null : row.get("syllable_shape");
+            if (st != null && !st.toString().isBlank()) { shapeText = st.toString().strip(); break; }
+        }
+        SyllableShape shape = null;
+        try { shape = SyllableShape.parse(shapeText); } catch (IllegalArgumentException e) { shapeText = null; }
+        out.put("roots", RootSuggester.suggest(corpus, taken, c, lo, hi, sd, shape));
+        out.put("shape", shapeText);
         out.put("learnedFrom", corpus.size());
         return out;
     }

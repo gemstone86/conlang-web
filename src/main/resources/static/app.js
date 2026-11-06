@@ -201,7 +201,9 @@ const TAB = {
     const heads = t => { const s = g.sections.find(x => x.title === t); const a = s && s.headings ? s.headings.split('\t') : []; while (a.length < 6) a.push(''); return a; };
     const cats = g.sections.map(s => s.title);
     for (const e of g.entries) if (!cats.includes(e.category)) cats.push(e.category);
-    let h = '';
+    let h = `<div class="card"><div class="row"><strong>Syllable shape</strong>
+      ${isOwner() ? `<input id="gr_shape" value="${esc(S.lang.syllable_shape || '')}" placeholder="e.g. (V)C(C)V(C)" size="20" class="form"><button data-act="saveShape">Save</button>` : `<span class="form">${esc(S.lang.syllable_shape || 'not set')}</span>`}</div>
+      <p class="muted small">C = consonant, V = vowel, brackets = optional. A leading (V) is an optional vowel at the start of a word only. sh, ch, gh, ng and diphthongs (ai, ou) count as one sound. "Suggest new roots" only proposes forms of this shape, and a language without its own shape uses its parent's.</p></div>`;
     if (canEdit()) h += `<div class="card"><div class="row"><select id="gr_cat" data-grcat="1">${cats.map(c => `<option>${esc(c)}</option>`).join('')}</select>
       <input id="gr_name" placeholder="name" size="26"><input id="gr_year" type="number" placeholder="from year" size="8"><input id="gr_id" type="hidden"></div>
       <div class="row">${[1, 2, 3, 4, 5, 6].map(k => `<input id="gr_c${k}" placeholder="column ${k}" size="22">`).join('')}</div>
@@ -627,12 +629,17 @@ const A = {
   undo: async () => { const r = await api('POST', base() + '/undo'); say('Undid ' + r.undone); renderPanel(); },
   redo: async () => { const r = await api('POST', base() + '/redo'); say('Redid ' + r.redone); renderPanel(); },
 
+  saveShape: async () => {
+    await api('PUT', base(), { syllableShape: val('gr_shape') });
+    say('Syllable shape saved.'); await loadWorlds(); renderPanel();
+  },
   suggestRoots: async () => {
     const [lo, hi] = val('sg_syl').split('-');
     const n = Math.max(1, Math.min(40, Number(val('sg_n')) || 10));
     const r = await api('GET', base() + '/suggest-roots?count=' + n + '&min=' + lo + '&max=' + hi);
-    $('#sg_out').innerHTML = r.roots.length ? r.roots.map(x => `<button class="form" data-act="useRoot" data-form="${esc(x)}">${esc(x)}</button>`).join(' ')
-      : '<span class="muted small">Not enough words yet to learn the sound of this language (it needs at least 5), or no free form was found. Try again or allow more syllables.</span>';
+    const shapeNote = r.shape ? `<span class="muted small">Shape ${esc(r.shape)}: </span>` : '';
+    $('#sg_out').innerHTML = shapeNote + (r.roots.length ? r.roots.map(x => `<button class="form" data-act="useRoot" data-form="${esc(x)}">${esc(x)}</button>`).join(' ')
+      : '<span class="muted small">Not enough words yet to learn the sound of this language (it needs at least 5), or no free form of that shape was found. Try again, allow more syllables, or check the syllable shape in the Grammar tab.</span>');
   },
   useRoot: async d => {
     if ($('#w_isref') && $('#w_isref').checked) { $('#w_isref').checked = false; syncRefBox(); }
@@ -1073,7 +1080,7 @@ function drawAutoSounds(full) {
 document.addEventListener('input', e => {
   if (e.target.dataset.autoslider) { S.autoYear = Number(e.target.value); drawAutoSounds(false); }
 });
-const UI_VERSION = '0.23.0';   // keep equal to the version in pom.xml
+const UI_VERSION = '0.24.0';   // keep equal to the version in pom.xml
 api('GET', '/api/version').then(v => {
   $('#ver').textContent = 'v' + v.version + (v.built ? ' · built ' + v.built.replace('T', ' ').replace('Z', ' UTC') : '');
   if (v.version !== UI_VERSION) {
