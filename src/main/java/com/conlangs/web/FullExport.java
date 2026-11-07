@@ -21,7 +21,7 @@ import org.springframework.stereotype.Service;
 /**
  * Everything in Root and Rune as one JSON file: accounts (with their password hashes, so passwords keep
  * working), worlds, languages, words, word forms, overrides, meanings, sound-change rules, form rules,
- * grammar, sounds, sentences, sharing, pending changes and the undo history. Not included: the admin log
+ * grammar, sounds, sentences, missing words, sharing, pending changes and the undo history. Not included: the admin log
  * and password reset codes.
  *
  * <pre>
@@ -39,7 +39,7 @@ public class FullExport {
     /** Root and Rune's tables, parents before children: the order an import must insert them in. */
     public static final List<String> TABLES = List.of(
             "users", "worlds", "languages", "shares", "words", "word_overrides", "rules", "changes", "edit_log",
-            "word_forms", "grammar_sections", "grammar_entries", "phonemes", "form_rules", "word_meanings", "sentences");
+            "word_forms", "grammar_sections", "grammar_entries", "phonemes", "form_rules", "word_meanings", "sentences", "missing_words");
 
     private final DataSource ds;
     private final ObjectMapper json;

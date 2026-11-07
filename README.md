@@ -121,7 +121,7 @@ updated to this version's right after.
 * **Word ids** are shown in the dictionary (first column, and searchable) and in the word popup.
 
 ## Not in this version
-sentence builder, gaps view, automatic coupling of the sound inventory to the sound-change rules, e-mail reset,
+sentence builder, automatic coupling of the sound inventory to the sound-change rules, e-mail reset,
 and script/calligraphy. Language settings (classes, erosion, tree position) can be edited by the language owner only.
 Deleting a word also deletes its locked overrides, and Undo does not bring those back.
 
@@ -172,6 +172,15 @@ Deleting a word also deletes its locked overrides, and Undo does not bring those
 
 ## v0.18.2
 - A form that starts earlier than its word is no longer reported as a problem: the word simply uses the form as it has evolved by the word's own year.
+
+## v1.2.0 (combined app)
+- **Missing words** tab (next to Dictionary): mark meanings a language has no word for yet, one at a time or several at once
+  (`meaning; type; note` per line). **Coin word** opens the dictionary with the meaning filled in; an entry is ticked off once the
+  language has a word for it, its own or inherited (found the same way the sentence builder finds words), and
+  **Remove the … that have a word now** clears those. Below the list: the meanings the saved sentences use but can't find,
+  including words a branch lacks because they were coined in the parent after the split. Viewers see the list; owners and
+  editors change it directly (it's a planning note, so no approval). Included in Export / Import everything.
+- Endpoints: `GET/POST /rune/api/languages/{id}/missing`, `POST …/missing/bulk`, `POST …/missing/clear-filled`, `DELETE /rune/api/missing/{id}`.
 
 ## v0.18.3
 - Dictionary search also finds reference words: search "see", "reference", or the name of the word they point to.
