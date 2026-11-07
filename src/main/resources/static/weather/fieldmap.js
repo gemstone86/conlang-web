@@ -160,7 +160,7 @@
       if (path && !/^tiles\/[\w.-]+\/$/.test(path)) path = null;
       this._tilePath = path || null;
       if (!path) { this.draw(); return; }
-      const base = "/" + path;
+      const base = "/weather/" + path; // the page lives under /weather/ in the combined app
       try {
         const r = await fetch(base + "manifest.json");
         if (!r.ok || this._tilePath !== path) return;
