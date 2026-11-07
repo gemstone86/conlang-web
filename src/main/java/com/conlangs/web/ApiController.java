@@ -36,8 +36,9 @@ public class ApiController {
     private final AppLog applog;
     private final SentenceService sentences;
     private final GraphService graphs;
+    private final RuleTransferService ruleTransfer;
 
-    public ApiController(Db db, Auth auth, Access access, Store store, DictService dict, ExportService export, ImportService imports, GrammarImportService grammarImport, FormGenerator forms, AppLog applog, SentenceService sentences, GraphService graphs) {
+    public ApiController(Db db, Auth auth, Access access, Store store, DictService dict, ExportService export, ImportService imports, GrammarImportService grammarImport, FormGenerator forms, AppLog applog, SentenceService sentences, GraphService graphs, RuleTransferService ruleTransfer) {
         this.db = db;
         this.auth = auth;
         this.access = access;
@@ -50,6 +51,7 @@ public class ApiController {
         this.applog = applog;
         this.sentences = sentences;
         this.graphs = graphs;
+        this.ruleTransfer = ruleTransfer;
     }
 
     private static String str(Map<String, Object> b, String k) {
@@ -279,15 +281,19 @@ public class ApiController {
         if (parent != null && split == null) throw new ApiException(400, "A branch language needs a split year.");
         String name = b.containsKey("name") ? str(b, "name") : (String) l.get("name");
         if (name == null || name.isBlank()) throw new ApiException(400, "A language needs a name.");
+        String shapeText = b.containsKey("syllableShape") ? str(b, "syllableShape") : (String) l.get("syllable_shape");
+        String shapeErr = SyllableShape.check(shapeText);
+        if (shapeErr != null) throw new ApiException(400, "Syllable shape: " + shapeErr);
         Long target = b.containsKey("erosionTarget") ? lng(b, "erosionTarget") : null;
-        db.update("update languages set name=?, parent_id=?, split_year=?, classes=?, erosion=?, erosion_target=?, ipa_map=?, grammar=?, def_suffix=? where id=?",
+        db.update("update languages set name=?, parent_id=?, split_year=?, classes=?, erosion=?, erosion_target=?, ipa_map=?, grammar=?, def_suffix=?, syllable_shape=? where id=?",
                 name.trim(), parent, split,
                 b.containsKey("classes") ? str(b, "classes") : l.get("classes"),
                 b.containsKey("erosion") ? str(b, "erosion") : l.get("erosion"),
                 target != null ? target : l.get("erosion_target"),
                 b.containsKey("ipaMap") ? str(b, "ipaMap") : l.get("ipa_map"),
                 b.containsKey("grammar") ? str(b, "grammar") : l.get("grammar"),
-                b.containsKey("defSuffix") ? str(b, "defSuffix") : l.get("def_suffix"), id);
+                b.containsKey("defSuffix") ? str(b, "defSuffix") : l.get("def_suffix"),
+                shapeText == null || shapeText.isBlank() ? null : shapeText.strip(), id);
         return Map.of("ok", true);
     }
 
@@ -411,7 +417,9 @@ public class ApiController {
     public Map<String, Object> edit(@PathVariable long id, @RequestBody Map<String, Object> b, HttpSession s) {
         @SuppressWarnings("unchecked")
         Map<String, Object> payload = b.get("payload") instanceof Map<?, ?> m ? (Map<String, Object>) m : Map.of();
-        return store.submit(auth.requireUid(s), id, str(b, "entity"), str(b, "action"), lng(b, "entityId"), payload);
+        long uidE = auth.requireUid(s);
+        if ("word".equals(str(b, "entity")) && !"DELETE".equals(str(b, "action"))) payload = dict.resolveLoan(uidE, id, payload);
+        return store.submit(uidE, id, str(b, "entity"), str(b, "action"), lng(b, "entityId"), payload);
     }
 
     @GetMapping("/languages/{id}/formrules")
@@ -442,8 +450,10 @@ public class ApiController {
         String label = str(b, "label");
         boolean overwrite = b != null && Boolean.parseBoolean(String.valueOf(b.get("overwrite")));
         String group = b != null && b.get("group") != null ? b.get("group").toString().trim() : null;
-        Map<String, Object> res = new LinkedHashMap<>(forms.generate(id, null, label == null || label.isBlank() ? null : label, group, overwrite));
-        applog.info("edit", uidG, "Generated forms in language #" + id + (label == null || label.isBlank() ? "" : " (" + label + ")") + (overwrite ? " with overwrite" : "") + ": " + res);
+        boolean prune = b != null && Boolean.parseBoolean(String.valueOf(b.get("prune")));
+        boolean dry = b != null && Boolean.parseBoolean(String.valueOf(b.get("dryRun")));
+        Map<String, Object> res = new LinkedHashMap<>(forms.rebuild(id, label == null || label.isBlank() ? null : label, group, overwrite, prune, dry));
+        applog.info("edit", uidG, "Generated forms in language #" + id + (label == null || label.isBlank() ? "" : " (" + label + ")") + (overwrite ? " with overwrite" : "") + (prune ? " with removal" : "") + (dry ? " (dry run)" : "") + ": created=" + res.get("created") + ", updated=" + res.get("updated") + ", removed=" + res.get("removed"));
         return res;
     }
 
@@ -451,8 +461,34 @@ public class ApiController {
     public Map<String, Object> bulk(@PathVariable long id, @RequestBody Map<String, Object> b, HttpSession s) {
         long uidB = auth.requireUid(s);
         boolean dry = Boolean.parseBoolean(String.valueOf(b.get("dryRun")));
-        Map<String, Object> res = dict.bulk(uidB, id, str(b, "text"), dry);
+        boolean skip = Boolean.parseBoolean(String.valueOf(b.get("skipExisting")));
+        Map<String, Object> res = dict.bulk(uidB, id, str(b, "text"), dry, skip);
         applog.info("edit", uidB, "Bulk entry in language #" + id + ": " + res.get("count") + " words" + (dry ? " (check only)" : ""));
+        return res;
+    }
+
+    @GetMapping("/languages/{id}/auto-sounds")
+    public Map<String, Object> autoSounds(@PathVariable long id, @RequestParam(required = false) Integer to, HttpSession s) {
+        return dict.autoSounds(auth.requireUid(s), id, to);
+    }
+
+    @PostMapping("/languages/{id}/auto-sounds/apply")
+    public Map<String, Object> applyAutoSounds(@PathVariable long id, @RequestBody Map<String, Object> b, HttpSession s) {
+        long uidA = auth.requireUid(s);
+        Integer to = b.get("to") == null || b.get("to").toString().isBlank() ? null : Integer.valueOf(b.get("to").toString());
+        Map<String, Object> res = dict.applyAutoSounds(uidA, id, to);
+        applog.info("edit", uidA, "Auto-built sounds in language #" + id + ": added=" + res.get("added") + ", removed=" + res.get("removed"));
+        return res;
+    }
+
+    @PostMapping("/languages/{id}/phonemes/import")
+    public Map<String, Object> importSounds(@PathVariable long id, @RequestBody Map<String, Object> b, HttpSession s) {
+        long uidP = auth.requireUid(s);
+        boolean dry = Boolean.parseBoolean(String.valueOf(b.get("dryRun")));
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> list = b.get("sounds") instanceof List<?> l ? (List<Map<String, Object>>) l : null;
+        Map<String, Object> res = dict.importSounds(uidP, id, str(b, "text"), list, dry);
+        applog.info("edit", uidP, "Sound import in language #" + id + (dry ? " (check only)" : "") + ": added=" + res.get("added") + ", changed=" + res.get("changed"));
         return res;
     }
 
@@ -567,5 +603,67 @@ public class ApiController {
     public Map<String, Object> divergence(@PathVariable long id, @RequestParam(required = false) Long a, @RequestParam(required = false) Long b,
                                           @RequestParam(required = false) Integer from, @RequestParam(required = false) Integer to, HttpSession s) {
         return graphs.divergence(auth.requireUid(s), id, a, b, from, to);
+    }
+
+    // ---------------- sound changes as JSON ----------------
+
+    @GetMapping("/languages/{id}/rules/export.json")
+    public ResponseEntity<Map<String, Object>> exportRulesJson(@PathVariable long id, @RequestParam(defaultValue = "branches") String scope, HttpSession s) {
+        long uid = auth.requireUid(s);
+        Map<String, Object> l = access.need(uid, id, Access.VIEWER);
+        List<Map<String, Object>> rules = new ArrayList<>();
+        for (Map<String, Object> r : rules(id, scope, s)) {
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("id", r.get("id"));
+            m.put("language", r.get("lang_name"));
+            m.put("year", r.get("year"));
+            m.put("order", r.get("ord"));
+            m.put("name", r.get("name") == null ? "" : r.get("name"));
+            m.put("pattern", r.get("pattern"));
+            m.put("replacement", r.get("replacement") == null ? "" : r.get("replacement"));
+            if (r.get("note") != null && !r.get("note").toString().isEmpty()) m.put("note", r.get("note"));
+            rules.add(m);
+        }
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("format", "root-and-rune sound changes");
+        body.put("help", "Import adjusts rules that have an id, adds rules without an id (or with an unknown id), and removes rules with \"delete\": true. "
+                + "language is a language name in the same world. Fields: year, order, name, pattern, replacement, note.");
+        body.put("rules", rules);
+        String fn = ((String) l.get("name")).replaceAll("[^A-Za-z0-9_-]", "_") + "-sound-changes.json";
+        return ResponseEntity.ok().header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + fn + "\"").contentType(MediaType.APPLICATION_JSON).body(body);
+    }
+
+    @PostMapping("/languages/{id}/rules/import")
+    public Map<String, Object> importRulesJson(@PathVariable long id, @RequestBody Map<String, Object> b, HttpSession s) {
+        long uid = auth.requireUid(s);
+        if (!(b.get("rules") instanceof List<?> raw)) throw new ApiException(400, "The file needs a \"rules\" list.");
+        List<Map<String, Object>> entries = new ArrayList<>();
+        for (Object o : raw) {
+            if (!(o instanceof Map<?, ?> m)) throw new ApiException(400, "Every entry in \"rules\" must be an object.");
+            @SuppressWarnings("unchecked")
+            Map<String, Object> e = (Map<String, Object>) m;
+            entries.add(e);
+        }
+        boolean removeMissing = Boolean.parseBoolean(String.valueOf(b.get("removeMissing")));
+        boolean dry = !Boolean.FALSE.equals(b.get("dryRun"));
+        Map<String, Object> res = ruleTransfer.importRules(uid, id, entries, removeMissing, dry);
+        applog.info("edit", uid, "Sound change import in language #" + id + (dry ? " (check)" : "") + ": +" + res.get("added") + " ~" + res.get("changed") + " -" + res.get("removed") + ", errors " + ((List<?>) res.get("errors")).size());
+        return res;
+    }
+
+    @GetMapping("/languages/{id}/suggest-roots")
+    public Map<String, Object> suggestRoots(@PathVariable long id, @RequestParam(defaultValue = "10") int count, @RequestParam(defaultValue = "2") int min,
+            @RequestParam(defaultValue = "3") int max, @RequestParam(required = false) Long seed, HttpSession s) {
+        return dict.suggestRoots(auth.requireUid(s), id, count, min, max, seed);
+    }
+
+    @GetMapping("/languages/{id}/tree-check")
+    public Map<String, Object> treeCheck(@PathVariable long id, HttpSession s) {
+        return dict.treeCheck(auth.requireUid(s), id);
+    }
+
+    @GetMapping("/languages/{id}/mergers")
+    public List<Map<String, Object>> mergers(@PathVariable long id, HttpSession s) {
+        return graphs.mergers(auth.requireUid(s), id);
     }
 }

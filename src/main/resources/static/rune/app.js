@@ -130,27 +130,47 @@ const TAB = {
   async dict() {
     S.words = await api('GET', base() + '/words');
     S.page = 0;
+    let tree = { lineage: [], problems: [] };
+    try { tree = await api('GET', base() + '/tree-check'); } catch (e) { /* the note is optional */ }
     let h = '';
     if (canEdit()) h += `<div class="card"><div class="row">
       <input id="w_gloss" placeholder="gloss" size="14"><input id="w_pos" placeholder="type" size="8"><input id="w_build" placeholder="build" size="8">
-      <input id="w_form" placeholder="form" size="14" class="form"><input id="w_year" placeholder="year" size="6" type="number">
+      <input id="w_form" placeholder="form" size="14" class="form"><input id="w_ref" list="w_refs" placeholder="refers to which word?" size="22" hidden><datalist id="w_refs">${S.words.filter(x => !x.ref_to).map(x => `<option value="${esc(x.gloss)} #${x.id}">${esc(x.form)}</option>`).join('')}</datalist><label style="display:inline;margin:0" title="The word has no form of its own: it shows the forms of another word"><input type="checkbox" id="w_isref" data-isref="1"> reference to another word</label>
+      <label style="display:inline;margin:0" title="Take the word from another language, as it sounded there in the year you give"><input type="checkbox" id="w_isloan" data-isloan="1"> borrow</label>
+      <select id="w_loanlang" data-loanlang="1" hidden><option value="">from which language?</option>${loanLangs().map(l => `<option value="${l.id}">${esc(l.name)}</option>`).join('')}</select><input id="w_loanword" list="w_loanwords" placeholder="search by meaning or form" size="28" hidden><datalist id="w_loanwords"></datalist><input id="w_year" placeholder="year" size="6" type="number">
       <input id="w_notes" placeholder="notes" size="20"><input id="w_id" type="hidden">
       <button class="primary" data-act="saveWord" id="w_btn">Add word</button></div>
+      <div class="row"><button data-act="suggestRoots">Suggest new roots</button> <input id="sg_n" type="number" value="10" min="1" max="40" size="3" title="how many">
+        <select id="sg_syl"><option value="1-1">1 syllable</option><option value="2-2" selected>2 syllables</option><option value="2-3">2-3 syllables</option><option value="3-4">3-4 syllables</option></select>
+        <span class="muted small">New forms that sound like this language and are not close to any existing word. Click one to use it.</span></div><div id="sg_out" class="row"></div>
       <div class="muted small">New words get their forms automatically from the rules on the Word forms tab. Click a word to see and edit all its forms.</div></div>`;
+    const fromWhere = {};
+    S.words.filter(w => w.inherited).forEach(w => { fromWhere[w.origin_lang] = (fromWhere[w.origin_lang] || 0) + 1; });
+    const anc = tree.lineage.slice(1);
+    if (anc.length) h += `<p class="small muted">Inherits words from ${anc.map(n => `<strong>${esc(n)}</strong> (${fromWhere[n] || 0})`).join(' ← ')}. A word is inherited only if it had been coined when the language split off.</p>`;
+    h += tree.problems.map(p => `<p class="small gap">⚠ ${esc(p)}</p>`).join('');
     h += `<div class="row"><input id="q" placeholder="Search (word, form, id)…" data-filter="1" value="${esc(S.q)}">
+      <button data-act="toggleProblems" id="probbtn"></button>
       <label style="display:inline;margin:0"><input type="checkbox" data-inh="1" ${S.showInherited === false ? '' : 'checked'}> Show inherited words</label>
       <label style="display:inline;margin:0 0 0 10px">Per page</label> <select data-psize="1">${[25, 50, 100, 250].map(n => `<option ${n === S.pageSize ? 'selected' : ''}>${n}</option>`).join('')}</select>
       <span class="pager"></span></div>
-    <table id="wt"><thead><tr><th>ID</th><th>Gloss</th><th>Type</th><th>Build</th><th>Year</th><th>Form</th><th>Definite</th><th>Len</th><th>IPA</th><th>Also in</th><th>Latest per branch</th><th></th></tr></thead><tbody id="wbody"></tbody></table>
+    <table id="wt"><thead><tr><th>ID</th><th>Gloss</th><th>Type</th><th>Build</th><th>Year</th><th>Form</th><th>Definite</th><th>Len</th><th>IPA</th><th>Also in</th><th>Latest per branch</th><th></th></tr>
+      <tr class="filters">${['id', 'gloss', 'pos', 'build', 'year', 'form'].map(k => `<th><input data-wf="${k}" value="${esc((S.wf || {})[k] || '')}" placeholder="${k === 'year' ? 'year, a..b, <a, >a' : k === 'id' ? 'id' : 'filter'}" style="width:100%;min-width:${k === 'id' ? 3 : 6}rem"></th>`).join('')}<th colspan="6"><button data-act="clearFilters" class="small">Clear filters</button></th></tr></thead><tbody id="wbody"></tbody></table>
     <div class="row"><span class="pager"></span></div>`;
     return h;
   },
   async rules() {
-    const scope = S.ruleScope || 'branches';
+    if (!S.ruleScope) { try { S.ruleScope = localStorage.getItem('ruleScope') || 'branches'; } catch (x) { S.ruleScope = 'branches'; } }
+    const scope = S.ruleScope;
     const rules = S.rules = await api('GET', base() + '/rules?scope=' + scope);
     const targets = [S.lang, ...descendants(S.lang)].filter(l => l.level >= 2);
-    const opt = (v, t) => `<option value="${v}" ${scope === v ? 'selected' : ''}>${t}</option>`;
-    let h = `<div class="row"><label style="margin:0">Show rules for</label><select data-scope="1">${opt('self', 'this language only')}${opt('branches', 'this language + its branches')}${opt('path', 'full path (ancestors + this language)')}</select></div>`;
+    const seg = (v, t) => `<button data-act="ruleScope" data-v="${v}" class="${scope === v ? 'primary' : ''}">${t}</button>`;
+    let h = `<div class="row"><span class="small muted">Show</span> ${seg('self', 'only ' + esc(S.lang.name))} ${seg('branches', esc(S.lang.name) + ' + all its branches')} ${seg('path', 'full path (ancestors + ' + esc(S.lang.name) + ')')}
+      <span class="small muted">${rules.length} rule${rules.length === 1 ? '' : 's'}</span></div>`;
+    h += `<div class="card"><div class="row"><a href="/rune/api/languages/${S.lang.id}/rules/export.json?scope=${scope}"><button>Export these sound changes (JSON)</button></a>
+      ${canEdit() ? `<input type="file" id="ri_file" accept=".json,application/json"><label style="display:inline;margin:0"><input type="checkbox" id="ri_rm"> remove rules that are missing from the file</label>
+      <button data-act="ruleImportCheck">Check file</button>` : ''}</div>
+      <div class="muted small">Edit the exported file and import it again: a rule with its id is adjusted, a rule without an id is added, <code>"delete": true</code> removes it. Nothing is changed until you have seen the check and pressed Apply.</div><div id="ri_out"></div></div>`;
     if (targets.length || rules.some(r => r.level >= 2)) h += `<div class="card"><div class="row"><label style="margin:0">Apply to</label>
       <select id="r_lang">${targets.map(l => `<option value="${l.id}">${esc(l.name)}${l.id === S.lang.id ? '' : ' (branch)'}</option>`).join('')}</select>
       <select id="r_tpl" data-tpl="1"><option value="">Template…</option>
@@ -171,7 +191,9 @@ const TAB = {
     const heads = t => { const s = g.sections.find(x => x.title === t); const a = s && s.headings ? s.headings.split('\t') : []; while (a.length < 6) a.push(''); return a; };
     const cats = g.sections.map(s => s.title);
     for (const e of g.entries) if (!cats.includes(e.category)) cats.push(e.category);
-    let h = '';
+    let h = `<div class="card"><div class="row"><strong>Syllable shape</strong>
+      ${isOwner() ? `<input id="gr_shape" value="${esc(S.lang.syllable_shape || '')}" placeholder="e.g. (V)C(C)V(C)" size="20" class="form"><button data-act="saveShape">Save</button>` : `<span class="form">${esc(S.lang.syllable_shape || 'not set')}</span>`}</div>
+      <p class="muted small">C = consonant, V = vowel, brackets = optional. A leading (V) is an optional vowel at the start of a word only. sh, ch, gh, ng and diphthongs (ai, ou) count as one sound. "Suggest new roots" only proposes forms of this shape, and a language without its own shape uses its parent's.</p></div>`;
     if (canEdit()) h += `<div class="card"><div class="row"><select id="gr_cat" data-grcat="1">${cats.map(c => `<option>${esc(c)}</option>`).join('')}</select>
       <input id="gr_name" placeholder="name" size="26"><input id="gr_year" type="number" placeholder="from year" size="8"><input id="gr_id" type="hidden"></div>
       <div class="row">${[1, 2, 3, 4, 5, 6].map(k => `<input id="gr_c${k}" placeholder="column ${k}" size="22">`).join('')}</div>
@@ -233,12 +255,16 @@ const TAB = {
     let h = `<div class="row"><label style="margin:0">Show inventory as of year</label><input type="number" id="s_year" data-soundyear="1" value="${yr ?? ''}" placeholder="now" size="8">
       <span class="muted small">Blank = sounds currently in the language. Give a sound a "from" / "until" year to make the table change over time.</span></div>
       <h3>Consonants</h3>${grid('consonant')}<h3>Vowels</h3>${grid('vowel')}`;
+    h += `<h3>Build from the word list</h3><div class="card"><p class="muted small">Reads the forms of this language's words at every year one of its own sound changes starts, and lists the sounds they use. Letters you have already placed in the table above keep their place; digraphs (sh, ch, th, ng) and diphthongs (ai, ou) count as one sound.</p>
+      <div class="row"><label style="margin:0">Up to year</label><input type="number" id="as_to" value="${S.autoTo ?? 900}" size="6"><button data-act="autoSoundsLoad">Build table</button></div><div id="as_out"></div></div>`;
     if (canEdit()) h += `<h3>Add / edit a sound</h3><div class="card"><div class="row"><input id="ph_symbol" placeholder="symbol" size="6" class="form">
       <select id="ph_kind"><option>consonant</option><option>vowel</option></select>
       <input id="ph_row" list="ph_rows" placeholder="row (manner / height)" size="18"><datalist id="ph_rows">${[...new Set(ph.map(p => p.row_label).filter(Boolean))].map(x => `<option>${esc(x)}</option>`).join('')}</datalist>
       <input id="ph_col" list="ph_cols" placeholder="column (place / backness)" size="22"><datalist id="ph_cols">${[...new Set(ph.map(p => p.col_label).filter(Boolean))].map(x => `<option>${esc(x)}</option>`).join('')}</datalist>
       <input id="ph_notes" placeholder="notes" size="18"><input id="ph_from" type="number" placeholder="from year" size="8"><input id="ph_to" type="number" placeholder="until year" size="8"><input id="ph_id" type="hidden"></div>
       <div class="row"><button class="primary" data-act="savePhoneme" id="ph_btn">Add sound</button><button data-act="cancelPhoneme" id="ph_cancel" hidden>Cancel edit</button></div></div>`;
+    if (canEdit()) h += `<h3>Import sounds</h3><div class="card"><p class="muted small">Paste a table with one sound per line: <code>Symbol | Kind | Row | Column | Notes | From | Until</code> (tab, | or ; between cells; the last three are optional), or choose a JSON file with a "sounds" list. Sounds with the same symbol, kind and years are updated.</p>
+      <textarea id="si_text" rows="6" class="form"></textarea><div class="row"><input type="file" id="si_file" accept=".json,.txt,.csv,.tsv"><button data-act="soundImportCheck">Check</button></div><div id="si_out"></div></div>`;
     h += '<h3>All sounds</h3><table><tr><th>Symbol</th><th>Kind</th><th>Row</th><th>Column</th><th>Notes</th><th>From</th><th>Until</th><th></th></tr>' + ph.map(p =>
       `<tr><td class="form">${esc(p.symbol)}</td><td>${esc(p.kind)}</td><td>${esc(p.row_label)}</td><td>${esc(p.col_label)}</td><td>${esc(p.notes)}</td><td>${p.year ?? ''}</td><td>${p.year_to ?? ''}</td>
       <td>${canEdit() ? `<button data-act="editPhoneme" data-id="${p.id}">Edit</button> <button class="danger" data-act="delPhoneme" data-id="${p.id}">✕</button>` : ''}</td></tr>`).join('') + '</table>';
@@ -276,12 +302,16 @@ const TAB = {
       <div class="row">${sel('g_a')} ↔ ${sel('g_b')}
       <select id="g_metric" data-gmetric="1"><option value="avg_distance">average difference</option><option value="identical">words with identical forms</option></select>
       <input id="g_from" type="number" placeholder="from year" size="8"><input id="g_to" type="number" placeholder="to year" size="8"><button class="primary" data-act="drawGraph">Draw</button></div><div id="g_out">Loading…</div>
+      <h3>Mergers: words that end up sounding the same</h3>
+      <p class="muted small">For this language and each of its branches: how many words had different forms when the language began (at its split) but are identical now, which sound change causes the most, and the biggest groups of words that now sound alike.
+      Mergers make a language hard to decode, so this is the number to watch when you want a language that is readable but hard to hear.</p>
+      <div class="row"><button class="primary" data-act="mergersGo">Calculate</button></div><div id="m_out"></div>
       <p class="muted small">The evolution tree of a single word is in the word popup: click a word in the dictionary.</p>`;
   },
   async bulk() {
     if (!canEdit()) return '<p class="muted">Editors only.</p>';
     return `<p class="muted small">One word per line: <code>gloss;type;form;year;notes</code> (tab-separated also works). Nothing is added if any line has an error.</p>
-    <textarea id="b_text" rows="12"></textarea><div class="row"><button data-act="bulkCheck">Check only</button><button class="primary" data-act="bulkGo">Add all</button></div>`;
+    <textarea id="b_text" rows="12"></textarea><div class="row"><label style="display:inline;margin:0"><input type="checkbox" id="b_skip"> skip words that already exist here (same gloss)</label></div><div class="row"><button data-act="bulkCheck">Check only</button><button class="primary" data-act="bulkGo">Add all</button></div><div id="b_out"></div>`;
   },
   async changes() {
     const cs = await api('GET', base() + '/changes');
@@ -408,18 +438,35 @@ function sentView(b) {
   if (notes.length) h += '<ul class="small">' + notes.map(p => `<li class="${p.ok === false ? 'gap' : 'muted'}"><code>${esc(p.input)}</code>: ${esc(p.reason || p.note)}</li>`).join('') + '</ul>';
   return h;
 }
+function yearMatches(spec, y) {
+  const t = spec.trim(); if (!t) return true;
+  let m;
+  if ((m = t.match(/^(-?\d+)\s*\.\.\s*(-?\d+)$/))) return y >= Math.min(+m[1], +m[2]) && y <= Math.max(+m[1], +m[2]);
+  if ((m = t.match(/^<\s*(-?\d+)$/))) return y < +m[1];
+  if ((m = t.match(/^>\s*(-?\d+)$/))) return y > +m[1];
+  if (/^-?\d+$/.test(t)) return y === +t;
+  return String(y).includes(t);
+}
+function fieldFilter(w) {
+  const f = S.wf || {}, has = (v, q) => !q.trim() || String(v ?? '').toLowerCase().includes(q.trim().toLowerCase());
+  if (f.id && f.id.trim()) { const ids = f.id.split(/[,\s]+/).filter(Boolean); if (!ids.includes(String(w.id))) return false; }
+  return has(w.gloss, f.gloss || '') && has(w.pos, f.pos || '') && has(w.build, f.build || '') && yearMatches(f.year || '', w.year) &&
+    (!(f.form || '').trim() || has(w.form, f.form) || has(w.origin_form, f.form) || has(w.ref_text, f.form));
+}
 function filteredWords() {
   const q = (S.q || '').toLowerCase();
-  const all = S.showInherited === false ? S.words.filter(w => !w.inherited) : S.words;
+  let all = S.showInherited === false ? S.words.filter(w => !w.inherited) : S.words;
+  if (S.onlyProblems) all = all.filter(w => (w.problems || []).length);
+  if (S.wf && Object.values(S.wf).some(v => (v || '').trim())) all = all.filter(fieldFilter);
   if (!q) return all;
-  return all.filter(w => [w.id, w.gloss, w.meaning, w.form, w.pos, w.notes, ...(w.forms || []).map(f => f.form)].join(' ').toLowerCase().includes(q));
+  return all.filter(w => [w.id, w.gloss, w.meaning, w.ref_text, w.ref_gloss, w.ref_to ? 'reference see' : '', w.form, w.pos, w.notes, ...(w.forms || []).map(f => f.form)].join(' ').toLowerCase().includes(q));
 }
 function wordRow(w) {
   const d = defForm(w), more = (w.forms || []).filter(f => f !== d).length;
   const inh = w.inherited ? ` <span class="badge" title="Coined in ${esc(w.origin_lang)} as ${esc(w.origin_form)}">from ${esc(w.origin_lang)}</span>` : '';
   const act = w.inherited ? `<button data-act="goOrigin" data-id="${w.id}" data-lang="${w.origin_lang_id}">Open in ${esc(w.origin_lang)}</button>`
     : (canEdit() ? `<button data-act="editWord" data-id="${w.id}">Edit</button> <button class="danger" data-act="delWord" data-id="${w.id}">✕</button>` : '');
-  return `<tr class="${w.inherited ? 'inherited' : ''}"><td class="muted small">${w.id}</td><td><a data-act="openWord" data-id="${w.id}" style="cursor:pointer"><strong>${esc(w.gloss)}</strong></a>${inh}${w.meaning_changed ? `<div class="small muted">means: ${esc(w.meaning)}</div>` : ''}${w.ref_text ? `<div class="small muted">${esc(w.ref_text)}</div>` : ''}${w.ref_missing ? '<div class="small gap">refers to a word that was not found</div>' : ''}</td><td>${esc(w.pos)}</td><td>${esc(w.build)}</td><td>${w.year}</td>
+  return `<tr class="${w.inherited ? 'inherited' : ''}"><td class="muted small">${w.id}</td><td><a data-act="openWord" data-id="${w.id}" style="cursor:pointer"><strong>${esc(w.gloss)}</strong></a>${inh}${w.meaning_changed ? `<div class="small muted">means: ${esc(w.meaning)}</div>` : ''}${w.loan_from ? `<div class="small muted">borrowed from <strong>${esc(w.loan_from)}</strong></div>` : ''}${w.ref_to ? `<div class="small muted">→ same as <strong>${esc(w.ref_gloss)}</strong> (#${w.ref_to})</div>` : ''}${(w.problems || []).map(p => `<div class="small gap">⚠ ${esc(p)}</div>`).join('')}</td><td>${esc(w.pos)}</td><td>${esc(w.build)}</td><td>${w.year}</td>
     <td class="form">${esc(w.form)}</td><td>${d ? lines(d.latest) : '<span class="muted">—</span>'}${more ? ` <span class="badge">+${more}</span>` : ''}</td>
     <td>${w.length}</td><td>${esc(w.pronunciation)}</td><td>${esc((w.exists_in || []).join(', '))}</td>
     <td>${lines(w.latest)}${w.has_overrides ? ' <span class="badge">locked</span>' : ''}</td>
@@ -427,6 +474,8 @@ function wordRow(w) {
 }
 function drawDict() {
   const body = $('#wbody'); if (!body) return;
+  const nProb = S.words.filter(w => (w.problems || []).length).length, pb = $('#probbtn');
+  if (pb) { pb.textContent = (S.onlyProblems ? 'Show all words' : 'Show only words with problems') + ' (' + nProb + ')'; pb.className = S.onlyProblems ? 'primary' : ''; }
   const list = filteredWords(), size = S.pageSize, pages = Math.max(1, Math.ceil(list.length / size));
   S.page = Math.min(S.page, pages - 1);
   body.innerHTML = list.slice(S.page * size, (S.page + 1) * size).map(wordRow).join('') || '<tr><td colspan="12" class="muted">No words.</td></tr>';
@@ -453,13 +502,14 @@ async function showWord() {
   const ce = w.language_id === (S.lang && S.lang.id) ? canEdit() : !!(ownLang && ownLang.level >= 2);
   const langs = [...new Map(r.history.map(x => [x.lang_id, x.lang])).entries()];
   let h = `<button class="modalx" data-act="closeModal">✕</button><h2>${esc(w.gloss)} <span class="badge">#${w.id}</span> <span class="badge">${esc(w.pos)}</span> <span class="badge">${esc(w.build)}</span></h2>
-    <p class="muted small">${S.lang && w.language_id !== S.lang.id ? 'Coined in another language; ' + esc(S.lang.name) + "'s own version is shown in the branch table below. " : ''}Coined ${w.year}${w.notes ? ' · ' + esc(w.notes) : ''}</p>
+    <p class="muted small">${S.lang && w.language_id !== S.lang.id ? 'Coined in another language; ' + esc(S.lang.name) + "'s own version is shown in the branch table below. " : ''}Coined ${w.year}${r.loan_from ? ' · borrowed from <strong>' + esc(r.loan_from) + '</strong>' : ''}${w.notes ? ' · ' + esc(w.notes) : ''}</p>
     <h3>Forms</h3><table><tr><th>Type</th><th>Entered</th><th>Latest per branch</th><th></th></tr>
-    <tr><td>word</td><td class="form">${esc(w.form)} <span class="muted small">(${w.year})</span></td><td>${lines(lastPerLang(r.history))}</td><td></td></tr>`;
-  for (const f of r.forms) h += `<tr><td>${esc(f.label)}</td><td class="form">${esc(f.form)} <span class="muted small">(${f.year ?? w.year})</span></td><td>${lines(lastPerLang(f.history))}</td>
-    <td>${ce ? `<button data-act="editForm" data-id="${f.id}" data-form="${esc(f.form)}">Edit</button> <button class="danger" data-act="delForm" data-id="${f.id}">✕</button>` : ''}</td></tr>`;
+    <tr><td>word</td><td class="form">${r.ref ? `reference to <strong>${esc(r.ref.gloss)}</strong> <span class="muted small">(#${r.ref.id}, ${w.year})</span>` : ''}${r.ref ? '' : ce ? `<a data-act="editWordForm" data-id="${w.id}" data-form="${esc(w.form)}" style="cursor:pointer" title="Click to edit">${esc(w.form)}</a>` : esc(w.form)}${r.ref ? '' : ` <span class="muted small">(${w.year})</span>`}</td><td>${lines(lastPerLang(r.history))}</td>
+    <td>${ce ? (r.ref ? `<button data-act="popupEdit" data-id="${w.id}">Edit</button>` : `<button data-act="editWordForm" data-id="${w.id}" data-form="${esc(w.form)}">Edit</button>`) : ''}</td></tr>`;
+  for (const f of r.forms) h += `<tr><td>${esc(f.label)}</td><td class="form">${ce && !r.ref ? `<a data-act="editForm" data-id="${f.id}" data-form="${esc(f.form)}" style="cursor:pointer" title="Click to edit">${esc(f.form)}</a>` : esc(f.form)} <span class="muted small">(${f.year ?? w.year})</span></td><td>${lines(lastPerLang(f.history))}</td>
+    <td>${ce && !r.ref ? `<button data-act="editForm" data-id="${f.id}" data-form="${esc(f.form)}">Edit</button> <button class="danger" data-act="delForm" data-id="${f.id}">✕</button>` : ''}</td></tr>`;
   h += '</table>';
-  if (ce) h += `<div class="row"><input id="f_label" list="f_labels" placeholder="form type (e.g. plural)" size="18"><datalist id="f_labels"><option>definite</option><option>plural</option><option>definite plural</option><option>past</option><option>future</option><option>object</option></datalist>
+  if (ce && !r.ref) h += `<div class="row"><input id="f_label" list="f_labels" placeholder="form type (e.g. plural)" size="18"><datalist id="f_labels"><option>definite</option><option>plural</option><option>definite plural</option><option>past</option><option>future</option><option>object</option></datalist>
     <input id="f_form" placeholder="form" class="form"><input id="f_year" type="number" placeholder="year" size="8" value="${w.year}" data-yearcheck="form"><span id="f_warn" class="gap small"></span><button class="primary" data-act="addForm">Add form</button></div>
     <p class="muted small">Every form is run through the sound changes on its own, so it can end up different from the base word.</p>`;
   if (r.ref) h += `<p class="small">Cross-reference: this word uses the forms of <strong>${esc(r.ref.gloss)}</strong> (#${r.ref.id}).</p>`;
@@ -502,6 +552,45 @@ async function showSentence() {
   if (!m) { m = document.createElement('div'); m.id = 'modal'; m.className = 'modal'; document.body.appendChild(m); }
   m.innerHTML = '<div class="modalbox">' + h + '</div>'; m.hidden = false;
 }
+function loanLangs() {
+  const w = (S.worlds || []).find(x => (x.languages || []).some(l => S.lang && l.id === S.lang.id));
+  return w ? w.languages.filter(l => l.id !== S.lang.id) : [];
+}
+function syncLoanBox() {
+  const on = $('#w_isloan') && $('#w_isloan').checked;
+  if ($('#w_loanlang')) $('#w_loanlang').hidden = !on;
+  if ($('#w_loanword')) $('#w_loanword').hidden = !on;
+  if (on && $('#w_isref') && $('#w_isref').checked) { $('#w_isref').checked = false; syncRefBox(); }
+  if ($('#w_form') && on) $('#w_form').hidden = true; else if ($('#w_form') && !($('#w_isref') && $('#w_isref').checked)) $('#w_form').hidden = false;
+}
+async function fillLoanWords() {
+  const id = val('w_loanlang'), dl = $('#w_loanwords');
+  if (!dl) return;
+  $('#w_loanword').value = '';
+  if (!id) { dl.innerHTML = ''; return; }
+  try {
+    const ws = await api('GET', '/rune/api/languages/' + id + '/words');
+    dl.innerHTML = ws.map(x => `<option value="${esc(x.gloss)} · ${esc(x.form)} #${x.id}">${esc(x.pos || '')}</option>`).join('');
+  } catch (e) { say(e.message, true); }
+}
+function syncRefBox() {
+  const on = $('#w_isref') && $('#w_isref').checked;
+  if ($('#w_ref')) $('#w_ref').hidden = !on;
+  if ($('#w_form')) $('#w_form').hidden = !!on;
+  if (on && $('#w_isloan') && $('#w_isloan').checked) { $('#w_isloan').checked = false; syncLoanBox(); $('#w_form').hidden = true; }
+}
+async function rebuildFlow(what, body) {
+  if (!confirm('Recompute ' + what + ' for EVERY word? Hand-edited forms will be overwritten.')) return;
+  const dry = await api('POST', base() + '/forms/generate', { ...body, overwrite: true, prune: true, dryRun: true });
+  let prune = false;
+  if (dry.stale && dry.stale.length) {
+    const lst = dry.stale.slice(0, 12).map(x => `${x.gloss} (${x.label}: ${x.form})`).join('\n');
+    prune = confirm(dry.stale.length + ' existing forms no longer fit any rule (wrong word type, or the condition no longer matches):\n\n' + lst + (dry.stale.length > 12 ? '\n… and ' + (dry.stale.length - 12) + ' more' : '') +
+      '\n\nOK = remove them as part of the rebuild.\nCancel = keep them.');
+  }
+  const r = await api('POST', base() + '/forms/generate', { ...body, overwrite: true, prune });
+  say('Added ' + r.created + ', updated ' + r.updated + ', removed ' + (r.removed || 0) + ' forms.'); renderPanel();
+}
 async function afterWordChange() { await refreshDict(); if (S.openId && $('#modal') && !$('#modal').hidden) await showWord(); }
 const TPL = {
   syncope: ['(?<={V}{C}){V}(?={C}{V})', ''], hiatus: ['{V}(?={V})', ''], haplology: ['(.{2,3})\\1', '$1'],
@@ -527,16 +616,47 @@ const A = {
   undo: async () => { const r = await api('POST', base() + '/undo'); say('Undid ' + r.undone); renderPanel(); },
   redo: async () => { const r = await api('POST', base() + '/redo'); say('Redid ' + r.redone); renderPanel(); },
 
+  saveShape: async () => {
+    await api('PUT', base(), { syllableShape: val('gr_shape') });
+    say('Syllable shape saved.'); await loadWorlds(); renderPanel();
+  },
+  suggestRoots: async () => {
+    const [lo, hi] = val('sg_syl').split('-');
+    const n = Math.max(1, Math.min(40, Number(val('sg_n')) || 10));
+    const r = await api('GET', base() + '/suggest-roots?count=' + n + '&min=' + lo + '&max=' + hi);
+    const shapeNote = r.shape ? `<span class="muted small">Shape ${esc(r.shape)}${r.mode === 'shape' ? ' (built from the shape and the Sounds tab, since there are too few words to learn from)' : ''}: </span>` : '';
+    $('#sg_out').innerHTML = shapeNote + (r.roots.length ? r.roots.map(x => `<button class="form" data-act="useRoot" data-form="${esc(x)}">${esc(x)}</button>`).join(' ')
+      : `<span class="muted small">${esc(r.reason || 'No free form was found. Try again or allow more syllables.')}</span>`);
+  },
+  useRoot: async d => {
+    if ($('#w_isref') && $('#w_isref').checked) { $('#w_isref').checked = false; syncRefBox(); }
+    if ($('#w_isloan') && $('#w_isloan').checked) { $('#w_isloan').checked = false; syncLoanBox(); }
+    $('#w_form').hidden = false; $('#w_form').value = d.form; $('#w_gloss').focus();
+  },
   saveWord: async () => {
     const p = { gloss: val('w_gloss'), pos: val('w_pos'), build: val('w_build'), form: val('w_form'), notes: val('w_notes') };
     if (val('w_year') !== '') p.year = Number(val('w_year'));
+    if ($('#w_isref') && $('#w_isref').checked) {
+      const t = val('w_ref').trim(), m = t.match(/#(\d+)\s*$/);
+      let target = m ? Number(m[1]) : null;
+      if (target == null) { const c = S.words.filter(x => !x.ref_to && x.gloss.toLowerCase() === t.toLowerCase()); if (c.length === 1) target = c[0].id; else { say(c.length ? 'Several words are called "' + t + '": pick one from the list.' : 'Pick the word to refer to from the list.', true); return; } }
+      p.ref_word_id = target; delete p.form;
+    } else if (val('w_id')) p.ref_word_id = null;
+    if ($('#w_isloan') && $('#w_isloan').checked) {
+      const t = val('w_loanword').trim(), m = t.match(/#(\d+)\s*$/);
+      if (!m) { say('Pick the language, then the word to borrow from the list.', true); return; }
+      if (val('w_year') === '') { say('Give the year of borrowing.', true); return; }
+      p.loan_word_id = Number(m[1]); delete p.form; delete p.ref_word_id;
+      if (!p.gloss) p.gloss = t.replace(/\s*#\d+\s*$/, '').replace(/\s*·.*$/, '');
+    }
     const id = val('w_id');
     const r = await api('POST', base() + '/edit', { entity: 'word', action: id ? 'UPDATE' : 'CREATE', entityId: id ? Number(id) : null, payload: p });
     say(r.status === 'pending' ? 'Submitted for the owner to approve.' : 'Saved.'); renderPanel();
   },
   editWord: async d => {
     const w = S.words.find(x => x.id === Number(d.id));
-    for (const [k, v] of [['gloss', w.gloss], ['pos', w.pos], ['build', w.build], ['form', w.form], ['year', w.year], ['notes', w.notes]]) $('#w_' + k).value = v ?? '';
+    for (const [k, v] of [['gloss', w.gloss], ['pos', w.pos], ['build', w.build], ['form', w.ref_to ? '' : w.form], ['year', w.year], ['notes', w.notes]]) $('#w_' + k).value = v ?? '';
+    $('#w_isref').checked = !!w.ref_to; $('#w_ref').value = w.ref_to ? w.ref_gloss + ' #' + w.ref_to : ''; syncRefBox();
     $('#w_id').value = w.id; $('#w_btn').textContent = 'Save changes'; window.scrollTo(0, 0);
   },
   delWord: async d => {
@@ -571,6 +691,43 @@ const A = {
     if (p.year != null && S.openWordYear != null && p.year < S.openWordYear && !confirm('The year ' + p.year + ' is older than the word itself (' + S.openWordYear + '). Add the form anyway?')) return;
     const r = await api('POST', wbase() + '/edit', { entity: 'form', action: 'CREATE', payload: p });
     say(r.status === 'pending' ? 'Submitted for the owner to approve.' : 'Form added.'); await afterWordChange();
+  },
+  ruleImportCheck: async () => {
+    const f = $('#ri_file') && $('#ri_file').files[0];
+    if (!f) { say('Choose a JSON file first.', true); return; }
+    let data;
+    try { data = JSON.parse(await f.text()); } catch (e) { say('That file is not valid JSON: ' + e.message, true); return; }
+    const rules = Array.isArray(data) ? data : data.rules;
+    if (!Array.isArray(rules)) { say('The file needs a "rules" list.', true); return; }
+    S.ruleImport = { rules, removeMissing: $('#ri_rm').checked };
+    const res = await api('POST', base() + '/rules/import', { ...S.ruleImport, dryRun: true });
+    const act = { add: 'add', change: 'change', remove: 'remove', same: 'same', skip: 'skip' };
+    let h = `<p><strong>${res.added}</strong> to add, <strong>${res.changed}</strong> to change, <strong>${res.removed}</strong> to remove, ${res.unchanged} unchanged.</p>`;
+    if (res.errors.length) h += '<div class="gap"><strong>Nothing will be imported until these are fixed:</strong><ul>' + res.errors.map(e => `<li>${esc(e)}</li>`).join('') + '</ul></div>';
+    const shown = res.items.filter(i => i.action !== 'same');
+    if (shown.length) h += '<table><tr><th></th><th>Language</th><th>Year</th><th>Pattern</th><th>Replacement</th><th></th></tr>' +
+      shown.map(i => `<tr class="${i.action === 'remove' ? 'pending' : ''}"><td>${act[i.action]}</td><td>${esc(i.language)}</td><td>${i.year ?? ''}</td><td class="form">${esc(i.pattern)}</td><td class="form">${esc(i.replacement)}</td><td class="small muted">${esc(i.detail)}</td></tr>`).join('') + '</table>';
+    if (!res.errors.length && (res.added || res.changed || res.removed)) h += '<div class="row"><button class="primary" data-act="ruleImportApply">Apply these changes</button></div>';
+    $('#ri_out').innerHTML = h;
+  },
+  ruleImportApply: async () => {
+    if (!S.ruleImport) return;
+    const res = await api('POST', base() + '/rules/import', { ...S.ruleImport, dryRun: false });
+    S.ruleImport = null;
+    say('Imported: ' + res.added + ' added, ' + res.changed + ' changed, ' + res.removed + ' removed' + (res.pending ? ' (' + res.pending + ' waiting for the owner to approve)' : '') + '. Undo is available.');
+    renderPanel();
+  },
+  ruleScope: async d => { S.ruleScope = d.v; try { localStorage.setItem('ruleScope', d.v); } catch (x) { /* ignore */ } renderPanel(); },
+  clearFilters: async () => { S.wf = {}; S.q = ''; S.page = 0; renderPanel(); },
+  toggleProblems: async () => { S.onlyProblems = !S.onlyProblems; S.page = 0; drawDict(); },
+  popupEdit: async d => {
+    const m = $('#modal'); if (m) m.hidden = true; S.openId = null;
+    if (S.tab === 'dict' && S.words.some(x => x.id === Number(d.id) && !x.inherited)) await A.editWord(d); else say('Open the word in its own language to edit it.', true);
+  },
+  editWordForm: async d => {
+    const f = prompt('New form of the word (the form it had when coined):', d.form); if (f == null || !f.trim() || f.trim() === d.form) return;
+    const r = await api('POST', wbase() + '/edit', { entity: 'word', action: 'UPDATE', entityId: Number(d.id), payload: { form: f.trim() } });
+    say(r.status === 'pending' ? 'Submitted for the owner to approve.' : 'Saved. Undo is available.'); await afterWordChange();
   },
   editForm: async d => {
     const f = prompt('New form:', d.form); if (f == null || !f.trim()) return;
@@ -622,14 +779,8 @@ const A = {
   genForms: async () => {
     const r = await api('POST', base() + '/forms/generate', {}); say('Added ' + r.created + ' forms.'); renderPanel();
   },
-  rebuildGroup: async d => {
-    if (!confirm('Recompute every form in ' + (d.g ? 'the group "' + d.g + '"' : 'the ungrouped forms') + ' for EVERY word? Hand-edited forms will be overwritten.')) return;
-    const r = await api('POST', base() + '/forms/generate', { group: d.g || '', overwrite: true }); say('Added ' + r.created + ', updated ' + r.updated + ' forms.'); renderPanel();
-  },
-  rebuildForm: async d => {
-    if (!confirm('Recompute the "' + d.l + '" form of EVERY word from the rule? Hand-edited forms will be overwritten.')) return;
-    const r = await api('POST', base() + '/forms/generate', { label: d.l, overwrite: true }); say('Added ' + r.created + ', updated ' + r.updated + ' forms.'); renderPanel();
-  },
+  rebuildGroup: async d => { await rebuildFlow(d.g ? 'every form in the group "' + d.g + '"' : 'every ungrouped form', { group: d.g || '' }); },
+  rebuildForm: async d => { await rebuildFlow('the "' + d.l + '" form', { label: d.l }); },
   rowToForm: async d => {
     const e = S.grammar.entries.find(x => x.id === Number(d.id));
     S.prefill = { label: e.name, hint: [e.c1, e.c2].filter(Boolean).join(' · ') }; S.tab = 'forms'; await renderPanel();
@@ -725,6 +876,20 @@ const A = {
     await api('PUT', '/rune/api/sentences/' + S.openSent, { source: val('e_src'), year: Number(val('e_year') || 0), translation: val('e_tr'), notes: val('e_notes'), kind: val('e_kind'), group: val('e_group'), sub: val('e_sub') });
     say('Saved.'); await showSentence(); renderPanel();
   },
+  mergersGo: async () => {
+    const o = $('#m_out'); o.textContent = 'Calculating…';
+    const res = await api('GET', base() + '/mergers');
+    let h = '<table><tr><th>Language</th><th>Words</th><th>Different forms at start</th><th>Different forms now</th><th>Merged</th><th>Words sharing a form: start</th><th>now</th></tr>' +
+      res.map(m => `<tr><td><strong>${esc(m.language)}</strong></td><td>${m.words}</td><td>${m.distinct_start}</td><td>${m.distinct_now}</td><td><strong>${m.merged}</strong> (${m.distinct_start ? Math.round(m.merged / m.distinct_start * 100) : 0}%)</td><td>${m.homophone_words_start}</td><td>${m.homophone_words_now}</td></tr>`).join('') + '</table>';
+    for (const m of res) {
+      if (!m.rules.length && !m.groups.length) continue;
+      h += `<details><summary>${esc(m.language)}: rules that merge the most, and words that now sound alike</summary>`;
+      if (m.rules.length) h += '<table><tr><th>Year</th><th>Rule</th><th>Words changed</th><th>Forms merged</th></tr>' + m.rules.map(r => `<tr><td>${r.year}</td><td class="form">${esc(r.rule)}</td><td>${r.changed}</td><td>${r.merged}</td></tr>`).join('') + '</table>';
+      if (m.groups.length) h += '<p class="small"><strong>Biggest groups of words with the same form now:</strong></p><ul class="small">' + m.groups.map(g => `<li><span class="form">${esc(g.form)}</span>: ${g.words.map(esc).join(', ')}</li>`).join('') + '</ul>';
+      h += '</details>';
+    }
+    o.innerHTML = h;
+  },
   drawGraph: async () => {
     const q = new URLSearchParams();
     for (const [k, id] of [['a', 'g_a'], ['b', 'g_b'], ['from', 'g_from'], ['to', 'g_to']]) if (val(id) !== '') q.set(k, val(id));
@@ -770,8 +935,53 @@ const A = {
     const r = await api('POST', base() + '/edit', { entity: 'word', action: 'CREATE', payload: { gloss: S.comp.gloss, build: 'compound', form: s.form, notes: 'compound: ' + S.comp.parts.join(' + ') } });
     say(r.status === 'pending' ? 'Submitted for approval.' : 'Word added.');
   },
-  bulkCheck: async () => { const r = await api('POST', base() + '/bulk', { text: val('b_text'), dryRun: true }); say(r.count + ' lines look good.'); },
-  bulkGo: async () => { const r = await api('POST', base() + '/bulk', { text: val('b_text') }); say('Added ' + r.count + ' words.'); S.tab = 'dict'; renderPanel(); },
+  bulkCheck: async () => {
+    const r = await api('POST', base() + '/bulk', { text: val('b_text'), dryRun: true, skipExisting: $('#b_skip').checked });
+    say(r.count + ' words would be added.' + (r.skipped.length ? ' Already there, skipped: ' + r.skipped.join(', ') + '.' : ''));
+  },
+  bulkGo: async () => {
+    const r = await api('POST', base() + '/bulk', { text: val('b_text'), skipExisting: $('#b_skip').checked });
+    say('Added ' + r.count + ' words.' + (r.skipped.length ? ' Skipped (already there): ' + r.skipped.join(', ') + '.' : '')); S.tab = 'dict'; renderPanel();
+  },
+  soundImportCheck: async () => {
+    const f = $('#si_file') && $('#si_file').files[0];
+    let body = { dryRun: true };
+    if (f) {
+      const t = await f.text();
+      if (/^\s*[\[{]/.test(t)) {
+        let d; try { d = JSON.parse(t); } catch (e) { say('That file is not valid JSON: ' + e.message, true); return; }
+        const list = Array.isArray(d) ? d : (d.sounds || d.phonemes);
+        if (!Array.isArray(list)) { say('The JSON needs a "sounds" list.', true); return; }
+        body.sounds = list;
+      } else body.text = t;
+    } else body.text = val('si_text');
+    if (!body.sounds && !(body.text || '').trim()) { say('Paste a table or choose a file first.', true); return; }
+    S.soundImport = body;
+    const res = await api('POST', base() + '/phonemes/import', body);
+    let h = `<p><strong>${res.added}</strong> to add, <strong>${res.changed}</strong> to change, ${res.unchanged} already the same.</p>`;
+    if (res.errors.length) h += '<div class="gap"><strong>Nothing will be imported until these are fixed:</strong><ul>' + res.errors.map(e => `<li>${esc(e)}</li>`).join('') + '</ul></div>';
+    const shown = res.items.filter(i => i.action === 'add' || i.action === 'change');
+    if (shown.length) h += '<table><tr><th></th><th>Symbol</th><th>Kind</th><th>Row</th><th>Column</th><th>From</th><th>Until</th></tr>' + shown.map(i => `<tr><td>${i.action}</td><td class="form">${esc(i.symbol)}</td><td>${esc(i.kind)}</td><td>${esc(i.row)}</td><td>${esc(i.col)}</td><td>${i.year ?? ''}</td><td>${i.year_to ?? ''}</td></tr>`).join('') + '</table>';
+    if (!res.errors.length && (res.added || res.changed)) h += '<div class="row"><button class="primary" data-act="soundImportApply">Apply these changes</button></div>';
+    $('#si_out').innerHTML = h;
+  },
+  soundImportApply: async () => {
+    if (!S.soundImport) return;
+    const res = await api('POST', base() + '/phonemes/import', { ...S.soundImport, dryRun: false });
+    S.soundImport = null;
+    say('Imported: ' + res.added + ' added, ' + res.changed + ' changed.'); renderPanel();
+  },
+  autoSoundsLoad: async () => {
+    S.autoTo = Number(val('as_to')) || 900;
+    S.autoData = await api('GET', base() + '/auto-sounds?to=' + S.autoTo);
+    S.autoYear = S.autoData.from;
+    drawAutoSounds(true);
+  },
+  autoSoundsApply: async () => {
+    if (!confirm('Replace the sounds made by an earlier build with these? Sounds you added by hand are not touched.')) return;
+    const res = await api('POST', base() + '/auto-sounds/apply', { to: S.autoTo });
+    say('Sounds saved: ' + res.added + ' added, ' + res.removed + ' earlier ones replaced, ' + res.keptYours + ' of yours kept as they were.'); renderPanel();
+  },
   approve: async d => { await api('POST', '/rune/api/changes/' + d.id + '/approve'); say('Approved.'); renderPanel(); },
   deny: async d => { await api('POST', '/rune/api/changes/' + d.id + '/deny'); say('Denied.'); renderPanel(); },
   addShare: async () => {
@@ -794,6 +1004,7 @@ document.addEventListener('click', e => {
 });
 document.addEventListener('input', e => {
   if (e.target.dataset.gfilter) { const q = e.target.value.toLowerCase(); document.querySelectorAll('.gt tr').forEach((tr, i) => { if (tr.querySelector('th')) return; tr.hidden = q && !tr.textContent.toLowerCase().includes(q); }); }
+  if (e.target.dataset.wf) { S.wf = S.wf || {}; S.wf[e.target.dataset.wf] = e.target.value; S.page = 0; drawDict(); return; }
   if (e.target.dataset.filter) { S.q = e.target.value; S.page = 0; drawDict(); }
 });
 document.addEventListener('click', e => { if (e.target.id === 'modal') { e.target.hidden = true; S.openId = null; } });
@@ -817,12 +1028,52 @@ document.addEventListener('change', e => {
   if (e.target.dataset.logauto) { stopLogTimer(); if (e.target.checked) S.logTimer = setInterval(() => { if (S.page === 'log') loadLog(true); else stopLogTimer(); }, 10000); return; }
   if (e.target.id === 'gr_cat') { applyHeadings(); return; }
   if (e.target.dataset.soundyear) { S.soundYear = e.target.value === '' ? '' : Number(e.target.value); renderPanel(); return; }
+  if (e.target.dataset.isref) { syncRefBox(); return; }
+  if (e.target.dataset.isloan) { syncLoanBox(); return; }
+  if (e.target.dataset.loanlang) { fillLoanWords(); return; }
   if (e.target.dataset.gmetric) { drawDivergence(); return; }
   if (e.target.dataset.inh) { S.showInherited = e.target.checked; S.page = 0; drawDict(); return; }
   if (e.target.dataset.psize) { S.pageSize = Number(e.target.value); try { localStorage.setItem('pageSize', String(S.pageSize)); } catch (x) { /* ignore */ } S.page = 0; drawDict(); return; }
   if (e.target.dataset.scope) { S.ruleScope = e.target.value; renderPanel(); return; }
   if (e.target.dataset.tpl && TPL[e.target.value]) { $('#r_pat').value = TPL[e.target.value][0]; $('#r_rep').value = TPL[e.target.value][1]; $('#r_name').value = e.target.selectedOptions[0].textContent; }
 });
-document.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.id === 'p') wrap(A.login)(); });
-api('GET', '/rune/api/version').then(v => { $('#ver').textContent = 'v' + v.version + (v.built ? ' · built ' + v.built.replace('T', ' ').replace('Z', ' UTC') : ''); }).catch(() => {});
+function autoIndex(d, year) { let k = 0; d.events.forEach((e, i) => { if (e.year <= year) k = i; }); return k; }
+function drawAutoSounds(full) {
+  const d = S.autoData; if (!d || !$('#as_out')) return;
+  const k = autoIndex(d, S.autoYear), ev = d.events[k];
+  const here = d.sounds.filter(x => x.counts[k] > 0);
+  const grid = kind => {
+    const all = here.filter(x => x.known && x.kind === kind), rows = [...new Set(all.map(x => x.row))], cols = [...new Set(all.map(x => x.col))];
+    if (!all.length) return '<p class="muted">None.</p>';
+    return '<table><tr><th></th>' + cols.map(c => `<th>${esc(c)}</th>`).join('') + '</tr>' + rows.map(r => `<tr><th>${esc(r)}</th>` + cols.map(c =>
+      `<td class="form">${all.filter(x => x.row === r && x.col === c).map(x => `<span title="/${esc(x.ipa)}/ in ${x.counts[k]} words, e.g. ${esc(x.examples.join(', '))}"${k > 0 && x.counts[k - 1] === 0 ? ' style="font-weight:bold;text-decoration:underline"' : ''}>${esc(x.symbol)}</span>`).join(', ')}</td>`).join('') + '</tr>').join('') + '</table>';
+  };
+  const gained = k > 0 ? d.sounds.filter(x => x.counts[k] > 0 && x.counts[k - 1] === 0).map(x => x.symbol) : [];
+  const lost = k > 0 ? d.sounds.filter(x => x.counts[k] === 0 && x.counts[k - 1] > 0).map(x => x.symbol) : [];
+  const odd = here.filter(x => !x.known).map(x => x.symbol);
+  let h = '';
+  if (full) h += `<div class="row"><input type="range" id="as_slider" data-autoslider="1" min="${d.from}" max="${d.to}" step="1" value="${S.autoYear}" style="flex:1;min-width:200px"><strong id="as_yr"></strong></div>`;
+  h += '<div id="as_table"></div>';
+  if (full && canEdit()) h += '<div class="row"><button class="primary" data-act="autoSoundsApply">Save as the sound table</button><span class="muted small">Saves each sound with the years it is in use (from / until), so the table above changes with its year box.</span></div>';
+  if (full) $('#as_out').innerHTML = h;
+  $('#as_yr').textContent = 'Year ' + S.autoYear + ' · sound-change set of ' + ev.year + ' · ' + ev.words + ' words';
+  $('#as_table').innerHTML = `${ev.rules.length ? `<p class="small muted">Sound changes starting ${ev.year}: ${ev.rules.map(esc).join('; ')}</p>` : ''}
+    ${gained.length ? `<p class="small">New since the previous step: <span class="form">${gained.map(esc).join(', ')}</span></p>` : ''}
+    ${lost.length ? `<p class="small">Gone since the previous step: <span class="form">${lost.map(esc).join(', ')}</span></p>` : ''}
+    <h4>Consonants (${here.filter(x => x.kind === 'consonant' && x.known).length})</h4>${grid('consonant')}<h4>Vowels (${here.filter(x => x.kind === 'vowel' && x.known).length})</h4>${grid('vowel')}
+    ${odd.length ? `<p class="gap small">Not recognised, so not placed: <span class="form">${odd.map(esc).join(', ')}</span>. Add them to the table above and build again.</p>` : ''}`;
+}
+document.addEventListener('input', e => {
+  if (e.target.dataset.autoslider) { S.autoYear = Number(e.target.value); drawAutoSounds(false); }
+});
+const UI_VERSION = '1.1.0';   // keep equal to the version in pom.xml
+api('GET', '/rune/api/version').then(v => {
+  $('#ver').textContent = 'v' + v.version + (v.built ? ' · built ' + v.built.replace('T', ' ').replace('Z', ' UTC') : '');
+  if (v.version !== UI_VERSION) {
+    const b = document.createElement('div');
+    b.style.cssText = 'background:#b3261e;color:#fff;padding:8px 14px;font-size:14px';
+    b.textContent = 'The page is version ' + UI_VERSION + ' but the running server is ' + v.version + '. Stop the app completely, then in Eclipse do Maven > Update Project (Force Update), Project > Clean, and start it again. Until then some features will fail.';
+    document.body.insertBefore(b, document.body.firstChild);
+  }
+}).catch(() => {});
 boot().catch(e => say(e.message, true));

@@ -56,3 +56,5 @@ tr.grouprow th{text-align:left;background:#eef0ee;padding:.5rem .6rem;font-size:
 .treewrap{overflow:auto;max-width:100%;border:1px solid #8883;border-radius:6px;padding:4px;margin:6px 0}
 header .home{font-size:.85rem;color:var(--muted,#666);text-decoration:none;white-space:nowrap}
 header .home:hover{text-decoration:underline}
+tr.filters th{background:transparent;padding:2px 4px;font-weight:normal}
+tr.filters input{font-size:.8rem;padding:2px 4px}

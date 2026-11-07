@@ -182,4 +182,146 @@ class EvolverTest {
         assertTrue(Math.abs(Distance.normalized("tiat", "tuat") - 0.25) < 1e-9);
         assertEquals(1.0, Distance.normalized("ab", ""));
     }
+
+    @Test
+    void ruleDiffFindsOnlyRealChanges() {
+        Map<String, Object> stored = new java.util.HashMap<>(Map.of("year", -500, "ord", 1, "name", "", "pattern", "air", "replacement", "ar"));
+        Map<String, Object> same = new java.util.HashMap<>(Map.of("year", -500L, "order", 1, "pattern", "air", "replacement", "ar", "name", ""));
+        assertTrue(RuleDiff.changed(stored, same).isEmpty());
+        Map<String, Object> edit = new java.util.HashMap<>(Map.of("year", -750, "replacement", "a"));
+        Map<String, Object> ch = RuleDiff.changed(stored, edit);
+        assertEquals(2, ch.size());
+        assertEquals(-750L, ch.get("year"));
+        assertEquals("a", ch.get("replacement"));
+    }
+
+    @Test
+    void mergerSimulationCountsCollapsedForms() {
+        List<String> start = List.of("tata", "kata", "tapa", "mama");
+        List<Map<String, String>> steps = List.of(
+                Map.of("1|t>k", "kaka", "2|a>o", "koko"),
+                Map.of("1|t>k", "kaka", "2|a>o", "koko"),
+                Map.of("1|t>k", "kapa", "2|a>o", "kopo"),
+                Map.of("2|a>o", "momo"));
+        List<int[]> r = Mergers.simulate(start, steps, List.of("1|t>k", "2|a>o"));
+        // t>k: tata and kata (as kaka) are no longer different: one form lost; tapa -> kapa changes but stays distinct
+        assertEquals(3, r.get(0)[0]);
+        assertEquals(1, r.get(0)[1]);
+        // a>o changes everything and loses nothing
+        assertEquals(4, r.get(1)[0]);
+        assertEquals(0, r.get(1)[1]);
+    }
+
+    @Test
+    void treeCheckFindsSplitsThatCutOffInheritance() {
+        List<TreeCheck.Node> ok = List.of(new TreeCheck.Node(1, "Elven", null, null), new TreeCheck.Node(2, "High", 1L, -2000),
+                new TreeCheck.Node(3, "Drow", 2L, -2000), new TreeCheck.Node(4, "Orc", 3L, -1800));
+        TreeCheck.Result r = TreeCheck.check(4, ok);
+        assertEquals(List.of("Orc", "Drow", "High", "Elven"), r.lineage());
+        assertTrue(r.problems().isEmpty());
+
+        List<TreeCheck.Node> late = List.of(new TreeCheck.Node(1, "Elven", null, null), new TreeCheck.Node(2, "High", 1L, -2000),
+                new TreeCheck.Node(3, "Drow", 2L, -1500), new TreeCheck.Node(4, "Orc", 3L, -1800));
+        r = TreeCheck.check(4, late);
+        assertEquals(1, r.problems().size());
+        assertTrue(r.problems().get(0).contains("Orc splits from Drow at -1800"));
+
+        List<TreeCheck.Node> none = List.of(new TreeCheck.Node(1, "Elven", null, null), new TreeCheck.Node(2, "High", 1L, null),
+                new TreeCheck.Node(3, "Drow", 2L, -2000), new TreeCheck.Node(4, "Orc", 3L, -1800));
+        r = TreeCheck.check(4, none);
+        assertEquals(1, r.problems().size());
+        assertTrue(r.problems().get(0).startsWith("High has no split year"));
+    }
+
+    @Test
+    void soundImportReadsPipeTabAndSemicolonTables() {
+        List<String> errors = new java.util.ArrayList<>();
+        String text = "| Symbol | Kind | Row | Column | Notes | From | Until |\n|---|---|---|---|---|---|---|\n"
+                + "| p | consonant | stop | lips | | | |\n"
+                + "x\tc\tfricative\tvelar\tharsh\t-1800\t500\n"
+                + "a;vowel;open;front;;;\n";
+        List<Map<String, Object>> out = SoundImport.parse(text, errors);
+        assertTrue(errors.isEmpty());
+        assertEquals(3, out.size());
+        assertEquals("p", out.get(0).get("symbol"));
+        assertEquals("stop", out.get(0).get("row_label"));
+        assertEquals("consonant", out.get(1).get("kind"));
+        assertEquals(Long.valueOf(-1800), out.get(1).get("year"));
+        assertEquals(Long.valueOf(500), out.get(1).get("year_to"));
+        assertEquals("vowel", out.get(2).get("kind"));
+    }
+
+    @Test
+    void soundImportReportsBadYears() {
+        List<String> errors = new java.util.ArrayList<>();
+        List<Map<String, Object>> out = SoundImport.parse("k;consonant;stop;velar;;abc;", errors);
+        assertEquals(0, out.size());
+        assertEquals(1, errors.size());
+    }
+
+    @Test
+    void rootSuggesterWritesNewFormsInTheStyleOfTheLanguage() {
+        List<String> corpus = List.of("tanak", "tonuk", "kanata", "nokat", "tunaka", "kotan", "nakota", "tokan", "katun", "nutaka", "taka", "kona");
+        List<String> a = RootSuggester.suggest(corpus, corpus, 6, 2, 3, 7L);
+        assertTrue(a.size() > 0 && a.size() <= 6);
+        for (String w : a) {
+            assertTrue(!corpus.contains(w));
+            int syl = RootSuggester.syllables(w);
+            assertTrue(syl >= 2 && syl <= 3);
+            assertTrue(w.matches("[tnkaou]+"));
+        }
+        assertEquals(a, RootSuggester.suggest(corpus, corpus, 6, 2, 3, 7L));
+        assertEquals(0, RootSuggester.suggest(List.of("ab", "ba"), List.of(), 5, 1, 3, 1L).size());
+    }
+
+    @Test
+    void inventorySplitsDigraphsDiphthongsAndLongVowels() {
+        assertEquals(List.of("sh", "ai", "ng", "ā"), InventoryBuilder.segment("shaingā", Set.of()));
+        assertEquals(List.of("k", "a:", "r"), InventoryBuilder.segment("ka:r", Set.of()));
+        assertEquals(List.of("t", "á", "t"), InventoryBuilder.segment("tát", Set.of()));
+        assertEquals(List.of("d", "o", "r", "u"), InventoryBuilder.segment("dor-u", Set.of()));
+    }
+
+    @Test
+    void inventoryClassifiesLettersAndKeepsOwnPlacement() {
+        InventoryBuilder.Sound sh = InventoryBuilder.classify("sh", Map.of());
+        assertEquals("Postalveolar", sh.col());
+        InventoryBuilder.Sound ll = InventoryBuilder.classify("ā", Map.of());
+        assertEquals("vowel", ll.kind());
+        assertEquals("aː", ll.ipa());
+        assertEquals("Open", ll.row());
+        assertEquals("ø", InventoryBuilder.classify("ö", Map.of()).ipa());
+        assertEquals("Close-mid", InventoryBuilder.classify("ö", Map.of()).row());
+        assertTrue(!InventoryBuilder.classify("@", Map.of()).known());
+        Map<String, InventoryBuilder.Sound> own = Map.of("r", new InventoryBuilder.Sound("r", "consonant", "Tap", "Dental", "r", true));
+        assertEquals("Tap", InventoryBuilder.classify("r", own).row());
+        Map<String, Object[]> inv = InventoryBuilder.inventory(List.of("kata", "kasha", "ta"), Map.of());
+        assertEquals(3, inv.get("a")[0]);
+        assertEquals(1, inv.get("sh")[0]);
+        assertTrue(!inv.containsKey("s"));
+    }
+
+    @Test
+    void syllableShapeChecksFormsAndSuggestionsFollowIt() {
+        SyllableShape sh = SyllableShape.parse("(V)C(C)V(C)");
+        assertTrue(sh.fits("barum") && sh.fits("toron") && sh.fits("rokagach") && sh.fits("urka") && sh.fits("grabu"));
+        assertTrue(!sh.fits("barumk"));      // two final consonants
+        assertTrue(!sh.fits("baeru"));       // two vowels in a row inside a word
+        assertTrue(!sh.fits("baruaa"));
+        assertTrue(SyllableShape.parse("CV").fits("kata") && !SyllableShape.parse("CV").fits("kat"));
+        assertTrue(SyllableShape.check("C(C)V(C)") == null);
+        assertTrue(SyllableShape.check("CX") != null && SyllableShape.check("C((C))V") != null && SyllableShape.check("CC") != null);
+        List<String> corpus = List.of("barum", "toron", "rokagach", "garum", "korag", "torum", "bagor", "rogum", "kurag", "dorag", "batum", "grabu");
+        List<String> got = RootSuggester.suggest(corpus, corpus, 8, 2, 3, 7L, sh);
+        assertTrue(!got.isEmpty());
+        for (String w : got) assertTrue(sh.fits(w));
+    }
+
+    @Test
+    void shapeAloneCanWriteWordsWithoutAnyExistingWords() {
+        SyllableShape sh = SyllableShape.parse("(V)C(C)V(C)");
+        java.util.Random rnd = new java.util.Random(3);
+        List<String> cons = List.of("b", "t", "k", "g", "r", "m", "n", "ch"), vows = List.of("a", "o", "u");
+        for (int i = 0; i < 50; i++) assertTrue(sh.fits(sh.generate(rnd, 1 + i % 3, cons, List.of("r"), cons, vows)));
+    }
 }
