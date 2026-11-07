@@ -28,7 +28,7 @@ function logShell() {
   const f = S.logFilter, opt = (v, t, cur) => `<option value="${v}" ${cur === v ? 'selected' : ''}>${t}</option>`;
   return `<div class="card"><h2>Log</h2>
     <div class="row"><select id="lg_level">${opt('', 'All levels', f.level)}${opt('WARN', 'Warnings and errors', f.level)}${opt('ERROR', 'Errors only', f.level)}</select>
-    <select id="lg_cat">${opt('', 'All categories', f.category)}${['api', 'auth', 'edit', 'import', 'share', 'system'].map(c => opt(c, c, f.category)).join('')}</select>
+    <select id="lg_cat">${opt('', 'All categories', f.category)}${['api', 'auth', 'edit', 'export', 'import', 'share', 'system'].map(c => opt(c, c, f.category)).join('')}</select>
     <input id="lg_q" placeholder="Search message, request, user…" size="30" value="${esc(f.q)}">
     <button class="primary" data-act="logSearch">Search</button><button data-act="logSearch">Refresh</button>
     <label style="display:inline;margin:0"><input type="checkbox" id="lg_auto" data-logauto="1" ${S.logTimer ? 'checked' : ''}> auto-refresh (10 s)</label>
@@ -73,7 +73,7 @@ async function loadWorlds() {
 }
 function render() {
   $('#who').innerHTML = S.me ? esc(S.me.username) + (S.me.is_admin ? ' <span class="badge">admin</span>' : '') +
-    (S.me.is_admin ? ` <button data-act="page" data-p="work" class="${S.page === 'log' ? '' : 'primary'}">Workspace</button> <button data-act="page" data-p="log" class="${S.page === 'log' ? 'primary' : ''}">Log</button> <button data-act="resetCode">Issue reset code</button>` : '') + ' <button data-act="logout">Log out</button>' : '';
+    (S.me.is_admin ? ` <button data-act="page" data-p="work" class="${S.page === 'log' ? '' : 'primary'}">Workspace</button> <button data-act="page" data-p="log" class="${S.page === 'log' ? 'primary' : ''}">Log</button> <button data-act="resetCode">Issue reset code</button> <button data-act="exportAll" title="All worlds, languages, words, rules, forms, grammar, sounds, sentences, sharing and accounts, as one file for the combined app">Export everything</button>` : '') + ' <button data-act="logout">Log out</button>' : '';
   if (!S.me) { $('#app').innerHTML = authView(); return; }
   if (S.me.is_admin && S.page === 'log') { $('#app').innerHTML = logShell(); loadLog(true); return; }
   $('#app').innerHTML = '<div class="layout"><div class="card tree" id="side">' + sideView() + '</div><div id="panel">' +
@@ -613,6 +613,7 @@ const A = {
   register: async () => { await api('POST', '/api/auth/register', { username: val('u'), password: val('p') }); await boot(); },
   doReset: async () => { await api('POST', '/api/auth/reset', { username: val('u'), code: val('rc'), password: val('np') }); say('Password changed. Log in with the new one.'); },
   logout: async () => { await api('POST', '/api/auth/logout'); S.me = null; S.lang = null; render(); },
+  exportAll: async () => { location.href = '/api/admin/export-all'; },
   resetCode: async () => {
     const u = prompt('Username to issue a reset code for:'); if (!u) return;
     const r = await api('POST', '/api/admin/reset-code', { username: u });
@@ -1080,7 +1081,7 @@ function drawAutoSounds(full) {
 document.addEventListener('input', e => {
   if (e.target.dataset.autoslider) { S.autoYear = Number(e.target.value); drawAutoSounds(false); }
 });
-const UI_VERSION = '0.24.2';   // keep equal to the version in pom.xml
+const UI_VERSION = '0.24.3';   // keep equal to the version in pom.xml
 api('GET', '/api/version').then(v => {
   $('#ver').textContent = 'v' + v.version + (v.built ? ' · built ' + v.built.replace('T', ' ').replace('Z', ' UTC') : '');
   if (v.version !== UI_VERSION) {

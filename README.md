@@ -122,6 +122,10 @@ Deleting a word also deletes its locked overrides, and Undo does not bring those
 ## v0.18.3
 - Dictionary search also finds reference words: search "see", "reference", or the name of the word they point to.
 
+## v0.24.3
+- **Export everything** (admins, in the top bar): downloads all of Root and Rune as one JSON file: accounts (with their password hashes, so passwords keep working), worlds, languages, words, word forms, overrides, meanings, sound changes, form rules, grammar, sounds, sentences, sharing, pending changes and undo history, every row with its id. The admin log and reset codes are left out. Endpoint: `GET /api/admin/export-all`.
+- Made for moving to the combined app (Root and Rune + Weather generator, branch `combined`), where an admin reads the file with **Import everything**.
+
 ## v0.24.2
 
 - Borrow: the word list is searchable by meaning and by form at the same time (each entry reads "meaning · form"), so you no longer have to look a word up in the other language first.
