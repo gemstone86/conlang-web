@@ -60,6 +60,39 @@ public class Auth {
         }
     }
 
+    /**
+     * Does the password match the account? Accounts moved over from the separate weather generator
+     * (com.eonweather.core.WeatherImport) keep their old password in its format, "pbkdf2$iterations$salt$hash"
+     * (salt column "pbkdf2"); the others use this app's (base64 hash, salt in its own column).
+     */
+    static boolean matches(String password, Map<String, Object> u) {
+        String stored = (String) u.get("pw_hash"), salt = (String) u.get("salt");
+        if (stored == null || "!".equals(salt)) return false;
+        if (stored.startsWith("pbkdf2$")) return legacyMatches(password, stored);
+        String h = hash(password, salt);
+        return MessageDigest.isEqual(h.getBytes(StandardCharsets.UTF_8), stored.getBytes(StandardCharsets.UTF_8));
+    }
+
+    private static boolean legacyMatches(String password, String stored) {
+        try {
+            String[] p = stored.split("\\$");
+            if (p.length != 4) return false;
+            Base64.Decoder b = Base64.getDecoder();
+            PBEKeySpec spec = new PBEKeySpec(password.toCharArray(), b.decode(p[2]), Integer.parseInt(p[1]), 256);
+            byte[] h = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256").generateSecret(spec).getEncoded();
+            return MessageDigest.isEqual(h, b.decode(p[3]));
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    /** After a login with an old-format password: stored again in this app's format. */
+    private void upgradeHash(Map<String, Object> u, String password) {
+        if (!String.valueOf(u.get("pw_hash")).startsWith("pbkdf2$")) return;
+        String salt = newSalt();
+        db.update("update users set pw_hash=?, salt=? where id=?", hash(password, salt), salt, u.get("id"));
+    }
+
     private static String newSalt() {
         byte[] b = new byte[16];
         RND.nextBytes(b);
@@ -102,14 +135,14 @@ public class Auth {
         if (tooManyFailures(key)) throw new ApiException(429, "Too many failed logins. Wait a few minutes and try again.");
         Map<String, Object> u = username == null ? null : db.one("select * from users where lower(username)=lower(?) and " + REAL_USER, username);
         // Always hash, so timing doesn't reveal whether the user exists.
-        String salt = u == null ? newSalt() : (String) u.get("salt");
-        String h = hash(password == null ? "" : password, salt);
-        if (u == null || !MessageDigest.isEqual(h.getBytes(StandardCharsets.UTF_8), ((String) u.get("pw_hash")).getBytes(StandardCharsets.UTF_8))) {
+        if (u == null) hash(password == null ? "" : password, newSalt());
+        if (u == null || !matches(password == null ? "" : password, u)) {
             applog.warn("auth", null, "POST /api/auth/login", 401, "Failed login for '" + username + "'" + (u == null ? " (no such user)" : " (wrong password)"));
             recordFailure(key);
             throw new ApiException(401, "Wrong username or password.");
         }
         loginFailures.remove(key);
+        upgradeHash(u, password);
         req.getSession(true);
         req.changeSessionId();
         long id = Db.num(u.get("id"));
@@ -175,8 +208,7 @@ public class Auth {
     public void changePassword(long uid, String current, String newPassword) {
         Map<String, Object> u = db.one("select * from users where id=?", uid);
         if (u == null) throw new ApiException(401, "Please log in.");
-        String h = hash(current == null ? "" : current, (String) u.get("salt"));
-        if (!MessageDigest.isEqual(h.getBytes(StandardCharsets.UTF_8), ((String) u.get("pw_hash")).getBytes(StandardCharsets.UTF_8)))
+        if (!matches(current == null ? "" : current, u))
             throw new ApiException(403, "Current password is wrong.");
         checkPassword(newPassword);
         String salt = newSalt();

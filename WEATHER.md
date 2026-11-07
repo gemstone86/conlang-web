@@ -463,7 +463,7 @@ Use the hour slider or ▶ to play through the day. Click anywhere on the map to
 - **Speed:** each moving storm gets its own speed between `speed_min` and `speed_max` (default 5–20 km/h). Half the storms are slower and half faster than about 10 km/h. Storms following the wind go faster in strong wind (up to ×1.4) and slower in calm (down to ×0.6), but never outside their min–max range. Clicking a storm shows its speed. All storm events are set to follow_wind 50 / wander 20; Pneumotropi follows the wind at 80, Ataxatropi wanders at 80.
 - `stay_in_region: true` keeps a storm inside the region it formed in; it still moves, but turns back or waits at the border (used by Summag).
 - If the same region rolls the same kind of storm while one is still alive, that storm **swells again** instead of a twin appearing.
-- The colour is the storm's force: Grundkrafter, Primalkrafter, Elementarkrafter, Livskrafter or Himlakrafter (aspects grouped as in the old `aspekt` enum).
+- The colour is the storm's force: Grundkrafter, Primalkrafter, Elementarkrafter, Livskrafter, Himlakrafter, Symbolkrafter or Själakrafter (aspects grouped as in the old `aspekt` enum; since 2.19 Topotropi is among the Grundkrafter, and Själakrafter holds Teotropi, Psykotropi and Daimotropi; since 2.20 Kosmotropi is among the Himlakrafter, Semotropi among the Symbolkrafter and Oneirotropi among the Själakrafter).
 - If the **influx** at the storm's peak matches its aspect (or its force), the influx bonus is added to the peak.
 - Clicking a storm shows its current strength out of its peak, whether it is growing or fading, how it moves and how many hours it has left.
 
@@ -500,60 +500,52 @@ The bottom-right corner of the page shows the version, e.g. `v1.28`. If the serv
 
 ## Putting it on the internet (Azure App Service)
 
-The jar contains everything, including a copy of the `world` folder, so it is the only file you upload.
+The weather generator now runs inside the combined app (Root and Rune + the weather generator, see README.md): one
+jar, `target/root-and-rune.jar`, with the weather generator at `/weather/`.
 
-1. **Build the jar:** in Eclipse, right-click the project → *Run As → Maven build…* → Goals: `clean package` → Run. The result is `target/eon-weather.jar`.
-2. **Database:** nothing to create. The built-in database file lives in the app's permanent `/home` folder (see the settings below). A separate PostgreSQL server is only worth it for many users, and it costs far more than the web app itself.
-3. **Create the web app:** *App Services → Create → Web App*. Publish: **Code**. Runtime stack: **Java 21**, **Java SE (Embedded Web Server)**. Operating system: **Linux**. Region: e.g. *Sweden Central*. Pricing plan: **Basic B1** (the Free plan sleeps and has a daily CPU limit).
-4. **Settings:** web app → *Settings → Environment variables*, add:
+**Switching the existing weather web app over** (keeps everything):
 
-   | Name | Value |
+1. **Back up first:** *Development Tools → Advanced Tools → Go → Debug console*, open `/home/data` and download
+   `eonweather.mv.db`. Best: try the move on your own computer first: put the downloaded file in this project's
+   `data/` folder (no `hub.mv.db` there), start the app, log in, and check that your maps, notes and journeys are there.
+2. **Change the environment variables** (web app → *Settings → Environment variables*):
+
+   | Remove | Add instead |
    |---|---|
-   | `PORT` | `80` |
-   | `WEBSITES_PORT` | `80` |
-   | `EON_DB_URL` | `jdbc:h2:file:/home/data/eonweather;MODE=PostgreSQL` |
-   | `EON_DB_USER` | `sa` |
-   | `EON_SECURE_COOKIE` | `true` |
-   | `EON_REGISTRATION` | `open` (set to `closed` once your players have accounts) |
-   | `WEBSITE_DISABLE_OVERLAPPED_RECYCLING` | `1` (a new version doesn't start until the old one has stopped; two copies writing the database file at once corrupts it) |
+   | `EON_DB_URL` | `DB_URL` = `jdbc:h2:file:/home/data/hub;MODE=PostgreSQL;NON_KEYWORDS=YEAR;DB_CLOSE_ON_EXIT=FALSE` |
+   | `EON_DB_USER` / `EON_DB_PASSWORD` | `DB_USER` = `sa` (`DB_PASSWORD` only if you had one) |
+   | `EON_SECURE_COOKIE` | `SECURE_COOKIE` = `true` |
+   | `EON_REGISTRATION` | `REGISTRATION` = `true` (open) or `false` (closed) |
 
-   Also turn on *Configuration → General settings → Always on*, so the site doesn't fall asleep.
-5. **Upload the jar** with the Azure CLI:
-   `az login` then
-   `az webapp deploy --resource-group <group> --name <app> --src-path target/eon-weather.jar --type jar`
-6. Open `https://<app>.azurewebsites.net`. The first start takes up to a minute.
+   Keep `PORT`, `WEBSITES_PORT`, `WEBSITE_DISABLE_OVERLAPPED_RECYCLING`, `EON_ADMINS`, `EON_DB_BACKUP_HOURS` /
+   `EON_DB_BACKUPS` and *Always on*. The new database must be in `/home/data` (as above), or it is lost at the next
+   deployment, and being next to `eonweather.mv.db` is how the move finds the old file.
+3. **Upload the new jar:**
+   `az webapp deploy --resource-group <group> --name <app> --src-path target/root-and-rune.jar --type jar`
+4. **On the first start** the old database is copied into `/home/data/hub.mv.db` (README.md, *Moving from the separate
+   weather generator*); the log says `Weather import: …`. The old file stays as it was, so going back is: the old jar
+   and the old settings.
+5. The weather generator is now at `https://<app>.azurewebsites.net/weather/`, the start page at `/` links both apps.
+   Old bookmarks to `/` land on the start page.
 
-To update later: build a new jar and repeat step 5. Notes and maps stay in the database.
+**A new web app from scratch:** *App Services → Create → Web App*, Publish **Code**, **Java 21**, **Java SE (Embedded
+Web Server)**, **Linux**, plan **Basic B1** (the Free plan sleeps). Set `PORT` and `WEBSITES_PORT` to `80`, `DB_URL` as
+above, `SECURE_COOKIE=true`, `WEBSITE_DISABLE_OVERLAPPED_RECYCLING=1`, turn on *Always on*, and upload the jar as in
+step 3. The first account registered becomes the admin.
 
-**The database file** is `/home/data/eonweather.mv.db`. App Service keeps `/home` across restarts and new deployments. To download it: *Development Tools → Advanced Tools → Go → Debug console*, open `/home/data`.
+To update later: build a new jar (Eclipse: *Run As → Maven build…* → `clean package`) and repeat step 3.
 
-How the app looks after the file (`DbGuard`, only for the built-in H2 file):
-- **One copy at a time.** File locks aren't reliable on App Service's `/home` network share, so a new version starting while the old one runs could write the file at the same time as the old one, which corrupts it. The copy using the file keeps `eonweather.owner` next to it (refreshed every 10 s); a new copy asks for the file (`eonweather.handover`), the old one closes the database cleanly and stops, and the new one takes over (waiting at most 2½ minutes). `WEBSITE_DISABLE_OVERLAPPED_RECYCLING=1` (above) avoids the overlap in the first place.
-- **Backups.** Every 6 hours (`EON_DB_BACKUP_HOURS`), 5 minutes after each start, the whole database is written as SQL to `/home/data/backups/eonweather-<date>.zip`; the newest 14 are kept (`EON_DB_BACKUPS`). Writing one reads every record, so a damaged file shows up there early: the admins get a message on the page.
-- **Repair at start.** A file that can't be opened because it is corrupted ("File corrupted while reading record") is renamed to `eonweather.corrupt-<date>.mv.db` (never deleted) and everything readable is taken back from it with H2's recovery tool. If that fails, the newest backup that works is loaded; if none, the app starts empty (the standard map is installed again). The admins see what happened in a message when they open the page, and it is in the log.
+**The database file** is `/home/data/hub.mv.db`. How the app looks after it (`DbGuard`, only for the built-in H2 file):
+- **One copy at a time.** File locks aren't reliable on App Service's `/home` network share, so a new version starting while the old one runs could write the file at the same time as the old one, which corrupts it. The copy using the file keeps `hub.owner` next to it (refreshed every 10 s); a new copy asks for the file (`hub.handover`), the old one closes the database cleanly and stops, and the new one takes over (waiting at most 2½ minutes). `WEBSITE_DISABLE_OVERLAPPED_RECYCLING=1` avoids the overlap in the first place.
+- **Backups.** Every 6 hours (`EON_DB_BACKUP_HOURS`), 5 minutes after each start, the whole database is written as SQL to `/home/data/backups/hub-<date>.zip`; the newest 14 are kept (`EON_DB_BACKUPS`). Writing one reads every record, so a damaged file shows up there early: the admins get a message on the page.
+- **Repair at start.** A file that can't be opened because it is corrupted ("File corrupted while reading record") is renamed to `hub.corrupt-<date>.mv.db` (never deleted) and everything readable is taken back from it with H2's recovery tool. If that fails, the newest backup that works is loaded; if none, the app starts empty (the standard map is installed again). The admins see what happened in a message when they open the page, and it is in the log.
 - **H2 2.3.232.** Versions before it have known bugs that corrupt the file (2.2.224, which Spring Boot 3.3 brings, among them). `pom.xml` sets `h2.version` to 2.3.232, which opens the old files as they are.
 
-**Repairing by hand** (if you'd rather): stop the app, download `/home/data/eonweather.mv.db`, and on your own computer run `java -cp h2-2.3.232.jar org.h2.tools.Recover -dir . -db eonweather`, then `java -cp h2-2.3.232.jar org.h2.tools.RunScript -url jdbc:h2:file:./new/eonweather -user sa -script eonweather.h2.sql`, and upload `new/eonweather.mv.db` in its place.
-
-**With PostgreSQL instead** (many users): set `EON_DB_URL` to `jdbc:postgresql://<server>.postgres.database.azure.com:5432/<database>?sslmode=require` and `EON_DB_USER` / `EON_DB_PASSWORD` to its login.
+**Repairing by hand** (if you'd rather): stop the app, download `/home/data/hub.mv.db`, and on your own computer run `java -cp h2-2.3.232.jar org.h2.tools.Recover -dir . -db hub`, then `java -cp h2-2.3.232.jar org.h2.tools.RunScript -url jdbc:h2:file:./new/hub -user sa -script hub.h2.sql`, and upload `new/hub.mv.db` in its place.
 
 Keep the app at **one instance**: logins are held in the app's memory, so scaling out to several instances would log people out at random.
 
-
-
-Set as environment variables, or edit `src/main/resources/application.properties`:
-
-| Variable | Default | Meaning |
-|---|---|---|
-| `PORT` | `8080` | Web port |
-| `EON_WORLD_DIR` | `world` | Folder with the data files |
-| `EON_REGISTRATION` | `open` | `closed` = no new accounts (existing ones can still log in) |
-| `EON_DB_URL` | H2 file in `./data` | e.g. `jdbc:postgresql://localhost:5432/eonweather` |
-| `EON_DB_USER` / `EON_DB_PASSWORD` | `sa` / empty | Database login |
-| `EON_SECURE_COOKIE` | `false` | Set `true` when served over HTTPS |
-| `EON_ADMINS` | `Gemstone,Gemstone86` | Usernames that may make and change regions and decide on height map suggestions, comma separated |
-
-Tables are created automatically on first start.
+The other settings are in README.md (*Settings*). Tables are created automatically on first start.
 
 ## Data files (`world/`)
 

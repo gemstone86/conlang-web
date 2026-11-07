@@ -2669,7 +2669,7 @@
     $("walk3dBtn").disabled = true;
     try {
       if (SG.open) openSgPanel(false);
-      const mod = await import("./walk3d.js?v=118");
+      const mod = await import("./walk3d.js?v=121");
       fieldMap.setPaused(true);                                  // the flat map rests underneath
       $("stage").classList.add("in3d");
       walk3d = mod.open({
@@ -3358,7 +3358,7 @@
   }
 
   // ── Version in the corner: the server's, and this page's if they differ (old files cached) ──
-  const CLIENT_VERSION = "2.18";
+  const CLIENT_VERSION = "2.20";
   function showVersion(server) {
     const el = $("appVersion");
     if (!el) return;
