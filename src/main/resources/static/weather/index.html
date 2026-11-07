@@ -1,0 +1,625 @@
+<!doctype html>
+<html lang="sv">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Eon Väder</title>
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Alegreya+Sans:ital,wght@0,400;0,500;0,700;1,400&family=IM+Fell+English:ital@0;1&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="app.css?v=119">
+</head>
+<body>
+<header class="bar">
+  <a href="/" class="home-link" title="Start">&#8592;</a>
+  <h1 class="brand" data-i18n="title">Eon Väder</h1>
+
+  <label class="field">
+    <span data-i18n="region">Område</span>
+    <select id="region"></select>
+  </label>
+  <div class="region-admin" id="regionAdmin" hidden>
+    <button type="button" class="icon" id="regionEdit" data-i18n-title="regionEditTitle" title="Redigera området">✎</button>
+    <button type="button" class="icon" id="regionNew" data-i18n-title="regionNewTitle" title="Nytt område">＋</button>
+  </div>
+
+  <div class="datebox" role="group" aria-label="Datum">
+    <button class="icon" id="prevMonth" data-i18n-title="prevMonth" title="Föregående månad">«</button>
+    <button class="icon" id="prevDay" data-i18n-title="prevDay" title="Föregående dag">‹</button>
+    <input id="year" type="number" inputmode="numeric" aria-label="År">
+    <select id="month" aria-label="Månad"></select>
+    <select id="day" aria-label="Dag"></select>
+    <button class="icon" id="nextDay" data-i18n-title="nextDay" title="Nästa dag">›</button>
+    <button class="icon" id="nextMonth" data-i18n-title="nextMonth" title="Nästa månad">»</button>
+  </div>
+
+  <label class="field">
+    <span data-i18n="calendar">Kalender</span>
+    <select id="calendar"></select>
+  </label>
+
+  <div id="influxBar" class="influx-bar" aria-live="polite"></div>
+
+  <div class="spacer"></div>
+  <button class="link" id="lang">English</button>
+  <div id="account"></div>
+</header>
+
+<main class="layout">
+  <section class="almanac" aria-live="polite">
+    <div class="today">
+      <h2 id="regionName" class="region-name"></h2>
+      <p id="dateText" class="date-text"></p>
+      <div class="readings">
+        <div class="reading">
+          <span class="value" id="temp"></span>
+          <span class="label" data-i18n="temperature">Temperatur</span>
+        </div>
+        <div class="reading">
+          <span class="value" id="wind"></span>
+          <span class="label" id="windName"></span>
+        </div>
+        <div class="reading">
+          <span class="value" id="rain"></span>
+          <span class="label" id="rainName"></span>
+        </div>
+      </div>
+      <ul id="events" class="events"></ul>
+      <p id="influx" class="influx"></p>
+    </div>
+
+    <figure class="hourly">
+      <canvas id="hourly" height="150"></canvas>
+      <figcaption class="legend">
+        <span class="k k-temp" data-i18n="temperature">Temperatur</span>
+        <span class="k k-wind" data-i18n="wind">Vind</span>
+        <span class="k k-rain" data-i18n="rain">Nederbörd</span>
+      </figcaption>
+    </figure>
+
+    <div class="religion-filter">
+      <label class="check"><input type="checkbox" id="allReligions" checked><span data-i18n="allReligions">Alla religioner</span></label>
+      <select id="religion" hidden aria-label="Religion"></select>
+    </div>
+
+    <div class="month">
+      <div class="month-head">
+        <h3 id="monthTitle"></h3>
+      </div>
+      <div id="monthGrid" class="month-grid" role="grid"></div>
+      <div class="cal-legend">
+        <span><i style="background:#8e2a2a"></i><span data-i18n="holiestDay">Heligaste dag</span></span>
+        <span><i style="background:#8a6d1f"></i><span data-i18n="holyDay">Helig dag</span></span>
+      </div>
+    </div>
+
+    <div class="notes">
+      <label class="note">
+        <span data-i18n="comment">Kommentar</span>
+        <textarea id="comment" rows="3"></textarea>
+      </label>
+      <div class="campaign">
+        <div class="campaign-head">
+          <label class="field">
+            <span data-i18n="campaign">Kampanj</span>
+            <select id="campaign"></select>
+          </label>
+          <div class="campaign-actions">
+            <button id="newCampaign" data-i18n="new">Ny</button>
+            <button id="renameCampaign" data-i18n="rename">Byt namn</button>
+            <button id="deleteCampaign" data-i18n="delete">Radera</button>
+            <button id="importNotes" data-i18n="import">Importera</button>
+            <button id="exportNotes" data-i18n="export">Exportera</button>
+            <input type="file" id="importFile" accept=".yaml,.yml,.txt" multiple hidden>
+          </div>
+        </div>
+        <textarea id="campaignNote" rows="3"></textarea>
+      </div>
+      <p id="notesStatus" class="status"></p>
+    </div>
+  </section>
+
+  <section class="atlas">
+    <div class="atlas-bar">
+      <label class="field">
+        <span data-i18n="map">Karta</span>
+        <select id="mapSelect"></select>
+      </label>
+      <div class="field" id="mapLayerBox" hidden>
+        <span data-i18n="mapView">Kartbild</span>
+        <details class="ley-filter map-layers" id="mapLayerDrop">
+          <summary id="mapLayerSummary" data-i18n-title="mapViewTip" title="Vilka kartor som syns ovanpå grundkartan">Standard</summary>
+          <div class="ley-panel">
+            <div class="ley-panel-actions">
+              <button type="button" id="mlDefault" data-i18n="mlDefault">Standard</button>
+              <button type="button" id="mlNone" data-i18n="mlNone">Bara grundkartan</button>
+            </div>
+            <div id="mapLayerList"></div>
+            <label class="ml-base"><input type="checkbox" checked disabled><span data-i18n="mlBase">Grundkarta</span></label>
+          </div>
+        </details>
+      </div>
+      <fieldset class="layers">
+        <legend class="sr" data-i18n="layers">Lager</legend>
+        <div class="lgroup" role="group" aria-labelledby="lgWeather">
+          <span class="lgroup-name" id="lgWeather" data-i18n="lgWeather">Väder</span>
+          <label><input type="checkbox" value="cloud" checked><span data-i18n="l.cloud">Moln</span></label>
+          <label class="sub" id="cloudFxBox" title="Molnsymboler"><input type="checkbox" id="cloudFx" checked><span data-i18n="cloudFx">Molnsymboler</span></label>
+          <label><input type="checkbox" value="rain" checked><span data-i18n="l.rain">Nederbörd</span></label>
+          <label class="sub" id="rainFxBox" title="Regneffekt"><input type="checkbox" id="rainFx" checked><span data-i18n="rainFx">Regneffekt</span></label>
+          <label><input type="checkbox" value="temp"><span data-i18n="l.temp">Temperatur</span></label>
+          <label><input type="checkbox" value="wind"><span data-i18n="l.wind">Vind</span></label>
+          <label class="magic"><input type="checkbox" value="magic" checked><span data-i18n="l.magic">Magiska stormar</span></label>
+          <label class="night"><input type="checkbox" value="night" checked><span data-i18n="l.night">Dag och natt</span></label>
+        </div>
+        <div class="lgroup" role="group" aria-labelledby="lgGeo">
+          <span class="lgroup-name" id="lgGeo" data-i18n="lgGeo">Geografi</span>
+          <label class="ley"><input type="checkbox" value="ley" checked><span data-i18n="l.ley">Kraftlinjer</span></label>
+          <details class="ley-filter" id="leyFilterBox">
+            <summary id="leyFilterSummary">Alla aspekter</summary>
+            <div class="ley-panel">
+              <div class="ley-panel-actions">
+                <button type="button" id="leyAll" data-i18n="leyAll">Visa alla</button>
+                <button type="button" id="leyNone" data-i18n="leyNone">Dölj alla</button>
+              </div>
+              <div id="leyAspectList"></div>
+            </div>
+          </details>
+          <label class="zone"><input type="checkbox" value="zone" checked><span data-i18n="l.zone">Högmagiska områden</span></label>
+          <label class="river"><input type="checkbox" value="river" checked><span data-i18n="l.river">Floder</span></label>
+          <label class="range"><input type="checkbox" value="range" checked><span data-i18n="l.range">Bergskedjor</span></label>
+          <label class="height" id="heightLayerBox" hidden><input type="checkbox" value="height"><span data-i18n="l.height">Höjdkarta</span></label>
+          <select id="heightPick" class="height-pick" hidden data-i18n-title="heightPickTip" title="Vilken höjdkarta appen använder (lagret, vind och regn, 3D): grundkartan, eller den beräknade – grundkartan med bergskedjorna resta, vattendelarna lyfta och flodernas dalar skurna. Den beräknade räknas fram på nytt när floder eller bergskedjor ändras.">
+            <option value="base" data-i18n="heightPickBase">Grundhöjd</option>
+            <option value="calc" data-i18n="heightPickCalc">Beräknad höjd</option>
+          </select>
+          <label class="forest" data-i18n-title="l.forestTip" title="Skog: grönt, mörkare ju tätare (0 = inga träd, 100 = träd överallt)"><input type="checkbox" value="forest"><span data-i18n="l.forest">Skog</span></label>
+          <label class="ice" data-i18n-title="l.iceTip" title="Is: glaciärer och istäcken, vitt (målas under Redigera → Is)"><input type="checkbox" value="ice"><span data-i18n="l.ice">Is</span></label>
+          <label class="road" data-i18n-title="l.roadTip" title="Vägar och stigar"><input type="checkbox" value="road"><span data-i18n="l.road">Vägar</span></label>
+          <label class="trip" data-i18n-title="l.tripTip" title="Resor: resande sällskap från Restid"><input type="checkbox" value="trip"><span data-i18n="l.trip">Resor</span></label>
+        </div>
+        <div class="lgroup" role="group" aria-labelledby="lgCiv">
+          <span class="lgroup-name" id="lgCiv" data-i18n="lgCiv">Civilisation</span>
+          <label class="nation"><input type="checkbox" value="nation" checked><span data-i18n="l.nation">Nationer</span></label>
+        </div>
+      </fieldset>
+      <div class="hour">
+        <button class="icon" id="play" data-i18n-title="play" title="Spela upp dygnet">▶</button>
+        <input type="range" id="hour" min="0" max="23" value="12" aria-label="Timme">
+        <output id="hourOut">12:00</output>
+        <output id="localTime" class="local-time"></output>
+      </div>
+      <label class="field slim">
+        <span data-i18n="opacity">Synlighet</span>
+        <input type="range" id="opacity" min="0.1" max="1" step="0.05" value="1">
+      </label>
+      <div class="spacer"></div>
+      <button id="sgBtn" hidden data-i18n-title="sgTip" title="Förslag på ändringar i kartan (höjder, skog, is, floder, vägar, bergskedjor, nationer): se dem, rösta och föreslå egna">Förslag</button>
+      <button id="travelBtn" data-i18n="travel" data-i18n-title="travelTip" title="Restid: hitta vägen mellan två platser och följ resande sällskap över kartan">Restid</button>
+      <button id="walk3dBtn" hidden data-i18n="walk3d" data-i18n-title="walk3dTip" title="Gå runt i kartan i 3D: klicka sedan på kartan där du vill börja">Gå i 3D</button>
+      <button id="symbolsBtn" hidden data-i18n="symbols">Symboler</button>
+      <button id="editMap" hidden data-i18n="editMap">Placera områden</button>
+      <button id="uploadMap" hidden data-i18n="uploadMap">Ladda upp karta</button>
+      <input type="file" id="mapFile" accept="image/png,image/jpeg,image/gif,image/webp" hidden>
+    </div>
+
+    <div id="editBar" class="edit-bar" hidden>
+      <label class="field no-suggest">
+        <span data-i18n="editWhat">Redigera</span>
+        <select id="editMode">
+          <option value="regions" data-i18n="editRegions">Områden</option>
+          <option value="ley" data-i18n="editLeylines">Kraftlinjer</option>
+          <option value="zone" data-i18n="editZones">Högmagiska områden</option>
+          <option value="height" data-i18n="editHeight">Höjdkarta</option>
+          <option value="forest" data-i18n="editForest">Skog</option>
+          <option value="ice" data-i18n="editIce">Is</option>
+          <option value="river" data-i18n="editRivers">Floder</option>
+          <option value="range" data-i18n="editRanges">Bergskedjor</option>
+          <option value="road" data-i18n="editRoads">Vägar</option>
+          <option value="nation" data-i18n="editNations">Nationer</option>
+        </select>
+      </label>
+      <label class="field" id="anchorRegionBox">
+        <span data-i18n="placing">Placerar</span>
+        <select id="anchorRegion"></select>
+      </label>
+      <label class="check" id="unplacedBox"><input type="checkbox" id="unplacedOnly"><span id="unplacedLabel">Bara oplacerade</span></label>
+      <label class="field" id="leyAspectBox" hidden>
+        <span data-i18n="leyAspect">Aspekt</span>
+        <select id="leyAspect"></select>
+      </label>
+      <button type="button" id="zoneNew" hidden data-i18n="zoneNew">Nytt område</button>
+      <div id="riverBar" class="river-bar" hidden>
+        <button type="button" id="rvNew" data-i18n="rvNew" data-i18n-title="rvNewTip" title="Släpp vald flod; nästa klick på kartan börjar en ny">Ny flod</button>
+        <label class="field slim" data-i18n-title="rvSizeTip" title="Flodens egen storlek: 1 = liten bäck … 10 = Amazonas. Biflöden läggs till nedströms.">
+          <span data-i18n="rvSize">Storlek</span>
+          <input type="range" id="rvSize" min="1" max="10" step="1" value="1">
+          <input type="number" id="rvSizeNum" min="1" max="10" step="1" value="1" class="num-small" aria-label="Storlek">
+        </label>
+        <label class="field slim">
+          <span data-i18n="rvName">Namn</span>
+          <input type="text" id="rvName" maxlength="100" class="rv-name">
+        </label>
+        <label class="field slim" data-i18n-title="rvSpeedTip" title="Flodens egen strömfart i km/h. Tom: räknas ut från hur brant floden faller i höjdkartan. Biflödenas vatten blandas in efter hur mycket det är.">
+          <span data-i18n="rvSpeed">Ström</span>
+          <input type="number" id="rvSpeed" min="0" max="30" step="0.5" class="num-small" aria-label="Ström (km/h)">
+          <span class="rv-unit">km/h</span>
+        </label>
+        <output id="rvInfo" class="rv-info"></output>
+        <output id="rvLen" class="rv-len"></output>
+        <button type="button" id="rvExtend" data-i18n="rvExtend" data-i18n-title="rvExtendTip" title="Fortsätt rita den valda floden från mynningen (eller klicka på dess källa eller mynning)">Fortsätt rita</button>
+        <button type="button" id="lkOut" hidden data-i18n="lkOut" data-i18n-title="lkOutTip" title="Rita en flod ut ur den valda sjön (dess utlopp). Du kan också klicka på sjön en gång till.">Rita utlopp</button>
+        <button type="button" id="rvDelete" data-i18n="rvDelete">Ta bort floden</button>
+        <button type="button" id="lkNew" data-i18n="lkNew" data-i18n-title="lkNewTip" title="En ny sjö: klicka sedan på kartan där den ligger. Floder kan rinna in i en sjö och ut ur den; allt som rinner in går vidare genom utloppet.">Ny sjö</button>
+        <label class="check" id="rvSuggestBox" data-i18n-title="rvSuggestTip" title="Visar i orange var floder troligast rinner enligt höjdkartan (där regnet samlas på väg ner till havet). Höjdkartan ändras inte. Där en flod redan är ritad visas inget förslag.">
+          <input type="checkbox" id="rvSuggest"><span data-i18n="rvSuggest">Föreslå floder</span>
+          <select id="rvSuggestAmt" aria-label="Antal">
+            <option value="few" data-i18n="rvSugFew">Bara stora</option>
+            <option value="some" data-i18n="rvSugSome">Mellan</option>
+            <option value="many" data-i18n="rvSugMany">Många</option>
+            <option value="all" data-i18n="rvSugAll">Alla bäckar</option>
+          </select>
+        </label>
+        <div class="spacer"></div>
+        <button type="button" id="rvExport" class="no-suggest" data-i18n="rvExport" data-i18n-title="rvExportTip" title="Ladda ner alla floder som en fil (JSON)">Exportera floder</button>
+        <button type="button" id="rvSave" class="no-suggest primary" data-i18n="rvSave">Spara floder</button>
+      </div>
+      <div id="rangeBar" class="river-bar range-bar" hidden>
+        <button type="button" id="rgNew" data-i18n="rgNew" data-i18n-title="rgNewTip" title="En ny bergskedja: klicka sedan längs dess kam på kartan, och tryck Enter när du är klar">Ny bergskedja</button>
+        <label class="field slim">
+          <span data-i18n="rvName">Namn</span>
+          <input type="text" id="rgName" maxlength="100" class="rv-name">
+        </label>
+        <label class="field slim" data-i18n-title="rgHeightTip" title="Kammens ungefärliga höjd, meter över havet (valfritt)">
+          <span data-i18n="rgHeight">Kamhöjd (m)</span>
+          <input type="number" id="rgHeight" min="-1000" max="12000" step="100" class="num-small" placeholder="—">
+        </label>
+        <output id="rgInfo" class="rv-info"></output>
+        <button type="button" id="rgBranch" data-i18n="rgBranch" data-i18n-title="rgBranchTip" title="En bergskedja som delar sig från en annan: klicka först på kammen där den delar sig, sedan längs den nya kammen, och tryck Enter när du är klar">Ny förgrening</button>
+        <button type="button" id="rgFinish" data-i18n="rgFinish" data-i18n-title="rgFinishTip" title="Klar med kammen (eller tryck Enter, eller dubbelklicka)">Klar med kammen</button>
+        <button type="button" id="rgExtend" data-i18n="rgExtend" data-i18n-title="rgExtendTip" title="Fortsätt rita den valda bergskedjans kam från dess sista punkt (eller klicka på dess första eller sista punkt)">Fortsätt rita</button>
+        <button type="button" id="rgDelete" data-i18n="rgDelete">Ta bort bergskedjan</button>
+        <div class="spacer"></div>
+        <button type="button" id="rgExport" class="no-suggest" data-i18n="rgExport" data-i18n-title="rgExportTip" title="Ladda ner alla bergskedjor som en fil (JSON)">Exportera bergskedjor</button>
+        <button type="button" id="rgSave" class="no-suggest primary" data-i18n="rgSave">Spara bergskedjor</button>
+      </div>
+      <div id="roadBar" class="river-bar road-bar" hidden>
+        <button type="button" id="wyNew" data-i18n="wyNew" data-i18n-title="wyNewTip" title="En ny väg: klicka sedan längs den på kartan. Ett klick på en annan väg ansluter dit och avslutar; Enter eller dubbelklick avslutar annars.">Ny väg</button>
+        <label class="field slim">
+          <span data-i18n="wyKind">Slag</span>
+          <select id="wyKind">
+            <option value="path" data-i18n="wyPath">Stig</option>
+            <option value="road" data-i18n="wyRoad" selected>Väg</option>
+            <option value="highway" data-i18n="wyHighway">Huvudväg</option>
+          </select>
+        </label>
+        <label class="field slim">
+          <span data-i18n="rvName">Namn</span>
+          <input type="text" id="wyName" maxlength="100" class="rv-name">
+        </label>
+        <output id="wyInfo" class="rv-info"></output>
+        <button type="button" id="wyExtend" data-i18n="rvExtend" data-i18n-title="wyExtendTip" title="Fortsätt rita den valda vägen från dess sista punkt (eller klicka på dess första eller sista punkt)">Fortsätt rita</button>
+        <button type="button" id="wyDelete" data-i18n="wyDelete">Ta bort vägen</button>
+        <div class="spacer"></div>
+        <button type="button" id="wyExport" class="no-suggest" data-i18n="wyExport" data-i18n-title="wyExportTip" title="Ladda ner alla vägar som en fil (JSON)">Exportera vägar</button>
+        <button type="button" id="wySave" class="no-suggest primary" data-i18n="wySave">Spara vägar</button>
+      </div>
+      <div id="nationBar" class="river-bar nation-bar" hidden>
+        <button type="button" id="ntNew" data-i18n="ntNew" data-i18n-title="ntNewTip" title="En ny nation: klicka sedan runt dess gräns på kartan">Ny nation</button>
+        <label class="field slim">
+          <span data-i18n="rvName">Namn</span>
+          <input type="text" id="ntName" maxlength="100" class="rv-name">
+        </label>
+        <label class="field slim">
+          <span data-i18n="ntColor">Färg</span>
+          <input type="color" id="ntColor" value="#c0504d">
+        </label>
+        <output id="ntInfo" class="rv-info"></output>
+        <button type="button" id="ntFinish" data-i18n="ntFinish" data-i18n-title="ntFinishTip" title="Stäng konturen (eller klicka på första hörnet, dubbelklicka eller tryck Enter)">Stäng konturen</button>
+        <button type="button" id="ntSub" data-i18n="ntSub" data-i18n-title="ntSubTip" title="En underindelning (provins, län …) av den valda nationen: klicka runt den på kartan">Ny underindelning</button>
+        <button type="button" id="ntPart" data-i18n="ntPart" data-i18n-title="ntPartTip" title="En till del av den valda nationen (en ö, en exklav): klicka runt den på kartan">Ny del</button>
+        <button type="button" id="ntDelPart" data-i18n="ntDelPart">Ta bort delen</button>
+        <button type="button" id="ntDelete" data-i18n="ntDelete">Ta bort nationen</button>
+        <div class="spacer"></div>
+        <button type="button" id="ntExport" class="no-suggest" data-i18n="ntExport" data-i18n-title="ntExportTip" title="Ladda ner alla nationer som en fil (JSON)">Exportera nationer</button>
+        <button type="button" id="ntSave" class="no-suggest primary" data-i18n="ntSave">Spara nationer</button>
+      </div>
+      <div id="suggestNote" class="suggest-note" hidden></div>
+      <div id="sgListBar" class="sg-list-bar" hidden>
+        <button type="button" id="sgLCancel" data-i18n="sgCancel">Avbryt förslaget</button>
+        <button type="button" id="sgLSendAccept" hidden data-i18n="sgSendAccept">Skicka och godkänn…</button>
+        <button type="button" id="sgLSend" class="primary" data-i18n="sgSend">Skicka förslag…</button>
+      </div>
+      <div id="heightBar" class="height-bar" hidden>
+        <div class="hp-tools" role="radiogroup" data-i18n-title="hpToolsHint">
+          <label title="Pensel"><input type="radio" name="hpTool" value="brush" checked><span data-i18n="hpBrush">Pensel</span></label>
+          <label><input type="radio" name="hpTool" value="raise"><span data-i18n="hpRaise">Höj</span></label>
+          <label><input type="radio" name="hpTool" value="lower"><span data-i18n="hpLower">Sänk</span></label>
+          <label><input type="radio" name="hpTool" value="smooth"><span data-i18n="hpSmooth">Jämna ut</span></label>
+          <label class="not-forest" data-i18n-title="hpErodeTip" title="Erodera: regn rinner nerför under penseln, skär raviner och dalar, nöter ner toppar och lägger gruset vid foten. Dra flera gånger för mer."><input type="radio" name="hpTool" value="erode"><span data-i18n="hpErode">Erodera</span></label>
+          <label class="not-forest" data-i18n-title="hpRoughTip" title="Ojämnhet: gör marken under penseln ojämnare – kullar, gropar och knölar, lika mycket upp som ner. Korn sätter hur stora de är, Styrka hur fort de växer. Dra flera gånger för mer."><input type="radio" name="hpTool" value="rough"><span data-i18n="hpRough">Ojämnhet</span></label>
+          <label><input type="radio" name="hpTool" value="polygon"><span data-i18n="hpPolygon">Polygon</span></label>
+          <label class="not-forest" data-i18n-title="hpPlateauTip" title="Platå: klicka runt konturen och tryck Skapa platå (eller Enter). Inuti lyfts marken till Höjd, med en brant kant (Kantbredd) från konturen. Det som redan finns behålls ovanpå, toppar högre än platån lämnas."><input type="radio" name="hpTool" value="plateau"><span data-i18n="hpPlateau">Platå</span></label>
+          <label class="not-forest" data-i18n-title="hpRiverTip" title="Flod: klicka från källan till mynningen och tryck Enter (eller Gräv floden). Högerklick tar bort sista punkten."><input type="radio" name="hpTool" value="river"><span data-i18n="hpRiver">Flod</span></label>
+          <label class="not-forest" data-i18n-title="hpRidgeTip" title="Ås: klicka längs åskammen och tryck Skapa ås (eller Enter). Höjd = kammens höjd, Bredd = hur långt ut sluttningarna når."><input type="radio" name="hpTool" value="ridge"><span data-i18n="hpRidge">Ås</span></label>
+          <label class="not-forest" data-i18n-title="hpCoastTip" title="Kust: klicka parvis – först inåt land, sedan där kusten ska vara. Flera par efter varandra längs kusten fogas ihop. Tryck Skapa kust (eller Enter)."><input type="radio" name="hpTool" value="coast"><span data-i18n="hpCoastTool">Kust</span></label>
+          <label><input type="radio" name="hpTool" value="fill"><span data-i18n="hpFill">Hink</span></label>
+          <label><input type="radio" name="hpTool" value="pick"><span data-i18n="hpPick">Pipett</span></label>
+          <label><input type="radio" name="hpTool" value="pan"><span data-i18n="hpPan">Flytta</span></label>
+        </div>
+        <label class="field slim hp-value">
+          <span data-i18n="hpHeight">Höjd</span>
+          <input type="range" id="hpValue" min="0" max="255" step="1" value="140">
+          <input type="number" id="hpValueNum" min="0" max="255" step="1" value="140" class="num-small">
+          <output id="hpValueM"></output>
+        </label>
+        <div class="hp-opts">
+        <label class="field slim" id="hpSizeBox">
+          <span id="hpSizeLabel" data-i18n="hpSize">Storlek</span>
+          <input type="range" id="hpSize" min="1" max="200" step="1" value="12">
+          <input type="number" id="hpSizeOut" min="1" max="200" step="1" value="12" class="num-small" aria-label="Storlek">
+        </label>
+        <label class="check" id="hpSoftBox"><input type="checkbox" id="hpSoft" checked><span data-i18n="hpSoft">Mjuk kant</span></label>
+        <label class="field slim" id="hpStrengthBox" hidden>
+          <span id="hpStrengthLabel" data-i18n="hpStrength">Styrka</span>
+          <input type="range" id="hpStrength" min="1" max="20" step="1" value="2">
+          <input type="number" id="hpStrengthOut" min="1" max="20" step="1" value="2" class="num-small" aria-label="Styrka">
+        </label>
+        <label class="field slim" id="hpGrainBox" hidden data-i18n-title="hpGrainTip" title="Hur stora kullarna och groparna blir (höjdkartans pixlar)">
+          <span data-i18n="hpGrain">Korn</span>
+          <input type="range" id="hpGrain" min="1" max="40" step="1" value="6">
+          <input type="number" id="hpGrainOut" min="1" max="40" step="1" value="6" class="num-small" aria-label="Korn">
+        </label>
+        <label class="field slim" id="hpTolBox" hidden>
+          <span data-i18n="hpTol">Tolerans</span>
+          <input type="range" id="hpTol" min="0" max="255" step="1" value="0">
+          <input type="number" id="hpTolOut" min="0" max="255" step="1" value="0" class="num-small" aria-label="Tolerans">
+        </label>
+        <label class="check" id="hpCoastBox" hidden><input type="checkbox" id="hpCoast" checked><span data-i18n="hpCoast">Stanna vid kusten</span></label>
+        <button type="button" id="hpPolyFill" hidden data-i18n="hpPolyFill">Fyll polygonen</button>
+        <button type="button" id="hpRiverCarve" hidden data-i18n="hpRiverCarve">Gräv floden</button>
+        <button type="button" id="hpRidgeMake" hidden data-i18n="hpRidgeMake">Skapa ås</button>
+        <button type="button" id="hpCoastMake" hidden data-i18n="hpCoastMake">Skapa kust</button>
+        <button type="button" id="hpPlateauMake" hidden data-i18n="hpPlateauMake">Skapa platå</button>
+        </div>
+        <label class="field slim">
+          <span data-i18n="hpView">Visning</span>
+          <select id="hpView"><option value="colour" data-i18n="hpColour">Färger</option><option value="grey" data-i18n="hpGrey">Gråskala</option></select>
+        </label>
+        <label class="field slim">
+          <span data-i18n="hpAlpha">Täckning</span>
+          <input type="range" id="hpAlpha" min="0.1" max="1" step="0.05" value="0.75">
+          <input type="number" id="hpAlphaNum" min="10" max="100" step="5" value="75" class="num-small" aria-label="Täckning (%)"><span class="unit">%</span>
+        </label>
+        <label class="field slim no-suggest not-forest" data-i18n-title="hpSeaHint" title="Det gråvärde som är havsytan. Allt under är hav.">
+          <span data-i18n="hpSea">Havsnivå</span>
+          <input type="number" id="hpSea" min="0" max="255" step="1" class="num-small" placeholder="—">
+        </label>
+        <label class="field slim no-suggest not-forest">
+          <span data-i18n="hpMps">Meter per steg</span>
+          <input type="number" id="hpMps" min="0" max="10000" step="any" class="num-small" placeholder="—">
+        </label>
+        <label class="check hp-out" data-i18n-title="hpOutTip" title="Markerar i blått pixlar som sticker upp eller ner kraftigt från (nästan) alla sina grannar: ensamma toppar och gropar på en eller två pixlar. Sluttningar och kuster markeras inte.">
+          <input type="checkbox" id="hpOut"><span data-i18n="hpOut">Markera avvikande</span>
+        </label>
+        <label class="field slim" id="hpOutThrBox" hidden data-i18n-title="hpOutThrTip" title="Hur mycket (i steg) en pixel ska skilja sig från grannarna för att markeras. 5 steg = 500 m på Mundanas skala.">
+          <span data-i18n="hpOutThr">Gräns (steg)</span>
+          <input type="number" id="hpOutThr" min="1" max="100" step="1" value="5" class="num-small">
+          <output id="hpOutCount"></output>
+        </label>
+        <label class="check not-forest" data-i18n-title="hpDivTip" title="Visar vad de ritade floderna säger om marken: vattendelare mellan floderna (gula; orangeröda där marken är för låg) och röda ringar där en flod går uppför i höjdkartan.">
+          <input type="checkbox" id="hpDiv"><span data-i18n="hpDiv">Vattendelare</span>
+        </label>
+        <button type="button" id="hpDivLift" class="not-forest" hidden data-i18n="hpDivLift" data-i18n-title="hpDivLiftTip" title="Höjer de för låga vattendelarna så att de står över båda floderna, med marken mot floderna i en mjuk sluttning. Bara höjer, bara land; floderna själva rörs inte. Ångra tar bort allt i ett steg.">Höj vattendelarna</button>
+        <output id="hpDivCount" class="not-forest"></output>
+        <output id="hpHover" class="hp-hover">&nbsp;</output>
+        <div class="hp-actions">
+          <button type="button" id="hpUndo" data-i18n="hpUndo">Ångra</button>
+          <button type="button" id="hpNew" class="no-suggest" data-i18n="hpNew">Ny tom…</button>
+          <button type="button" id="hpFromDefault" class="no-suggest" data-i18n="hpFromDefault">Hämta standardkartans</button>
+          <button type="button" id="hpUseDerived" class="no-suggest not-forest" data-i18n="hpUseDerived" data-i18n-title="hpUseDerivedTip" title="Lägg in den beräknade höjdkartan (bergskedjorna resta, vattendelarna lyfta, flodernas dalar skurna) i det du målar, som ett steg att ångra. Spara sedan som vanligt.">Använd beräknad</button>
+          <button type="button" id="hpExport" data-i18n="hpExport">Exportera PNG</button>
+          <button type="button" id="fpUpload" class="only-forest" data-i18n="fpUpload">Ladda upp…</button>
+          <button type="button" id="fpClear" class="only-forest" data-i18n="fpClear">Töm…</button>
+          <button type="button" id="hpSave" class="primary no-suggest" data-i18n="hpSave">Spara höjdkarta</button>
+          <button type="button" id="hpSuggestCancel" class="only-suggest" data-i18n="sgCancel">Avbryt förslaget</button>
+          <button type="button" id="hpSendAccept" class="only-suggest" hidden data-i18n="sgSendAccept">Skicka och godkänn…</button>
+          <button type="button" id="hpSend" class="primary only-suggest" data-i18n="sgSend">Skicka förslag…</button>
+        </div>
+      </div>
+      <span class="hint" id="editHint">Klicka för att sätta ut en punkt. Dra för att flytta. Högerklicka för att ta bort.</span>
+      <label class="field slim not-height">
+        <span data-i18n="reach">Räckvidd</span>
+        <input type="range" id="reach" min="0.05" max="0.6" step="0.01" value="0.2">
+      </label>
+      <label class="field slim not-height">
+        <span data-i18n="kmPerPixel">Km per pixel</span>
+        <input type="number" id="kmPerPixel" min="0" max="10000" step="any" class="num-small" placeholder="—">
+      </label>
+      <label class="field slim not-height" data-i18n-title="wrapHint" title="Hur många pixlar bred kartan är ett varv runt världen. Tomt = kartan går inte runt.">
+        <span data-i18n="wrapWidth">Varv runt (px)</span>
+        <input type="number" id="wrapWidth" min="0" max="100000" step="1" class="num-small" placeholder="—">
+      </label>
+      <label class="field slim not-height" id="tilesBox" data-i18n-title="tilesHint" title="Skarpare bilder som laddas när man zoomar in. Kartan måste visa samma värld med samma inramning.">
+        <span data-i18n="tiles">Zoombilder</span>
+        <select id="mapTiles"></select>
+      </label>
+      <label class="check not-height"><input type="checkbox" id="mapPublic"><span data-i18n="public">Synlig för alla</span></label>
+      <div class="height-tools no-suggest">
+        <button id="heightUpload" data-i18n="heightUpload">Höjdkarta…</button>
+        <button id="heightBlank" data-i18n="heightBlank" data-i18n-title="heightBlankTip" title="En höjdkarta där allt ligger på samma höjd, med Mundanas skala: havsytan vid 120, 100 m per steg">Tom höjdkarta…</button>
+        <button id="heightRemove" hidden data-i18n="heightRemove">Ta bort höjdkarta</button>
+        <label class="check" id="heightShowBox" hidden><input type="checkbox" id="heightShow"><span data-i18n="heightShow">Visa höjd</span></label>
+        <label class="field slim" id="blockBox" hidden>
+          <span data-i18n="blockAt">Blockerar helt vid</span>
+          <input type="range" id="blockHeight" min="5" max="255" step="1" value="200">
+          <output id="blockOut">200</output>
+        </label>
+        <input type="file" id="forestFile" accept="image/png,image/jpeg,image/gif,image/webp" hidden>
+        <input type="file" id="heightFile" accept="image/png,image/jpeg,image/gif,image/webp" hidden>
+      </div>
+      <div class="spacer not-height"></div>
+      <button id="renameMap" class="not-height" data-i18n="rename">Byt namn</button>
+      <button id="replaceMap" class="not-height" data-i18n="replaceImage">Byt bild</button>
+      <button id="deleteMap" class="not-height" data-i18n="delete">Radera</button>
+      <button id="exportMap" hidden data-i18n="exportMap" data-i18n-title="exportMapTip" title="Ladda ner det som skiljer kartan från standardkartan i den här versionen (höjdkarta, floder, nationer, regioner …), för att skicka vidare">Exportera…</button>
+      <button id="saveAnchors" class="primary not-height" data-i18n="savePositions">Spara placeringar</button>
+    </div>
+
+    <div id="stage" class="stage" tabindex="0" aria-label="Karta">
+      <canvas id="mapCanvas"></canvas>
+      <canvas id="fxCanvas" class="fx" aria-hidden="true"></canvas>
+      <div id="popup" class="popup" hidden></div>
+      <div id="empty" class="empty" hidden></div>
+      <aside id="sgPanel" class="sg-panel" hidden aria-labelledby="sgTitle">
+        <header class="sg-head">
+          <h3 id="sgTitle" data-i18n="sgTitle">Förslag på ändringar</h3>
+          <button type="button" class="icon" id="sgClose" data-i18n-title="close" title="Stäng">×</button>
+        </header>
+        <div class="sg-tools">
+          <select id="sgFilter" aria-label="Visa">
+            <option value="open" data-i18n="sgOpen">Öppna</option>
+            <option value="all" data-i18n="sgAll">Alla</option>
+          </select>
+          <button type="button" id="sgNew" class="primary" data-i18n="sgNew">Föreslå en ändring</button>
+          <button type="button" id="sgExport" hidden></button>
+        </div>
+        <p id="sgMsg" class="sg-msg" role="status"></p>
+        <ol id="sgList" class="sg-list"></ol>
+        <section id="sgDetail" class="sg-detail" hidden></section>
+      </aside>
+      <aside id="trPanel" class="sg-panel tr-panel" hidden aria-labelledby="trTitle">
+        <header class="sg-head">
+          <h3 id="trTitle" data-i18n="trTitle">Restid</h3>
+          <span class="tr-head-btns">
+            <button type="button" class="icon" id="trGear" data-i18n-title="trSettings" title="Inställningar: farter, vägar, väder, backar, timmar per dag">⚙</button>
+            <button type="button" class="icon" id="trClose" data-i18n-title="close" title="Stäng">×</button>
+          </span>
+        </header>
+        <div id="trPlan" class="tr-plan"></div>
+        <p id="trMsg" class="sg-msg" role="status"></p>
+        <h4 class="tr-sub" data-i18n="trJourneys">Resor</h4>
+        <ol id="trList" class="sg-list tr-list"></ol>
+      </aside>
+      <div class="zoom" role="group" aria-label="Zoom">
+        <button class="icon" id="zoomIn" aria-label="Zooma in">+</button>
+        <button class="icon" id="zoomOut" aria-label="Zooma ut">−</button>
+        <button class="icon" id="zoomFit" aria-label="Hela kartan">⤢</button>
+      </div>
+    </div>
+    <div id="mapLegend" class="map-legend"></div>
+  </section>
+</main>
+
+
+<dialog id="symbolsDialog" class="wide">
+  <form method="dialog">
+    <h2 data-i18n="symbolsTitle">Symboler för aspekter</h2>
+    <p class="dialog-text" data-i18n="symbolsHelp"></p>
+    <div id="symbolGrid" class="symbol-grid"></div>
+    <p id="symbolError" class="error" role="alert"></p>
+    <div class="dialog-actions"><div class="spacer"></div><button class="primary" data-i18n="close">Stäng</button></div>
+  </form>
+  <input type="file" id="symbolFile" accept="image/png,image/jpeg,image/gif,image/webp,image/svg+xml,.svg" hidden>
+</dialog>
+
+<dialog id="regionDialog" class="region-dialog">
+  <form method="dialog" id="regionForm" novalidate>
+    <h2 id="regionTitle">Nytt område</h2>
+    <div class="rd-top">
+      <label class="field stack rd-name"><span data-i18n="rdName">Namn</span><input id="rdName" maxlength="60" required></label>
+      <label class="field stack" id="rdFromBox"><span data-i18n="rdFrom">Utgå från</span><select id="rdFrom"></select></label>
+      <label class="field stack rd-desc"><span data-i18n="rdDesc">Beskrivning</span><textarea id="rdDesc" rows="2" maxlength="2000"></textarea></label>
+    </div>
+    <div class="rd-months-wrap">
+      <table class="rd-months">
+        <thead><tr><th></th><th>Jan</th><th>Feb</th><th>Mar</th><th>Apr</th><th>Maj</th><th>Jun</th><th>Jul</th><th>Aug</th><th>Sep</th><th>Okt</th><th>Nov</th><th>Dec</th></tr></thead>
+        <tbody>
+          <tr data-row="temperature"><th data-i18n="rdTemp">Temperatur °C</th></tr>
+          <tr data-row="precipitation"><th data-i18n="rdRain">Nederbörd</th></tr>
+          <tr data-row="wind"><th data-i18n="rdWind">Vind</th></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="rd-hint" data-i18n="rdMonthsHint">Temperatur är dygnets medel. Nederbörd och vind läggs till generatorns grundvärden: 0 är normalt, högre ger mer, negativt mindre.</p>
+    <div class="rd-row">
+      <label class="field slim" data-i18n-title="rdSwingHint" title="Hur mycket varmare dagen är än natten. 0 ger ändå 3–5 grader."><span data-i18n="rdSwing">Dygnssvängning</span><input type="number" id="rdDrop" min="0" max="60" step="1" class="num-small"></label>
+      <label class="field slim" data-i18n-title="rdSharpHint" title="0 = mjuk övergång mellan dag och natt, högre = snabbare temperaturfall och längre kalla perioder."><span data-i18n="rdSharp">Skarphet</span><input type="number" id="rdDropSpeed" min="0" max="20" step="0.5" class="num-small"></label>
+      <label class="field slim"><span data-i18n="rdPrevailing">Förhärskande vind från</span>
+        <select id="rdWindDir"><option value="">—</option><option>N</option><option>NE</option><option>E</option><option>SE</option><option>S</option><option>SW</option><option>W</option><option>NW</option></select></label>
+      <label class="field slim"><span data-i18n="rdPrevailingPct">dagar %</span><input type="number" id="rdWindPct" min="0" max="100" step="1" class="num-small"></label>
+      <label class="field slim" data-i18n-title="rdCloudHint" title="Mer (eller, negativt, mindre) moln på kartan. Påverkar inte vädret i övrigt."><span data-i18n="rdCloud">Molntäcke</span><input type="number" id="rdCloud" min="-10" max="10" step="1" class="num-small"></label>
+      <label class="field slim" data-i18n-title="rdRadiusHint" title="Om satt: områdets väder stannar inom detta avstånd från dess punkter (andel av kartans bredd, t.ex. 0.015) i stället för att flyta ut i grannarna."><span data-i18n="rdRadius">Håll inom</span><input type="number" id="rdRadius" min="0" max="0.5" step="0.005" class="num-small" placeholder="—"></label>
+      <label class="field slim" data-i18n-title="rdBaseHeightHint" title="Höjden (m ö.h.) som temperaturerna gäller för. I 3D (snö, is, glaciärer, snöfall) blir det 6,5° kallare per km över den och varmare under. Tomt = havsnivå."><span data-i18n="rdBaseHeight">Temperaturhöjd (m)</span><input type="number" id="rdBaseHeight" min="-1000" max="9000" step="50" class="num-small" placeholder="0"></label>
+    </div>
+    <h3 class="rd-h3" data-i18n="rdEvents">Händelser</h3>
+    <p class="rd-hint" data-i18n="rdEventsHint">”1 på 7 dagar” betyder att händelsen inträffar i snitt var sjunde dag. Temp, Regn och Vind ändrar vädret den dagen. Namn som börjar med ”Högmagisk” (eller innehåller ”magistorm” eller ”alstra”) blir magiska stormar på kartan.</p>
+    <div id="rdEventList" class="rd-events"></div>
+    <button type="button" id="rdAddEvent" data-i18n="rdAddEvent">+ Lägg till händelse</button>
+    <p id="rdError" class="error" role="alert"></p>
+    <div class="dialog-actions">
+      <button type="button" id="rdDelete" class="danger" data-i18n="rdDelete">Ta bort</button>
+      <button type="button" id="rdDownload" data-i18n="rdDownload">Ladda ner YAML</button>
+      <div class="spacer"></div>
+      <button type="button" id="rdCancel" data-i18n="cancel">Avbryt</button>
+      <button type="submit" class="primary" id="rdSave" data-i18n="rdSave">Spara område</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="evRules" class="wide">
+  <form method="dialog">
+    <h2 data-i18n="evRulesTitle">Händelseregler</h2>
+    <p class="tr-note" id="evRulesSource"></p>
+    <textarea id="evRulesText" class="ev-rules-text" spellcheck="false" rows="22"></textarea>
+    <p class="sg-msg" id="evRulesMsg" role="status"></p>
+    <div class="dialog-actions">
+      <button type="button" id="evRulesReset" hidden data-i18n="evRulesReset" data-i18n-title="evRulesResetTip" title="Ta bort appens version: alla får reglerna i world/events.yaml">Återställ till filen</button>
+      <button value="cancel" data-i18n="close">Stäng</button>
+      <button type="button" id="evRulesSave" class="primary" hidden data-i18n="evRulesSave">Spara för alla</button>
+    </div>
+  </form>
+</dialog>
+<dialog id="trSettings" class="wide">
+  <form method="dialog">
+    <h2 data-i18n="trSettings">Inställningar för restid</h2>
+    <p class="tr-note" data-i18n="trSettingsHelp">Farter i km/h. Avdragen gäller som beskrivet: skog och dåligt väder bara utanför vägarna, riktigt dåligt väder, djup snö och backar överallt. Backar i procent medellutning över kartans pixlar (ungefär 5 km).</p>
+    <p class="tr-note" id="trSetSource"></p>
+    <div id="trSettingsBody" class="tr-set-grid"></div>
+    <div class="dialog-actions">
+      <button value="events" id="trEventRules" data-i18n="evRules" data-i18n-title="evRulesTip" title="Reglerna för händelser under resor: chansen och vad terrängen ändrar">Händelseregler…</button>
+      <button value="allreset" id="trResetAll" hidden data-i18n="trResetAll" data-i18n-title="trResetAllTip" title="Ta bort värdena som sparats för alla: alla får världsfilens (world/travel.yaml)">Återställ allas</button>
+      <button value="all" id="trSaveAll" hidden data-i18n="trSaveAll" data-i18n-title="trSaveAllTip" title="Spara värdena för alla som inte ändrat sina egna (ersätter world/travel.yaml i appen)">Spara för alla</button>
+      <button value="reset" data-i18n="trReset" data-i18n-title="trResetTip" title="Ta bort dina egna ändringar: du får samma värden som alla andra">Återställ mina</button>
+      <button value="cancel" data-i18n="cancel">Avbryt</button>
+      <button value="ok" class="primary" data-i18n="trSaveMine" data-i18n-title="trSaveMineTip" title="Spara värdena bara för dig">Spara för mig</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="promptDialog">
+  <form method="dialog" id="promptForm">
+    <h2 id="promptTitle"></h2>
+    <div id="promptBody"></div>
+    <div class="dialog-actions" id="promptActions"></div>
+  </form>
+</dialog>
+
+<script src="i18n.js?v=119"></script>
+<script src="fieldmap.js?v=119"></script>
+<script src="terrain.js?v=119"></script>
+<script src="heightpaint.js?v=119"></script>
+<script src="rivers.js?v=119"></script>
+<script src="vendor/polygon-clipping-0.15.7.umd.min.js"></script>
+<script src="nations.js?v=119"></script>
+<script src="ranges.js?v=119"></script>
+<script src="roads.js?v=119"></script>
+<script src="layersugg.js?v=119"></script>
+<script src="travel.js?v=119"></script>
+<script src="events.js?v=119"></script>
+<script src="app.js?v=119"></script>
+<a id="tilesWarn" class="tiles-warn" hidden target="_blank" rel="noopener"></a>
+<div id="appVersion" class="app-version" aria-label="Version"></div>
+</body>
+</html>

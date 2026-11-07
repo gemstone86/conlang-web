@@ -1,0 +1,148 @@
+name: "Amdai-Shek (Södra)"
+
+temperature:
+  jan: -22
+  feb: -18
+  mar: -13
+  apr: -9
+  may: -5
+  jun: 5
+  jul: 12
+  aug: 19
+  sep: 10
+  oct: 3
+  nov: -9
+  dec: -17
+
+temperature_drop: 5  
+drop_speed: 0
+
+# Höjden (m ö.h.) som temperaturerna ovan gäller för. I 3D blir det 6,5° kallare per km över den.
+base_heat_height: 500
+
+precipitation:
+  jan: 0
+  feb: 0
+  mar: 0
+  apr: 0
+  may: 0
+  jun: 0
+  jul: 0
+  aug: 0
+  sep: 0
+  oct: 1
+  nov: 1
+  dec: 1
+
+shift: 0
+
+wind:
+  jan: 0
+  feb: 0
+  mar: 0
+  apr: 0
+  may: 0
+  jun: 0
+  jul: 0
+  aug: 0
+  sep: 0
+  oct: 0
+  nov: 0
+  dec: 0
+
+# Förhärskande vind (västanvind, ca 49° N): varifrån vinden oftast blåser
+# och hur stor del av dagarna (%). Övriga dagar: oftast en grannriktning, ibland vilken som helst.
+prevailing_wind: SW
+prevailing_chance: 45
+
+events:
+  - name: "Drake"
+    occurs: 1
+    days: 1000
+  - name: "Starka vindar (+1 vindstyrka, +3 alstra pneumotropi)"
+    follow_wind: 80
+    wander: 20
+    growth: 50
+    duration_min: 6
+    duration_max: 24
+    occurs: 1
+    days: 28
+  - name: "Isande Kyla (-5C temperatur)"
+    occurs: 1
+    days: 50
+  - name: "Kryotropiskt Lågtryck (-10C temperatur)"
+    occurs: 1
+    days: 100
+  - name: ""
+    occurs: 31
+    days: 28
+  - name: "Raunisk Räd"
+    occurs: 1
+    days: 120
+  - name: "Verdisk Räd"
+    occurs: 1
+    days: 60
+  - name: "Kryotropisk Magistorm (Styrka 5)"
+    follow_wind: 50
+    wander: 20
+    growth: 50
+    duration_min: 6
+    duration_max: 24
+    occurs: 1
+    days: 100
+  - name: "Kryotropisk Magistorm (Styrka 10)"
+    follow_wind: 50
+    wander: 20
+    growth: 50
+    duration_min: 12
+    duration_max: 48
+    occurs: 1
+    days: 200
+  - name: "Kryotropisk Magistorm (Styrka 15)"
+    follow_wind: 50
+    wander: 20
+    growth: 50
+    duration_min: 12
+    duration_max: 72
+    occurs: 1
+    days: 300
+  - name: "Kryotropisk Magistorm (Styrka 20)"
+    follow_wind: 50
+    wander: 20
+    growth: 50
+    duration_min: 12
+    duration_max: 96
+    occurs: 1
+    days: 400
+  - name: "Fototropisk Magistorm (Styrka 5)"
+    follow_wind: 50
+    wander: 20
+    growth: 50
+    duration_min: 6
+    duration_max: 24
+    occurs: 1
+    days: 100
+  - name: "Fototropisk Magistorm (Styrka 10)"
+    follow_wind: 50
+    wander: 20
+    growth: 50
+    duration_min: 12
+    duration_max: 48
+    occurs: 1
+    days: 200
+  - name: "Fototropisk Magistorm (Styrka 15)"
+    follow_wind: 50
+    wander: 20
+    growth: 50
+    duration_min: 12
+    duration_max: 72
+    occurs: 1
+    days: 300
+  - name: "Fototropisk Magistorm (Styrka 20)"
+    follow_wind: 50
+    wander: 20
+    growth: 50
+    duration_min: 12
+    duration_max: 96
+    occurs: 1
+    days: 400

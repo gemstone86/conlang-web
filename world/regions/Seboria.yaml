@@ -1,0 +1,62 @@
+# Seboria: som Godrion men 3 grader kallare, mindre blåsigt (-1 vind) och utan lindormar.
+name: "Seboria"
+
+temperature:
+  jan: -20
+  feb: -15
+  mar: -10
+  apr: -7
+  may: -3
+  jun: 1
+  jul: 8
+  aug: 9
+  sep: 2
+  oct: -5
+  nov: -12
+  dec: -17
+
+temperature_drop: 5
+drop_speed: 5
+
+# Höjden (m ö.h.) som temperaturerna ovan gäller för. I 3D blir det 6,5° kallare per km över den.
+base_heat_height: 600
+
+precipitation:
+  jan: 0
+  feb: 0
+  mar: 0
+  apr: 0
+  may: 2
+  jun: 2
+  jul: 2
+  aug: 2
+  sep: 2
+  oct: 1
+  nov: 1
+  dec: 1
+
+shift: 0
+
+wind:
+  jan: 0
+  feb: 0
+  mar: 0
+  apr: 0
+  may: 0
+  jun: 0
+  jul: 1
+  aug: 1
+  sep: 0
+  oct: 0
+  nov: 0
+  dec: 0
+
+# Förhärskande vind (västanvind, ca 56° N): varifrån vinden oftast blåser
+# och hur stor del av dagarna (%). Övriga dagar: oftast en grannriktning, ibland vilken som helst.
+prevailing_wind: SW
+prevailing_chance: 45
+
+events:
+  - name: "Svår åska"
+    occurs: 1
+    days: 250

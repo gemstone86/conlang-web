@@ -1,0 +1,62 @@
+# Okända landet: ungefär som norra Skandinavien (samma klimat som Norra Ringbergen). Södra halvklotet: årstiderna är omvända (kallast i juli).
+name: "Okända landet"
+
+temperature:
+  jan: 12
+  feb: 10
+  mar: 5
+  apr: -2
+  may: -8
+  jun: -12
+  jul: -14
+  aug: -13
+  sep: -9
+  oct: -3
+  nov: 3
+  dec: 9
+
+temperature_drop: 4
+drop_speed: 2
+
+# Höjden (m ö.h.) som temperaturerna ovan gäller för. I 3D blir det 6,5° kallare per km över den.
+base_heat_height: 400
+
+precipitation:
+  jan: 2
+  feb: 2
+  mar: 1
+  apr: 1
+  may: 0
+  jun: 0
+  jul: 0
+  aug: 0
+  sep: 0
+  oct: 0
+  nov: 1
+  dec: 1
+
+shift: 0
+
+wind:
+  jan: 0
+  feb: 0
+  mar: 1
+  apr: 1
+  may: 1
+  jun: 1
+  jul: 1
+  aug: 1
+  sep: 1
+  oct: 1
+  nov: 1
+  dec: 1
+
+# Förhärskande vind (västanvind, ca 49° S): varifrån vinden oftast blåser
+# och hur stor del av dagarna (%). Övriga dagar: oftast en grannriktning, ibland vilken som helst.
+prevailing_wind: NW
+prevailing_chance: 45
+
+events:
+  - name: "Drake"
+    occurs: 1
+    days: 1000

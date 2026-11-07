@@ -1,0 +1,56 @@
+# Askhavet: en märklig plats utan förhärskande vind: vinden kan komma från alla håll lika ofta. Södra halvklotet (varmast i januari).
+name: "Askhavet"
+
+temperature:
+  jan: 26
+  feb: 26
+  mar: 25
+  apr: 24
+  may: 22
+  jun: 21
+  jul: 20
+  aug: 21
+  sep: 22
+  oct: 23
+  nov: 24
+  dec: 25
+
+temperature_drop: 2
+drop_speed: 1
+
+# Höjden (m ö.h.) som temperaturerna ovan gäller för. I 3D blir det 6,5° kallare per km över den.
+base_heat_height: 0
+
+precipitation:
+  jan: 1
+  feb: 1
+  mar: 1
+  apr: 0
+  may: 0
+  jun: 0
+  jul: 0
+  aug: 0
+  sep: 0
+  oct: 0
+  nov: 1
+  dec: 1
+
+shift: 0
+
+wind:
+  jan: 1
+  feb: 1
+  mar: 1
+  apr: 1
+  may: 1
+  jun: 1
+  jul: 1
+  aug: 1
+  sep: 1
+  oct: 1
+  nov: 1
+  dec: 1
+
+# Ingen förhärskande vind: alla åtta riktningar är lika vanliga.
+
+events: []

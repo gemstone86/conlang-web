@@ -1,0 +1,57 @@
+religions:
+  - name: "Daakkyrkan"
+    holiest:
+      name: "Ljusbärarens ankomst"
+      month: "1"
+      day: "7"
+    holy_days:
+      - name: "Jordesoldatens förkunnelse"
+        month: "1"
+        day: "16"
+      - name: "Alla själars dag"
+        month: "3"
+        day: "24"
+      - name: "Milgaroks Hädanfärd"
+        month: "6"
+        day: "21"
+      - name: "Daaks uppenbarelsedag"
+        month: "12"
+        day: "23"
+
+  - name: "Samoriska Läran"
+    holiest:
+      name: "Auriasmäss"
+      month: "6"
+      day: "1"
+    unholiest:
+      name: "Nattmässa"
+      month: "12"
+      day: "8"
+    holy_days:
+      - name: "Nimtomäss"
+        month: "5"
+        day: "15"
+      - name: "Zorianmäss"
+        month: "9"
+        day: "8"
+      - name: "Ramsalmäss"
+        month: "11"
+        day: "15"
+      - name: "Aurias och Pelias Dag"
+        repeat_months: 1
+        start_month: 1
+        start_day: 1
+    unholy_days:
+      - name: "Dagbryt"
+        month: "2"
+        day: "7"
+  - name: "Vontartron"
+    holiest:
+      name: "Vontar-lozad"
+      month: 7
+      day: 11
+    holy_days:
+      - name: "åttondedag"
+        repeat_days: 8
+        start_month: 1
+        start_day: 2

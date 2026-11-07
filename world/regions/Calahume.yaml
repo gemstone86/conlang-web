@@ -1,0 +1,62 @@
+# Calahume: lite kallare än Drunok (-2 grader), ungefär som Sverige. Samma nederbörd och vind som Drunok, men utan Drunoks händelser.
+name: "Calahume"
+
+temperature:
+  jan: -9
+  feb: -5
+  mar: 0
+  apr: 8
+  may: 12
+  jun: 16
+  jul: 20
+  aug: 17
+  sep: 9
+  oct: 4
+  nov: -1
+  dec: -7
+
+temperature_drop: 3
+drop_speed: 1
+
+# Höjden (m ö.h.) som temperaturerna ovan gäller för. I 3D blir det 6,5° kallare per km över den.
+base_heat_height: 450
+
+precipitation:
+  jan: 0
+  feb: 0
+  mar: 0
+  apr: 0
+  may: 0
+  jun: 5
+  jul: 5
+  aug: 5
+  sep: 0
+  oct: 0
+  nov: 0
+  dec: 0
+
+shift: 0
+
+wind:
+  jan: 0
+  feb: 0
+  mar: 0
+  apr: 0
+  may: 0
+  jun: 0
+  jul: 0
+  aug: 0
+  sep: 0
+  oct: 0
+  nov: 0
+  dec: 0
+
+# Förhärskande vind (västanvind, ca 57° N): varifrån vinden oftast blåser
+# och hur stor del av dagarna (%). Övriga dagar: oftast en grannriktning, ibland vilken som helst.
+prevailing_wind: SW
+prevailing_chance: 45
+
+events:
+  - name: "Drake"
+    occurs: 1
+    days: 1000

@@ -1,0 +1,169 @@
+# Savann. Magiska stormar av alla aspekter ungefär var 50:e dag; de lämnar aldrig Summag.
+name: "Summag"
+
+temperature:
+  jan: 21
+  feb: 22
+  mar: 25
+  apr: 28
+  may: 31
+  jun: 30
+  jul: 28
+  aug: 27
+  sep: 28
+  oct: 27
+  nov: 24
+  dec: 22
+
+temperature_drop: 9
+drop_speed: 3
+
+# Höjden (m ö.h.) som temperaturerna ovan gäller för. I 3D blir det 6,5° kallare per km över den.
+base_heat_height: 300
+
+precipitation:
+  jan: -2
+  feb: -2
+  mar: -1
+  apr: 1
+  may: 2
+  jun: 3
+  jul: 3
+  aug: 3
+  sep: 2
+  oct: 0
+  nov: -1
+  dec: -2
+
+shift: 0
+
+wind:
+  jan: 1
+  feb: 1
+  mar: 1
+  apr: 0
+  may: 0
+  jun: 0
+  jul: 0
+  aug: 0
+  sep: 0
+  oct: 0
+  nov: 1
+  dec: 1
+
+# Förhärskande vind (västanvind, ca 34° N): varifrån vinden oftast blåser
+# och hur stor del av dagarna (%). Övriga dagar: oftast en grannriktning, ibland vilken som helst.
+prevailing_wind: SW
+prevailing_chance: 45
+
+events:
+  - name: "Drake"
+    occurs: 1
+    days: 1000
+  - name: "Värmebölja (+10C)"
+    occurs: 1
+    days: 200
+  - name: "Liten Magistorm"
+    follow_wind: 50
+    wander: 20
+    growth: 50
+    duration_min: 6
+    duration_max: 24
+    stay_in_region: true
+    occurs: 1
+    days: 100
+    list:
+      - "Kronotropi 5"
+      - "Nomotropi 5"
+      - "Ataxatropi 5"
+      - "Termotropi 5"
+      - "Kryotropi 5"
+      - "Fototropi 5"
+      - "Skototropi 5"
+      - "Pyrotropi 5"
+      - "Geotropi 5"
+      - "Pneumotropi 5"
+      - "Hydrotropi 5"
+      - "Biotropi 5"
+      - "Nekrotropi 5"
+      - "Heliotropi 5"
+      - "Selenotropi 5"
+      - "Astrotropi 5"
+  - name: "Magistorm"
+    follow_wind: 50
+    wander: 20
+    growth: 50
+    duration_min: 12
+    duration_max: 48
+    stay_in_region: true
+    occurs: 1
+    days: 150
+    list:
+      - "Kronotropi 10"
+      - "Nomotropi 10"
+      - "Ataxatropi 10"
+      - "Termotropi 10"
+      - "Kryotropi 10"
+      - "Fototropi 10"
+      - "Skototropi 10"
+      - "Pyrotropi 10"
+      - "Geotropi 10"
+      - "Pneumotropi 10"
+      - "Hydrotropi 10"
+      - "Biotropi 10"
+      - "Nekrotropi 10"
+      - "Heliotropi 10"
+      - "Selenotropi 10"
+      - "Astrotropi 10"
+  - name: "Kraftig Magistorm"
+    follow_wind: 50
+    wander: 20
+    growth: 50
+    duration_min: 12
+    duration_max: 72
+    stay_in_region: true
+    occurs: 1
+    days: 300
+    list:
+      - "Kronotropi 15"
+      - "Nomotropi 15"
+      - "Ataxatropi 15"
+      - "Termotropi 15"
+      - "Kryotropi 15"
+      - "Fototropi 15"
+      - "Skototropi 15"
+      - "Pyrotropi 15"
+      - "Geotropi 15"
+      - "Pneumotropi 15"
+      - "Hydrotropi 15"
+      - "Biotropi 15"
+      - "Nekrotropi 15"
+      - "Heliotropi 15"
+      - "Selenotropi 15"
+      - "Astrotropi 15"
+  - name: "Svår Magistorm"
+    follow_wind: 50
+    wander: 20
+    growth: 50
+    duration_min: 12
+    duration_max: 96
+    stay_in_region: true
+    occurs: 1
+    days: 600
+    list:
+      - "Kronotropi 20"
+      - "Nomotropi 20"
+      - "Ataxatropi 20"
+      - "Termotropi 20"
+      - "Kryotropi 20"
+      - "Fototropi 20"
+      - "Skototropi 20"
+      - "Pyrotropi 20"
+      - "Geotropi 20"
+      - "Pneumotropi 20"
+      - "Hydrotropi 20"
+      - "Biotropi 20"
+      - "Nekrotropi 20"
+      - "Heliotropi 20"
+      - "Selenotropi 20"
+      - "Astrotropi 20"

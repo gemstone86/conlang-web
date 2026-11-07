@@ -1,0 +1,65 @@
+# Härlandet: mycket torrt land sydväst om Dödens hav. Hett året runt, nästan inget regn.
+name: "Härlandet"
+
+temperature:
+  jan: 24
+  feb: 25
+  mar: 27
+  apr: 29
+  may: 31
+  jun: 32
+  jul: 31
+  aug: 30
+  sep: 30
+  oct: 29
+  nov: 27
+  dec: 25
+
+temperature_drop: 12
+drop_speed: 6
+
+# Höjden (m ö.h.) som temperaturerna ovan gäller för. I 3D blir det 6,5° kallare per km över den.
+base_heat_height: 300
+
+precipitation:
+  jan: -3
+  feb: -3
+  mar: -3
+  apr: -3
+  may: -3
+  jun: -3
+  jul: -3
+  aug: -3
+  sep: -3
+  oct: -3
+  nov: -3
+  dec: -3
+
+shift: 0
+
+wind:
+  jan: 1
+  feb: 1
+  mar: 1
+  apr: 1
+  may: 1
+  jun: 1
+  jul: 1
+  aug: 1
+  sep: 1
+  oct: 1
+  nov: 1
+  dec: 1
+
+# Förhärskande vind (passadvind, ca 11° N): varifrån vinden oftast blåser
+# och hur stor del av dagarna (%). Övriga dagar: oftast en grannriktning, ibland vilken som helst.
+prevailing_wind: NE
+prevailing_chance: 60
+
+events:
+  - name: "Drake"
+    occurs: 1
+    days: 1000
+  - name: "Sandstorm"
+    occurs: 1
+    days: 40

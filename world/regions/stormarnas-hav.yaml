@@ -1,0 +1,94 @@
+# Stormarnas hav, norra delen (runt ekvatorn och norrut). Havet ligger efter land: varmast runt augusti.
+name: "Stormarnas Hav"
+
+temperature:
+  jan: 12
+  feb: 10
+  mar: 9
+  apr: 12
+  may: 14
+  jun: 16
+  jul: 20
+  aug: 24
+  sep: 22
+  oct: 18
+  nov: 16
+  dec: 15
+
+temperature_drop: 2
+drop_speed: 1
+
+# Höjden (m ö.h.) som temperaturerna ovan gäller för. I 3D blir det 6,5° kallare per km över den.
+base_heat_height: 0
+
+precipitation:
+  jan: 1
+  feb: 0
+  mar: 0
+  apr: 0
+  may: 0
+  jun: 0
+  jul: 0
+  aug: 0
+  sep: 1
+  oct: 1
+  nov: 2
+  dec: 1
+
+shift: 0
+
+wind:
+  jan: 2
+  feb: 2
+  mar: 1
+  apr: 1
+  may: 1
+  jun: 1
+  jul: 1
+  aug: 1
+  sep: 2
+  oct: 2
+  nov: 3
+  dec: 3
+
+# Förhärskande vind (passadvind, ca 10° N): varifrån vinden oftast blåser
+# och hur stor del av dagarna (%). Övriga dagar: oftast en grannriktning, ibland vilken som helst.
+prevailing_wind: NE
+prevailing_chance: 60
+
+events:
+  - name: "Drake"
+    occurs: 1
+    days: 1000
+  - name: "Magistorm (Hydrotropi 5)"
+    follow_wind: 50
+    wander: 20
+    growth: 50
+    duration_min: 6
+    duration_max: 24
+    occurs: 1
+    days: 100
+  - name: "Magistorm (Hydrotropi 10)"
+    follow_wind: 50
+    wander: 20
+    growth: 50
+    duration_min: 12
+    duration_max: 48
+    occurs: 1
+    days: 200
+  - name: "Magistorm (Hydrotropi 15)"
+    follow_wind: 50
+    wander: 20
+    growth: 50
+    duration_min: 12
+    duration_max: 72
+    occurs: 1
+    days: 400
+  - name: "Magistorm (Hydrotropi 20)"
+    follow_wind: 50
+    wander: 20
+    growth: 50
+    duration_min: 12
+    duration_max: 96
+    occurs: 1
+    days: 800

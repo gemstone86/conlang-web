@@ -1,0 +1,65 @@
+# Het savann med torrtid och regntid.
+name: "Nbeyo"
+
+temperature:
+  jan: 21
+  feb: 22
+  mar: 25
+  apr: 28
+  may: 31
+  jun: 30
+  jul: 28
+  aug: 27
+  sep: 28
+  oct: 27
+  nov: 24
+  dec: 22
+
+temperature_drop: 9
+drop_speed: 3
+
+# Höjden (m ö.h.) som temperaturerna ovan gäller för. I 3D blir det 6,5° kallare per km över den.
+base_heat_height: 400
+
+precipitation:
+  jan: -2
+  feb: -2
+  mar: -1
+  apr: 1
+  may: 2
+  jun: 3
+  jul: 3
+  aug: 3
+  sep: 2
+  oct: 0
+  nov: -1
+  dec: -2
+
+shift: 0
+
+wind:
+  jan: 1
+  feb: 1
+  mar: 1
+  apr: 0
+  may: 0
+  jun: 0
+  jul: 0
+  aug: 0
+  sep: 0
+  oct: 0
+  nov: 1
+  dec: 1
+
+# Förhärskande vind (passadvind, ca 16° N): varifrån vinden oftast blåser
+# och hur stor del av dagarna (%). Övriga dagar: oftast en grannriktning, ibland vilken som helst.
+prevailing_wind: NE
+prevailing_chance: 60
+
+events:
+  - name: "Drake"
+    occurs: 1
+    days: 1000
+  - name: "Värmebölja (+10C)"
+    occurs: 1
+    days: 200

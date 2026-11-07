@@ -1,0 +1,63 @@
+# Raunbukten: som Thalahavet men ännu blåsigare (+1 vind till).
+# Havet ligger efter land: varmast runt augusti, kallast runt mars.
+name: "Raunbukten"
+
+temperature:
+  jan: 10
+  feb: 8
+  mar: 7
+  apr: 10
+  may: 12
+  jun: 14
+  jul: 18
+  aug: 22
+  sep: 20
+  oct: 16
+  nov: 14
+  dec: 13
+
+temperature_drop: 1
+drop_speed: 0
+
+# Höjden (m ö.h.) som temperaturerna ovan gäller för. I 3D blir det 6,5° kallare per km över den.
+base_heat_height: 0
+
+precipitation:
+  jan: 0
+  feb: 0
+  mar: 0
+  apr: 0
+  may: 0
+  jun: 0
+  jul: 0
+  aug: 0
+  sep: 0
+  oct: 0
+  nov: 0
+  dec: 0
+
+shift: 0
+
+wind:
+  jan: 3
+  feb: 3
+  mar: 3
+  apr: 2
+  may: 3
+  jun: 3
+  jul: 3
+  aug: 3
+  sep: 3
+  oct: 4
+  nov: 4
+  dec: 3
+
+# Förhärskande vind (västanvind, ca 38° N): varifrån vinden oftast blåser
+# och hur stor del av dagarna (%). Övriga dagar: oftast en grannriktning, ibland vilken som helst.
+prevailing_wind: SW
+prevailing_chance: 45
+
+events:
+  - name: "Drake"
+    occurs: 1
+    days: 1000

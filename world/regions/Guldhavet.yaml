@@ -1,0 +1,111 @@
+# Guldhavet: ungefär som Nordsjön. En magisk ström för varje aspekt (+3), ungefär en i veckan totalt. De är vanliga händelser, inte magiska stormar.
+name: "Guldhavet"
+
+temperature:
+  jan: 5
+  feb: 4
+  mar: 5
+  apr: 7
+  may: 10
+  jun: 13
+  jul: 16
+  aug: 17
+  sep: 15
+  oct: 12
+  nov: 9
+  dec: 6
+
+temperature_drop: 3
+drop_speed: 1
+
+# Höjden (m ö.h.) som temperaturerna ovan gäller för. I 3D blir det 6,5° kallare per km över den.
+base_heat_height: 0
+
+precipitation:
+  jan: 1
+  feb: 1
+  mar: 1
+  apr: 1
+  may: 0
+  jun: 0
+  jul: 1
+  aug: 1
+  sep: 1
+  oct: 2
+  nov: 2
+  dec: 2
+
+shift: 0
+
+wind:
+  jan: 2
+  feb: 2
+  mar: 2
+  apr: 1
+  may: 1
+  jun: 1
+  jul: 1
+  aug: 1
+  sep: 2
+  oct: 2
+  nov: 3
+  dec: 3
+
+# Förhärskande vind (västanvind, ca 53° N): varifrån vinden oftast blåser
+# och hur stor del av dagarna (%). Övriga dagar: oftast en grannriktning, ibland vilken som helst.
+prevailing_wind: SW
+prevailing_chance: 45
+
+events:
+  # 17 aspekter, var och en ungefär var 119:e dag = ungefär en magisk ström i veckan totalt.
+  - name: "Magisk ström: Kronotropi (+3)"
+    occurs: 1
+    days: 119
+  - name: "Magisk ström: Nomotropi (+3)"
+    occurs: 1
+    days: 119
+  - name: "Magisk ström: Ataxatropi (+3)"
+    occurs: 1
+    days: 119
+  - name: "Magisk ström: Termotropi (+3)"
+    occurs: 1
+    days: 119
+  - name: "Magisk ström: Kryotropi (+3)"
+    occurs: 1
+    days: 119
+  - name: "Magisk ström: Fototropi (+3)"
+    occurs: 1
+    days: 119
+  - name: "Magisk ström: Skototropi (+3)"
+    occurs: 1
+    days: 119
+  - name: "Magisk ström: Pyrotropi (+3)"
+    occurs: 1
+    days: 119
+  - name: "Magisk ström: Geotropi (+3)"
+    occurs: 1
+    days: 119
+  - name: "Magisk ström: Pneumotropi (+3)"
+    occurs: 1
+    days: 119
+  - name: "Magisk ström: Hydrotropi (+3)"
+    occurs: 1
+    days: 119
+  - name: "Magisk ström: Biotropi (+3)"
+    occurs: 1
+    days: 119
+  - name: "Magisk ström: Nekrotropi (+3)"
+    occurs: 1
+    days: 119
+  - name: "Magisk ström: Heliotropi (+3)"
+    occurs: 1
+    days: 119
+  - name: "Magisk ström: Selenotropi (+3)"
+    occurs: 1
+    days: 119
+  - name: "Magisk ström: Astrotropi (+3)"
+    occurs: 1
+    days: 119
+  - name: "Magisk ström: Ikonotropi (+3)"
+    occurs: 1
+    days: 119

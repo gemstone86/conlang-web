@@ -1,0 +1,68 @@
+# Had-ahd: samma klimat som Amdai-Shek (Södra). (Amdai-Sheks magiska stormar ingår inte.)
+name: "Had-ahd"
+
+temperature:
+  jan: -22
+  feb: -18
+  mar: -13
+  apr: -9
+  may: -5
+  jun: 5
+  jul: 12
+  aug: 19
+  sep: 10
+  oct: 3
+  nov: -9
+  dec: -17
+
+temperature_drop: 5
+drop_speed: 0
+
+# Höjden (m ö.h.) som temperaturerna ovan gäller för. I 3D blir det 6,5° kallare per km över den.
+base_heat_height: 600
+
+precipitation:
+  jan: 0
+  feb: 0
+  mar: 0
+  apr: 0
+  may: 0
+  jun: 0
+  jul: 0
+  aug: 0
+  sep: 0
+  oct: 1
+  nov: 1
+  dec: 1
+
+shift: 0
+
+wind:
+  jan: 0
+  feb: 0
+  mar: 0
+  apr: 0
+  may: 0
+  jun: 0
+  jul: 0
+  aug: 0
+  sep: 0
+  oct: 0
+  nov: 0
+  dec: 0
+
+# Förhärskande vind (västanvind, ca 49° N): varifrån vinden oftast blåser
+# och hur stor del av dagarna (%). Övriga dagar: oftast en grannriktning, ibland vilken som helst.
+prevailing_wind: SW
+prevailing_chance: 45
+
+events:
+  - name: "Drake"
+    occurs: 1
+    days: 1000
+  - name: "Isande Kyla (-5C temperatur)"
+    occurs: 1
+    days: 50
+  - name: "Kryotropiskt Lågtryck (-10C temperatur)"
+    occurs: 1
+    days: 100

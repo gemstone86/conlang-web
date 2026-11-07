@@ -1,0 +1,60 @@
+# Vindarnas hav: som Stormarnas hav men mindre regn (-1) och blåsigare (+2 vind).
+# Havet ligger efter land: varmast runt augusti, kallast runt mars.
+name: "Vindarnas hav"
+
+temperature:
+  jan: 12
+  feb: 10
+  mar: 9
+  apr: 12
+  may: 14
+  jun: 16
+  jul: 20
+  aug: 24
+  sep: 22
+  oct: 18
+  nov: 16
+  dec: 15
+
+temperature_drop: 2
+drop_speed: 1
+
+# Höjden (m ö.h.) som temperaturerna ovan gäller för. I 3D blir det 6,5° kallare per km över den.
+base_heat_height: 0
+
+precipitation:
+  jan: 0
+  feb: -1
+  mar: -1
+  apr: -1
+  may: -1
+  jun: -1
+  jul: -1
+  aug: -1
+  sep: 0
+  oct: 0
+  nov: 1
+  dec: 0
+
+shift: 0
+
+wind:
+  jan: 4
+  feb: 4
+  mar: 3
+  apr: 3
+  may: 3
+  jun: 3
+  jul: 3
+  aug: 3
+  sep: 4
+  oct: 4
+  nov: 5
+  dec: 5
+
+# Förhärskande vind (passadvind, ca 8° S): varifrån vinden oftast blåser
+# och hur stor del av dagarna (%). Övriga dagar: oftast en grannriktning, ibland vilken som helst.
+prevailing_wind: SE
+prevailing_chance: 60
+
+events: []

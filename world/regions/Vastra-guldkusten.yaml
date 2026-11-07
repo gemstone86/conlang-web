@@ -1,0 +1,62 @@
+# Västra guldkusten: som Guldhavet (väster om havet), men med inlandsklimat: kallare vintrar och varmare somrar (temperaturens utslag ×1,6) och lite mindre vind.
+name: "Västra guldkusten"
+
+temperature:
+  jan: 2
+  feb: 0
+  mar: 2
+  apr: 5
+  may: 10
+  jun: 15
+  jul: 20
+  aug: 21
+  sep: 18
+  oct: 13
+  nov: 8
+  dec: 4
+
+temperature_drop: 4
+drop_speed: 1
+
+# Höjden (m ö.h.) som temperaturerna ovan gäller för. I 3D blir det 6,5° kallare per km över den.
+base_heat_height: 200
+
+precipitation:
+  jan: 1
+  feb: 1
+  mar: 1
+  apr: 1
+  may: 0
+  jun: 0
+  jul: 1
+  aug: 1
+  sep: 1
+  oct: 2
+  nov: 2
+  dec: 2
+
+shift: 0
+
+wind:
+  jan: 1
+  feb: 1
+  mar: 1
+  apr: 0
+  may: 0
+  jun: 0
+  jul: 0
+  aug: 0
+  sep: 1
+  oct: 1
+  nov: 2
+  dec: 2
+
+# Förhärskande vind (västanvind, ca 51° N): varifrån vinden oftast blåser
+# och hur stor del av dagarna (%). Övriga dagar: oftast en grannriktning, ibland vilken som helst.
+prevailing_wind: SW
+prevailing_chance: 45
+
+events:
+  - name: "Drake"
+    occurs: 1
+    days: 1000

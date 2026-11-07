@@ -1,0 +1,65 @@
+# Khosala: som Ebhron (Södra) men längre in i landet: mindre vind (-2) och mindre regn (-1 nederbörd).
+name: "Khosala"
+
+temperature:
+  jan: 21
+  feb: 22
+  mar: 24
+  apr: 26
+  may: 28
+  jun: 30
+  jul: 30
+  aug: 29
+  sep: 28
+  oct: 26
+  nov: 24
+  dec: 22
+
+temperature_drop: 5
+drop_speed: 1
+
+# Höjden (m ö.h.) som temperaturerna ovan gäller för. I 3D blir det 6,5° kallare per km över den.
+base_heat_height: 300
+
+precipitation:
+  jan: -2
+  feb: -2
+  mar: -2
+  apr: -1
+  may: 0
+  jun: 1
+  jul: 2
+  aug: 1
+  sep: 0
+  oct: -1
+  nov: -2
+  dec: -2
+
+shift: 0
+
+wind:
+  jan: 1
+  feb: 1
+  mar: 0
+  apr: 0
+  may: 0
+  jun: 0
+  jul: 0
+  aug: 0
+  sep: 1
+  oct: 1
+  nov: 1
+  dec: 1
+
+# Förhärskande vind (passadvind, ca 7° N): varifrån vinden oftast blåser
+# och hur stor del av dagarna (%). Övriga dagar: oftast en grannriktning, ibland vilken som helst.
+prevailing_wind: NE
+prevailing_chance: 60
+
+events:
+  - name: "Drake"
+    occurs: 1
+    days: 1000
+  - name: "Värmebölja (+10C)"
+    occurs: 1
+    days: 200

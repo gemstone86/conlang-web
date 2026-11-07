@@ -1,0 +1,62 @@
+# Halkyon-havet: ett lugnt hav med lite vind (-2) och en förhärskande vind som blåser MOT öster (alltså FRÅN väster).
+name: "Halkyon-havet"
+
+temperature:
+  jan: 26
+  feb: 26
+  mar: 27
+  apr: 27
+  may: 28
+  jun: 28
+  jul: 28
+  aug: 28
+  sep: 28
+  oct: 27
+  nov: 27
+  dec: 26
+
+temperature_drop: 2
+drop_speed: 0
+
+# Höjden (m ö.h.) som temperaturerna ovan gäller för. I 3D blir det 6,5° kallare per km över den.
+base_heat_height: 0
+
+precipitation:
+  jan: 1
+  feb: 1
+  mar: 1
+  apr: 1
+  may: 1
+  jun: 1
+  jul: 1
+  aug: 1
+  sep: 1
+  oct: 1
+  nov: 1
+  dec: 1
+
+shift: 0
+
+wind:
+  jan: -2
+  feb: -2
+  mar: -2
+  apr: -2
+  may: -2
+  jun: -2
+  jul: -2
+  aug: -2
+  sep: -2
+  oct: -2
+  nov: -2
+  dec: -2
+
+# Förhärskande vind (mot öster, ca 4° N): varifrån vinden oftast blåser
+# och hur stor del av dagarna (%). Övriga dagar: oftast en grannriktning, ibland vilken som helst.
+prevailing_wind: W
+prevailing_chance: 60
+
+events:
+  - name: "Halkyon"
+    occurs: 1
+    days: 7

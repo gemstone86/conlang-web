@@ -1,0 +1,68 @@
+# Drakbergen: en kall bergskedja, samma grundtemperatur som Amdai-Shek (Södra) men 3 grader kallare.
+name: "Drakbergen"
+
+temperature:
+  jan: -25
+  feb: -21
+  mar: -16
+  apr: -12
+  may: -8
+  jun: 2
+  jul: 9
+  aug: 16
+  sep: 7
+  oct: 0
+  nov: -12
+  dec: -20
+
+temperature_drop: 6
+drop_speed: 1
+
+# Höjden (m ö.h.) som temperaturerna ovan gäller för. I 3D blir det 6,5° kallare per km över den.
+base_heat_height: 950
+
+precipitation:
+  jan: 0
+  feb: 0
+  mar: 0
+  apr: 0
+  may: 0
+  jun: 0
+  jul: 0
+  aug: 0
+  sep: 0
+  oct: 1
+  nov: 1
+  dec: 1
+
+shift: 0
+
+wind:
+  jan: 1
+  feb: 1
+  mar: 1
+  apr: 1
+  may: 1
+  jun: 1
+  jul: 1
+  aug: 1
+  sep: 1
+  oct: 1
+  nov: 1
+  dec: 1
+
+# Förhärskande vind (västanvind, ca 45° N): varifrån vinden oftast blåser
+# och hur stor del av dagarna (%). Övriga dagar: oftast en grannriktning, ibland vilken som helst.
+prevailing_wind: SW
+prevailing_chance: 45
+
+events:
+  - name: "Héave drake"
+    occurs: 1
+    days: 7
+  - name: "Drake"
+    occurs: 1
+    days: 100
+  - name: "Panthera"
+    occurs: 1
+    days: 10

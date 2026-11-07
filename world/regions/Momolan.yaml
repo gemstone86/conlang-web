@@ -1,0 +1,76 @@
+# Ökenland längs en stor flod (forntida Egypten). Floden svämmar över sent på sommaren.
+name: "Momolan"
+
+temperature:
+  jan: 14
+  feb: 16
+  mar: 20
+  apr: 25
+  may: 30
+  jun: 33
+  jul: 35
+  aug: 34
+  sep: 32
+  oct: 27
+  nov: 21
+  dec: 16
+
+temperature_drop: 14
+drop_speed: 6
+
+# Höjden (m ö.h.) som temperaturerna ovan gäller för. I 3D blir det 6,5° kallare per km över den.
+base_heat_height: 400
+
+precipitation:
+  jan: -2
+  feb: -3
+  mar: -4
+  apr: -4
+  may: -5
+  jun: -5
+  jul: -5
+  aug: -5
+  sep: -4
+  oct: -3
+  nov: -3
+  dec: -2
+
+shift: 0
+
+# Molntäcke: -1 ger något klarare himmel (bara kartan, inte vädret).
+cloud_cover: -1
+
+wind:
+  jan: 1
+  feb: 1
+  mar: 1
+  apr: 1
+  may: 0
+  jun: 0
+  jul: 0
+  aug: 0
+  sep: 0
+  oct: 0
+  nov: 1
+  dec: 1
+
+# Förhärskande vind (passadvind, ca 22° N): varifrån vinden oftast blåser
+# och hur stor del av dagarna (%). Övriga dagar: oftast en grannriktning, ibland vilken som helst.
+prevailing_wind: NE
+prevailing_chance: 60
+
+events:
+  - name: "Drake"
+    occurs: 1
+    days: 1000
+  - name: "Sandstorm"
+    occurs: 1
+    days: 50
+  - name: "Värmebölja (+10C)"
+    occurs: 1
+    days: 200
+  - name: "Flodens översvämning"
+    occurs: 1
+    days: 7
+    start_month: 7
+    end_month: 9

@@ -1,0 +1,69 @@
+# Hett och fuktigt, regnperiod mitt på året.
+name: "Dhuk"
+
+temperature:
+  jan: 25
+  feb: 26
+  mar: 27
+  apr: 28
+  may: 29
+  jun: 30
+  jul: 31
+  aug: 31
+  sep: 30
+  oct: 29
+  nov: 27
+  dec: 26
+
+temperature_drop: 3
+drop_speed: 0
+
+# Höjden (m ö.h.) som temperaturerna ovan gäller för. I 3D blir det 6,5° kallare per km över den.
+base_heat_height: 400
+
+precipitation:
+  jan: 2
+  feb: 2
+  mar: 3
+  apr: 3
+  may: 4
+  jun: 5
+  jul: 5
+  aug: 5
+  sep: 4
+  oct: 3
+  nov: 2
+  dec: 2
+
+shift: 0
+
+wind:
+  jan: 0
+  feb: 0
+  mar: 0
+  apr: 0
+  may: 1
+  jun: 1
+  jul: 1
+  aug: 0
+  sep: 0
+  oct: 0
+  nov: 0
+  dec: 0
+
+# Förhärskande vind (passadvind, ca 27° N): varifrån vinden oftast blåser
+# och hur stor del av dagarna (%). Övriga dagar: oftast en grannriktning, ibland vilken som helst.
+prevailing_wind: NE
+prevailing_chance: 60
+
+events:
+  - name: "Drake"
+    occurs: 1
+    days: 1000
+  - name: "Monsunregn (+5 regn)"
+    occurs: 1
+    days: 200
+    bonus_rain: 5
+  - name: "Värmebölja (+10C)"
+    occurs: 1
+    days: 200

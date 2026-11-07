@@ -1,0 +1,89 @@
+name: "Drunok"
+
+temperature:
+  jan: -7
+  feb: -3
+  mar: 2
+  apr: 10
+  may: 14
+  jun: 18
+  jul: 22
+  aug: 19
+  sep: 11
+  oct: 6
+  nov: 1
+  dec: -5
+
+temperature_drop: 3
+drop_speed: 1
+
+# Höjden (m ö.h.) som temperaturerna ovan gäller för. I 3D blir det 6,5° kallare per km över den.
+base_heat_height: 450
+
+precipitation:
+  jan: 0
+  feb: 0
+  mar: 0
+  apr: 0
+  may: 0
+  jun: 5
+  jul: 5
+  aug: 5
+  sep: 0
+  oct: 0
+  nov: 0
+  dec: 0
+
+shift: 0
+
+wind:
+  jan: 0
+  feb: 0
+  mar: 0
+  apr: 0
+  may: 0
+  jun: 0
+  jul: 0
+  aug: 0
+  sep: 0
+  oct: 0
+  nov: 0
+  dec: 0
+
+# Förhärskande vind (västanvind, ca 44° N): varifrån vinden oftast blåser
+# och hur stor del av dagarna (%). Övriga dagar: oftast en grannriktning, ibland vilken som helst.
+prevailing_wind: SW
+prevailing_chance: 45
+
+events:
+  - name: "Drake"
+    occurs: 1
+    days: 1000
+  - name: "Skugglandsvarelser"
+    occurs: 1
+    days: 400
+  - name: "Högmagisk Skototropi"
+    follow_wind: 50
+    wander: 20
+    growth: 50
+    duration_min: 6
+    duration_max: 24
+    occurs: 1
+    days: 300
+  - name: "Högmagisk Kryotropi"
+    follow_wind: 50
+    wander: 20
+    growth: 50
+    duration_min: 6
+    duration_max: 24
+    occurs: 1
+    days: 300
+  - name: "Forandrade"
+    occurs: 1
+    days: 200
+  - name: "Raunisk Räd"
+    occurs: 1
+    days: 100
+  - name: "Troll"
+    occurs: 1
+    days: 200

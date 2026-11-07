@@ -1,0 +1,118 @@
+name: "Tarkas"
+
+temperature:
+  jan: 15
+  feb: 18
+  mar: 22
+  apr: 27
+  may: 33
+  jun: 36
+  jul: 37
+  aug: 36
+  sep: 33
+  oct: 28
+  nov: 21
+  dec: 17
+
+temperature_drop: 15
+drop_speed: 6
+
+# Höjden (m ö.h.) som temperaturerna ovan gäller för. I 3D blir det 6,5° kallare per km över den.
+base_heat_height: 200
+
+precipitation:
+  jan: -1
+  feb: -2
+  mar: -2
+  apr: -3
+  may: -3
+  jun: -4
+  jul: -4
+  aug: -3
+  sep: -2
+  oct: -2
+  nov: -1
+  dec: -1
+
+shift: 0
+
+wind:
+  jan: 2
+  feb: 1
+  mar: 0
+  apr: 0
+  may: 0
+  jun: 0
+  jul: 0
+  aug: 0
+  sep: 0
+  oct: 0
+  nov: 1
+  dec: 2
+
+# Förhärskande vind (västanvind, ca 41° N): varifrån vinden oftast blåser
+# och hur stor del av dagarna (%). Övriga dagar: oftast en grannriktning, ibland vilken som helst.
+prevailing_wind: SW
+prevailing_chance: 45
+
+events:
+  - name: "Drake"
+    occurs: 1
+    days: 1000
+  - name: "Starka vindar (+3 alstra pneumotropi)"
+    follow_wind: 80
+    wander: 20
+    growth: 50
+    duration_min: 6
+    duration_max: 24
+    occurs: 1
+    days: 28
+  - name: "Torka (-3 alstra hydrotropi)"
+    follow_wind: 50
+    wander: 20
+    growth: 50
+    duration_min: 6
+    duration_max: 24
+    occurs: 1
+    days: 14
+  - name: "Hetta (+3 alstra termotropi)"
+    follow_wind: 50
+    wander: 20
+    growth: 50
+    duration_min: 6
+    duration_max: 24
+    occurs: 1
+    days: 28
+    bonus_temp: 5
+  - name: "Magistorm (Styrka 10)"
+    follow_wind: 50
+    wander: 20
+    growth: 50
+    duration_min: 12
+    duration_max: 48
+    occurs: 1
+    days: 20
+  - name: "Magistorm (Styrka 15)"
+    follow_wind: 50
+    wander: 20
+    growth: 50
+    duration_min: 12
+    duration_max: 72
+    occurs: 1
+    days: 40
+  - name: "Magistorm (Styrka 20)"
+    follow_wind: 50
+    wander: 20
+    growth: 50
+    duration_min: 12
+    duration_max: 96
+    occurs: 1
+    days: 60
+  - name: "Magistorm (Styrka 25)"
+    follow_wind: 50
+    wander: 20
+    growth: 50
+    duration_min: 12
+    duration_max: 96
+    occurs: 1
+    days: 400

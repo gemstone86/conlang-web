@@ -1,0 +1,52 @@
+# Influx aspect lists for each cycle level.
+# Year cycle: 16 entries, repeating every 16 years. Cycle 0 = year -7032.
+# Month cycle: 12 entries, one per month, repeats every year.
+# Week cycle: 4 entries, one per week of the month (days 1-7, 8-14, 15-21, 22-28).
+# Day cycle: 7 entries, one per day of the week, fixed.
+
+year:
+  - Kronotropi
+  - Nomotropi
+  - Ataxatropi
+  - Termotropi
+  - Kryotropi
+  - Fototropi
+  - Skototropi
+  - Biotropi
+  - Nekrotropi
+  - Heliotropi
+  - Selenotropi
+  - Astrotropi
+  - Pyrotropi
+  - Geotropi
+  - Hydrotropi
+  - Pneumotropi
+
+month:
+  - Kryotropi
+  - Nomotropi
+  - Geotropi
+  - Biotropi
+  - Pyrotropi
+  - Fototropi
+  - Termotropi
+  - Ataxatropi
+  - Hydrotropi
+  - Pneumotropi
+  - Nekrotropi
+  - Skototropi
+
+week:
+  - Selenotropi
+  - Ataxatropi
+  - Heliotropi
+  - Nomotropi
+
+day:
+  - Heliotropi
+  - Selenotropi
+  - Nekrotropi
+  - Astrotropi
+  - Pyrotropi
+  - Biotropi
+  - Hydrotropi

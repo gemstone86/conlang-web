@@ -1,0 +1,66 @@
+# Hett och mycket fuktigt, regnar nästan året om.
+name: "Dhurkoor"
+
+temperature:
+  jan: 24
+  feb: 25
+  mar: 26
+  apr: 27
+  may: 28
+  jun: 29
+  jul: 30
+  aug: 30
+  sep: 29
+  oct: 28
+  nov: 26
+  dec: 25
+
+temperature_drop: 2
+drop_speed: 0
+
+# Höjden (m ö.h.) som temperaturerna ovan gäller för. I 3D blir det 6,5° kallare per km över den.
+base_heat_height: 200
+
+precipitation:
+  jan: 3
+  feb: 3
+  mar: 3
+  apr: 4
+  may: 4
+  jun: 5
+  jul: 5
+  aug: 4
+  sep: 4
+  oct: 3
+  nov: 3
+  dec: 3
+
+shift: 0
+
+wind:
+  jan: 0
+  feb: 0
+  mar: 0
+  apr: 0
+  may: 0
+  jun: 1
+  jul: 1
+  aug: 0
+  sep: 0
+  oct: 0
+  nov: 0
+  dec: 0
+
+# Förhärskande vind (passadvind, ca 17° N): varifrån vinden oftast blåser
+# och hur stor del av dagarna (%). Övriga dagar: oftast en grannriktning, ibland vilken som helst.
+prevailing_wind: NE
+prevailing_chance: 60
+
+events:
+  - name: "Drake"
+    occurs: 1
+    days: 1000
+  - name: "Monsunregn (+5 regn)"
+    occurs: 1
+    days: 200
+    bonus_rain: 5

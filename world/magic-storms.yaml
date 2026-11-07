@@ -1,0 +1,46 @@
+# Magic storms on the map
+#
+# Every magic event (names containing "Magistorm", "Högmagisk" or "alstra") becomes a storm.
+# Each storm event in additional-events.yaml and regions/*.yaml can have these settings:
+#
+#   follow_wind:  chance in % that the storm moves with the wind
+#   wander:       chance in % that it wanders randomly, ignoring the wind
+#                 Rolled once per storm. Whatever is left over is stationary:
+#                 follow_wind 50 + wander 20  ->  50% follows wind, 20% wanders, 30% stays put.
+#                 If both are missing (or 0), the storm is always stationary.
+#                 If they add up to more than 100 they are scaled to fit
+#                 (50 + 80 -> 38% follows wind, 62% wanders).
+#   speed_min / speed_max: how fast a moving storm travels, in km/h. Each storm gets its own
+#                 speed between the two, picked so that half the storms are slower and half
+#                 faster than the middle value (5 and 20 -> typically about 10 km/h).
+#                 Storms that follow the wind go somewhat faster in strong wind and slower in
+#                 calm, but always stay between speed_min and speed_max.
+#                 Turned into map pixels with the map's km-per-pixel setting.
+#   growth:       1-100. 50 = grows as fast as it dies.
+#                 Low (towards 1)   = grows very slowly, ends abruptly.
+#                 High (towards 100) = starts abruptly, dies away slowly.
+#   duration_min / duration_max: how long the storm lasts, in hours (picked at random between them)
+#   stay_in_region: true = the storm never leaves the region it formed in (it still moves inside it:
+#                 a wandering storm turns back at the border, a wind-driven one waits there).
+#                 Set on a region's storm events, it also applies to the global storms (e.g.
+#                 "Liten Magistorm") that form in that region. See Summag.yaml.
+#
+# The settings below are used when an event has none of its own, and the aspect rules
+# override the event's values when the storm's aspect is known (named in the event,
+# or the single dominant aspect of the day for force storms like "Grundkrafter 10").
+
+defaults:
+  follow_wind: 0
+  wander: 0
+  speed_min: 5
+  speed_max: 20
+  growth: 50
+  duration_min: 12
+  duration_max: 48
+  stay_in_region: false
+
+aspects:
+  Pneumotropi:
+    follow_wind: 80
+  Ataxatropi:
+    wander: 80

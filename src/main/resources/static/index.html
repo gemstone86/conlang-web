@@ -3,18 +3,242 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Root and Rune</title>
-<link rel="icon" type="image/png" href="favicon.png">
-<link rel="stylesheet" href="style.css">
+<title>Root and Rune · Weather generator</title>
+<link rel="icon" type="image/png" href="rune/favicon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Alegreya+Sans:wght@400;500;700&family=IM+Fell+English:ital@0;1&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink: #1c2430; --ink-2: #26313f; --line: #3a4757;
+    --bone: #ece6d6; --bone-dim: #b6af9e; --brass: #c9a24a; --moss: #6f9f7f; --sky: #7fb3d9; --err: #e08a7a;
+    --serif: "IM Fell English", Georgia, serif; --sans: "Alegreya Sans", system-ui, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; min-height: 100%; }
+  body {
+    font: 17px/1.5 var(--sans); color: var(--bone);
+    background:
+      radial-gradient(1200px 600px at 15% -10%, rgba(111,159,127,.18), transparent 60%),
+      radial-gradient(1000px 600px at 110% 110%, rgba(127,179,217,.16), transparent 60%),
+      var(--ink);
+    display: flex; flex-direction: column; align-items: center; padding: 3rem 1.2rem 2rem;
+  }
+  header { text-align: center; margin-bottom: 2.2rem; }
+  header h1 { font: 400 clamp(2rem, 5vw, 3rem)/1.1 var(--serif); margin: 0; color: var(--brass); letter-spacing: .01em; }
+  header p { margin: .5rem 0 0; color: var(--bone-dim); font-style: italic; font-family: var(--serif); }
+  main { width: 100%; max-width: 860px; display: grid; gap: 1.6rem; }
+
+  .apps { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 1.2rem; }
+  .app {
+    position: relative; display: flex; flex-direction: column; gap: .4rem; text-decoration: none; color: inherit;
+    padding: 1.6rem 1.5rem 1.4rem; border-radius: 14px; border: 1px solid var(--line);
+    background: linear-gradient(160deg, var(--ink-2), rgba(28,36,48,.6));
+    transition: transform .15s ease, border-color .15s ease, box-shadow .15s ease;
+  }
+  .app:hover, .app:focus-visible { transform: translateY(-3px); box-shadow: 0 10px 30px rgba(0,0,0,.35); outline: none; }
+  .app.rune:hover, .app.rune:focus-visible { border-color: var(--moss); }
+  .app.weather:hover, .app.weather:focus-visible { border-color: var(--sky); }
+  .app .glyph { width: 52px; height: 52px; margin-bottom: .4rem; }
+  .app h2 { font: 400 1.7rem/1.1 var(--serif); margin: 0; }
+  .app.rune h2 { color: #a9d1b5; }
+  .app.weather h2 { color: #b5d6ee; }
+  .app p { margin: 0; color: var(--bone-dim); font-size: .95rem; }
+  .app .note { margin-top: .5rem; font-size: .82rem; color: var(--brass); min-height: 1.2em; }
+  .app .go { position: absolute; right: 1.2rem; top: 1.3rem; font-size: 1.3rem; color: var(--bone-dim); transition: transform .15s; }
+  .app:hover .go { transform: translateX(4px); color: var(--bone); }
+
+  .card { border: 1px solid var(--line); border-radius: 14px; background: rgba(38,49,63,.75); padding: 1.3rem 1.5rem; }
+  .card h3 { font: 400 1.35rem/1.2 var(--serif); margin: 0 0 .8rem; color: var(--brass); }
+  #account { max-width: 420px; width: 100%; justify-self: center; }
+  label { display: block; font-size: .85rem; color: var(--bone-dim); margin: .7rem 0 .25rem; }
+  input {
+    width: 100%; font: inherit; color: var(--bone); background: var(--ink); border: 1px solid var(--line);
+    border-radius: 8px; padding: .5rem .7rem;
+  }
+  input:focus { outline: 2px solid var(--brass); outline-offset: 1px; border-color: transparent; }
+  .row { display: flex; gap: .6rem; align-items: center; flex-wrap: wrap; margin-top: 1rem; }
+  button {
+    font: 500 .95rem var(--sans); cursor: pointer; border-radius: 8px; padding: .5rem 1rem;
+    border: 1px solid var(--line); background: transparent; color: var(--bone);
+  }
+  button:hover { border-color: var(--bone-dim); }
+  button.primary { background: var(--brass); border-color: var(--brass); color: var(--ink); }
+  button.primary:hover { filter: brightness(1.08); }
+  button.link { border: none; padding: .2rem 0; color: var(--sky); background: none; }
+  button.link:hover { text-decoration: underline; }
+  .spacer { flex: 1; }
+  .msg { min-height: 1.3em; margin: .7rem 0 0; font-size: .9rem; }
+  .msg:empty { display: none; }
+  .msg.err { color: var(--err); }
+  .msg.ok { color: var(--moss); }
+  .who { display: flex; align-items: center; gap: .8rem; flex-wrap: wrap; }
+  .who strong { font-family: var(--serif); font-size: 1.25rem; font-weight: 400; }
+  .badge { font-size: .72rem; text-transform: uppercase; letter-spacing: .06em; color: var(--brass); border: 1px solid var(--brass-dim, #8f7536); border-radius: 99px; padding: .05rem .5rem; }
+  details { margin-top: 1rem; color: var(--bone-dim); font-size: .9rem; }
+  details summary { cursor: pointer; }
+  [hidden] { display: none !important; }
+  footer { margin-top: 2.5rem; color: var(--bone-dim); font-size: .8rem; }
+</style>
 </head>
 <body>
 <header>
-  <img src="logo.png" alt="" class="logo"><h1>Root and Rune</h1>
-  <span id="who"></span>
+  <h1>Root and Rune · Weather</h1>
+  <p>Languages and skies for your worlds</p>
 </header>
-<div id="msg" hidden></div>
-<main id="app"></main>
-<div id="ver"></div>
-<script src="app.js"></script>
+
+<main>
+  <nav class="apps" aria-label="Apps">
+    <a class="app rune" href="/rune/">
+      <svg class="glyph" viewBox="0 0 52 52" aria-hidden="true" fill="none" stroke="#a9d1b5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M26 6v40M26 16l-9-8M26 16l9-8M26 30l-11 8M26 30l11 8M26 46l-6 4M26 46l6 4"/>
+      </svg>
+      <span class="go" aria-hidden="true">&#8594;</span>
+      <h2>Root and Rune</h2>
+      <p>Build constructed languages: dictionaries, sound changes over time, grammar and language families.</p>
+      <div class="note" id="runeNote"></div>
+    </a>
+    <a class="app weather" href="/weather/">
+      <svg class="glyph" viewBox="0 0 52 52" aria-hidden="true" fill="none" stroke="#b5d6ee" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M15 30a8 8 0 0 1 1-16 11 11 0 0 1 21 3 7 7 0 0 1 0 13H15z"/>
+        <path d="M18 37l-2 5M26 37l-2 5M34 37l-2 5"/>
+      </svg>
+      <span class="go" aria-hidden="true">&#8594;</span>
+      <h2>Weather generator</h2>
+      <p>Eon's day-by-day weather, calendars and events, with the world map and campaign notes.</p>
+      <div class="note" id="weatherNote"></div>
+    </a>
+  </nav>
+
+  <section class="card" id="account" aria-live="polite">
+    <!-- logged in -->
+    <div id="inView" hidden>
+      <div class="who"><span>Logged in as</span> <strong id="whoName"></strong> <span class="badge" id="whoAdmin" hidden>admin</span></div>
+      <div class="row">
+        <button type="button" id="pwToggle">Change password</button>
+        <div class="spacer"></div>
+        <button type="button" id="logoutBtn">Log out</button>
+      </div>
+      <form id="pwForm" hidden>
+        <label for="pwCur">Current password</label><input id="pwCur" type="password" autocomplete="current-password" required>
+        <label for="pwNew">New password (8+ characters)</label><input id="pwNew" type="password" autocomplete="new-password" minlength="8" required>
+        <div class="row"><button class="primary" type="submit">Save new password</button></div>
+      </form>
+      <p class="msg" id="inMsg"></p>
+    </div>
+
+    <!-- logged out -->
+    <form id="authForm" hidden>
+      <h3 id="authTitle">Log in</h3>
+      <label for="u">Username</label><input id="u" autocomplete="username" required>
+      <label for="p">Password</label><input id="p" type="password" autocomplete="current-password" required>
+      <div class="row">
+        <button class="primary" type="submit" id="authSubmit">Log in</button>
+        <div class="spacer"></div>
+        <button class="link" type="button" id="authSwitch">Create an account</button>
+      </div>
+      <p class="msg" id="authMsg"></p>
+      <details id="resetBox">
+        <summary>Forgot your password?</summary>
+        <p>Ask an admin for a reset code, then enter it here with your username above.</p>
+        <label for="rc">Reset code</label><input id="rc" autocomplete="one-time-code">
+        <label for="np">New password (8+ characters)</label><input id="np" type="password" autocomplete="new-password">
+        <div class="row"><button type="button" id="resetBtn">Set new password</button></div>
+      </details>
+    </form>
+  </section>
+</main>
+
+<footer>One account for both apps.</footer>
+
+<script>
+'use strict';
+const $ = id => document.getElementById(id);
+const state = { me: null, regOpen: true, mode: 'login' };
+
+// where to go after logging in (?next=/rune/ when an app sent the visitor here); only paths on this site
+const next = (() => {
+  const n = new URLSearchParams(location.search).get('next');
+  return n && /^\/(rune|weather)\//.test(n) ? n : null;
+})();
+
+async function api(method, url, body) {
+  const res = await fetch(url, {
+    method, credentials: 'same-origin',
+    headers: body ? { 'Content-Type': 'application/json' } : {},
+    body: body ? JSON.stringify(body) : undefined
+  });
+  let data = null;
+  try { data = await res.json(); } catch (e) { /* no body */ }
+  if (!res.ok) throw new Error((data && (data.error || data.message)) || ('Request failed (' + res.status + ')'));
+  return data;
+}
+function msg(el, text, kind) { el.textContent = text || ''; el.className = 'msg' + (kind ? ' ' + kind : ''); }
+
+function render() {
+  const me = state.me;
+  $('inView').hidden = !me;
+  $('authForm').hidden = !!me;
+  $('runeNote').textContent = me ? '' : 'Log in to use';
+  $('weatherNote').textContent = me ? '' : 'Open to everyone · log in to save notes and maps';
+  if (me) {
+    $('whoName').textContent = me.username;
+    $('whoAdmin').hidden = !me.is_admin;
+  } else {
+    const reg = state.mode === 'register';
+    $('authTitle').textContent = reg ? 'Create an account' : 'Log in';
+    $('authSubmit').textContent = reg ? 'Create account' : 'Log in';
+    $('authSwitch').textContent = reg ? 'I already have an account' : 'Create an account';
+    $('authSwitch').hidden = !reg && !state.regOpen;
+    $('p').autocomplete = reg ? 'new-password' : 'current-password';
+    $('resetBox').hidden = reg;
+    if (next) msg($('authMsg'), 'Log in to continue.');
+  }
+}
+
+async function load() {
+  const r = await api('GET', '/api/auth/me');
+  state.me = r.user; state.regOpen = r.registrationOpen;
+  render();
+}
+
+$('authSwitch').onclick = () => {
+  state.mode = state.mode === 'login' ? 'register' : 'login';
+  msg($('authMsg'), ''); render(); $('u').focus();
+};
+$('authForm').onsubmit = async e => {
+  e.preventDefault();
+  try {
+    const r = await api('POST', state.mode === 'register' ? '/api/auth/register' : '/api/auth/login',
+      { username: $('u').value.trim(), password: $('p').value });
+    $('p').value = '';
+    if (next) { location.href = next; return; }
+    state.me = r.user; state.mode = 'login'; render();
+  } catch (err) { msg($('authMsg'), err.message, 'err'); }
+};
+$('resetBtn').onclick = async () => {
+  try {
+    await api('POST', '/api/auth/reset', { username: $('u').value.trim(), code: $('rc').value, password: $('np').value });
+    $('rc').value = ''; $('np').value = '';
+    $('resetBox').open = false;
+    msg($('authMsg'), 'Password changed. Log in with the new one.', 'ok');
+  } catch (err) { msg($('authMsg'), err.message, 'err'); }
+};
+$('logoutBtn').onclick = async () => {
+  try { await api('POST', '/api/auth/logout'); } catch (e) { /* already logged out */ }
+  state.me = null; $('pwForm').hidden = true; msg($('inMsg'), ''); render();
+};
+$('pwToggle').onclick = () => { $('pwForm').hidden = !$('pwForm').hidden; if (!$('pwForm').hidden) $('pwCur').focus(); };
+$('pwForm').onsubmit = async e => {
+  e.preventDefault();
+  try {
+    await api('POST', '/api/auth/password', { current: $('pwCur').value, password: $('pwNew').value });
+    $('pwCur').value = ''; $('pwNew').value = ''; $('pwForm').hidden = true;
+    msg($('inMsg'), 'Password changed.', 'ok');
+  } catch (err) { msg($('inMsg'), err.message, 'err'); }
+};
+
+load().catch(err => { $('authForm').hidden = false; msg($('authMsg'), err.message, 'err'); });
+</script>
 </body>
 </html>

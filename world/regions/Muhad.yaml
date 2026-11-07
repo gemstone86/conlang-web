@@ -1,0 +1,71 @@
+# Öken, något mildare än Tarkas.
+name: "Mûhad"
+
+temperature:
+  jan: 13
+  feb: 16
+  mar: 20
+  apr: 25
+  may: 31
+  jun: 34
+  jul: 35
+  aug: 34
+  sep: 31
+  oct: 26
+  nov: 19
+  dec: 15
+
+temperature_drop: 13
+drop_speed: 6
+
+# Höjden (m ö.h.) som temperaturerna ovan gäller för. I 3D blir det 6,5° kallare per km över den.
+base_heat_height: 200
+
+precipitation:
+  jan: -2
+  feb: -2
+  mar: -3
+  apr: -3
+  may: -4
+  jun: -4
+  jul: -4
+  aug: -4
+  sep: -3
+  oct: -3
+  nov: -2
+  dec: -2
+
+shift: 0
+
+# Molntäcke: -1 ger något klarare himmel (bara kartan, inte vädret).
+cloud_cover: -1
+
+wind:
+  jan: 2
+  feb: 1
+  mar: 1
+  apr: 0
+  may: 0
+  jun: 0
+  jul: 0
+  aug: 0
+  sep: 0
+  oct: 1
+  nov: 1
+  dec: 2
+
+# Förhärskande vind (västanvind, ca 39° N): varifrån vinden oftast blåser
+# och hur stor del av dagarna (%). Övriga dagar: oftast en grannriktning, ibland vilken som helst.
+prevailing_wind: SW
+prevailing_chance: 45
+
+events:
+  - name: "Drake"
+    occurs: 1
+    days: 1000
+  - name: "Sandstorm"
+    occurs: 1
+    days: 50
+  - name: "Värmebölja (+10C)"
+    occurs: 1
+    days: 200

@@ -1,0 +1,85 @@
+# Händelser under resor (Restid → "Händelser" på en resa)
+#
+# A journey with events rolls once in every 6-hour slot, at a random hour inside the slot. The day is split
+# into two 12-hour cycles, day and night; at most one event happens per cycle (after a hit, the rest of the
+# cycle is quiet). Each roll is "a in b": an event if the die shows a or less on a b-sided die.
+#
+# An admin can replace this file from the app (Restid → ⚙ → Händelseregler…); the app's version then
+# counts instead of this file until it is reset.
+
+# The local hour (where the journey started) the day cycle begins: day 06–18, night 18–06
+cycleStart: 6
+# Hours between rolls: 6 gives two rolls per cycle (1, 2, 3, 4, 6 or 12)
+slotHours: 6
+
+# The chance with no modifiers (Neutral): a in b
+base:
+  day:   { a: 1, b: 8 }
+  night: { a: 1, b: 8 }
+
+# first: only the first circumstance that matches counts, in list order (the place is one of them);
+# all: every one that matches counts, added together
+combine: first
+
+# The die never gets fewer sides than minB or more than maxB
+limits:
+  minB: 2
+  maxB: 20
+
+# Circumstances (omständigheter): when the party is somewhere that matches "when" (everything listed in it
+# must hold), "day" and "night" change the chance: b: -3 takes three sides off the die (1 in 8 → 1 in 5),
+# a: 1 adds one to a (1 in 8 → 2 in 8); setA / setB set them outright. "both" counts for day and night alike.
+#
+# What "when" can ask about (at the party's spot at the hour of the roll):
+#   travel: foot | river | sea      on foot, by river boat, or by ship (a list for several)
+#   road: none | path | road | highway   on foot: the road it is on (none: no road or path)
+#   forest: 50          at least 50 % trees (or { min: 20, max: 50 })
+#   ice: 50             at least 50 % ice
+#   height: 1500        at least 1500 m above the sea (or { min, max })
+#   steep: 8            the ground at least 8 % steep (or { min, max }); about 8 % and up is mountains
+#   coast: 10           within 10 km of the shore (on land: of the sea; at sea: of land)
+#   zone: true          inside a high-magic area (or the aspect's name, or a list of them)
+#   nation: Jorpagna    inside that nation or subdivision (or a list); any: inside some nation; none: outside all
+#
+# Night has the same circumstances as the day for now: give a circumstance "day" and "night" instead of
+# "both" to make them differ.
+modifiers:
+  # at sea: near land it is the coast, further out the open sea
+  - name: Kust
+    when: { travel: sea, coast: 10 }
+    both: { b: -1 }
+  - name: Hav
+    when: { travel: sea }
+    both: { b: -1 }
+  # on the roads (huvudväg = landsväg, väg = småväg; a path counts as the land around it)
+  - name: Landsväg
+    when: { travel: foot, road: highway }
+    both: { b: -3 }
+  - name: Småväg
+    when: { travel: foot, road: road }
+    both: { b: -2 }
+  # the land itself
+  - name: Skog
+    when: { travel: foot, forest: 50 }
+    both: { b: -3 }
+  - name: Berg
+    when: { travel: foot, steep: 8 }
+    both: { b: 0 }
+  - name: Kust
+    when: { travel: foot, coast: 10 }
+    both: { b: -1 }
+  # open land inside a nation is fields; outside every nation it is wilderness
+  - name: Fält
+    when: { travel: foot, nation: any }
+    both: { b: 1 }
+  - name: Vildmark
+    when: { travel: foot, nation: none }
+    both: { b: -2 }
+  # on a river boat: Neutral (no circumstance)
+
+# Not on the map yet, so not used automatically (the values, for when they are):
+#   Byamark -2, Stadsmark -4   (needs villages and towns on the map)
+#   Dungeon -4, Grotta -3, Ruin -4, Underdark -4   (places the map doesn't have)
+#   moor +1, Träsk 0   (could be painted, like forest)
+#   Vilse -5   (a state of the party, not a place)
+#   Warm Desert +2   (could come from the climate: hot and dry)

@@ -1,0 +1,68 @@
+# Virvelhavet: ett mycket kallt hav med ständiga virvlar.
+name: "Virvelhavet"
+
+temperature:
+  jan: -18
+  feb: -17
+  mar: -14
+  apr: -10
+  may: -5
+  jun: -1
+  jul: 2
+  aug: 1
+  sep: -3
+  oct: -8
+  nov: -13
+  dec: -16
+
+temperature_drop: 4
+drop_speed: 2
+
+# Höjden (m ö.h.) som temperaturerna ovan gäller för. I 3D blir det 6,5° kallare per km över den.
+base_heat_height: 0
+
+precipitation:
+  jan: 0
+  feb: 0
+  mar: 0
+  apr: 0
+  may: 0
+  jun: 0
+  jul: 0
+  aug: 0
+  sep: 0
+  oct: 0
+  nov: 0
+  dec: 0
+
+shift: 0
+
+wind:
+  jan: 2
+  feb: 2
+  mar: 2
+  apr: 2
+  may: 2
+  jun: 2
+  jul: 2
+  aug: 2
+  sep: 2
+  oct: 2
+  nov: 2
+  dec: 2
+
+# Förhärskande vind (polar östanvind, ca 69° N): varifrån vinden oftast blåser
+# och hur stor del av dagarna (%). Övriga dagar: oftast en grannriktning, ibland vilken som helst.
+prevailing_wind: NE
+prevailing_chance: 50
+
+events:
+  - name: "Liten virvel"
+    occurs: 1
+    days: 5
+  - name: "Medel virvel"
+    occurs: 1
+    days: 10
+  - name: "Stor virvel"
+    occurs: 1
+    days: 15

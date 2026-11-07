@@ -1,0 +1,62 @@
+# Nermada: som Thalamur (Södra) men varmare (+4 grader).
+name: "Nermada"
+
+temperature:
+  jan: 7
+  feb: 10
+  mar: 13
+  apr: 16
+  may: 19
+  jun: 24
+  jul: 28
+  aug: 29
+  sep: 24
+  oct: 18
+  nov: 12
+  dec: 9
+
+temperature_drop: 2
+drop_speed: 0
+
+# Höjden (m ö.h.) som temperaturerna ovan gäller för. I 3D blir det 6,5° kallare per km över den.
+base_heat_height: 200
+
+precipitation:
+  jan: 1
+  feb: 1
+  mar: 0
+  apr: 0
+  may: 0
+  jun: 1
+  jul: 1
+  aug: 0
+  sep: 1
+  oct: 1
+  nov: 2
+  dec: 2
+
+shift: 1
+
+wind:
+  jan: 2
+  feb: 2
+  mar: 2
+  apr: 2
+  may: 2
+  jun: 2
+  jul: 2
+  aug: 2
+  sep: 3
+  oct: 3
+  nov: 4
+  dec: 4
+
+# Förhärskande vind (västanvind, ca 31° N): varifrån vinden oftast blåser
+# och hur stor del av dagarna (%). Övriga dagar: oftast en grannriktning, ibland vilken som helst.
+prevailing_wind: SW
+prevailing_chance: 45
+
+events:
+  - name: ""
+    occurs: 1
+    days: 1000

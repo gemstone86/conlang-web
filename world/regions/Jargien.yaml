@@ -1,0 +1,53 @@
+name: "Jargien"
+
+temperature:
+  jan: 3
+  feb: 4
+  mar: 5
+  apr: 8
+  may: 13
+  jun: 16
+  jul: 19
+  aug: 21
+  sep: 16
+  oct: 13
+  nov: 8
+  dec: 5
+
+temperature_drop: 2
+drop_speed: 1
+
+precipitation:
+  jan: 0
+  feb: 0
+  mar: 0
+  apr: 0
+  may: 0
+  jun: 0
+  jul: 0
+  aug: 0
+  sep: 1
+  oct: 1
+  nov: 1
+  dec: 1
+
+shift: 0
+
+wind:
+  jan: 1
+  feb: 0
+  mar: 0
+  apr: 0
+  may: 0
+  jun: 0
+  jul: 0
+  aug: 0
+  sep: 1
+  oct: 1
+  nov: 1
+  dec: 2
+
+events:
+  - name: "Drake"
+    occurs: 1
+    days: 200

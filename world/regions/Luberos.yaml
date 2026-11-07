@@ -1,0 +1,69 @@
+# Luberos: hett och tropiskt med mycket regn (samma klimat som Tarhai).
+name: "Luberos"
+
+temperature:
+  jan: 26
+  feb: 27
+  mar: 28
+  apr: 29
+  may: 30
+  jun: 30
+  jul: 31
+  aug: 31
+  sep: 30
+  oct: 29
+  nov: 28
+  dec: 27
+
+temperature_drop: 2
+drop_speed: 0
+
+# Höjden (m ö.h.) som temperaturerna ovan gäller för. I 3D blir det 6,5° kallare per km över den.
+base_heat_height: 300
+
+precipitation:
+  jan: 4
+  feb: 4
+  mar: 4
+  apr: 5
+  may: 5
+  jun: 5
+  jul: 5
+  aug: 5
+  sep: 5
+  oct: 4
+  nov: 4
+  dec: 4
+
+shift: 0
+
+wind:
+  jan: 0
+  feb: 0
+  mar: 0
+  apr: 0
+  may: 0
+  jun: 0
+  jul: 0
+  aug: 0
+  sep: 0
+  oct: 0
+  nov: 0
+  dec: 0
+
+# Förhärskande vind (passadvind, ca 0° S): varifrån vinden oftast blåser
+# och hur stor del av dagarna (%). Övriga dagar: oftast en grannriktning, ibland vilken som helst.
+prevailing_wind: SE
+prevailing_chance: 60
+
+events:
+  - name: "Drake"
+    occurs: 1
+    days: 1000
+  - name: "Monsunregn (+5 regn)"
+    bonus_rain: 5
+    occurs: 1
+    days: 200
+  - name: "Värmebölja (+10C)"
+    occurs: 1
+    days: 200

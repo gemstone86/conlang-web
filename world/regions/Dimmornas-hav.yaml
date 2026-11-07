@@ -1,0 +1,73 @@
+# Dimmornas hav: Godrions klimat, men med dimma varje dag och mycket mer moln.
+name: "Dimmornas hav"
+
+temperature:
+  jan: -17
+  feb: -12
+  mar: -7
+  apr: -4
+  may: 0
+  jun: 4
+  jul: 11
+  aug: 12
+  sep: 5
+  oct: -2
+  nov: -9
+  dec: -14
+
+temperature_drop: 5
+drop_speed: 5
+
+# Höjden (m ö.h.) som temperaturerna ovan gäller för. I 3D blir det 6,5° kallare per km över den.
+base_heat_height: 0
+
+precipitation:
+  jan: 0
+  feb: 0
+  mar: 0
+  apr: 0
+  may: 2
+  jun: 2
+  jul: 2
+  aug: 2
+  sep: 2
+  oct: 1
+  nov: 1
+  dec: 1
+
+shift: 0
+
+# Molntäcke: +1 ger ungefär 10 procentenheter mer moln en torr dag (bara kartan, inte vädret).
+cloud_cover: 3
+
+wind:
+  jan: 1
+  feb: 1
+  mar: 1
+  apr: 1
+  may: 1
+  jun: 1
+  jul: 2
+  aug: 2
+  sep: 1
+  oct: 1
+  nov: 1
+  dec: 1
+
+# Förhärskande vind (västanvind, ca 57° N): varifrån vinden oftast blåser
+# och hur stor del av dagarna (%). Övriga dagar: oftast en grannriktning, ibland vilken som helst.
+prevailing_wind: SW
+prevailing_chance: 45
+
+events:
+  # days: 1 = varje dag. Dimma lägger sig på kartan under de svala timmarna (kväll, natt och morgon).
+  - name: "Havsdimma"
+    occurs: 1
+    days: 1
+  - name: "Tjock havsdimma"
+    occurs: 1
+    days: 4
+    bonus_wind: -2
+  - name: "Svår åska"
+    occurs: 1
+    days: 250

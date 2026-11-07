@@ -1,0 +1,62 @@
+# Isöknen: extremt torrt och kallt, ganska blåsigt. Södra halvklotet: årstiderna är omvända (kallast i juli).
+name: "Isöknen"
+
+temperature:
+  jan: -7
+  feb: -9
+  mar: -13
+  apr: -18
+  may: -24
+  jun: -28
+  jul: -30
+  aug: -26
+  sep: -22
+  oct: -17
+  nov: -13
+  dec: -10
+
+temperature_drop: 8
+drop_speed: 5
+
+# Höjden (m ö.h.) som temperaturerna ovan gäller för. I 3D blir det 6,5° kallare per km över den.
+base_heat_height: 800
+
+precipitation:
+  jan: -3
+  feb: -3
+  mar: -3
+  apr: -3
+  may: -3
+  jun: -3
+  jul: -3
+  aug: -3
+  sep: -3
+  oct: -3
+  nov: -3
+  dec: -3
+
+shift: 0
+
+wind:
+  jan: 3
+  feb: 3
+  mar: 3
+  apr: 3
+  may: 3
+  jun: 3
+  jul: 3
+  aug: 3
+  sep: 3
+  oct: 3
+  nov: 3
+  dec: 3
+
+# Förhärskande vind (polar östanvind, ca 70° S): varifrån vinden oftast blåser
+# och hur stor del av dagarna (%). Övriga dagar: oftast en grannriktning, ibland vilken som helst.
+prevailing_wind: SE
+prevailing_chance: 50
+
+events:
+  - name: "Snöfyk"
+    occurs: 1
+    days: 20

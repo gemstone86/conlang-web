@@ -1,0 +1,62 @@
+# Bredea: som Ebhron (Norra) men blåsigare (+2 vind) och mycket regnigare (+2 nederbörd).
+name: "Bredea"
+
+temperature:
+  jan: 10
+  feb: 12
+  mar: 16
+  apr: 20
+  may: 25
+  jun: 28
+  jul: 30
+  aug: 30
+  sep: 27
+  oct: 22
+  nov: 16
+  dec: 11
+
+temperature_drop: 2
+drop_speed: 0
+
+# Höjden (m ö.h.) som temperaturerna ovan gäller för. I 3D blir det 6,5° kallare per km över den.
+base_heat_height: 200
+
+precipitation:
+  jan: 2
+  feb: 2
+  mar: 2
+  apr: 2
+  may: 2
+  jun: 2
+  jul: 2
+  aug: 2
+  sep: 2
+  oct: 3
+  nov: 3
+  dec: 3
+
+shift: 0
+
+wind:
+  jan: 2
+  feb: 2
+  mar: 2
+  apr: 2
+  may: 2
+  jun: 2
+  jul: 2
+  aug: 2
+  sep: 2
+  oct: 2
+  nov: 2
+  dec: 2
+
+# Förhärskande vind (passadvind, ca 25° N): varifrån vinden oftast blåser
+# och hur stor del av dagarna (%). Övriga dagar: oftast en grannriktning, ibland vilken som helst.
+prevailing_wind: NE
+prevailing_chance: 60
+
+events:
+  - name: "Drake"
+    occurs: 1
+    days: 1000

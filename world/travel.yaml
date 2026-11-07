@@ -1,0 +1,93 @@
+# Restid (the travel calculator): the rules for how fast travelling parties move.
+#
+# These are the values everyone starts from. An admin can override them for everyone in the app
+# (Restid → ⚙ → "Spara för alla"), and each user can still change them for themselves (⚙ → OK).
+# Order, lowest first: the values built into the app, this file, the admin's values, your own.
+# Leave a value out (or the whole file) and the one before it is used.
+#
+# Speeds are km/h. A party's speed at a spot is:
+#   pace + road bonus − deductions, worked out every quarter of an hour where the party is.
+
+# The paces to choose between (km/h on ordinary ground)
+pace:
+  slow: 3
+  normal: 4
+  fast: 5
+
+# Bonus on roads (km/h); with no road or path at all there is none
+road:
+  path: 0.5
+  road: 1
+  highway: 1.5
+
+# A further deduction with no road or path at all (km/h); 0 = none
+offRoad: 0
+
+# Fording a river with no road or path over it: hours per size of the river there (its flow, tributaries
+# included: a river of size 32 takes 32 × 0.25 = 8 hours). On a road or path the bridge is there: no time.
+riverHoursPerSize: 0.25
+
+# Forest, off the road and on paths: deduction per 25 % trees (smoothly: 100 % trees = 4 × this)
+forestPer25: 0.5
+
+# Weather. "Bad": off the road and on paths only. "Really bad": everywhere, on top of "bad".
+bad: 1
+veryBad: 1
+# What counts as bad / really bad weather where the party is (precipitation as the app shows it, wind in m/s)
+badRain: 2
+badWind: 14
+veryBadRain: 6
+veryBadWind: 20
+
+# Deep snow, everywhere (km/h at most): where the date's mean temperature at that height is below −2°,
+# fully below −8°, and on painted ice
+snow: 2
+
+# Slopes, everywhere: deduction per 1 % average slope up / down (over about 15 km). Off roads and paths
+# the ground's own steepness counts too, at least 70 % of it, whichever way it is crossed.
+slopeUp: 1
+slopeDown: 0.5
+
+# The lowest speed (km/h). Further deductions below it still count, but ever more gently, so it never reaches 0.
+minSpeed: 1
+
+# A day's travel: hours of travel per day, and the hour it starts (local time where the journey starts)
+hoursPerDay: 10
+dayStart: 7
+
+# Days an arrived party (its token and fading route) stays on the map
+keepDays: 3
+
+# Roads: steeper than this (average %, over about 15 km) is drawn red while editing roads
+steep:
+  path: 5
+  road: 3
+  highway: 2
+
+# How much routes off the roads and rivers (and at sea) wander instead of going straight:
+# 1 = normal (a few km to each side), 0 = straight lines, 2 = twice as much
+wiggle: 1
+
+# Boats, for journeys allowed them ("Använd färjor", "Havsresa" when planning)
+# River boats (km/h): the speed in still water (and across a lake). Downstream they get downShare of the
+# river's current on top; upstream all of it is taken off, and where less than minUp km/h would be left there
+# is no way up. (The current: each river's own, set in the river editor or worked out from how steeply it
+# falls in the height map, with its tributaries' water mixed in.) With a current of 4.75 km/h: 3 up, 10.1 down.
+boat:
+  still: 7.75
+  downShare: 0.5
+  minUp: 1
+# Ferries and river boats only on rivers at least this big (the river's flow there, tributaries included)
+boatMinFlow: 4
+# Ships at sea (km/h): normal wind, a good wind (from behind or the quarter, at least windGood m/s),
+# a bad wind (against the way the ship sails, below windCalm m/s, or a storm: veryBadWind and more)
+sea:
+  normal: 9.9
+  good: 14.8
+  bad: 4.9
+windGood: 5
+windCalm: 2
+# 1: a ship at sea sails day and night; 0: only the journey's hours a day (river boats always do)
+seaAllDay: 1
+# Hours to get on board (a river boat, a ship, or from one to the other)
+boardHours: 1

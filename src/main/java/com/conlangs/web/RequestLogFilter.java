@@ -25,7 +25,7 @@ public class RequestLogFilter extends OncePerRequestFilter {
             chain.doFilter(req, res);
         } finally {
             long ms = System.currentTimeMillis() - t0;
-            if (ms >= SLOW_MS && req.getRequestURI().startsWith("/api/") && !req.getRequestURI().startsWith("/api/admin/log")) {
+            if (ms >= SLOW_MS && req.getRequestURI().contains("/api/") && !req.getRequestURI().startsWith("/rune/api/admin/log")) {
                 applog.warn("system", AppLog.uid(req.getSession(false)), req.getMethod() + " " + req.getRequestURI(), res.getStatus(), "Slow request: " + ms + " ms");
             }
         }

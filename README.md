@@ -1,28 +1,61 @@
-# Root and Rune
+# Root and Rune + Weather generator
 
-Multi-user web app for building constructed languages: language families with split years, a dictionary,
-dated sound-change rules that evolve every word down the family tree automatically (with locked overrides),
-automatic compound erosion, sharing with owner approval, undo/redo and Excel export.
+One web app with a start page and one login for two tools:
 
-Spring Boot 3.3 · Java 21 · Maven · embedded H2 2.3.232 (single file) via JDBC · plain-JS front end.
-Same layout as the weather generator.
+| Path | What |
+|---|---|
+| `/` | Start page: log in, register, change or reset your password, and pick an app |
+| `/rune/` | **Root and Rune**, the conlang builder (this README, below). API: `/rune/api/…` |
+| `/weather/` | **Weather generator** (Eon Weather): weather, calendars, the world map and campaign notes. See [WEATHER.md](WEATHER.md). API: `/weather/api/…` |
+| `/api/auth/…` | The shared login: `me`, `login`, `register`, `logout`, `password`, `reset` |
+
+Spring Boot 3.3 · Java 21 · Maven · one embedded H2 2.3.232 database file via JDBC · plain-JS front ends.
+
+Code layout: `com.hub` (start-up, shared login, database guard), `com.conlangs.web` (Root and Rune),
+`com.eonweather` + `weather`, `date`, `context`, `gui` (the weather generator and its engine).
+Pages: `src/main/resources/static/` (start page), `static/rune/`, `static/weather/`.
 
 ## Running it
 
     mvn spring-boot:run          (or run.bat / run.ps1)
-    open http://localhost:8081
+    open http://localhost:8080
 
-The first account you register becomes the admin. The database is `./data/conlangs.mv.db`.
-To build one jar: `mvn package`, then `java -jar target/root-and-rune.jar`.
+To build one jar: `mvn package`, then `java -jar target/root-and-rune.jar` (run it next to the `world/` folder, or the copy
+packed in the jar is used). Docker: `docker compose up -d --build`.
+
+**Accounts.** There is one account per person for both apps. The first account registered becomes the admin of
+both. Root and Rune needs you to be logged in; the weather generator can be used without logging in (logging in saves
+notes, campaigns and maps). Weather admins are the site admins plus any usernames in `EON_ADMINS` (default
+`Gemstone,Gemstone86`); once one of those names is registered, the others can't be registered by anyone else.
+Forgotten password: an admin issues a reset code in Root and Rune (**Issue reset code**), and the user enters it on
+the start page.
+
+**Database.** One H2 file, `./data/hub.mv.db`, holding both apps' tables. It is guarded like the weather generator's
+was: a copy of the app starting up waits for the old one to hand the file over, a damaged file is repaired (or
+restored from the newest backup), and backups are written to `./data/backups/` (see WEATHER.md, *Backups*).
 
 ### Eclipse
 1. File → Import → Maven → Existing Maven Projects → pick this folder.
 2. If you see red errors: right-click the project → Maven → Update Project (tick Force Update).
-3. Run `com.conlangs.web.ConlangApplication` as a Java Application, then open http://localhost:8081.
+3. Run `com.hub.HubApplication` as a Java Application, then open http://localhost:8080.
 
-Configuration (environment variables): `CONLANG_DB_URL` (keep `;NON_KEYWORDS=YEAR` in the URL),
-`CONLANG_DB_USER`, `CONLANG_DB_PASSWORD`, `CONLANG_REGISTRATION=false` to close registration,
-`CONLANG_SECURE_COOKIE=true` behind HTTPS. Docker: `docker compose up --build`.
+### Settings (environment variables)
+
+| Variable | Default | |
+|---|---|---|
+| `PORT` | `8080` | |
+| `DB_URL` | `jdbc:h2:file:./data/hub;MODE=PostgreSQL;NON_KEYWORDS=YEAR;DB_CLOSE_ON_EXIT=FALSE` | keep `NON_KEYWORDS=YEAR` |
+| `DB_USER` / `DB_PASSWORD` | `sa` / empty | |
+| `REGISTRATION` | `true` | `false` = only existing accounts (the first account can always be made) |
+| `SECURE_COOKIE` | `false` | `true` behind HTTPS |
+| `EON_ADMINS` | `Gemstone,Gemstone86` | extra weather admins |
+| `EON_WORLD_DIR` | `world` | the weather generator's region and calendar files |
+| `EON_DB_BACKUP_HOURS` / `EON_DB_BACKUPS` | `6` / `14` | backup interval and how many to keep |
+
+These replace the separate apps' `CONLANG_*` and `EON_DB_*` / `EON_REGISTRATION` / `EON_SECURE_COOKIE` settings.
+
+**Moving from the two separate apps.** The combined app starts with a new, empty database (`data/hub.mv.db`);
+it does not read the old `data/conlangs.mv.db` or `data/eonweather.mv.db`, and accounts have to be made again.
 
 ## How it works
 
@@ -52,14 +85,14 @@ Configuration (environment variables): `CONLANG_DB_URL` (keep `;NON_KEYWORDS=YEA
   owner's approval (Changes tab) unless "auto-approve" is ticked for that user. Authors see their own pending changes.
 * **Undo/redo** per language; editors undo only their own edits. **Export Excel** gives Dictionary, History, Rules, Languages.
 * **Password reset**: the admin clicks "Issue reset code" and gives the user the one-time code (valid 24 h).
-* **One-time import**: as admin, `POST /api/admin/import-elven` (multipart `file`, `languageId`) reads the sheet
+* **One-time import**: as admin, `POST /rune/api/admin/import-elven` (multipart `file`, `languageId`) reads the sheet
   "Ygg Elven dict" and imports root/derived/phrase rows. It skips "shifted"/"indexed" rows (regenerated from rules).
 
 * **Grammar tab**: tables of rules (word order, tenses, affixes, prepositions...) grouped in sections, each section with its
   own column headings. Add, edit and delete rows and sections; changes follow the same approval and undo rules as the dictionary.
 * **Sounds tab**: consonant and vowel grids. Give a sound a "from" / "until" year and the grid changes with the year you choose.
   (The years are entered by hand; they are not yet derived from the sound-change rules.)
-* **One-time grammar import**: as admin, `POST /api/admin/import-grammar` (multipart `file`, `languageId`, optional `replace=true`)
+* **One-time grammar import**: as admin, `POST /rune/api/admin/import-grammar` (multipart `file`, `languageId`, optional `replace=true`)
   reads the "Ygg Elven" sheet (settings, proto-vs-later, sound modifiers, pronunciation rules, grammar tables, consonant and vowel grids).
 
 * **Admin log**: admins get a **Log** page (next to Workspace in the top bar) with errors, warnings and messages: logins, edits,
@@ -73,7 +106,8 @@ and script/calligraphy. Language settings (classes, erosion, tree position) can 
 Deleting a word also deletes its locked overrides, and Undo does not bring those back.
 
 ## Tests
-`mvn test` runs `EvolverTest` (family-tree inheritance, splits, overrides, bad regexes, erosion collision stop).
+`mvn test` runs `EvolverTest` (family-tree inheritance, splits, overrides, bad regexes, erosion collision stop) and
+`CombinedAppTest`, which starts the whole app on a fresh database and checks the start page, both apps and the shared login.
 
 ## v0.9.0
 - A branch language's dictionary now also lists the parent words that existed when it split off, shown in the branch's own evolved form (tinted rows, "from <language>" badge, "Open in <language>" button). Words coined after the split are not shown. Toggle with "Show inherited words".

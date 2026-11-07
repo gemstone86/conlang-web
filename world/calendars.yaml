@@ -1,0 +1,45 @@
+calendar:
+  - name: "Jargiska Kalendern"
+    division:
+      - name: "År"
+        days: 336
+      - name: "Månad"
+        count: 12
+      - name: "Dag"
+        count: 28
+
+  - name: "Dvärgiska Kalendern"
+    offset: 2356862
+    division:
+      - name: "År"
+        days: 336
+      - name: "Vecka"
+        count: 42
+      - name: "Dag"
+        count: 8
+
+  - name: "Ny kalender"
+    division:
+      - name: "År"
+        days: 21
+      - name: "Dag"
+        count: 21
+
+  - name: "Foriansk Tideräkning"
+    offset: -282576
+    division:
+      - name: "År"
+        days: 336
+      - name: "Månad"
+        count: 12
+      - name: "Dag"
+        count: 28
+  - name: "Jantalasian Year"
+    offset: -996912
+    division:
+      - name: "År"
+        days: 360
+      - name: "Månad"
+        count: 9
+      - name: "Vecka"
+        count: 10

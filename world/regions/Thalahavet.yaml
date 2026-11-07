@@ -1,0 +1,63 @@
+# Thalahavet: som Rhungsjön men blåsigare (+1 vind).
+# Havet ligger efter land: varmast runt augusti, kallast runt mars.
+name: "Thalahavet"
+
+temperature:
+  jan: 10
+  feb: 8
+  mar: 7
+  apr: 10
+  may: 12
+  jun: 14
+  jul: 18
+  aug: 22
+  sep: 20
+  oct: 16
+  nov: 14
+  dec: 13
+
+temperature_drop: 1
+drop_speed: 0
+
+# Höjden (m ö.h.) som temperaturerna ovan gäller för. I 3D blir det 6,5° kallare per km över den.
+base_heat_height: 0
+
+precipitation:
+  jan: 0
+  feb: 0
+  mar: 0
+  apr: 0
+  may: 0
+  jun: 0
+  jul: 0
+  aug: 0
+  sep: 0
+  oct: 0
+  nov: 0
+  dec: 0
+
+shift: 0
+
+wind:
+  jan: 2
+  feb: 2
+  mar: 2
+  apr: 1
+  may: 2
+  jun: 2
+  jul: 2
+  aug: 2
+  sep: 2
+  oct: 3
+  nov: 3
+  dec: 2
+
+# Förhärskande vind (västanvind, ca 33° N): varifrån vinden oftast blåser
+# och hur stor del av dagarna (%). Övriga dagar: oftast en grannriktning, ibland vilken som helst.
+prevailing_wind: SW
+prevailing_chance: 45
+
+events:
+  - name: "Drake"
+    occurs: 1
+    days: 1000

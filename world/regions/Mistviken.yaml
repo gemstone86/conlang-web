@@ -1,0 +1,73 @@
+# Mistviken: som Dimmornas hav (dimma varje dag, mycket moln), men nästan helt vindstilla (-3 vind). Södra halvklotet: årstiderna är omvända (kallast i juli).
+name: "Mistviken"
+
+temperature:
+  jan: 2
+  feb: 3
+  mar: -3
+  apr: -10
+  may: -17
+  jun: -22
+  jul: -25
+  aug: -21
+  sep: -16
+  oct: -13
+  nov: -9
+  dec: -5
+
+temperature_drop: 5
+drop_speed: 5
+
+# Höjden (m ö.h.) som temperaturerna ovan gäller för. I 3D blir det 6,5° kallare per km över den.
+base_heat_height: 0
+
+precipitation:
+  jan: 2
+  feb: 2
+  mar: 2
+  apr: 1
+  may: 1
+  jun: 1
+  jul: 0
+  aug: 0
+  sep: 0
+  oct: 0
+  nov: 2
+  dec: 2
+
+shift: 0
+
+# Molntäcke: +1 ger ungefär 10 procentenheter mer moln en torr dag (bara kartan, inte vädret).
+cloud_cover: 3
+
+wind:
+  jan: -1
+  feb: -1
+  mar: -2
+  apr: -2
+  may: -2
+  jun: -2
+  jul: -2
+  aug: -2
+  sep: -2
+  oct: -2
+  nov: -2
+  dec: -2
+
+# Förhärskande vind (polar östanvind, ca 73° S): varifrån vinden oftast blåser
+# och hur stor del av dagarna (%). Övriga dagar: oftast en grannriktning, ibland vilken som helst.
+prevailing_wind: SE
+prevailing_chance: 50
+
+events:
+  # days: 1 = varje dag. Dimma lägger sig på kartan under de svala timmarna (kväll, natt och morgon).
+  - name: "Havsdimma"
+    occurs: 1
+    days: 1
+  - name: "Tjock havsdimma"
+    occurs: 1
+    days: 4
+    bonus_wind: -2
+  - name: "Svår åska"
+    occurs: 1
+    days: 250

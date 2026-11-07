@@ -1,0 +1,65 @@
+# Renen Or: som Miam men regnigare (+1 nederbörd).
+name: "Renen Or"
+
+temperature:
+  jan: 18
+  feb: 19
+  mar: 21
+  apr: 23
+  may: 26
+  jun: 28
+  jul: 29
+  aug: 29
+  sep: 27
+  oct: 24
+  nov: 21
+  dec: 19
+
+temperature_drop: 4
+drop_speed: 1
+
+# Höjden (m ö.h.) som temperaturerna ovan gäller för. I 3D blir det 6,5° kallare per km över den.
+base_heat_height: 300
+
+precipitation:
+  jan: 2
+  feb: 2
+  mar: 3
+  apr: 3
+  may: 4
+  jun: 4
+  jul: 4
+  aug: 4
+  sep: 4
+  oct: 3
+  nov: 2
+  dec: 2
+
+shift: 0
+
+wind:
+  jan: 0
+  feb: 0
+  mar: 0
+  apr: 0
+  may: 0
+  jun: 1
+  jul: 1
+  aug: 0
+  sep: 0
+  oct: 0
+  nov: 0
+  dec: 0
+
+# Förhärskande vind (passadvind, ca 23° N): varifrån vinden oftast blåser
+# och hur stor del av dagarna (%). Övriga dagar: oftast en grannriktning, ibland vilken som helst.
+prevailing_wind: NE
+prevailing_chance: 60
+
+events:
+  - name: "Drake"
+    occurs: 1
+    days: 1000
+  - name: "Värmebölja (+10C)"
+    occurs: 1
+    days: 200

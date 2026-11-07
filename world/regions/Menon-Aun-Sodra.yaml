@@ -1,0 +1,68 @@
+# Nästan tropiskt, varmare än Drunok.
+name: "Menon Aun (Södra)"
+
+temperature:
+  jan: 16
+  feb: 17
+  mar: 19
+  apr: 21
+  may: 24
+  jun: 26
+  jul: 27
+  aug: 27
+  sep: 25
+  oct: 22
+  nov: 19
+  dec: 17
+
+temperature_drop: 4
+drop_speed: 1
+
+# Höjden (m ö.h.) som temperaturerna ovan gäller för. I 3D blir det 6,5° kallare per km över den.
+base_heat_height: 400
+
+precipitation:
+  jan: 1
+  feb: 1
+  mar: 2
+  apr: 2
+  may: 3
+  jun: 3
+  jul: 4
+  aug: 4
+  sep: 3
+  oct: 2
+  nov: 1
+  dec: 1
+
+shift: 0
+
+wind:
+  jan: 0
+  feb: 0
+  mar: 0
+  apr: 0
+  may: 0
+  jun: 1
+  jul: 1
+  aug: 0
+  sep: 0
+  oct: 0
+  nov: 0
+  dec: 0
+
+# Förhärskande vind (passadvind, ca 29° N): varifrån vinden oftast blåser
+# och hur stor del av dagarna (%). Övriga dagar: oftast en grannriktning, ibland vilken som helst.
+prevailing_wind: NE
+prevailing_chance: 60
+
+events:
+  - name: "Drake"
+    occurs: 1
+    days: 1000
+  - name: "Wyrd attack"
+    occurs: 1
+    days: 750
+  - name: "Värmebölja (+10C)"
+    occurs: 1
+    days: 200

@@ -1,0 +1,65 @@
+# Taupernas dal: tempererat (samma klimat som Kamor) i en liten dal mitt i isvidderna. Vädret sprids inte utanför dalen.
+name: "Taupernas dal"
+
+temperature:
+  jan: 4
+  feb: 5
+  mar: 8
+  apr: 10
+  may: 14
+  jun: 17
+  jul: 19
+  aug: 19
+  sep: 16
+  oct: 12
+  nov: 7
+  dec: 5
+
+temperature_drop: 2
+drop_speed: 1
+
+# Höjden (m ö.h.) som temperaturerna ovan gäller för. I 3D blir det 6,5° kallare per km över den.
+base_heat_height: 950
+
+precipitation:
+  jan: 1
+  feb: 1
+  mar: 1
+  apr: 1
+  may: 1
+  jun: 1
+  jul: 1
+  aug: 1
+  sep: 1
+  oct: 2
+  nov: 2
+  dec: 1
+
+shift: 0
+
+# Bara en liten dal: vädret stannar inom detta avstånd från punkterna (halva Koyn-Dolozs radie).
+contained_radius: 0.0075
+
+wind:
+  jan: 1
+  feb: 1
+  mar: 1
+  apr: 1
+  may: 0
+  jun: 0
+  jul: 0
+  aug: 0
+  sep: 1
+  oct: 1
+  nov: 1
+  dec: 1
+
+# Förhärskande vind (polar östanvind, ca 73° N): varifrån vinden oftast blåser
+# och hur stor del av dagarna (%). Övriga dagar: oftast en grannriktning, ibland vilken som helst.
+prevailing_wind: NE
+prevailing_chance: 50
+
+events:
+  - name: "Drake"
+    occurs: 1
+    days: 1000

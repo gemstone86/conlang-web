@@ -1,0 +1,69 @@
+# Hett och fuktigt, torrare vintrar.
+name: "Takalorr"
+
+temperature:
+  jan: 23
+  feb: 24
+  mar: 26
+  apr: 28
+  may: 30
+  jun: 31
+  jul: 32
+  aug: 31
+  sep: 30
+  oct: 28
+  nov: 25
+  dec: 24
+
+temperature_drop: 4
+drop_speed: 1
+
+# Höjden (m ö.h.) som temperaturerna ovan gäller för. I 3D blir det 6,5° kallare per km över den.
+base_heat_height: 0
+
+precipitation:
+  jan: 1
+  feb: 1
+  mar: 2
+  apr: 3
+  may: 4
+  jun: 5
+  jul: 5
+  aug: 4
+  sep: 3
+  oct: 2
+  nov: 1
+  dec: 1
+
+shift: 0
+
+wind:
+  jan: 0
+  feb: 0
+  mar: 0
+  apr: 1
+  may: 1
+  jun: 1
+  jul: 1
+  aug: 0
+  sep: 0
+  oct: 0
+  nov: 0
+  dec: 0
+
+# Förhärskande vind (passadvind, ca 23° N): varifrån vinden oftast blåser
+# och hur stor del av dagarna (%). Övriga dagar: oftast en grannriktning, ibland vilken som helst.
+prevailing_wind: NE
+prevailing_chance: 60
+
+events:
+  - name: "Drake"
+    occurs: 1
+    days: 1000
+  - name: "Monsunregn (+5 regn)"
+    occurs: 1
+    days: 200
+    bonus_rain: 5
+  - name: "Värmebölja (+10C)"
+    occurs: 1
+    days: 200

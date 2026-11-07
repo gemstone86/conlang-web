@@ -1,0 +1,65 @@
+# Het savann vid kusten: jämnare temperatur och havsbris.
+name: "Colostro"
+
+temperature:
+  jan: 21
+  feb: 22
+  mar: 24
+  apr: 26
+  may: 28
+  jun: 30
+  jul: 30
+  aug: 29
+  sep: 28
+  oct: 26
+  nov: 24
+  dec: 22
+
+temperature_drop: 5
+drop_speed: 1
+
+# Höjden (m ö.h.) som temperaturerna ovan gäller för. I 3D blir det 6,5° kallare per km över den.
+base_heat_height: 200
+
+precipitation:
+  jan: -1
+  feb: -1
+  mar: -1
+  apr: 0
+  may: 1
+  jun: 2
+  jul: 3
+  aug: 2
+  sep: 1
+  oct: 0
+  nov: -1
+  dec: -1
+
+shift: 0
+
+wind:
+  jan: 2
+  feb: 2
+  mar: 1
+  apr: 1
+  may: 1
+  jun: 1
+  jul: 1
+  aug: 1
+  sep: 2
+  oct: 2
+  nov: 2
+  dec: 2
+
+# Förhärskande vind (passadvind, ca 14° N): varifrån vinden oftast blåser
+# och hur stor del av dagarna (%). Övriga dagar: oftast en grannriktning, ibland vilken som helst.
+prevailing_wind: NE
+prevailing_chance: 60
+
+events:
+  - name: "Drake"
+    occurs: 1
+    days: 1000
+  - name: "Värmebölja (+10C)"
+    occurs: 1
+    days: 200

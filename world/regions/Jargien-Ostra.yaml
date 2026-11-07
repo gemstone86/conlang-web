@@ -1,0 +1,62 @@
+# Östra Jargien: som Västra Jargien men ungefär 2 grader kallare.
+name: "Jargien (Östra)"
+
+temperature:
+  jan: 1
+  feb: 2
+  mar: 3
+  apr: 6
+  may: 11
+  jun: 14
+  jul: 17
+  aug: 19
+  sep: 14
+  oct: 11
+  nov: 6
+  dec: 3
+
+temperature_drop: 2
+drop_speed: 1
+
+# Höjden (m ö.h.) som temperaturerna ovan gäller för. I 3D blir det 6,5° kallare per km över den.
+base_heat_height: 500
+
+precipitation:
+  jan: 0
+  feb: 0
+  mar: 0
+  apr: 0
+  may: 0
+  jun: 0
+  jul: 0
+  aug: 0
+  sep: 1
+  oct: 1
+  nov: 1
+  dec: 1
+
+shift: 0
+
+wind:
+  jan: 1
+  feb: 0
+  mar: 0
+  apr: 0
+  may: 0
+  jun: 0
+  jul: 0
+  aug: 0
+  sep: 1
+  oct: 1
+  nov: 1
+  dec: 2
+
+# Förhärskande vind (västanvind, ca 41° N): varifrån vinden oftast blåser
+# och hur stor del av dagarna (%). Övriga dagar: oftast en grannriktning, ibland vilken som helst.
+prevailing_wind: SW
+prevailing_chance: 45
+
+events:
+  - name: "Drake"
+    occurs: 1
+    days: 200

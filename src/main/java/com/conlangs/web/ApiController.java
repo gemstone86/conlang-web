@@ -21,8 +21,8 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
-@RestController
-@RequestMapping("/api")
+@RestController("runeApiController")
+@RequestMapping("/rune/api")
 public class ApiController {
     private final Db db;
     private final Auth auth;
@@ -77,41 +77,7 @@ public class ApiController {
         return Map.of("version", appVersion, "built", appBuilt);
     }
 
-    // ---------------- auth ----------------
-
-    @GetMapping("/auth/me")
-    public Map<String, Object> me(HttpSession s) {
-        Map<String, Object> u = auth.current(s);
-        Map<String, Object> out = new LinkedHashMap<>();
-        out.put("user", u);
-        out.put("registrationOpen", auth.registrationOpen());
-        return out;
-    }
-
-    @PostMapping("/auth/register")
-    public Map<String, Object> register(@RequestBody Map<String, Object> b, HttpServletRequest req) {
-        auth.register(str(b, "username"), str(b, "password"));
-        auth.login(str(b, "username"), str(b, "password"), req);
-        return me(req.getSession());
-    }
-
-    @PostMapping("/auth/login")
-    public Map<String, Object> login(@RequestBody Map<String, Object> b, HttpServletRequest req) {
-        auth.login(str(b, "username"), str(b, "password"), req);
-        return me(req.getSession());
-    }
-
-    @PostMapping("/auth/logout")
-    public Map<String, Object> logout(HttpSession s) {
-        auth.logout(s);
-        return Map.of("ok", true);
-    }
-
-    @PostMapping("/auth/reset")
-    public Map<String, Object> reset(@RequestBody Map<String, Object> b) {
-        auth.resetPassword(str(b, "username"), str(b, "code"), str(b, "password"));
-        return Map.of("ok", true);
-    }
+    // login, logout, register and password reset live in com.hub.AuthController (/api/auth), shared with the weather generator
 
     @PostMapping("/admin/reset-code")
     public Map<String, Object> resetCode(@RequestBody Map<String, Object> b, HttpSession s) {
@@ -124,7 +90,7 @@ public class ApiController {
     @GetMapping("/admin/users")
     public List<Map<String, Object>> users(HttpSession s) {
         auth.requireAdmin(s);
-        return db.rows("select id, username, is_admin, created from users order by username");
+        return db.rows("select id, username, is_admin, created from users where " + Auth.REAL_USER + " order by username");
     }
 
     @PostMapping("/admin/import-elven")
@@ -368,7 +334,7 @@ public class ApiController {
         if (target == null) throw new ApiException(400, "targetId is required.");
         needShareOwner(uid, scope, target);
         String level = "EDITOR".equalsIgnoreCase(str(b, "level")) ? "EDITOR" : "VIEWER";
-        Map<String, Object> u = db.one("select id from users where lower(username)=lower(?)", str(b, "username"));
+        Map<String, Object> u = db.one("select id from users where lower(username)=lower(?) and " + Auth.REAL_USER, str(b, "username"));
         if (u == null) throw new ApiException(404, "No user with that name.");
         if (Db.num(u.get("id")) == uid) throw new ApiException(400, "You already own this.");
         boolean auto = "EDITOR".equals(level) && Boolean.parseBoolean(String.valueOf(b.get("autoApprove")));

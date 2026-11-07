@@ -1,0 +1,1443 @@
+{
+ "name": "Mundana",
+ "image": "map.jpg",
+ "height": "height.png",
+ "settings": {
+  "reach": 0.27,
+  "kmPerPixel": 5.41,
+  "wrapWidth": 5335,
+  "tiles": "tiles/mundana-1/",
+  "seaLevel": 120,
+  "metersPerStep": 100,
+  "blockHeight": 30,
+  "clockX": 0.6287,
+  "heightRev": 6,
+  "riversRelease": "2026-10-31T13:38:48.143566300Z",
+  "rangesRelease": "2026-10-31T13:38:48.143566300Z",
+  "roadsRelease": "2026-10-31T13:38:48.143566300Z",
+  "forestRelease": "2026-10-31T13:38:48.143566300Z"
+ },
+ "symbols": {
+  "Ataxatropi": "symbols/Ataxatropi.png",
+  "Biotropi": "symbols/Biotropi.png",
+  "Fototropi": "symbols/Fototropi.png",
+  "Geotropi": "symbols/Geotropi.png",
+  "Hydrotropi": "symbols/Hydrotropi.png",
+  "Ikonotropi": "symbols/Ikonotropi.png",
+  "Kryotropi": "symbols/Kryotropi.png",
+  "Nekrotropi": "symbols/Nekrotropi.png",
+  "Pneumotropi": "symbols/Pneumotropi.png",
+  "Pyrotropi": "symbols/Pyrotropi.png",
+  "Skototropi": "symbols/Skototropi.png",
+  "Termotropi": "symbols/Termotropi.png"
+ },
+ "anchors": [
+  {
+   "region": "Amdai-Shek (Norra)",
+   "x": 0.708,
+   "y": 0.217
+  },
+  {
+   "region": "Amdai-Shek (Södra)",
+   "x": 0.718,
+   "y": 0.243
+  },
+  {
+   "region": "Asharien (Ashaslätten)",
+   "x": 0.567,
+   "y": 0.299
+  },
+  {
+   "region": "Asharien (Norra)",
+   "x": 0.567,
+   "y": 0.286
+  },
+  {
+   "region": "Asharien (Sunari)",
+   "x": 0.559,
+   "y": 0.316
+  },
+  {
+   "region": "Cermira",
+   "x": 0.569,
+   "y": 0.276
+  },
+  {
+   "region": "Colonan",
+   "x": 0.62,
+   "y": 0.256
+  },
+  {
+   "region": "Drunok",
+   "x": 0.559,
+   "y": 0.277
+  },
+  {
+   "region": "Mithera (Södra)",
+   "x": 0.572,
+   "y": 0.269
+  },
+  {
+   "region": "Consaber (Tokon)",
+   "x": 0.639,
+   "y": 0.258
+  },
+  {
+   "region": "Consaber (Urma Breann)",
+   "x": 0.626,
+   "y": 0.285
+  },
+  {
+   "region": "Consaber (Danbreann)",
+   "x": 0.629,
+   "y": 0.311
+  },
+  {
+   "region": "Forion (Västra)",
+   "x": 0.429,
+   "y": 0.492
+  },
+  {
+   "region": "Forion (Östra)",
+   "x": 0.448,
+   "y": 0.499
+  },
+  {
+   "region": "Igonhavet",
+   "x": 0.515,
+   "y": 0.338
+  },
+  {
+   "region": "Melorion",
+   "x": 0.537,
+   "y": 0.339
+  },
+  {
+   "region": "Mio-Enara",
+   "x": 0.352,
+   "y": 0.534
+  },
+  {
+   "region": "Ordensstaten",
+   "x": 0.69,
+   "y": 0.275
+  },
+  {
+   "region": "Soldarn",
+   "x": 0.572,
+   "y": 0.342
+  },
+  {
+   "region": "Stormarnas Hav",
+   "x": 0.56,
+   "y": 0.449
+  },
+  {
+   "region": "Tarkas",
+   "x": 0.507,
+   "y": 0.284
+  },
+  {
+   "region": "Thalamur (Norra)",
+   "x": 0.605,
+   "y": 0.258
+  },
+  {
+   "region": "Thalamur (Norra)",
+   "x": 0.608,
+   "y": 0.267
+  },
+  {
+   "region": "Raunslätterna (Östra)",
+   "x": 0.607,
+   "y": 0.219
+  },
+  {
+   "region": "Norra-Isvidderna",
+   "x": 0.565,
+   "y": 0.102
+  },
+  {
+   "region": "Raunslätterna (Västra)",
+   "x": 0.536,
+   "y": 0.203
+  },
+  {
+   "region": "Godrion",
+   "x": 0.475,
+   "y": 0.221
+  },
+  {
+   "region": "Colostro",
+   "x": 0.492,
+   "y": 0.427
+  },
+  {
+   "region": "Dhuk",
+   "x": 0.448,
+   "y": 0.356
+  },
+  {
+   "region": "Dhurkoor",
+   "x": 0.425,
+   "y": 0.41
+  },
+  {
+   "region": "Eumo",
+   "x": 0.47,
+   "y": 0.34
+  },
+  {
+   "region": "Lomar",
+   "x": 0.472,
+   "y": 0.429
+  },
+  {
+   "region": "Momolan",
+   "x": 0.495,
+   "y": 0.382
+  },
+  {
+   "region": "Mûhad",
+   "x": 0.486,
+   "y": 0.294
+  },
+  {
+   "region": "Nbeyo",
+   "x": 0.482,
+   "y": 0.415
+  },
+  {
+   "region": "Takalorr",
+   "x": 0.568,
+   "y": 0.381
+  },
+  {
+   "region": "Yonggurla",
+   "x": 0.5,
+   "y": 0.304
+  },
+  {
+   "region": "Ziu",
+   "x": 0.495,
+   "y": 0.285
+  },
+  {
+   "region": "Ebhron (Mellan)",
+   "x": 0.687,
+   "y": 0.405
+  },
+  {
+   "region": "Ebhron (Norra)",
+   "x": 0.692,
+   "y": 0.357
+  },
+  {
+   "region": "Ebhron (Södra)",
+   "x": 0.686,
+   "y": 0.46
+  },
+  {
+   "region": "Menon Aun (Norra)",
+   "x": 0.379,
+   "y": 0.259
+  },
+  {
+   "region": "Menon Aun (Södra)",
+   "x": 0.369,
+   "y": 0.347
+  },
+  {
+   "region": "Miam",
+   "x": 0.351,
+   "y": 0.374
+  },
+  {
+   "region": "Summag",
+   "x": 0.463,
+   "y": 0.32
+  },
+  {
+   "region": "Tarhai",
+   "x": 0.402,
+   "y": 0.337
+  },
+  {
+   "region": "Jargien (Västra)",
+   "x": 0.522,
+   "y": 0.287
+  },
+  {
+   "region": "Jargien (Östra)",
+   "x": 0.542,
+   "y": 0.284
+  },
+  {
+   "region": "Kamor",
+   "x": 0.524,
+   "y": 0.251
+  },
+  {
+   "region": "Västmark",
+   "x": 0.555,
+   "y": 0.345
+  },
+  {
+   "region": "Jargien",
+   "x": 0.535,
+   "y": 0.285
+  },
+  {
+   "region": "Norra-Isvidderna",
+   "x": 0.22,
+   "y": 0.048
+  },
+  {
+   "region": "Norra-Isvidderna",
+   "x": 0.114,
+   "y": 0.047
+  },
+  {
+   "region": "Norra-Isvidderna",
+   "x": 0.77,
+   "y": 0.069
+  },
+  {
+   "region": "Norra-Isvidderna",
+   "x": 0.007,
+   "y": 0.041
+  },
+  {
+   "region": "Norra-Isvidderna",
+   "x": 0.987,
+   "y": 0.063
+  },
+  {
+   "region": "Blå havet",
+   "x": 0.461,
+   "y": 0.262
+  },
+  {
+   "region": "Seboria",
+   "x": 0.504,
+   "y": 0.208
+  },
+  {
+   "region": "Camara",
+   "x": 0.611,
+   "y": 0.25
+  },
+  {
+   "region": "Fria staterna",
+   "x": 0.66,
+   "y": 0.28
+  },
+  {
+   "region": "Had-ahd",
+   "x": 0.752,
+   "y": 0.241
+  },
+  {
+   "region": "Kamor viken",
+   "x": 0.506,
+   "y": 0.239
+  },
+  {
+   "region": "Monoliten",
+   "x": 0.58,
+   "y": 0.238
+  },
+  {
+   "region": "Norra Ringbergen",
+   "x": 0.573,
+   "y": 0.181
+  },
+  {
+   "region": "Raunbukten",
+   "x": 0.667,
+   "y": 0.3
+  },
+  {
+   "region": "Rhungsjön",
+   "x": 0.589,
+   "y": 0.313
+  },
+  {
+   "region": "Thalahavet",
+   "x": 0.617,
+   "y": 0.325
+  },
+  {
+   "region": "Vardahl",
+   "x": 0.691,
+   "y": 0.299
+  },
+  {
+   "region": "Drunok",
+   "x": 0.55,
+   "y": 0.273
+  },
+  {
+   "region": "Drunok",
+   "x": 0.557,
+   "y": 0.261
+  },
+  {
+   "region": "Drunok",
+   "x": 0.561,
+   "y": 0.268
+  },
+  {
+   "region": "Berenhelm",
+   "x": 0.709,
+   "y": 0.319
+  },
+  {
+   "region": "Bredea",
+   "x": 0.668,
+   "y": 0.368
+  },
+  {
+   "region": "Dimmornas hav",
+   "x": 0.467,
+   "y": 0.198
+  },
+  {
+   "region": "Issjön",
+   "x": 0.276,
+   "y": 0.082
+  },
+  {
+   "region": "Vita bergen",
+   "x": 0.375,
+   "y": 0.067
+  },
+  {
+   "region": "Koyn-Doloz",
+   "x": 0.411,
+   "y": 0.26
+  },
+  {
+   "region": "Koyn-Doloz",
+   "x": 0.428,
+   "y": 0.264
+  },
+  {
+   "region": "Koyn-Doloz",
+   "x": 0.402,
+   "y": 0.218
+  },
+  {
+   "region": "Méaslätten",
+   "x": 0.677,
+   "y": 0.238
+  },
+  {
+   "region": "Méaslätten",
+   "x": 0.696,
+   "y": 0.512
+  },
+  {
+   "region": "Blå havet",
+   "x": 0.446,
+   "y": 0.266
+  },
+  {
+   "region": "Norra-Isvidderna",
+   "x": 0.466,
+   "y": 0.084
+  },
+  {
+   "region": "Damarien (Norra)",
+   "x": 0.549,
+   "y": 0.311
+  },
+  {
+   "region": "Damarien (Södra)",
+   "x": 0.554,
+   "y": 0.33
+  },
+  {
+   "region": "Igonhavet",
+   "x": 0.502,
+   "y": 0.324
+  },
+  {
+   "region": "Khosala",
+   "x": 0.785,
+   "y": 0.426
+  },
+  {
+   "region": "Khosala",
+   "x": 0.835,
+   "y": 0.414
+  },
+  {
+   "region": "Khosala",
+   "x": 0.829,
+   "y": 0.534
+  },
+  {
+   "region": "Khosala",
+   "x": 0.776,
+   "y": 0.496
+  },
+  {
+   "region": "Luberos",
+   "x": 0.634,
+   "y": 0.501
+  },
+  {
+   "region": "Nermada",
+   "x": 0.593,
+   "y": 0.339
+  },
+  {
+   "region": "Taupernas dal",
+   "x": 0.428,
+   "y": 0.106
+  },
+  {
+   "region": "Taupernas dal",
+   "x": 0.433,
+   "y": 0.123
+  },
+  {
+   "region": "Thalamur (Södra)",
+   "x": 0.605,
+   "y": 0.317
+  },
+  {
+   "region": "Monoliten",
+   "x": 0.563,
+   "y": 0.237
+  },
+  {
+   "region": "Monoliten",
+   "x": 0.563,
+   "y": 0.208
+  },
+  {
+   "region": "Monoliten",
+   "x": 0.583,
+   "y": 0.211
+  },
+  {
+   "region": "Norra Ringbergen",
+   "x": 0.561,
+   "y": 0.194
+  },
+  {
+   "region": "Norra Ringbergen",
+   "x": 0.586,
+   "y": 0.192
+  },
+  {
+   "region": "Stormarnas Hav",
+   "x": 0.5,
+   "y": 0.579
+  },
+  {
+   "region": "Norra-Isvidderna",
+   "x": 0.634,
+   "y": 0.059
+  },
+  {
+   "region": "Bel-Ren",
+   "x": 0.742,
+   "y": 0.386
+  },
+  {
+   "region": "Bel-Ren",
+   "x": 0.758,
+   "y": 0.387
+  },
+  {
+   "region": "Blodbergen",
+   "x": 0.281,
+   "y": 0.364
+  },
+  {
+   "region": "Blodbergen",
+   "x": 0.292,
+   "y": 0.33
+  },
+  {
+   "region": "Blodbergen",
+   "x": 0.307,
+   "y": 0.308
+  },
+  {
+   "region": "Blodbergen",
+   "x": 0.299,
+   "y": 0.352
+  },
+  {
+   "region": "Blodviken",
+   "x": 0.316,
+   "y": 0.341
+  },
+  {
+   "region": "Blodviken",
+   "x": 0.311,
+   "y": 0.379
+  },
+  {
+   "region": "Calahume",
+   "x": 0.368,
+   "y": 0.202
+  },
+  {
+   "region": "Calahume",
+   "x": 0.382,
+   "y": 0.202
+  },
+  {
+   "region": "Dödens hav",
+   "x": 0.201,
+   "y": 0.365
+  },
+  {
+   "region": "Dödens hav",
+   "x": 0.231,
+   "y": 0.367
+  },
+  {
+   "region": "Dödens hav",
+   "x": 0.225,
+   "y": 0.414
+  },
+  {
+   "region": "Dödens hav",
+   "x": 0.178,
+   "y": 0.333
+  },
+  {
+   "region": "Eldhavet",
+   "x": 0.074,
+   "y": 0.298
+  },
+  {
+   "region": "Eldhavet",
+   "x": 0.098,
+   "y": 0.346
+  },
+  {
+   "region": "Eldhavet",
+   "x": 0.128,
+   "y": 0.375
+  },
+  {
+   "region": "Eldhavet",
+   "x": 0.115,
+   "y": 0.401
+  },
+  {
+   "region": "Guldhavet",
+   "x": 0.135,
+   "y": 0.216
+  },
+  {
+   "region": "Guldhavet",
+   "x": 0.157,
+   "y": 0.219
+  },
+  {
+   "region": "Guldhavet",
+   "x": 0.148,
+   "y": 0.274
+  },
+  {
+   "region": "Isöknen",
+   "x": 0.172,
+   "y": 0.869
+  },
+  {
+   "region": "Isöknen",
+   "x": 0.204,
+   "y": 0.858
+  },
+  {
+   "region": "Härlandet",
+   "x": 0.183,
+   "y": 0.395
+  },
+  {
+   "region": "Härlandet",
+   "x": 0.198,
+   "y": 0.405
+  },
+  {
+   "region": "Härlandet",
+   "x": 0.211,
+   "y": 0.414
+  },
+  {
+   "region": "Kryddöarna",
+   "x": 0.379,
+   "y": 0.423
+  },
+  {
+   "region": "Kardra",
+   "x": 0.716,
+   "y": 0.429
+  },
+  {
+   "region": "Ishavet",
+   "x": 0.63,
+   "y": 0.854
+  },
+  {
+   "region": "Ishavet",
+   "x": 0.718,
+   "y": 0.833
+  },
+  {
+   "region": "Ishavet",
+   "x": 0.82,
+   "y": 0.846
+  },
+  {
+   "region": "Ishavet",
+   "x": 0.915,
+   "y": 0.886
+  },
+  {
+   "region": "Ishavet",
+   "x": 0.994,
+   "y": 0.801
+  },
+  {
+   "region": "Ishavet",
+   "x": 0.031,
+   "y": 0.803
+  },
+  {
+   "region": "Ishavet",
+   "x": 0.336,
+   "y": 0.803
+  },
+  {
+   "region": "Ishavet",
+   "x": 0.49,
+   "y": 0.851
+  },
+  {
+   "region": "Ishavet",
+   "x": 0.233,
+   "y": 0.755
+  },
+  {
+   "region": "Kuh-dar",
+   "x": 0.77,
+   "y": 0.364
+  },
+  {
+   "region": "Mistviken",
+   "x": 0.771,
+   "y": 0.931
+  },
+  {
+   "region": "Mistviken",
+   "x": 0.784,
+   "y": 0.936
+  },
+  {
+   "region": "Nordliga vildmarken",
+   "x": 0.343,
+   "y": 0.211
+  },
+  {
+   "region": "Nordliga vildmarken",
+   "x": 0.317,
+   "y": 0.208
+  },
+  {
+   "region": "Nordliga vildmarken",
+   "x": 0.284,
+   "y": 0.21
+  },
+  {
+   "region": "Okända landet",
+   "x": 0.102,
+   "y": 0.714
+  },
+  {
+   "region": "Okända landet",
+   "x": 0.141,
+   "y": 0.766
+  },
+  {
+   "region": "Renen Or",
+   "x": 0.331,
+   "y": 0.371
+  },
+  {
+   "region": "Renen Or",
+   "x": 0.33,
+   "y": 0.353
+  },
+  {
+   "region": "Ruhn",
+   "x": 0.321,
+   "y": 0.317
+  },
+  {
+   "region": "Södra isvidderna",
+   "x": 0.376,
+   "y": 0.961
+  },
+  {
+   "region": "Södra isvidderna",
+   "x": 0.522,
+   "y": 0.959
+  },
+  {
+   "region": "Södra isvidderna",
+   "x": 0.626,
+   "y": 0.963
+  },
+  {
+   "region": "Södra isvidderna",
+   "x": 0.723,
+   "y": 0.96
+  },
+  {
+   "region": "Södra isvidderna",
+   "x": 0.813,
+   "y": 0.955
+  },
+  {
+   "region": "Södra isvidderna",
+   "x": 0.875,
+   "y": 0.971
+  },
+  {
+   "region": "Södra isvidderna",
+   "x": 0.977,
+   "y": 0.961
+  },
+  {
+   "region": "Södra isvidderna",
+   "x": 0.263,
+   "y": 0.97
+  },
+  {
+   "region": "Södra isvidderna",
+   "x": 0.103,
+   "y": 0.957
+  },
+  {
+   "region": "Södra isvidderna",
+   "x": 0.013,
+   "y": 0.95
+  },
+  {
+   "region": "Södra isvidderna",
+   "x": 0.181,
+   "y": 0.973
+  },
+  {
+   "region": "Södra isvidderna",
+   "x": 0.764,
+   "y": 0.97
+  },
+  {
+   "region": "Veren",
+   "x": 0.324,
+   "y": 0.274
+  },
+  {
+   "region": "Ruhn",
+   "x": 0.314,
+   "y": 0.318
+  },
+  {
+   "region": "Virvelhavet",
+   "x": 0.122,
+   "y": 0.13
+  },
+  {
+   "region": "Vita havet",
+   "x": 0.17,
+   "y": 0.902
+  },
+  {
+   "region": "Vita havet",
+   "x": 0.153,
+   "y": 0.879
+  },
+  {
+   "region": "Västra guldkusten",
+   "x": 0.123,
+   "y": 0.239
+  },
+  {
+   "region": "Östra guldkusten",
+   "x": 0.17,
+   "y": 0.241
+  },
+  {
+   "region": "Yo-lin",
+   "x": 0.293,
+   "y": 0.554
+  },
+  {
+   "region": "Yo-lin",
+   "x": 0.308,
+   "y": 0.553
+  },
+  {
+   "region": "Stormarnas Hav",
+   "x": 0.067,
+   "y": 0.524
+  },
+  {
+   "region": "Norra-Isvidderna",
+   "x": 0.283,
+   "y": 0.018
+  },
+  {
+   "region": "Norra-Isvidderna",
+   "x": 0.381,
+   "y": 0.011
+  },
+  {
+   "region": "Askhavet",
+   "x": 0.891,
+   "y": 0.621
+  },
+  {
+   "region": "Askhavet",
+   "x": 0.92,
+   "y": 0.626
+  },
+  {
+   "region": "Drakbergen",
+   "x": 0.781,
+   "y": 0.259
+  },
+  {
+   "region": "Fjärran östern",
+   "x": 0.892,
+   "y": 0.335
+  },
+  {
+   "region": "Fjärran östern",
+   "x": 0.968,
+   "y": 0.361
+  },
+  {
+   "region": "Halkyon-havet",
+   "x": 0.958,
+   "y": 0.48
+  },
+  {
+   "region": "Pantherabergen",
+   "x": 0.793,
+   "y": 0.184
+  },
+  {
+   "region": "Pantherabergen",
+   "x": 0.768,
+   "y": 0.185
+  },
+  {
+   "region": "Vindarnas hav",
+   "x": 0.712,
+   "y": 0.536
+  },
+  {
+   "region": "Vindkusten",
+   "x": 0.82,
+   "y": 0.562
+  },
+  {
+   "region": "Vindkusten",
+   "x": 0.773,
+   "y": 0.537
+  },
+  {
+   "region": "Vindarnas hav",
+   "x": 0.801,
+   "y": 0.606
+  },
+  {
+   "region": "Vindarnas hav",
+   "x": 0.755,
+   "y": 0.599
+  },
+  {
+   "region": "Stormarnas Hav (Södra)",
+   "x": 0.417,
+   "y": 0.719
+  },
+  {
+   "region": "Stormarnas Hav (Södra)",
+   "x": 0.311,
+   "y": 0.707
+  },
+  {
+   "region": "Stormarnas Hav (Södra)",
+   "x": 0.217,
+   "y": 0.695
+  },
+  {
+   "region": "Stormarnas Hav (Södra)",
+   "x": 0.133,
+   "y": 0.636
+  },
+  {
+   "region": "Stormarnas Hav (Södra)",
+   "x": 0.068,
+   "y": 0.619
+  },
+  {
+   "region": "Stormarnas Hav (Södra)",
+   "x": 0.482,
+   "y": 0.678
+  },
+  {
+   "region": "Stormarnas Hav (Södra)",
+   "x": 0.628,
+   "y": 0.716
+  },
+  {
+   "region": "Stormarnas Hav (Södra)",
+   "x": 0.767,
+   "y": 0.741
+  },
+  {
+   "region": "Stormarnas Hav (Södra)",
+   "x": 0.853,
+   "y": 0.736
+  },
+  {
+   "region": "Stormarnas Hav (Södra)",
+   "x": 0.947,
+   "y": 0.774
+  },
+  {
+   "region": "Stormarnas Hav (Södra)",
+   "x": 0.99,
+   "y": 0.765
+  },
+  {
+   "region": "Stormarnas Hav",
+   "x": 0.455,
+   "y": 0.553
+  },
+  {
+   "region": "Stormarnas Hav",
+   "x": 0.401,
+   "y": 0.541
+  },
+  {
+   "region": "Stormarnas Hav",
+   "x": 0.627,
+   "y": 0.534
+  },
+  {
+   "region": "Stormarnas Hav",
+   "x": 0.63,
+   "y": 0.448
+  },
+  {
+   "region": "Stormarnas Hav",
+   "x": 0.669,
+   "y": 0.478
+  },
+  {
+   "region": "Stormarnas Hav",
+   "x": 0.679,
+   "y": 0.564
+  },
+  {
+   "region": "Stormarnas Hav",
+   "x": 0.368,
+   "y": 0.57
+  },
+  {
+   "region": "Mio-Enara",
+   "x": 0.324,
+   "y": 0.499
+  },
+  {
+   "region": "Stormarnas Hav",
+   "x": 0.365,
+   "y": 0.444
+  },
+  {
+   "region": "Stormarnas Hav",
+   "x": 0.319,
+   "y": 0.463
+  },
+  {
+   "region": "Stormarnas Hav",
+   "x": 0.267,
+   "y": 0.496
+  },
+  {
+   "region": "Stormarnas Hav",
+   "x": 0.207,
+   "y": 0.501
+  },
+  {
+   "region": "Menon Aun (Södra)",
+   "x": 0.388,
+   "y": 0.318
+  },
+  {
+   "region": "Menon Aun (Norra)",
+   "x": 0.36,
+   "y": 0.266
+  },
+  {
+   "region": "Stormarnas Hav",
+   "x": 0.509,
+   "y": 0.433
+  },
+  {
+   "region": "Stormarnas Hav",
+   "x": 0.478,
+   "y": 0.503
+  },
+  {
+   "region": "Raunslätterna (Östra)",
+   "x": 0.632,
+   "y": 0.187
+  },
+  {
+   "region": "Raunslätterna (Östra)",
+   "x": 0.663,
+   "y": 0.193
+  },
+  {
+   "region": "Méaslätten",
+   "x": 0.66,
+   "y": 0.26
+  },
+  {
+   "region": "Fjärran östern",
+   "x": 0.85,
+   "y": 0.339
+  },
+  {
+   "region": "Raunslätterna (Västra)",
+   "x": 0.538,
+   "y": 0.23
+  },
+  {
+   "region": "Raunslätterna (Västra)",
+   "x": 0.551,
+   "y": 0.219
+  },
+  {
+   "region": "Cermira",
+   "x": 0.573,
+   "y": 0.278
+  },
+  {
+   "region": "Monoliten",
+   "x": 0.574,
+   "y": 0.249
+  },
+  {
+   "region": "Blå havet",
+   "x": 0.475,
+   "y": 0.266
+  },
+  {
+   "region": "Blå havet",
+   "x": 0.484,
+   "y": 0.26
+  },
+  {
+   "region": "Karagien",
+   "x": 0.4996937,
+   "y": 0.2608258
+  }
+ ],
+ "leylines": [
+  {
+   "aspect": "Fototropi",
+   "a": {
+    "x": 0.729,
+    "y": 0.274
+   },
+   "b": {
+    "x": 0.818,
+    "y": 0.264
+   }
+  },
+  {
+   "aspect": "Kronotropi",
+   "a": {
+    "x": 0.626,
+    "y": 0.243
+   },
+   "b": {
+    "x": 0.677,
+    "y": 0.188
+   }
+  },
+  {
+   "aspect": "Kryotropi",
+   "a": {
+    "x": 0.572,
+    "y": 0.265
+   },
+   "b": {
+    "x": 0.51,
+    "y": 0.186
+   }
+  },
+  {
+   "aspect": "Termotropi",
+   "a": {
+    "x": 0.413,
+    "y": 0.251
+   },
+   "b": {
+    "x": 0.49,
+    "y": 0.288
+   }
+  },
+  {
+   "aspect": "Termotropi",
+   "a": {
+    "x": 0.434,
+    "y": 0.111
+   },
+   "b": {
+    "x": 0.413,
+    "y": 0.251
+   }
+  },
+  {
+   "aspect": "Fototropi",
+   "a": {
+    "x": 0.643,
+    "y": 0.108
+   },
+   "b": {
+    "x": 0.708,
+    "y": 0.194
+   }
+  },
+  {
+   "aspect": "Fototropi",
+   "a": {
+    "x": 0.519,
+    "y": 0.542
+   },
+   "b": {
+    "x": 0.593,
+    "y": 0.774
+   }
+  },
+  {
+   "aspect": "Hydrotropi",
+   "a": {
+    "x": 0.509,
+    "y": 0.338
+   },
+   "b": {
+    "x": 0.636,
+    "y": 0.384
+   }
+  },
+  {
+   "aspect": "Hydrotropi",
+   "a": {
+    "x": 0.47445339590584934,
+    "y": 0.5505859212500213
+   },
+   "b": {
+    "x": 0.5777467785831395,
+    "y": 0.6580598789593427
+   }
+  },
+  {
+   "aspect": "Hydrotropi",
+   "a": {
+    "x": 0.261,
+    "y": 0.258
+   },
+   "b": {
+    "x": 0.249,
+    "y": 0.514
+   }
+  },
+  {
+   "aspect": "Biotropi",
+   "a": {
+    "x": 0.539,
+    "y": 0.241
+   },
+   "b": {
+    "x": 0.61,
+    "y": 0.279
+   }
+  },
+  {
+   "aspect": "Biotropi",
+   "a": {
+    "x": 0.536,
+    "y": 0.276
+   },
+   "b": {
+    "x": 0.61,
+    "y": 0.279
+   }
+  },
+  {
+   "aspect": "Biotropi",
+   "a": {
+    "x": 0.539,
+    "y": 0.237
+   },
+   "b": {
+    "x": 0.536,
+    "y": 0.281
+   }
+  },
+  {
+   "aspect": "Termotropi",
+   "a": {
+    "x": 0.507,
+    "y": 0.281
+   },
+   "b": {
+    "x": 0.904,
+    "y": 0.626
+   }
+  },
+  {
+   "aspect": "Kryotropi",
+   "a": {
+    "x": 0.707,
+    "y": 0.197
+   },
+   "b": {
+    "x": 0.572,
+    "y": 0.266
+   }
+  },
+  {
+   "aspect": "Kryotropi",
+   "a": {
+    "x": 0.537,
+    "y": 0.95
+   },
+   "b": {
+    "x": 0.832,
+    "y": 0.37
+   }
+  },
+  {
+   "aspect": "Pyrotropi",
+   "a": {
+    "x": 0.107,
+    "y": 0.357
+   },
+   "b": {
+    "x": 0.183,
+    "y": 0.518
+   }
+  },
+  {
+   "aspect": "Pyrotropi",
+   "a": {
+    "x": 0.64,
+    "y": 0.315
+   },
+   "b": {
+    "x": 0.643,
+    "y": 0.297
+   }
+  },
+  {
+   "aspect": "Kronotropi",
+   "a": {
+    "x": 0.602,
+    "y": 0.288
+   },
+   "b": {
+    "x": 0.672,
+    "y": 0.303
+   }
+  },
+  {
+   "aspect": "Kronotropi",
+   "a": {
+    "x": 0.559,
+    "y": 0.292
+   },
+   "b": {
+    "x": 0.595,
+    "y": 0.336
+   }
+  },
+  {
+   "aspect": "Pyrotropi",
+   "a": {
+    "x": 0.734,
+    "y": 0.684
+   },
+   "b": {
+    "x": 0.799,
+    "y": 0.67
+   }
+  },
+  {
+   "aspect": "Geotropi",
+   "a": {
+    "x": 0.734,
+    "y": 0.684
+   },
+   "b": {
+    "x": 0.803,
+    "y": 0.699
+   }
+  },
+  {
+   "aspect": "Pneumotropi",
+   "a": {
+    "x": 0.734,
+    "y": 0.684
+   },
+   "b": {
+    "x": 0.786,
+    "y": 0.735
+   }
+  }
+ ],
+ "zones": [
+  {
+   "aspect": "Nekrotropi",
+   "points": [
+    {
+     "y": 0.25,
+     "x": 0.618
+    },
+    {
+     "y": 0.246,
+     "x": 0.618
+    },
+    {
+     "y": 0.246,
+     "x": 0.621
+    },
+    {
+     "y": 0.251,
+     "x": 0.621
+    }
+   ]
+  }
+ ],
+ "rivers": "rivers.json",
+ "ranges": "ranges.json",
+ "roads": "roads.json",
+ "forest": "forest.png"
+}

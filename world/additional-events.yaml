@@ -1,0 +1,159 @@
+events:
+  - name: "Lätt Åska"
+    occurs: 1
+    days: 28
+    affected_by: "rain"
+    bonus_wind: 0
+    bonus_temp: 0
+    bonus_rain: 0
+
+  - name: "Svår Åska"
+    occurs: 1
+    days: 84
+    start_month: 8
+    end_month: 1
+
+  - name: "Lätt Dimma"
+    occurs: 1
+    days: 56
+    bonus_wind: -4
+    bonus_temp: -2
+    bonus_rain: 0
+    min_wind: 0
+    max_wind: 3
+    min_temp: 0
+    max_temp: 25
+
+  - name: "Tjock Dimma"
+    occurs: 1
+    days: 84
+    bonus_wind: -6
+    bonus_temp: -2
+    bonus_rain: 0
+    min_wind: 0
+    max_wind: 4
+    min_temp: -5
+    max_temp: 20
+
+  - name: "Köldknäpp"
+    occurs: 1
+    days: 200
+    start_month: 10
+    end_month: 2
+    bonus_wind: 0
+    bonus_temp: -10
+    bonus_rain: 0
+
+  - name: "Värmevåg"
+    occurs: 1
+    days: 200
+    start_month: 4
+    end_month: 8
+    bonus_wind: 0
+    bonus_temp: 10
+    bonus_rain: 0
+
+  - name: "Molnklart"
+    occurs: 1
+    days: 50
+    bonus_wind: 0
+    bonus_temp: 0
+    bonus_rain: -100
+
+  - name: "Stjärnfall"
+    occurs: 1
+    days: 300
+    bonus_wind: 0
+    bonus_temp: 0
+    bonus_rain: 0
+
+  - name: "Hagel"
+    occurs: 1
+    days: 150
+    bonus_wind: 0
+    bonus_temp: 0
+    bonus_rain: 0
+    max_temp: 15
+
+  - name: "Komet"
+    occurs: 1
+    days: 300
+    bonus_wind: 0
+    bonus_temp: 0
+    bonus_rain: 0
+
+  - name: "Liten Magistorm"
+    follow_wind: 50
+    wander: 20
+    growth: 50
+    duration_min: 6
+    duration_max: 24
+    list:
+      - "Grundkrafter 5"
+      - "Elementarkrafter 5"
+      - "Himlakrafter 5"
+      - "Primalkrafter 5"
+      - "Livskrafter 5"
+      - "Symbolkrafter 5"
+    occurs: 1
+    days: 84
+    bonus_wind: 0
+    bonus_temp: 0
+    bonus_rain: 0
+
+  - name: "Magistorm"
+    follow_wind: 50
+    wander: 20
+    growth: 50
+    duration_min: 12
+    duration_max: 48
+    list:
+      - "Grundkrafter 10"
+      - "Elementarkrafter 10"
+      - "Himlakrafter 10"
+      - "Primalkrafter 10"
+      - "Livskrafter 10"
+      - "Symbolkrafter 10"
+    occurs: 1
+    days: 336
+    bonus_wind: 0
+    bonus_temp: 0
+    bonus_rain: 0
+
+  - name: "Kraftig Magistorm"
+    follow_wind: 50
+    wander: 20
+    growth: 50
+    duration_min: 12
+    duration_max: 72
+    list:
+      - "Grundkrafter 15"
+      - "Elementarkrafter 15"
+      - "Himlakrafter 15"
+      - "Primalkrafter 15"
+      - "Livskrafter 15"
+      - "Symbolkrafter 15"
+    occurs: 1
+    days: 672
+    bonus_wind: 0
+    bonus_temp: 0
+    bonus_rain: 0
+
+  - name: "Svår Magistorm"
+    follow_wind: 50
+    wander: 20
+    growth: 50
+    duration_min: 12
+    duration_max: 96
+    list:
+      - "Grundkrafter 20"
+      - "Elementarkrafter 20"
+      - "Himlakrafter 20"
+      - "Primalkrafter 20"
+      - "Livskrafter 20"
+      - "Symbolkrafter 20"
+    occurs: 1
+    days: 1344
+    bonus_wind: 0
+    bonus_temp: 0
+    bonus_rain: 0

@@ -1,0 +1,71 @@
+# Dödens hav: ungefär som Karibiska havet, med flera mycket farliga händelser.
+name: "Dödens hav"
+
+temperature:
+  jan: 25
+  feb: 25
+  mar: 26
+  apr: 27
+  may: 28
+  jun: 28
+  jul: 28
+  aug: 29
+  sep: 29
+  oct: 28
+  nov: 27
+  dec: 26
+
+temperature_drop: 2
+drop_speed: 0
+
+# Höjden (m ö.h.) som temperaturerna ovan gäller för. I 3D blir det 6,5° kallare per km över den.
+base_heat_height: 0
+
+precipitation:
+  jan: 0
+  feb: 0
+  mar: 0
+  apr: 0
+  may: 1
+  jun: 1
+  jul: 1
+  aug: 2
+  sep: 2
+  oct: 2
+  nov: 1
+  dec: 0
+
+shift: 0
+
+wind:
+  jan: 1
+  feb: 1
+  mar: 1
+  apr: 1
+  may: 1
+  jun: 1
+  jul: 1
+  aug: 1
+  sep: 2
+  oct: 2
+  nov: 1
+  dec: 1
+
+# Förhärskande vind (passadvind, ca 25° N): varifrån vinden oftast blåser
+# och hur stor del av dagarna (%). Övriga dagar: oftast en grannriktning, ibland vilken som helst.
+prevailing_wind: NE
+prevailing_chance: 60
+
+events:
+  - name: "Monstervåg"
+    occurs: 1
+    days: 10
+  - name: "Flytande rev"
+    occurs: 1
+    days: 15
+  - name: "Liten virvel"
+    occurs: 1
+    days: 15
+  - name: "Stor virvel"
+    occurs: 1
+    days: 25

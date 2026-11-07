@@ -1,0 +1,62 @@
+# Vindkusten: varmare än Vindarnas hav (+4 grader), med en kraftig vind som blåser MOT nordväst (alltså FRÅN sydost).
+name: "Vindkusten"
+
+temperature:
+  jan: 16
+  feb: 18
+  mar: 20
+  apr: 24
+  may: 28
+  jun: 26
+  jul: 22
+  aug: 20
+  sep: 19
+  oct: 16
+  nov: 14
+  dec: 13
+
+temperature_drop: 2
+drop_speed: 1
+
+# Höjden (m ö.h.) som temperaturerna ovan gäller för. I 3D blir det 6,5° kallare per km över den.
+base_heat_height: 0
+
+precipitation:
+  jan: 0
+  feb: -1
+  mar: -1
+  apr: -1
+  may: -1
+  jun: -1
+  jul: -1
+  aug: -1
+  sep: 0
+  oct: 0
+  nov: 1
+  dec: 0
+
+shift: 0
+
+wind:
+  jan: 6
+  feb: 6
+  mar: 5
+  apr: 5
+  may: 5
+  jun: 5
+  jul: 5
+  aug: 5
+  sep: 6
+  oct: 6
+  nov: 7
+  dec: 7
+
+# Förhärskande vind (kraftig vind mot nordväst, ca 8° S): varifrån vinden oftast blåser
+# och hur stor del av dagarna (%). Övriga dagar: oftast en grannriktning, ibland vilken som helst.
+prevailing_wind: SE
+prevailing_chance: 75
+
+events:
+  - name: "Drake"
+    occurs: 1
+    days: 1000
