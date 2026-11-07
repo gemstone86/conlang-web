@@ -54,8 +54,13 @@ restored from the newest backup), and backups are written to `./data/backups/` (
 
 These replace the separate apps' `CONLANG_*` and `EON_DB_*` / `EON_REGISTRATION` / `EON_SECURE_COOKIE` settings.
 
-**Moving from the two separate apps.** The combined app starts with a new, empty database (`data/hub.mv.db`);
-it does not read the old `data/conlangs.mv.db` or `data/eonweather.mv.db`, and accounts have to be made again.
+**Moving from the separate Root and Rune app.** In the old app (v0.24.3 or later), log in as admin and click
+**Export everything**: one JSON file with all accounts, worlds, languages, words, forms, sound changes, grammar, sounds,
+sentences, sharing, pending changes and undo history. In this app, register your account, then in Root and Rune click
+**Import everything** and pick the file. Accounts are matched by username: one that exists here keeps its password
+here, the others are created with their old passwords. Everything else keeps its ids. Importing replaces Root and
+Rune's data here (you're asked first if there is any); accounts are never deleted. The weather generator's data
+(notes, campaigns, own maps) isn't moved: it starts empty here.
 
 ## How it works
 
