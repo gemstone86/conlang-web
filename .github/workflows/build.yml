@@ -21,3 +21,8 @@ jobs:
         with:
           name: test-reports
           path: target/surefire-reports/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: root-and-rune-jar
+          path: target/root-and-rune.jar
+          retention-days: 7
