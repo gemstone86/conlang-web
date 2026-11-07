@@ -26,7 +26,7 @@ await page.click('[data-act=missMark][data-g=moon]'); await page.waitForTimeout(
 console.log('LIST:', (await text('#tabbody')).replace(/.*?Missing words \(/, 'Missing words (').slice(0, 400));
 await page.click('[data-act=missCoin][data-g=fire]'); await page.waitForSelector('#w_gloss');
 console.log('COIN prefill:', await page.inputValue('#w_gloss'), '/', await page.inputValue('#w_pos'), '| msg:', await text('#msg'));
-await page.fill('#w_form', 'pira'); await page.click('[data-act=addWord]'); await page.waitForTimeout(800);
+await page.fill('#w_form', 'pira'); await page.click('[data-act=saveWord]'); await page.waitForTimeout(800);
 await page.click('[data-act=tab][data-t=missing]'); await page.waitForSelector('#m_gloss');
 console.log('AFTER COIN:', (await text('#tabbody')).replace(/.*?Missing words \(/, 'Missing words (').slice(0, 300));
 await page.click('[data-act=missClear]'); await page.waitForTimeout(600); console.log('CLEAR:', await text('#msg'));
