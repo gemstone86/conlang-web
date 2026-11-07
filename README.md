@@ -51,6 +51,8 @@ restored from the newest backup), and backups are written to `./data/backups/` (
 | `EON_ADMINS` | `Gemstone,Gemstone86` | extra weather admins |
 | `EON_WORLD_DIR` | `world` | the weather generator's region and calendar files |
 | `EON_DB_BACKUP_HOURS` / `EON_DB_BACKUPS` | `6` / `14` | backup interval and how many to keep |
+| `EON_IMPORT` | `auto` | moving the old weather database in (below): `auto`, `force` or `off` |
+| `EON_IMPORT_FROM` | `eonweather.mv.db` next to the `DB_URL` file | the old weather database file |
 
 These replace the separate apps' `CONLANG_*` and `EON_DB_*` / `EON_REGISTRATION` / `EON_SECURE_COOKIE` settings.
 
@@ -59,8 +61,21 @@ These replace the separate apps' `CONLANG_*` and `EON_DB_*` / `EON_REGISTRATION`
 sentences, sharing, pending changes and undo history. In this app, register your account, then in Root and Rune click
 **Import everything** and pick the file. Accounts are matched by username: one that exists here keeps its password
 here, the others are created with their old passwords. Everything else keeps its ids. Importing replaces Root and
-Rune's data here (you're asked first if there is any); accounts are never deleted. The weather generator's data
-(notes, campaigns, own maps) isn't moved: it starts empty here.
+Rune's data here (you're asked first if there is any); accounts are never deleted.
+
+**Moving from the separate weather generator.** Its database is moved in by itself the first time this app starts:
+put the old `eonweather.mv.db` in the same folder as this app's database (`./data/` locally, `/home/data/` on Azure,
+where the old app already left it), or point `EON_IMPORT_FROM` at it. Everything comes along: accounts, maps with
+their anchors, height maps, rivers, roads, ranges, nations, forest, ice, leylines and high-magic areas, journeys,
+suggestions and votes, notes, campaigns, regions made in the app, symbols and the admin settings. Ids are kept.
+Accounts are matched by username (any letter case): one that exists here keeps its password here, the others are
+created with their old passwords (stored again in this app's format the first time they log in). If no account
+existed here yet, the weather admins (`EON_ADMINS`) become site admins.
+The old file is only read (a copy is opened), and the move runs in one transaction: if anything fails, nothing
+changes, the log says why, and the app starts anyway. It runs once (it leaves a note in the database), and it never
+replaces weather data people have already made here (notes, campaigns, own maps, journeys, suggestions); to replace it
+anyway, start once with `EON_IMPORT=force`, then set it back. `EON_IMPORT=off` turns it off. The standard map is
+updated to this version's right after.
 
 ## How it works
 

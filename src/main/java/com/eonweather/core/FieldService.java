@@ -41,12 +41,13 @@ public final class FieldService {
     /** The aspects grouped into their forces (from the old aspekt enum). */
     static final Map<String, String> FORCE_OF = new HashMap<>();
     static {
-        for (String a : List.of("Kronotropi", "Nomotropi", "Ataxatropi")) FORCE_OF.put(a, "Grundkrafter");
+        for (String a : List.of("Kronotropi", "Nomotropi", "Ataxatropi", "Topotropi")) FORCE_OF.put(a, "Grundkrafter");
         for (String a : List.of("Termotropi", "Kryotropi", "Fototropi", "Skototropi")) FORCE_OF.put(a, "Primalkrafter");
         for (String a : List.of("Pyrotropi", "Geotropi", "Pneumotropi", "Hydrotropi")) FORCE_OF.put(a, "Elementarkrafter");
         for (String a : List.of("Biotropi", "Nekrotropi")) FORCE_OF.put(a, "Livskrafter");
-        for (String a : List.of("Heliotropi", "Selenotropi", "Astrotropi")) FORCE_OF.put(a, "Himlakrafter");
-        FORCE_OF.put("Ikonotropi", "Symbolkrafter");
+        for (String a : List.of("Heliotropi", "Selenotropi", "Astrotropi", "Kosmotropi")) FORCE_OF.put(a, "Himlakrafter");
+        for (String a : List.of("Ikonotropi", "Semotropi")) FORCE_OF.put(a, "Symbolkrafter");
+        for (String a : List.of("Teotropi", "Psykotropi", "Daimotropi", "Oneirotropi")) FORCE_OF.put(a, "Själakrafter");
     }
 
     private final World world;
@@ -396,14 +397,15 @@ public final class FieldService {
     }
 
     static final List<String> ASPECT_ORDER = List.of(
-            "Kronotropi", "Nomotropi", "Ataxatropi",
+            "Kronotropi", "Nomotropi", "Ataxatropi", "Topotropi",
             "Termotropi", "Kryotropi", "Fototropi", "Skototropi",
             "Pyrotropi", "Geotropi", "Pneumotropi", "Hydrotropi",
             "Biotropi", "Nekrotropi",
-            "Heliotropi", "Selenotropi", "Astrotropi",
-            "Ikonotropi");
+            "Heliotropi", "Selenotropi", "Astrotropi", "Kosmotropi",
+            "Ikonotropi", "Semotropi",
+            "Teotropi", "Psykotropi", "Daimotropi", "Oneirotropi");
     static final List<String> FORCE_ORDER = List.of(
-            "Grundkrafter", "Primalkrafter", "Elementarkrafter", "Livskrafter", "Himlakrafter", "Symbolkrafter");
+            "Grundkrafter", "Primalkrafter", "Elementarkrafter", "Livskrafter", "Himlakrafter", "Symbolkrafter", "Själakrafter");
 
     /**
      * The aspect(s) that dominate a storm, used to pick its symbol:

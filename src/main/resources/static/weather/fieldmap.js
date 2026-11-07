@@ -72,6 +72,7 @@
   const FORCE_COLOURS = {
     Grundkrafter: "#d9d2ff", Primalkrafter: "#ff8296", Elementarkrafter: "#4fd6c4",
     Livskrafter: "#93df6a", Himlakrafter: "#7fb8ff", Symbolkrafter: "#f0a8ff",
+    Själakrafter: "#ffc76b",
   };
   const MAGIC_DEFAULT = "#a98bf2";
   const DIRS = { N: 0, NE: 45, E: 90, SE: 135, S: 180, SW: 225, W: 270, NW: 315 };
@@ -92,7 +93,9 @@
     Termotropi: "#e0505a", Kryotropi: "#3fb0a0", Fototropi: "#f4f1e6", Skototropi: "#0d0d12",
     Pyrotropi: "#ee8a33", Geotropi: "#a2703a", Pneumotropi: "#4cc6e6", Hydrotropi: "#4d6fd6",
     Biotropi: "#3fb34f", Nekrotropi: "#8f8f8f", Heliotropi: "#ffd23f", Selenotropi: "#c8c8ff",
-    Astrotropi: "#6a5ae0", Ikonotropi: "#9b5fc8",
+    Astrotropi: "#6a5ae0", Ikonotropi: "#9b5fc8", Topotropi: "#7a8f5c",
+    Teotropi: "#ffe9a8", Psykotropi: "#e57bb8", Daimotropi: "#b8322e", Oneirotropi: "#8fa7ff",
+    Kosmotropi: "#2f2b78", Semotropi: "#d98fd0",
   };
   const LEY_SAMPLES = 480;
 
