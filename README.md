@@ -23,6 +23,9 @@ Pages: `src/main/resources/static/` (start page), `static/rune/`, `static/weathe
 To build one jar: `mvn package`, then `java -jar target/root-and-rune.jar` (run it next to the `world/` folder, or the copy
 packed in the jar is used). Docker: `docker compose up -d --build`.
 
+**Publishing:** every merge into `main` is published to Azure App Service by the GitHub action *Deploy to Azure*, after
+the tests pass. Setup and the Azure settings: WEATHER.md, *Putting it on the internet*.
+
 **Accounts.** There is one account per person for both apps. The first account registered becomes the admin of
 both. Root and Rune needs you to be logged in; the weather generator can be used without logging in (logging in saves
 notes, campaigns and maps). Weather admins are the site admins plus any usernames in `EON_ADMINS` (default

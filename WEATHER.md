@@ -533,7 +533,14 @@ Web Server)**, **Linux**, plan **Basic B1** (the Free plan sleeps). Set `PORT` a
 above, `SECURE_COOKIE=true`, `WEBSITE_DISABLE_OVERLAPPED_RECYCLING=1`, turn on *Always on*, and upload the jar as in
 step 3. The first account registered becomes the admin.
 
-To update later: build a new jar (Eclipse: *Run As → Maven build…* → `clean package`) and repeat step 3.
+**Updates are published automatically:** whenever something is merged into `main`, the GitHub action *Deploy to Azure*
+(`.github/workflows/deploy.yml`) builds the jar, runs the tests, uploads it (only if they pass) and waits until the site
+answers with the new version. Set up once in GitHub (repo → *Settings → Secrets and variables → Actions*): the variable
+`AZURE_WEBAPP_NAME` (the web app's name) and the secret `AZURE_WEBAPP_PUBLISH_PROFILE` (Azure portal → the web app →
+*Overview → Download publish profile*, paste the whole file; if the button is greyed out, turn on *SCM Basic Auth
+Publishing Credentials* under *Settings → Configuration → General settings*). It can also be run by hand: *Actions →
+Deploy to Azure → Run workflow*. By hand without GitHub: build a new jar (Eclipse: *Run As → Maven build…* →
+`clean package`) and repeat step 3.
 
 **The database file** is `/home/data/hub.mv.db`. How the app looks after it (`DbGuard`, only for the built-in H2 file):
 - **One copy at a time.** File locks aren't reliable on App Service's `/home` network share, so a new version starting while the old one runs could write the file at the same time as the old one, which corrupts it. The copy using the file keeps `hub.owner` next to it (refreshed every 10 s); a new copy asks for the file (`hub.handover`), the old one closes the database cleanly and stops, and the new one takes over (waiting at most 2½ minutes). `WEBSITE_DISABLE_OVERLAPPED_RECYCLING=1` avoids the overlap in the first place.

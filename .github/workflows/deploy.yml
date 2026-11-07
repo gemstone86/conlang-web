@@ -1,0 +1,76 @@
+# Publishes the app to Azure App Service whenever something lands on main (a merged pull request or a push),
+# or by hand: Actions → Deploy to Azure → Run workflow.
+#
+# Set up once (repo → Settings → Secrets and variables → Actions):
+#   Variables tab → New repository variable:  AZURE_WEBAPP_NAME = the web app's name (the <name> in <name>.azurewebsites.net)
+#   Secrets tab   → New repository secret:    AZURE_WEBAPP_PUBLISH_PROFILE = the whole publish profile file
+#     (Azure portal → the web app → Overview → Download publish profile. If that button is greyed out:
+#      Settings → Configuration → General settings → turn on "SCM Basic Auth Publishing Credentials", save, try again.)
+
+name: Deploy to Azure
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# one deployment at a time; a newer one waits instead of overlapping (the database file allows one app copy at a time)
+concurrency:
+  group: deploy-azure
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: ${{ steps.deploy.outputs.webapp-url }}
+    steps:
+      - name: Check the setup
+        env:
+          APP: ${{ vars.AZURE_WEBAPP_NAME }}
+          PROFILE: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+        run: |
+          if [ -z "$APP" ] || [ -z "$PROFILE" ]; then
+            echo "::error::Not set up yet: add the repository variable AZURE_WEBAPP_NAME and the secret AZURE_WEBAPP_PUBLISH_PROFILE (see the top of .github/workflows/deploy.yml)."
+            exit 1
+          fi
+
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+
+      # with the tests: a version that fails them is never published
+      - name: Build and test
+        run: mvn -B package
+
+      - name: Version
+        id: version
+        run: echo "version=$(mvn -q -DforceStdout help:evaluate -Dexpression=project.version)" >> "$GITHUB_OUTPUT"
+
+      - name: Deploy the jar
+        id: deploy
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ vars.AZURE_WEBAPP_NAME }}
+          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+          package: target/root-and-rune.jar
+          type: JAR
+
+      # the new copy takes the database over from the old one (up to a few minutes), then answers with its version
+      - name: Wait until the new version answers
+        env:
+          URL: ${{ steps.deploy.outputs.webapp-url }}
+          WANT: ${{ steps.version.outputs.version }}
+        run: |
+          URL="${URL%/}"
+          for i in $(seq 40); do
+            GOT=$(curl -sf --max-time 20 "$URL/rune/api/version" | sed -n 's/.*"version":"\([^"]*\)".*/\1/p' || true)
+            if [ "$GOT" = "$WANT" ]; then echo "Version $GOT is live at $URL"; exit 0; fi
+            echo "waiting… (server says: ${GOT:-no answer yet})"; sleep 15
+          done
+          echo "::error::$URL did not answer with version $WANT within 10 minutes. Check the web app's Log stream in Azure."
+          exit 1
