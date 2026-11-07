@@ -39,7 +39,8 @@
   .app:hover, .app:focus-visible { transform: translateY(-3px); box-shadow: 0 10px 30px rgba(0,0,0,.35); outline: none; }
   .app.rune:hover, .app.rune:focus-visible { border-color: var(--moss); }
   .app.weather:hover, .app.weather:focus-visible { border-color: var(--sky); }
-  .app .glyph { width: 52px; height: 52px; margin-bottom: .4rem; }
+  .app .glyph { width: 64px; height: 64px; margin-bottom: .3rem; }
+  .app img.logo { width: auto; align-self: flex-start; }
   .app h2 { font: 400 1.7rem/1.1 var(--serif); margin: 0; }
   .app.rune h2 { color: #a9d1b5; }
   .app.weather h2 { color: #b5d6ee; }
@@ -90,9 +91,7 @@
 <main>
   <nav class="apps" aria-label="Apps">
     <a class="app rune" href="/rune/">
-      <svg class="glyph" viewBox="0 0 52 52" aria-hidden="true" fill="none" stroke="#a9d1b5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M26 6v40M26 16l-9-8M26 16l9-8M26 30l-11 8M26 30l11 8M26 46l-6 4M26 46l6 4"/>
-      </svg>
+      <img class="glyph logo" src="rune/logo-light.png" alt="">
       <span class="go" aria-hidden="true">&#8594;</span>
       <h2>Root and Rune</h2>
       <p>Build constructed languages: dictionaries, sound changes over time, grammar and language families.</p>
