@@ -75,7 +75,7 @@ public class EonWeatherConfig {
             WeatherImport.Result r = WeatherImport.run(ds, old, mode.equals("force"), admins);
             if (r.imported()) System.out.println("Weather import: " + r.message() + ": " + r.rows() + "; accounts created "
                     + r.accountsCreated() + ", matched " + r.accountsMatched());
-            else if (from != null && !from.isBlank() || !r.message().startsWith("no old")) System.out.println("Weather import: skipped, " + r.message());
+            else System.out.println("Weather import: skipped, " + r.message());
         } catch (Exception e) {
             // the app still starts (with the weather data it has); nothing was changed
             System.err.println("Weather import FAILED (nothing changed): " + e);
