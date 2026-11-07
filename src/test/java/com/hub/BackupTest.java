@@ -124,7 +124,9 @@ class BackupTest {
 
         // new rows get ids after the imported ones
         JsonNode nw = om.readTree(post(moved, "/rune/api/worlds", "{\"name\":\"After\"}", false).body());
-        assertTrue(nw.path("id").asLong() > branch, nw.toString());
+        assertTrue(nw.path("id").asLong() > world, nw.toString());
+        JsonNode nl = om.readTree(post(moved, "/rune/api/languages", "{\"worldId\":" + world + ",\"name\":\"Later\"}", false).body());
+        assertTrue(nl.path("id").asLong() > branch, nl.toString());
         HttpResponse<String> w2 = post(moved, "/rune/api/languages/" + proto + "/edit",
                 "{\"entity\":\"word\",\"action\":\"CREATE\",\"payload\":{\"gloss\":\"fire\",\"form\":\"pira\",\"year\":0}}", false);
         assertEquals(200, w2.statusCode(), w2.body());
