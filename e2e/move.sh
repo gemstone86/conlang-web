@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
+# Account ids differ between the apps (accounts are matched by name), so they're left out of the comparisons.
 # Fills the separate Root and Rune (v0.24.3, port 8081) with data, exports it, imports it into the combined app
 # (port 8080) and checks that everything arrived.
 set -euo pipefail
 OLD=http://localhost:8081; NEW=http://localhost:8080
+NOIDS='walk(if type == "object" then del(.author_id, .owner_id, .user_id, .decided_by, .world_owner) else . end)'
 j() { curl -sf -H 'Content-Type: application/json' "$@"; }
 po() { j -b old-$1.txt -c old-$1.txt -X POST "$OLD$2" -d "$3"; }
 go() { curl -sf -b old-$1.txt "$OLD$2"; }
@@ -21,8 +23,8 @@ po gem /api/languages/$P/sentences '{"source":"water","year":0,"translation":"Wa
 po gem /api/shares "{\"scope\":\"LANGUAGE\",\"targetId\":$B,\"username\":\"Friend\",\"level\":\"EDITOR\"}" >/dev/null
 po fr /api/languages/$B/edit '{"entity":"word","action":"CREATE","payload":{"gloss":"sky","form":"sema","year":700}}' >/dev/null  # waits for approval
 
-for L in $P $B; do for what in words rules formrules sentences changes; do go gem /api/languages/$L/$what | jq -S . > old-$L-$what.json; done; done
-go fr /api/worlds | jq -S . > old-friend-worlds.json
+for L in $P $B; do for what in words rules formrules sentences changes; do go gem /api/languages/$L/$what | jq -S "$NOIDS" > old-$L-$what.json; done; done
+go fr /api/worlds | jq -S "$NOIDS" > old-friend-worlds.json
 curl -sf -b old-gem.txt "$OLD/api/admin/export-all" -o export.json
 echo "export: $(wc -c < export.json) bytes, tables: $(jq -c '.tables | map_values(.rows | length)' export.json)"
 
@@ -33,12 +35,12 @@ jq -e '.warnings == [] and .usersCreated == ["Friend"] and .usersMatched == ["Ge
 
 fail=0
 for L in $P $B; do for what in words rules formrules sentences changes; do
-  curl -sf -b new-gem.txt "$NEW/rune/api/languages/$L/$what" | jq -S . > new-$L-$what.json
-  if diff -q old-$L-$what.json new-$L-$what.json >/dev/null; then echo "same: language $L $what ($(jq length new-$L-$what.json))"; else echo "DIFFERENT: language $L $what"; diff old-$L-$what.json new-$L-$what.json | head -20; fail=1; fi
+  curl -sf -b new-gem.txt "$NEW/rune/api/languages/$L/$what" | jq -S "$NOIDS" > new-$L-$what.json
+  if diff -q old-$L-$what.json new-$L-$what.json >/dev/null; then echo "same: language $L $what ($(jq length new-$L-$what.json))"; else echo "DIFFERENT: language $L $what"; diff old-$L-$what.json new-$L-$what.json | head -20 || true; fail=1; fi
 done; done
 j -c new-fr.txt -X POST $NEW/api/auth/login -d '{"username":"Friend","password":"friends-pass"}' >/dev/null && echo "Friend logs in with the old password"
-curl -sf -b new-fr.txt $NEW/rune/api/worlds | jq -S . > new-friend-worlds.json
-diff -q old-friend-worlds.json new-friend-worlds.json >/dev/null && echo "same: Friend's shared languages" || { echo "DIFFERENT: Friend's worlds"; diff old-friend-worlds.json new-friend-worlds.json | head; fail=1; }
+curl -sf -b new-fr.txt $NEW/rune/api/worlds | jq -S "$NOIDS" > new-friend-worlds.json
+diff -q old-friend-worlds.json new-friend-worlds.json >/dev/null && echo "same: Friend's shared languages" || { echo "DIFFERENT: Friend's worlds"; diff old-friend-worlds.json new-friend-worlds.json | head || true; fail=1; }
 # the approval waiting from Friend can be approved in the combined app
 CH=$(jq '.[0].id' new-$B-changes.json)
 curl -sf -b new-gem.txt -X POST $NEW/rune/api/changes/$CH/approve >/dev/null && echo "approved Friend's pending word"
