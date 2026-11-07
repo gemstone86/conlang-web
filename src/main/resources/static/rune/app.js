@@ -28,7 +28,7 @@ function logShell() {
   const f = S.logFilter, opt = (v, t, cur) => `<option value="${v}" ${cur === v ? 'selected' : ''}>${t}</option>`;
   return `<div class="card"><h2>Log</h2>
     <div class="row"><select id="lg_level">${opt('', 'All levels', f.level)}${opt('WARN', 'Warnings and errors', f.level)}${opt('ERROR', 'Errors only', f.level)}</select>
-    <select id="lg_cat">${opt('', 'All categories', f.category)}${['api', 'auth', 'edit', 'import', 'share', 'system'].map(c => opt(c, c, f.category)).join('')}</select>
+    <select id="lg_cat">${opt('', 'All categories', f.category)}${['api', 'auth', 'edit', 'export', 'import', 'share', 'system'].map(c => opt(c, c, f.category)).join('')}</select>
     <input id="lg_q" placeholder="Search message, request, user…" size="30" value="${esc(f.q)}">
     <button class="primary" data-act="logSearch">Search</button><button data-act="logSearch">Refresh</button>
     <label style="display:inline;margin:0"><input type="checkbox" id="lg_auto" data-logauto="1" ${S.logTimer ? 'checked' : ''}> auto-refresh (10 s)</label>
@@ -73,7 +73,7 @@ async function loadWorlds() {
 }
 function render() {
   $('#who').innerHTML = S.me ? esc(S.me.username) + (S.me.is_admin ? ' <span class="badge">admin</span>' : '') +
-    (S.me.is_admin ? ` <button data-act="page" data-p="work" class="${S.page === 'log' ? '' : 'primary'}">Workspace</button> <button data-act="page" data-p="log" class="${S.page === 'log' ? 'primary' : ''}">Log</button> <button data-act="resetCode">Issue reset code</button>` : '') + ' <button data-act="logout">Log out</button>' : '';
+    (S.me.is_admin ? ` <button data-act="page" data-p="work" class="${S.page === 'log' ? '' : 'primary'}">Workspace</button> <button data-act="page" data-p="log" class="${S.page === 'log' ? 'primary' : ''}">Log</button> <button data-act="resetCode">Issue reset code</button> <button data-act="exportAll" title="All worlds, languages, words, rules, forms, grammar, sounds, sentences, sharing and accounts, as one file">Export everything</button> <button data-act="importAll" title="Read an Export everything file (e.g. from the separate Root and Rune app). Replaces Root and Rune's data here.">Import everything</button>` : '') + ' <button data-act="logout">Log out</button>' : '';
   if (!S.me) { location.href = '/?next=' + encodeURIComponent(location.pathname); return; }
   if (S.me.is_admin && S.page === 'log') { $('#app').innerHTML = logShell(); loadLog(true); return; }
   $('#app').innerHTML = '<div class="layout"><div class="card tree" id="side">' + sideView() + '</div><div id="panel">' +
@@ -600,6 +600,36 @@ const TPL = {
 // ---------- actions ----------
 const A = {
   logout: async () => { await api('POST', '/api/auth/logout'); location.href = '/'; },
+  exportAll: async () => { location.href = '/rune/api/admin/export-all'; },
+  importAll: async () => {
+    const file = await new Promise(res => {
+      const inp = document.createElement('input'); inp.type = 'file'; inp.accept = '.json,application/json';
+      inp.onchange = () => res(inp.files[0] || null); inp.click();
+    });
+    if (!file) return;
+    const send = async replace => {
+      const fd = new FormData(); fd.append('file', file); if (replace) fd.append('replace', 'true');
+      const res = await fetch('/rune/api/admin/import-all', { method: 'POST', body: fd });
+      let data = null; try { data = await res.json(); } catch (e) { /* no body */ }
+      return { res, data };
+    };
+    say('Importing ' + file.name + '…');
+    let { res, data } = await send(false);
+    if (res.status === 409) {
+      if (!confirm(data.error + '\n\nDelete all worlds, languages and everything in them here, and import the file instead? Accounts are kept.')) { say(''); return; }
+      ({ res, data } = await send(true));
+    }
+    if (!res.ok) throw new Error((data && (data.error || data.message)) || ('Import failed (' + res.status + ')'));
+    const c = data.counts || {};
+    alert('Imported from Root and Rune ' + (data.from || '?') + ':\n\n'
+      + (c.worlds || 0) + ' worlds, ' + (c.languages || 0) + ' languages, ' + (c.words || 0) + ' words, ' + (c.rules || 0) + ' sound changes, '
+      + (c.word_forms || 0) + ' word forms, ' + (c.form_rules || 0) + ' form rules, ' + (c.sentences || 0) + ' sentences.\n\n'
+      + 'Accounts created (their old passwords work): ' + (data.usersCreated.join(', ') || 'none') + '\n'
+      + 'Accounts that already existed here (passwords here kept): ' + (data.usersMatched.join(', ') || 'none')
+      + (data.warnings.length ? '\n\nNotes:\n' + data.warnings.join('\n') : ''));
+    S.lang = null; say('');
+    await boot();
+  },
   resetCode: async () => {
     const u = prompt('Username to issue a reset code for:'); if (!u) return;
     const r = await api('POST', '/rune/api/admin/reset-code', { username: u });
