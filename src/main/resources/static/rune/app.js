@@ -28,7 +28,7 @@ function logShell() {
   const f = S.logFilter, opt = (v, t, cur) => `<option value="${v}" ${cur === v ? 'selected' : ''}>${t}</option>`;
   return `<div class="card"><h2>Log</h2>
     <div class="row"><select id="lg_level">${opt('', 'All levels', f.level)}${opt('WARN', 'Warnings and errors', f.level)}${opt('ERROR', 'Errors only', f.level)}</select>
-    <select id="lg_cat">${opt('', 'All categories', f.category)}${['api', 'auth', 'edit', 'export', 'import', 'share', 'system'].map(c => opt(c, c, f.category)).join('')}</select>
+    <select id="lg_cat">${opt('', 'All categories', f.category)}${['api', 'auth', 'connector', 'edit', 'export', 'import', 'share', 'system'].map(c => opt(c, c, f.category)).join('')}</select>
     <input id="lg_q" placeholder="Search message, request, user…" size="30" value="${esc(f.q)}">
     <button class="primary" data-act="logSearch">Search</button><button data-act="logSearch">Refresh</button>
     <label style="display:inline;margin:0"><input type="checkbox" id="lg_auto" data-logauto="1" ${S.logTimer ? 'checked' : ''}> auto-refresh (10 s)</label>
@@ -57,6 +57,33 @@ function drawLog(more) {
 }
 function stopLogTimer() { if (S.logTimer) { clearInterval(S.logTimer); S.logTimer = null; } }
 
+// ---------- Claude connector (admin) ----------
+async function connectorPage() {
+  const [keys, users] = await Promise.all([api('GET', '/rune/api/admin/connector-keys'), api('GET', '/rune/api/admin/users')]);
+  const fresh = S.connectorNew;
+  S.connectorNew = null;
+  $('#app').innerHTML = `<div class="card narrow" style="max-width:860px"><h2>Claude connector</h2>
+  <p>Lets Claude (claude.ai) read your languages and weather data, so it can look things up while helping you: words, sound
+  changes, word histories, missing words, sentences, and the weather generator's regions, days, maps and notes. It can't change anything.</p>
+  <p>Each connector address acts as one account and sees exactly what that account sees. Safest: register an account for it on
+  the start page (e.g. <em>Claude</em>) and share the worlds or languages it should read with it as <em>viewer</em>.
+  Or pick your own account to let it see everything you see.</p>
+  ${fresh ? `<div class="card pending"><strong>New connector address for ${esc(fresh.username)}</strong> (shown only now, copy it):
+    <div class="row"><input id="cn_url" value="${esc(fresh.url)}" readonly size="70" onclick="this.select()"><button data-act="connectorCopy">Copy</button></div>
+    <ol class="small"><li>In claude.ai open <strong>Settings → Connectors</strong> and click <strong>Add custom connector</strong>.</li>
+    <li>Give it a name (e.g. <em>Root and Rune</em>), paste the address as the URL and add it.</li>
+    <li>In a chat, turn the connector on in the tools menu, and ask away.</li></ol>
+    <p class="small muted">Anyone with the address can read what that account can see, so keep it to yourself. Revoke it below if it leaks.</p></div>` : ''}
+  <h3>Make an address</h3>
+  <div class="row"><select id="cn_user">${users.map(u => `<option value="${esc(u.username)}" ${u.username.toLowerCase() === 'claude' ? 'selected' : ''}>${esc(u.username)}${u.is_admin ? ' (admin)' : ''}</option>`).join('')}</select>
+  <input id="cn_label" placeholder="label, e.g. claude.ai" size="20"><button class="primary" data-act="connectorCreate">Make connector address</button></div>
+  <h3>Addresses in use</h3>` + (keys.length ? `<table><tr><th>#</th><th>Account</th><th>Label</th><th>Made</th><th>Last used</th><th>Calls</th><th></th></tr>` +
+    keys.map(k => `<tr><td class="muted small">${k.id}</td><td>${esc(k.username)}</td><td>${esc(k.label || '')}</td><td class="small">${esc(String(k.created || '').slice(0, 16).replace('T', ' '))}</td>
+      <td class="small">${k.last_used ? esc(String(k.last_used).slice(0, 16).replace('T', ' ')) : '<span class="muted">never</span>'}</td><td>${k.calls}</td>
+      <td><button class="danger" data-act="connectorRevoke" data-id="${k.id}">Revoke</button></td></tr>`).join('') + '</table>'
+    : '<p class="muted">None yet.</p>') + '<p class="small muted">Every call is in the Log (category <em>connector</em>).</p></div>';
+}
+
 // ---------- boot ----------
 async function boot() {
   const r = await api('GET', '/api/auth/me');
@@ -73,9 +100,10 @@ async function loadWorlds() {
 }
 function render() {
   $('#who').innerHTML = S.me ? esc(S.me.username) + (S.me.is_admin ? ' <span class="badge">admin</span>' : '') +
-    (S.me.is_admin ? ` <button data-act="page" data-p="work" class="${S.page === 'log' ? '' : 'primary'}">Workspace</button> <button data-act="page" data-p="log" class="${S.page === 'log' ? 'primary' : ''}">Log</button> <button data-act="resetCode">Issue reset code</button> <button data-act="exportAll" title="All worlds, languages, words, rules, forms, grammar, sounds, sentences, sharing and accounts, as one file">Export everything</button> <button data-act="importAll" title="Read an Export everything file (e.g. from the separate Root and Rune app). Replaces Root and Rune's data here.">Import everything</button>` : '') + ' <button data-act="logout">Log out</button>' : '';
+    (S.me.is_admin ? ` <button data-act="page" data-p="work" class="${['log', 'connector'].includes(S.page) ? '' : 'primary'}">Workspace</button> <button data-act="page" data-p="log" class="${S.page === 'log' ? 'primary' : ''}">Log</button> <button data-act="page" data-p="connector" class="${S.page === 'connector' ? 'primary' : ''}" title="Let Claude read your languages and weather data">Claude connector</button> <button data-act="resetCode">Issue reset code</button> <button data-act="exportAll" title="All worlds, languages, words, rules, forms, grammar, sounds, sentences, sharing and accounts, as one file">Export everything</button> <button data-act="importAll" title="Read an Export everything file (e.g. from the separate Root and Rune app). Replaces Root and Rune's data here.">Import everything</button>` : '') + ' <button data-act="logout">Log out</button>' : '';
   if (!S.me) { location.href = '/?next=' + encodeURIComponent(location.pathname); return; }
   if (S.me.is_admin && S.page === 'log') { $('#app').innerHTML = logShell(); loadLog(true); return; }
+  if (S.me.is_admin && S.page === 'connector') { $('#app').innerHTML = '<div class="card">Loading…</div>'; connectorPage().catch(e => say(e.message, true)); return; }
   $('#app').innerHTML = '<div class="layout"><div class="card tree" id="side">' + sideView() + '</div><div id="panel">' +
     (S.lang ? '<div class="card" id="panelbody">Loading…</div>' : '<div class="card"><h2>Welcome</h2><p>Create a world, then a language in it. Pick a language on the left to work on it.</p></div>') + '</div></div>';
   if (S.lang) renderPanel();
@@ -162,13 +190,14 @@ const TAB = {
   async rules() {
     if (!S.ruleScope) { try { S.ruleScope = localStorage.getItem('ruleScope') || 'branches'; } catch (x) { S.ruleScope = 'branches'; } }
     const scope = S.ruleScope;
-    const rules = S.rules = await api('GET', base() + '/rules?scope=' + scope);
+    const [rules, versions] = await Promise.all([api('GET', base() + '/rules?scope=' + scope), api('GET', base() + '/rule-versions').catch(() => [])]);
+    S.rules = rules; S.ruleVersions = versions;
     const targets = [S.lang, ...descendants(S.lang)].filter(l => l.level >= 2);
     const seg = (v, t) => `<button data-act="ruleScope" data-v="${v}" class="${scope === v ? 'primary' : ''}">${t}</button>`;
     let h = `<div class="row"><span class="small muted">Show</span> ${seg('self', 'only ' + esc(S.lang.name))} ${seg('branches', esc(S.lang.name) + ' + all its branches')} ${seg('path', 'full path (ancestors + ' + esc(S.lang.name) + ')')}
       <span class="small muted">${rules.length} rule${rules.length === 1 ? '' : 's'}</span></div>`;
     h += `<div class="card"><div class="row"><a href="/rune/api/languages/${S.lang.id}/rules/export.json?scope=${scope}"><button>Export these sound changes (JSON)</button></a>
-      ${canEdit() ? `<input type="file" id="ri_file" accept=".json,application/json"><label style="display:inline;margin:0"><input type="checkbox" id="ri_rm"> remove rules that are missing from the file</label>
+      ${canEdit() ? `<input type="file" id="ri_file" accept=".json,application/json"><input id="ri_tag" placeholder="tag all imported (optional)" size="22" list="r_taglist" title="Every sound change in the file gets this tag (or several, comma separated), on top of its own tags"><label style="display:inline;margin:0"><input type="checkbox" id="ri_rm"> remove rules that are missing from the file</label>
       <button data-act="ruleImportCheck">Check file</button>` : ''}</div>
       <div class="muted small">Edit the exported file and import it again: a rule with its id is adjusted, a rule without an id is added, <code>"delete": true</code> removes it. Nothing is changed until you have seen the check and pressed Apply.</div><div id="ri_out"></div></div>`;
     if (targets.length || rules.some(r => r.level >= 2)) h += `<div class="card"><div class="row"><label style="margin:0">Apply to</label>
@@ -178,12 +207,18 @@ const TAB = {
       <option value="haplology">Haplology</option><option value="geminate">Geminate simplification</option><option value="cluster">Cluster reduction</option></select>
       <input id="r_year" type="number" placeholder="year" size="6"><input id="r_ord" type="number" placeholder="order" size="4" value="0">
       <input id="r_name" placeholder="name"><input id="r_pat" placeholder="pattern (regex, {V} classes, # = word edge)" size="34" class="form">
-      <input id="r_rep" placeholder="replacement ($1)" size="14" class="form"><input id="r_id" type="hidden"></div>
+      <input id="r_rep" placeholder="replacement ($1)" size="14" class="form">
+      <input id="r_tags" placeholder="tags, e.g. vowel shift, experimental" size="26" list="r_taglist"><datalist id="r_taglist">${ruleTagList(rules).map(t => `<option value="${esc(t.tag)}">`).join('')}</datalist><input id="r_id" type="hidden"></div>
       <div class="row"><button data-act="previewRule">Preview effect</button><button class="primary" data-act="addRule" id="r_btn">Add rule</button><button data-act="cancelRule" id="r_cancel" hidden>Cancel edit</button>
       <span class="muted small">A rule on a branch only affects that branch and its own branches. Define classes like V=aeiou in Settings.</span></div><div id="rprev"></div></div>`;
-    h += '<table><tr><th>Year</th><th>Language</th><th>Order</th><th>Name</th><th>Pattern</th><th>Replacement</th><th></th></tr>';
-    for (const r of rules) h += `<tr><td>${r.year}</td><td>${esc(r.lang_name)}</td><td>${r.ord}</td><td>${esc(r.name)}</td><td class="form">${esc(r.pattern)}</td><td class="form">${esc(r.replacement)}</td>
+    h += ruleVersionsCard(versions);
+    h += ruleTagBar(rules);
+    const shown = S.ruleTag ? rules.filter(r => ruleTags(r).some(t => t.toLowerCase() === S.ruleTag)) : rules;
+    h += '<table><tr><th>Year</th><th>Language</th><th>Order</th><th>Name</th><th>Pattern</th><th>Replacement</th><th>Tags</th><th></th></tr>';
+    for (const r of shown) h += `<tr class="${r.off ? 'ruleoff' : ''}" ${r.off ? `title="Switched off in ${esc(r.off_in)}: left out when words evolve"` : ''}><td>${r.year}</td><td>${esc(r.lang_name)}</td><td>${r.ord}</td><td>${esc(r.name)}${r.off ? ' <span class="badge">off</span>' : ''}</td><td class="form">${esc(r.pattern)}</td><td class="form">${esc(r.replacement)}</td>
+      <td>${ruleTags(r).map(t => `<a class="tagchip small${S.ruleTag === t.toLowerCase() ? ' on' : ''}" data-act="ruleTagFilter" data-t="${esc(t)}">${esc(t)}</a>`).join(' ')}</td>
       <td>${r.level >= 2 ? `<button data-act="editRule" data-id="${r.id}">Edit</button> <button class="danger" data-act="delRule" data-id="${r.id}">✕</button>` : ''}</td></tr>`;
+    if (!shown.length) h += `<tr><td colspan="8" class="muted">${S.ruleTag ? 'No sound changes with that tag here.' : 'No sound changes yet.'}</td></tr>`;
     return h + '</table>';
   },
   async grammar() {
@@ -272,9 +307,15 @@ const TAB = {
   },
   async compound() {
     if (!canEdit()) return '<p class="muted">Editors only.</p>';
-    return `<p class="muted small">Join existing words (by exact gloss) and literal pieces with +. Example: <code>hand + leaf</code>. Erosion uses the steps in Settings.</p>
-    <div class="row"><input id="c_gloss" placeholder="gloss of the new word"><input id="c_parts" placeholder="part + part + part" size="40">
-    <button class="primary" data-act="compPrev">Erode</button></div><div id="cprev"></div>`;
+    let miss = { entries: [], fromSentences: [] };
+    try { miss = S.missing = await api('GET', base() + '/missing'); } catch (e) { /* the side list is optional */ }
+    return `<div class="compwrap"><div class="compmain">
+    <p class="muted small">Join existing words (by exact gloss) and literal pieces with +. Example: <code>hand + leaf</code>. Erosion uses the steps in Settings.
+    Pick a meaning from the missing words on the right to coin the compound for it.</p>
+    <div class="row"><input id="c_gloss" placeholder="gloss of the new word" value="${esc(S.compPick ? S.compPick.g : '')}"><input id="c_pos" placeholder="type" size="8" value="${esc(S.compPick ? S.compPick.p : '')}">
+    <input id="c_parts" placeholder="part + part + part" size="40">
+    <button class="primary" data-act="compPrev">Erode</button></div><div id="cprev"></div></div>
+    <aside class="card compside"><h3>Missing words</h3><input id="c_missq" placeholder="filter" size="16"><div id="c_misslist">${compMissList(miss)}</div></aside></div>`;
   },
   async missing() {
     const r = S.missing = await api('GET', base() + '/missing');
@@ -294,7 +335,7 @@ const TAB = {
       r.entries.map(e => `<tr class="${e.word ? 'muted' : ''}"><td><strong>${esc(e.gloss)}</strong></td><td>${esc(e.pos || '')}</td><td>${esc(e.notes || '')}</td>
         <td class="small muted">${esc(e.created_by_name || '')}${e.created ? ' · ' + esc(String(e.created).slice(0, 10)) : ''}</td>
         <td>${e.word ? `✓ now <span class="form">${esc(e.word.form)}</span> <a data-act="openWord" data-id="${e.word.id}" style="cursor:pointer" class="small">#${e.word.id}</a>`
-          : (canEdit() ? `<button class="primary" data-act="missCoin" data-g="${esc(e.gloss)}" data-p="${esc(e.pos || '')}">Coin word</button>` : '')}
+          : (canEdit() ? `<button class="primary" data-act="missCoin" data-g="${esc(e.gloss)}" data-p="${esc(e.pos || '')}">Coin word</button> <button data-act="missCompound" data-g="${esc(e.gloss)}" data-p="${esc(e.pos || '')}" title="Make it a compound of existing words">Compound</button>` : '')}
         ${canEdit() ? ` <button class="danger" data-act="missDel" data-id="${e.id}" title="Remove from the list">✕</button>` : ''}</td></tr>`).join('') + '</table>'
       : '<p class="muted">Nothing marked as missing.</p>';
     if (filled.length && canEdit()) h += `<div class="row"><button data-act="missClear">Remove the ${filled.length} that have a word now</button></div>`;
@@ -627,6 +668,65 @@ const TPL = {
   geminate: ['({C})\\1', '$1'], cluster: ['({C})({C})(?={C})', '$2']
 };
 
+// ---------- sound changes: tags and versions ----------
+const ruleTags = r => (r.tags || '').split(',').map(t => t.trim()).filter(Boolean);
+function ruleTagList(rules) {
+  const m = new Map();
+  for (const r of rules) for (const t of ruleTags(r)) { const k = t.toLowerCase(); const e = m.get(k) || { tag: t, n: 0, off: 0 }; e.n++; if (r.off) e.off++; m.set(k, e); }
+  for (const t of (S.lang.off_tags || '').split(',').map(x => x.trim()).filter(Boolean)) if (!m.has(t.toLowerCase())) m.set(t.toLowerCase(), { tag: t, n: 0, off: 0 });
+  return [...m.values()].sort((a, b) => a.tag.localeCompare(b.tag));
+}
+function ruleTagBar(rules) {
+  const tags = ruleTagList(rules);
+  if (!tags.length) return '';
+  const ownOff = new Set((S.lang.off_tags || '').split(',').map(x => x.trim().toLowerCase()).filter(Boolean));
+  return `<div class="card"><div class="row"><strong>Tags</strong> <span class="small muted">click one to show only those sound changes${isOwner() ? '; switching a tag off leaves its sound changes out (here and in all branches) until you switch it on again' : ''}</span>
+    ${S.ruleTag ? '<button data-act="ruleTagFilter" data-t="">Show all</button>' : ''}</div><div class="row">` + tags.map(t => {
+      const k = t.tag.toLowerCase(), mine = ownOff.has(k), inherited = !mine && t.off > 0;
+      return `<span class="tagbox${mine || inherited ? ' isoff' : ''}"><a class="tagchip${S.ruleTag === k ? ' on' : ''}" data-act="ruleTagFilter" data-t="${esc(t.tag)}">${esc(t.tag)} <span class="small">(${t.n})</span></a>`
+        + (mine ? ' <span class="small">off</span>' : inherited ? ' <span class="small" title="Switched off in a parent language">off above</span>' : '')
+        + (isOwner() && !inherited ? ` <button class="small" data-act="ruleTagSwitch" data-t="${esc(t.tag)}" data-off="${mine ? 'false' : 'true'}">${mine ? 'Switch on' : 'Switch off'}</button>` : '') + '</span>';
+    }).join(' ') + '</div></div>';
+}
+function ruleVersionsCard(versions) {
+  const when = v => esc(String(v.created || '').slice(0, 16).replace('T', ' '));
+  return `<details class="card" ${S.ruleVersionsOpen ? 'open' : ''} data-versions="1"><summary><strong>Versions</strong> <span class="small muted">(${versions.length}) save ${esc(S.lang.name)}'s sound changes as they are now, compare and restore</span></summary>
+    ${canEdit() ? `<div class="row"><input id="rv_name" placeholder="name, e.g. before the vowel shift" size="28"><input id="rv_note" placeholder="note (optional)" size="34">
+      <button class="primary" data-act="ruleVersionSave">Save version</button></div>` : ''}
+    <p class="small muted">A version holds ${esc(S.lang.name)}'s own sound changes (not its branches') and the tags switched off in it.${isOwner() ? ' Restoring one first saves the sound changes as they are now as a version, so you can always go back.' : ''}</p>`
+    + (versions.length ? '<table><tr><th>Name</th><th>Note</th><th>Saved</th><th>Rules</th><th></th></tr>' + versions.map(v => `<tr><td><strong>${esc(v.name)}</strong></td><td class="small">${esc(v.note || '')}</td>
+      <td class="small">${when(v)} · ${esc(v.created_by_name || '')}</td><td>${v.rule_count}</td>
+      <td><button data-act="ruleVersionCompare" data-id="${v.id}">Compare</button>${isOwner() ? ` <button data-act="ruleVersionRestore" data-id="${v.id}" data-n="${esc(v.name)}">Restore</button>` : ''}${isOwner() || (canEdit() && v.created_by === S.me.id) ? ` <button class="danger" data-act="ruleVersionDel" data-id="${v.id}" data-n="${esc(v.name)}">✕</button>` : ''}</td></tr>`).join('') + '</table>'
+      : '<p class="muted">No versions saved yet.</p>') + '<div id="rv_out"></div></details>';
+}
+function ruleRow(r) { return `<td>${r.year}</td><td>${r.ord ?? 0}</td><td>${esc(r.name || '')}</td><td class="form">${esc(r.pattern)}</td><td class="form">${esc(r.replacement || '')}</td><td class="small">${esc(r.tags || '')}</td>`; }
+function ruleCompareView(c) {
+  const v = c.version, head = '<tr><th>Year</th><th>Order</th><th>Name</th><th>Pattern</th><th>Replacement</th><th>Tags</th></tr>';
+  if (c.same) return `<p class="card">No changes since <strong>${esc(v.name)}</strong>.</p>`;
+  let h = `<div class="card"><h4>Since “${esc(v.name)}”: ${c.added.length} added, ${c.removed.length} removed, ${c.changed.length} changed</h4>`;
+  if (c.added.length) h += '<p><strong>Added since</strong></p><table>' + head + c.added.map(r => `<tr class="diffadd">${ruleRow(r)}</tr>`).join('') + '</table>';
+  if (c.removed.length) h += '<p><strong>Removed since</strong></p><table>' + head + c.removed.map(r => `<tr class="diffdel">${ruleRow(r)}</tr>`).join('') + '</table>';
+  if (c.changed.length) h += '<p><strong>Changed since</strong></p><table><tr><th>Sound change</th><th>What</th><th>Then</th><th>Now</th></tr>' + c.changed.map(x => x.fields.map((f, i) =>
+    `<tr>${i === 0 ? `<td rowspan="${x.fields.length}">${esc(x.now.name || x.now.pattern)} <span class="small muted">#${x.id}</span></td>` : ''}<td>${esc(f)}</td><td class="form diffdel">${esc(x.then[f] ?? '')}</td><td class="form diffadd">${esc(x.now[f] ?? '')}</td></tr>`).join('')).join('') + '</table>';
+  if ((c.offTags.then || '') !== (c.offTags.now || '')) h += `<p>Tags switched off then: <strong>${esc(c.offTags.then || 'none')}</strong>; now: <strong>${esc(c.offTags.now || 'none')}</strong></p>`;
+  return h + '</div>';
+}
+
+// ---------- compound: missing words on the side ----------
+function compMissList(miss) {
+  const open = miss.entries.filter(e => !e.word), sel = S.compPick && S.compPick.g.toLowerCase();
+  const item = (g, p, note) => `<a class="misspick${sel === g.toLowerCase() ? ' on' : ''}" data-act="compPick" data-g="${esc(g)}" data-p="${esc(p || '')}" title="${esc(note || 'Coin the compound for this meaning')}">${esc(g)}${p ? ` <span class="small muted">${esc(p)}</span>` : ''}</a>`;
+  let h = open.length ? open.map(e => item(e.gloss, e.pos, e.notes)).join('') : '<p class="small muted">None marked as missing.</p>';
+  if (miss.fromSentences.length) h += '<h4 class="small muted">Needed by sentences</h4>' + miss.fromSentences.map(g => item(g.meaning, '', 'Used in: ' + g.sentences.map(x => x.translation || x.source).join(' / '))).join('');
+  return h;
+}
+function filterMissList() {
+  const q = (val('c_missq') || '').trim().toLowerCase();
+  document.querySelectorAll('#c_misslist .misspick').forEach(a => { a.hidden = !!q && !a.dataset.g.toLowerCase().includes(q); });
+}
+document.addEventListener('input', e => { if (e.target.id === 'c_missq') filterMissList(); });
+document.addEventListener('toggle', e => { if (e.target.dataset && e.target.dataset.versions) S.ruleVersionsOpen = e.target.open; }, true);
+
 // ---------- actions ----------
 const A = {
   logout: async () => { await api('POST', '/api/auth/logout'); location.href = '/'; },
@@ -670,6 +770,7 @@ const A = {
       + (r.haveWord.length ? ' Has a word already: ' + r.haveWord.join(', ') + '.' : '') + (r.bad.length ? ' Not added (brackets or too long): ' + r.bad.join(', ') + '.' : ''));
     await renderPanel();
   },
+  missCompound: async d => { S.compPick = { g: d.g, p: d.p || '' }; S.tab = 'compound'; await renderPanel(); if ($('#c_parts')) $('#c_parts').focus(); },
   missMark: async d => { await api('POST', base() + '/missing', { gloss: d.g }); say('Marked as missing.'); await renderPanel(); },
   missDel: async d => { await api('DELETE', '/rune/api/missing/' + d.id); await renderPanel(); },
   missClear: async () => { const r = await api('POST', base() + '/missing/clear-filled'); say('Removed ' + r.removed + '.'); await renderPanel(); },
@@ -691,7 +792,7 @@ const A = {
     await api('POST', '/rune/api/languages', { worldId: Number(d.w), name: n }); await loadWorlds(); render();
   },
   pick: async d => { S.lang = S.worlds.flatMap(w => w.languages).find(l => l.id === Number(d.id)); S.tab = 'dict'; render(); },
-  tab: async d => { S.tab = d.t; if (d.t !== 'forms') S.prefill = null; renderPanel(); },
+  tab: async d => { S.tab = d.t; if (d.t !== 'rules') S.ruleTag = null; if (d.t !== 'compound') S.compPick = null; if (d.t !== 'forms') S.prefill = null; renderPanel(); },
   undo: async () => { const r = await api('POST', base() + '/undo'); say('Undid ' + r.undone); renderPanel(); },
   redo: async () => { const r = await api('POST', base() + '/redo'); say('Redid ' + r.redone); renderPanel(); },
 
@@ -744,6 +845,15 @@ const A = {
     say(r.status === 'pending' ? 'Submitted for the owner to approve.' : 'Deleted. (Undo is available.)'); renderPanel();
   },
   page: async d => { S.page = d.p; stopLogTimer(); S.openId = null; const m = $('#modal'); if (m) m.hidden = true; render(); },
+  connectorCreate: async () => {
+    S.connectorNew = await api('POST', '/rune/api/admin/connector-keys', { username: val('cn_user'), label: val('cn_label') });
+    await connectorPage();
+  },
+  connectorCopy: async () => { const i = $('#cn_url'); i.select(); try { await navigator.clipboard.writeText(i.value); say('Copied.'); } catch (e) { document.execCommand('copy'); say('Copied.'); } },
+  connectorRevoke: async d => {
+    if (!confirm('Revoke connector address #' + d.id + '? Claude can no longer use it.')) return;
+    await api('DELETE', '/rune/api/admin/connector-keys/' + d.id); say('Revoked.'); await connectorPage();
+  },
   logSearch: async () => { S.logFilter = { level: val('lg_level'), category: val('lg_cat'), q: val('lg_q').trim() }; await loadLog(true); },
   logMore: async () => { await loadLog(false); },
   logRow: async d => {
@@ -778,14 +888,14 @@ const A = {
     try { data = JSON.parse(await f.text()); } catch (e) { say('That file is not valid JSON: ' + e.message, true); return; }
     const rules = Array.isArray(data) ? data : data.rules;
     if (!Array.isArray(rules)) { say('The file needs a "rules" list.', true); return; }
-    S.ruleImport = { rules, removeMissing: $('#ri_rm').checked };
+    S.ruleImport = { rules, removeMissing: $('#ri_rm').checked, tag: val('ri_tag').trim() };
     const res = await api('POST', base() + '/rules/import', { ...S.ruleImport, dryRun: true });
     const act = { add: 'add', change: 'change', remove: 'remove', same: 'same', skip: 'skip' };
-    let h = `<p><strong>${res.added}</strong> to add, <strong>${res.changed}</strong> to change, <strong>${res.removed}</strong> to remove, ${res.unchanged} unchanged.</p>`;
+    let h = `<p><strong>${res.added}</strong> to add, <strong>${res.changed}</strong> to change, <strong>${res.removed}</strong> to remove, ${res.unchanged} unchanged.${res.tagAll ? ` Every sound change in the file gets the tag <strong>${esc(res.tagAll)}</strong> (unchanged ones have it already).` : ''}</p>`;
     if (res.errors.length) h += '<div class="gap"><strong>Nothing will be imported until these are fixed:</strong><ul>' + res.errors.map(e => `<li>${esc(e)}</li>`).join('') + '</ul></div>';
     const shown = res.items.filter(i => i.action !== 'same');
-    if (shown.length) h += '<table><tr><th></th><th>Language</th><th>Year</th><th>Pattern</th><th>Replacement</th><th></th></tr>' +
-      shown.map(i => `<tr class="${i.action === 'remove' ? 'pending' : ''}"><td>${act[i.action]}</td><td>${esc(i.language)}</td><td>${i.year ?? ''}</td><td class="form">${esc(i.pattern)}</td><td class="form">${esc(i.replacement)}</td><td class="small muted">${esc(i.detail)}</td></tr>`).join('') + '</table>';
+    if (shown.length) h += '<table><tr><th></th><th>Language</th><th>Year</th><th>Pattern</th><th>Replacement</th><th>Tags</th><th></th></tr>' +
+      shown.map(i => `<tr class="${i.action === 'remove' ? 'pending' : ''}"><td>${act[i.action]}</td><td>${esc(i.language)}</td><td>${i.year ?? ''}</td><td class="form">${esc(i.pattern)}</td><td class="form">${esc(i.replacement)}</td><td class="small">${esc(i.tags || '')}</td><td class="small muted">${esc(i.detail)}</td></tr>`).join('') + '</table>';
     if (!res.errors.length && (res.added || res.changed || res.removed)) h += '<div class="row"><button class="primary" data-act="ruleImportApply">Apply these changes</button></div>';
     $('#ri_out').innerHTML = h;
   },
@@ -925,16 +1035,36 @@ const A = {
   addRule: async () => {
     const id = val('r_id'), lang = val('r_lang') || S.lang.id;
     const r = await api('POST', '/rune/api/languages/' + lang + '/edit', { entity: 'rule', action: id ? 'UPDATE' : 'CREATE', entityId: id ? Number(id) : null,
-      payload: { year: Number(val('r_year')), ord: Number(val('r_ord') || 0), name: val('r_name'), pattern: val('r_pat'), replacement: val('r_rep') } });
+      payload: { year: Number(val('r_year')), ord: Number(val('r_ord') || 0), name: val('r_name'), pattern: val('r_pat'), replacement: val('r_rep'), tags: val('r_tags') } });
     say(r.status === 'pending' ? 'Submitted for the owner to approve.' : (id ? 'Rule saved.' : 'Rule added.')); renderPanel();
   },
   editRule: async d => {
     const r = S.rules.find(x => x.id === Number(d.id));
-    for (const [k, v] of [['year', r.year], ['ord', r.ord], ['name', r.name], ['pat', r.pattern], ['rep', r.replacement]]) $('#r_' + k).value = v ?? '';
+    for (const [k, v] of [['year', r.year], ['ord', r.ord], ['name', r.name], ['pat', r.pattern], ['rep', r.replacement], ['tags', r.tags]]) $('#r_' + k).value = v ?? '';
     $('#r_id').value = r.id; if (![...$('#r_lang').options].some(o => o.value === String(r.language_id))) $('#r_lang').add(new Option(r.lang_name, r.language_id));
     $('#r_lang').value = r.language_id; $('#r_lang').disabled = true; $('#r_btn').textContent = 'Save changes'; $('#r_cancel').hidden = false; window.scrollTo(0, 0);
   },
   cancelRule: async () => renderPanel(),
+  ruleTagFilter: async d => { const k = (d.t || '').toLowerCase(); S.ruleTag = !k || S.ruleTag === k ? null : k; await renderPanel(); },
+  ruleTagSwitch: async d => {
+    const r = await api('POST', base() + '/tag-switch', { tag: d.t, off: d.off === 'true' });
+    S.lang.off_tags = r.off_tags; say('Sound changes tagged "' + d.t + '" are ' + (d.off === 'true' ? 'switched off' : 'on again') + '.'); await renderPanel();
+  },
+  ruleVersionSave: async () => {
+    const r = await api('POST', base() + '/rule-versions', { name: val('rv_name'), note: val('rv_note') });
+    S.ruleVersionsOpen = true; say('Saved as version #' + r.id + '.'); await renderPanel();
+  },
+  ruleVersionCompare: async d => { $('#rv_out').innerHTML = ruleCompareView(await api('GET', '/rune/api/rule-versions/' + d.id + '/compare')); },
+  ruleVersionRestore: async d => {
+    if (!confirm('Restore "' + d.n + '"? ' + S.lang.name + "'s sound changes become as they were in that version. The sound changes as they are now are saved as a version first, so you can go back.")) return;
+    const r = await api('POST', '/rune/api/rule-versions/' + d.id + '/restore');
+    S.ruleVersionsOpen = true; await loadWorlds(); S.lang = S.worlds.flatMap(w => w.languages).find(l => l.id === S.lang.id) || S.lang;
+    say('Restored ' + r.restored + ' sound changes. The ones before were saved as version #' + r.savedFirst + '.'); await renderPanel();
+  },
+  ruleVersionDel: async d => {
+    if (!confirm('Delete the version "' + d.n + '"? The sound changes themselves are not touched.')) return;
+    await api('DELETE', '/rune/api/rule-versions/' + d.id); S.ruleVersionsOpen = true; await renderPanel();
+  },
   delRule: async d => {
     if (!confirm('Delete this rule?')) return;
     const rule = S.rules.find(x => x.id === Number(d.id));
@@ -1008,11 +1138,25 @@ const A = {
     $('#cprev').innerHTML = `<p class="small muted">From: ${esc(r.parts.join(' + '))}</p><table><tr><th>Form</th><th>Step</th><th></th></tr>` +
       r.steps.map((s, i) => `<tr><td class="form">${esc(s.form)}</td><td class="small">${esc(s.rule)}</td><td><button data-act="compUse" data-i="${i}">Use as word</button></td></tr>`).join('') + '</table>';
   },
+  compPick: async d => {
+    S.compPick = { g: d.g, p: d.p || '' };
+    $('#c_gloss').value = d.g; $('#c_pos').value = d.p || '';
+    document.querySelectorAll('#c_misslist .misspick').forEach(a => a.classList.toggle('on', a.dataset.g === d.g));
+    $('#c_parts').focus();
+    say('Now join words for "' + d.g + '" and click Erode.');
+  },
   compUse: async d => {
     const s = S.comp.steps[Number(d.i)];
-    if (!S.comp.gloss) { say('Enter a gloss first.', true); return; }
-    const r = await api('POST', base() + '/edit', { entity: 'word', action: 'CREATE', payload: { gloss: S.comp.gloss, build: 'compound', form: s.form, notes: 'compound: ' + S.comp.parts.join(' + ') } });
-    say(r.status === 'pending' ? 'Submitted for approval.' : 'Word added.');
+    const gloss = val('c_gloss').trim() || S.comp.gloss, pos = val('c_pos').trim();
+    if (!gloss) { say('Enter a gloss first, or pick a missing word on the right.', true); return; }
+    const payload = { gloss, build: 'compound', form: s.form, notes: 'compound: ' + S.comp.parts.join(' + ') };
+    if (pos) payload.pos = pos;
+    const r = await api('POST', base() + '/edit', { entity: 'word', action: 'CREATE', payload });
+    S.words = [];
+    if (r.status === 'pending') { say('Submitted for approval. "' + gloss + '" leaves the missing words once the owner approves it.'); return; }
+    say('Word added: ' + gloss + ' = ' + s.form + '.');
+    S.compPick = null; $('#c_gloss').value = ''; $('#c_pos').value = '';
+    try { S.missing = await api('GET', base() + '/missing'); $('#c_misslist').innerHTML = compMissList(S.missing); filterMissList(); } catch (e) { /* list refresh is optional */ }
   },
   bulkCheck: async () => {
     const r = await api('POST', base() + '/bulk', { text: val('b_text'), dryRun: true, skipExisting: $('#b_skip').checked });
@@ -1145,7 +1289,7 @@ function drawAutoSounds(full) {
 document.addEventListener('input', e => {
   if (e.target.dataset.autoslider) { S.autoYear = Number(e.target.value); drawAutoSounds(false); }
 });
-const UI_VERSION = '1.2.0';   // keep equal to the version in pom.xml
+const UI_VERSION = '1.5.1';   // keep equal to the version in pom.xml
 api('GET', '/rune/api/version').then(v => {
   $('#ver').textContent = 'v' + v.version + (v.built ? ' · built ' + v.built.replace('T', ' ').replace('Z', ' UTC') : '');
   if (v.version !== UI_VERSION) {

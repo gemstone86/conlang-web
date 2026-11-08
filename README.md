@@ -80,6 +80,26 @@ replaces weather data people have already made here (notes, campaigns, own maps,
 anyway, start once with `EON_IMPORT=force`, then set it back. `EON_IMPORT=off` turns it off. The standard map is
 updated to this version's right after.
 
+## Claude connector
+
+Lets Claude (claude.ai) read your languages and weather data while helping you. It's an MCP server built into the app,
+at `/mcp/<key>`, with read-only tools:
+
+- Root and Rune: `rune_list_languages`, `rune_language`, `rune_words` (with a search), `rune_search_words` (all languages),
+  `rune_word_history`, `rune_sound_changes`, `rune_preview_sound_change` (needs editor access), `rune_sound_change_versions`,
+  `rune_compare_sound_change_version`, `rune_word_form_rules`,
+  `rune_grammar`, `rune_sounds`, `rune_sentences`, `rune_build_sentence`, `rune_missing_words`, `rune_pending_changes`,
+  `rune_edit_log`, `rune_suggest_roots`.
+- Weather generator: `weather_world` (regions, calendars), `weather_day`, `weather_month`, `weather_maps`,
+  `weather_campaigns`, `weather_notes`, and `weather_get` for any other read-only data (rivers, nations, trips…).
+
+**Setting it up:** register an account for Claude on the start page (e.g. *Claude*) and share the worlds or languages
+it should read with it as *viewer* (or use your own account to let it see everything you see). In Root and Rune, an
+admin opens **Claude connector** in the top bar, picks the account and clicks **Make connector address**. In claude.ai,
+**Settings → Connectors → Add custom connector**, paste the address. The address is shown once; anyone who has it
+can read what that account can see, so revoke it on the same page if it leaks. Every call is in the Log (category
+*connector*). Only a hash of each key is stored (table `connector_keys`).
+
 ## How it works
 
 * **World → languages.** A language can branch from a parent at a split year. A branch inherits each word as it
@@ -175,6 +195,35 @@ Deleting a word also deletes its locked overrides, and Undo does not bring those
 
 ## v0.18.2
 - A form that starts earlier than its word is no longer reported as a problem: the word simply uses the form as it has evolved by the word's own year.
+
+## v1.5.1 (combined app)
+- Importing sound changes (JSON) can **tag everything in the file**: fill in *tag all imported* next to the file (one tag
+  or several, comma separated). New sound changes get it, changed ones get it with their changes, and ones already in
+  the app get it too (the check lists them as "changes tags"); their own tags are kept.
+
+## v1.5.0 (combined app)
+- **Tags on sound changes**: give a sound change tags (comma separated, e.g. `vowel shift, experimental`). The Sound changes
+  tab shows every tag in view with its count; click one to see only those sound changes. The language's owner can
+  **switch a tag off**: its sound changes are then left out wherever words evolve (dictionary, histories, sentences,
+  missing words) in that language and all its branches, and shown greyed out, until it's switched on again.
+- **Versions of sound changes**: *Versions* on the Sound changes tab saves a language's own sound changes (and its
+  switched-off tags) under a name and note. **Compare** shows what has been added, removed and changed since, field by
+  field; **Restore** (owner) puts them back as they were, after saving the current ones as a version, so a restore can
+  be undone. Restoring clears the undo steps for sound changes in that language. Versions are part of Export / Import
+  everything, and the Claude connector can list and compare them.
+- Endpoints: `GET/POST /rune/api/languages/{id}/rule-versions`, `GET /rune/api/rule-versions/{vid}/compare`,
+  `POST /rune/api/rule-versions/{vid}/restore`, `DELETE /rune/api/rule-versions/{vid}`, `POST /rune/api/languages/{id}/tag-switch`.
+
+## v1.4.0 (combined app)
+- **Claude connector**: read-only access for Claude (claude.ai) to Root and Rune and the weather generator, as one
+  account, through an MCP server at `/mcp/<key>`. Admins make and revoke the addresses on the new **Claude connector**
+  page. See *Claude connector* above.
+
+## v1.3.0 (combined app)
+- **Compound** tab: the language's missing words (and the meanings saved sentences need) are listed on the right, with a
+  filter. Click one to coin the compound for it: its meaning and type are filled in, and **Use as word** saves the eroded
+  form under that meaning, which takes it off the list. New *type* field for the compound.
+- **Missing words** tab: a **Compound** button next to *Coin word* opens the Compound tab with that meaning picked.
 
 ## v1.2.0 (combined app)
 - **Missing words** tab (next to Dictionary): mark meanings a language has no word for yet, one at a time or several at once
