@@ -196,6 +196,12 @@ Deleting a word also deletes its locked overrides, and Undo does not bring those
 ## v0.18.2
 - A form that starts earlier than its word is no longer reported as a problem: the word simply uses the form as it has evolved by the word's own year.
 
+## v1.7.0 (combined app)
+- **Dictionaries are kept between page loads**: a worked-out dictionary is handed out again until anything in the data
+  changes (in the test: 0.25–0.5 s → 30–70 ms for a repeat load). Any edit anywhere (a word, sound change, setting,
+  tag switch, share, import…) makes the next load work it out afresh, so it's never out of date; the admin log and
+  connector use don't count as changes. The 12 most recently used dictionaries are kept.
+
 ## v1.6.1 (combined app)
 - **Faster dictionaries** (5–8× in a test with 6 languages, 240 sound changes, 2 300 words and 4 000 word forms:
   2.6 s → 0.5 s): each sound change's pattern is compiled once per request instead of for every word, form and branch;
