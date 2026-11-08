@@ -72,7 +72,7 @@ public class Db {
 
     private void changed(String sql) {
         String q = sql.toLowerCase(Locale.ROOT);
-        if (q.contains("app_log") || q.contains("connector_keys") || q.contains("reset_codes")) return;
+        if (q.contains("app_log") || q.contains("connector_keys") || q.contains("reset_codes") || q.contains("set last_login")) return;
         version.incrementAndGet();
         // in a transaction, others only see the change once it's committed: move the version again then, so nothing
         // worked out in between (from the data as it was) is kept

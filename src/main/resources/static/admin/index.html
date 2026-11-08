@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Admin · Root and Rune · Weather</title>
+<link rel="icon" type="image/png" href="../rune/favicon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Alegreya+Sans:wght@400;500;700&family=IM+Fell+English:ital@0;1&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink: #1c2430; --ink-2: #26313f; --line: #3a4757;
+    --bone: #ece6d6; --bone-dim: #b6af9e; --brass: #c9a24a; --moss: #6f9f7f; --sky: #7fb3d9; --err: #e08a7a;
+    --serif: "IM Fell English", Georgia, serif; --sans: "Alegreya Sans", system-ui, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 16px/1.45 var(--sans); color: var(--bone); background: var(--ink); padding: 1.6rem 1.4rem 3rem; }
+  a { color: var(--sky); }
+  header { display: flex; align-items: baseline; gap: 1rem; flex-wrap: wrap; margin-bottom: 1.4rem; }
+  header h1 { font: 400 2rem/1.1 var(--serif); margin: 0; color: var(--brass); flex: 1; }
+  header nav a { margin-left: 1rem; text-decoration: none; }
+  header nav a:hover { text-decoration: underline; }
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: .8rem; margin-bottom: 1.4rem; }
+  .tile { border: 1px solid var(--line); border-radius: 12px; background: var(--ink-2); padding: .7rem .9rem; }
+  .tile b { display: block; font: 400 1.8rem/1.1 var(--serif); color: var(--bone); }
+  .tile span { font-size: .85rem; color: var(--bone-dim); }
+  .bar { display: flex; gap: .8rem; align-items: center; flex-wrap: wrap; margin-bottom: .7rem; }
+  input { font: inherit; color: var(--bone); background: var(--ink-2); border: 1px solid var(--line); border-radius: 8px; padding: .45rem .7rem; min-width: 16rem; }
+  input:focus { outline: 2px solid var(--brass); outline-offset: 1px; border-color: transparent; }
+  .muted { color: var(--bone-dim); font-size: .9rem; }
+  .wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 12px; }
+  table { border-collapse: collapse; width: 100%; font-size: .95rem; }
+  th, td { padding: .5rem .7rem; text-align: left; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  th { background: var(--ink-2); color: var(--bone-dim); font-weight: 500; cursor: pointer; user-select: none; position: sticky; top: 0; }
+  th:hover { color: var(--bone); }
+  th.sorted::after { content: " ▾"; }
+  th.sorted.up::after { content: " ▴"; }
+  td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  td.num.zero { color: #66707c; }
+  th.group { text-align: center; cursor: default; color: var(--brass); }
+  tr:last-child td { border-bottom: none; }
+  tbody tr:hover td { background: rgba(255,255,255,.03); }
+  .badge { font-size: .7rem; text-transform: uppercase; letter-spacing: .06em; border-radius: 99px; padding: .05rem .45rem; margin-left: .35rem; border: 1px solid; }
+  .badge.site { color: var(--brass); border-color: #8f7536; }
+  .badge.weather { color: var(--sky); border-color: #4f7895; }
+  .msg { padding: 1rem 1.2rem; border: 1px solid var(--line); border-radius: 12px; background: var(--ink-2); max-width: 36rem; }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Admin</h1>
+  <nav><a href="/">← Start</a><a href="/rune/">Root and Rune</a><a href="/weather/">Weather generator</a></nav>
+</header>
+
+<div id="denied" class="msg" hidden></div>
+
+<main id="main" hidden>
+  <section class="tiles" id="tiles"></section>
+  <div class="bar">
+    <input id="q" placeholder="Find a user…" autocomplete="off">
+    <span class="muted" id="count"></span>
+    <span class="muted" id="reg"></span>
+  </div>
+  <div class="wrap">
+    <table>
+      <thead>
+        <tr><th class="group" colspan="4"></th><th class="group" colspan="3">Root and Rune</th><th class="group" colspan="3">Weather generator</th><th class="group" colspan="2"></th></tr>
+        <tr id="heads"></tr>
+      </thead>
+      <tbody id="rows"></tbody>
+    </table>
+  </div>
+  <p class="muted">Counts are what each account owns: its worlds and languages and the words in them, and its weather campaigns,
+    maps and notes. <em>Shared with</em> is how many worlds or languages others have shared with it. "Last login" is recorded from v1.9.0 on.
+    Password resets: Root and Rune → <em>Issue reset code</em>. Who can read through Claude: Root and Rune → <em>Claude connector</em>.</p>
+</main>
+
+<script>
+'use strict';
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const COLS = [
+  { k: 'username', t: 'User' },
+  { k: 'role', t: 'Role' },
+  { k: 'created', t: 'Joined' },
+  { k: 'last_login', t: 'Last login' },
+  { k: 'worlds', t: 'Worlds', n: 1 }, { k: 'languages', t: 'Languages', n: 1 }, { k: 'words', t: 'Words', n: 1 },
+  { k: 'campaigns', t: 'Campaigns', n: 1 }, { k: 'maps', t: 'Maps', n: 1 }, { k: 'notes', t: 'Notes', n: 1 },
+  { k: 'shared_with', t: 'Shared with', n: 1 }, { k: 'connector_keys', t: 'Connector', n: 1 }
+];
+const state = { users: [], sort: 'username', up: true, q: '' };
+const day = v => v ? String(v).slice(0, 16).replace('T', ' ') : '';
+const role = u => u.is_admin ? 3 : u.weather_admin ? 2 : 1;
+
+function draw() {
+  $('heads').innerHTML = COLS.map(c => `<th data-k="${c.k}" class="${state.sort === c.k ? 'sorted' + (state.up ? ' up' : '') : ''}">${c.t}</th>`).join('');
+  const q = state.q.toLowerCase();
+  let list = state.users.filter(u => !q || u.username.toLowerCase().includes(q));
+  const key = state.sort, dir = state.up ? 1 : -1;
+  list.sort((a, b) => {
+    const va = key === 'role' ? role(a) : a[key], vb = key === 'role' ? role(b) : b[key];
+    if (va == null && vb == null) return 0;
+    if (va == null) return 1;
+    if (vb == null) return -1;
+    return (typeof va === 'number' ? va - vb : String(va).localeCompare(String(vb), undefined, { sensitivity: 'base' })) * dir;
+  });
+  $('rows').innerHTML = list.map(u => '<tr>' + COLS.map(c => {
+    if (c.k === 'username') return `<td><strong>${esc(u.username)}</strong></td>`;
+    if (c.k === 'role') return `<td>${u.is_admin ? '<span class="badge site" title="Site admin: both apps">admin</span>' : u.weather_admin ? '<span class="badge weather" title="Weather admin (EON_ADMINS)">weather admin</span>' : '<span class="muted">user</span>'}</td>`;
+    if (c.k === 'created') return `<td>${esc(day(u.created))}</td>`;
+    if (c.k === 'last_login') return `<td>${u.last_login ? esc(day(u.last_login)) : '<span class="muted">—</span>'}</td>`;
+    const v = Number(u[c.k] || 0);
+    return `<td class="num${v ? '' : ' zero'}">${v.toLocaleString()}</td>`;
+  }).join('') + '</tr>').join('') || `<tr><td colspan="${COLS.length}" class="muted">No user matches.</td></tr>`;
+  $('count').textContent = list.length === state.users.length ? state.users.length + ' users' : list.length + ' of ' + state.users.length + ' users';
+}
+
+$('heads').addEventListener('click', e => {
+  const k = e.target.dataset && e.target.dataset.k;
+  if (!k) return;
+  if (state.sort === k) state.up = !state.up; else { state.sort = k; state.up = !COLS.find(c => c.k === k).n; }
+  draw();
+});
+$('q').addEventListener('input', e => { state.q = e.target.value; draw(); });
+
+async function load() {
+  const me = await (await fetch('/api/auth/me', { credentials: 'same-origin' })).json();
+  if (!me.user) { location.href = '/?next=' + encodeURIComponent('/admin/'); return; }
+  const res = await fetch('/api/admin/users', { credentials: 'same-origin' });
+  if (!res.ok) {
+    $('denied').hidden = false;
+    $('denied').innerHTML = res.status === 403 ? 'This page is for admins only. <a href="/">Back to the start page</a>.' : 'Could not load the users (' + res.status + ').';
+    return;
+  }
+  const d = await res.json();
+  state.users = d.users;
+  const t = d.totals;
+  const tiles = [['users', 'users'], ['admins', 'admins'], ['worlds', 'worlds'], ['languages', 'languages'], ['words', 'words'],
+    ['campaigns', 'weather campaigns'], ['maps', 'own maps'], ['notes', 'weather notes']];
+  $('tiles').innerHTML = tiles.map(([k, label]) => `<div class="tile"><b>${Number(t[k] || 0).toLocaleString()}</b><span>${label}</span></div>`).join('');
+  $('reg').textContent = d.registrationOpen ? 'Registration is open.' : 'Registration is closed (REGISTRATION=false).';
+  $('main').hidden = false;
+  draw();
+}
+load().catch(e => { $('denied').hidden = false; $('denied').textContent = e.message; });
+</script>
+</body>
+</html>

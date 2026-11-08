@@ -88,3 +88,5 @@ td.diffdel{text-decoration:line-through}
 tr.lostword td{opacity:.55}
 tr.lostword td:last-child{opacity:1}
 .lostbadge{background:#f3e3d3;color:#7a4a1c}
+a.badge{text-decoration:none;color:inherit}
+a.badge:hover{text-decoration:underline}

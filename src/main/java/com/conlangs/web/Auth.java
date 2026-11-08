@@ -147,6 +147,7 @@ public class Auth {
         req.changeSessionId();
         long id = Db.num(u.get("id"));
         req.getSession().setAttribute("uid", id);
+        db.update("update users set last_login=? where id=?", new Timestamp(System.currentTimeMillis()), id);
         applog.info("auth", id, "Logged in");
         return id;
     }
