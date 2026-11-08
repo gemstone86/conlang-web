@@ -104,6 +104,8 @@ public class SentenceService {
         final List<Integer> splits = new ArrayList<>();
         final Map<Long, Map<String, Object>> words = new LinkedHashMap<>();
         final Map<Long, List<Meanings.Ev>> meanings = new HashMap<>();
+        final Map<Long, List<Losses.Loss>> losses = new HashMap<>();
+        final Map<Long, String> langNames = new HashMap<>();
         final Map<Long, List<Map<String, Object>>> forms = new HashMap<>();
         final Map<Long, List<Evolver.Override>> overrides = new HashMap<>();
         final String vowels;
@@ -130,6 +132,11 @@ public class SentenceService {
                     meanings.computeIfAbsent(Db.num(m.get("word_id")), k -> new ArrayList<>())
                             .add(new Meanings.Ev(Db.num(m.get("lang_id")), ((Number) m.get("year")).intValue(), (String) m.get("mode"), (String) m.get("meaning")));
                 }
+                for (Map<String, Object> x : db.rows("select x.* from word_losses x join words w on w.id=x.word_id where w.language_id=?", l)) {
+                    losses.computeIfAbsent(Db.num(x.get("word_id")), k -> new ArrayList<>())
+                            .add(new Losses.Loss(Db.num(x.get("lang_id")), ((Number) x.get("year")).intValue()));
+                }
+                langNames.put(l, (String) access.language(l).get("name"));
                 for (Map<String, Object> f : db.rows("select f.* from word_forms f join words w on w.id=f.word_id where w.language_id=? order by f.id", l)) {
                     forms.computeIfAbsent(Db.num(f.get("word_id")), k -> new ArrayList<>()).add(f);
                 }
@@ -166,15 +173,56 @@ public class SentenceService {
             List<Map<String, Object>> out = new ArrayList<>();
             for (Map<String, Object> w : words.values()) {
                 if (((Number) w.get("year")).intValue() > year) continue;
-                long src = Db.num(w.get("language_id"));
-                int from = pathRootFirst.indexOf(src);
-                List<Long> sub = pathRootFirst.subList(from, pathRootFirst.size());
-                List<Integer> cuts = splits.subList(Math.min(from, splits.size()), splits.size());
-                for (String sense : Meanings.senses((String) w.get("gloss"), meanings.getOrDefault(Db.num(w.get("id")), List.of()), sub, cuts, year)) {
-                    if (norm(sense).equals(norm(text))) { out.add(w); break; }
-                }
+                Losses.Loss lost = lostIn(w);
+                if (lost != null && lost.year() <= year) continue;
+                if (means(w, text, year)) out.add(w);
             }
             return out;
+        }
+
+        private boolean means(Map<String, Object> w, String text, int year) {
+            long src = Db.num(w.get("language_id"));
+            int from = pathRootFirst.indexOf(src);
+            List<Long> sub = pathRootFirst.subList(from, pathRootFirst.size());
+            List<Integer> cuts = splits.subList(Math.min(from, splits.size()), splits.size());
+            for (String sense : Meanings.senses((String) w.get("gloss"), meanings.getOrDefault(Db.num(w.get("id")), List.of()), sub, cuts, year)) {
+                if (norm(sense).equals(norm(text))) return true;
+            }
+            return false;
+        }
+
+        /** When the word stops being used in this language (its own loss or one that keeps it from reaching here), or null. */
+        Losses.Loss lostIn(Map<String, Object> w) {
+            List<Losses.Loss> ls = losses.get(Db.num(w.get("id")));
+            if (ls == null) return null;
+            int from = pathRootFirst.indexOf(Db.num(w.get("language_id")));
+            return Losses.lostAt(ls, pathRootFirst.subList(from, pathRootFirst.size()), splits.subList(Math.min(from, splits.size()), splits.size()));
+        }
+
+        /** Why there is no word for the text in the year: lost before it, or not coined yet. Null if neither. */
+        String why(String text, int year) {
+            List<String> tries = new ArrayList<>();
+            tries.add(text);
+            for (int dash = text.lastIndexOf('-'); dash > 0; dash = text.lastIndexOf('-', dash - 1)) tries.add(text.substring(0, dash).trim());
+            for (String t : tries) {
+                String lostWhy = null, laterWhy = null;
+                int laterYear = Integer.MAX_VALUE;
+                for (Map<String, Object> w : words.values()) {
+                    int coined = ((Number) w.get("year")).intValue();
+                    if (!means(w, t, Math.max(year, coined))) continue;
+                    Losses.Loss lost = lostIn(w);
+                    if (coined <= year && lost != null && lost.year() <= year) {
+                        if (lostWhy == null) lostWhy = "'" + w.get("gloss") + "' was lost in " + langNames.getOrDefault(lost.langId(), "?") + " in " + lost.year()
+                                + (lost.langId() == langId ? "" : ", before " + langNames.getOrDefault(langId, "this language") + " split off");
+                    } else if (coined > year && coined < laterYear) {
+                        laterYear = coined;
+                        laterWhy = "'" + w.get("gloss") + "' isn't coined until " + coined;
+                    }
+                }
+                if (lostWhy != null) return lostWhy;
+                if (laterWhy != null) return laterWhy;
+            }
+            return null;
         }
     }
 
@@ -266,8 +314,13 @@ public class SentenceService {
                     continue;
                 }
                 Hit h = lookup(c, t, year);
-                if (h == null) { gap(p, "no word with that meaning"); p.put("form", "[" + t + "?]"); bad = true; surface = (surface == null ? "" : surface) + "[" + t + "?]"; gl.add(t); continue; }
+                if (h == null) { String why = c.why(t, year); gap(p, why == null ? "no word with that meaning" : why); p.put("missingWord", true); p.put("form", "[" + t + "?]"); bad = true; surface = (surface == null ? "" : surface) + "[" + t + "?]"; gl.add(t); continue; }
                 Map<String, Object> w0 = h.word();
+                Losses.Loss lostHit = c.lostIn(w0);
+                if (lostHit != null && lostHit.year() <= year) {   // picked by id (meaning#12) although it's no longer used
+                    gap(p, "'" + w0.get("gloss") + "' was lost in " + c.langNames.getOrDefault(lostHit.langId(), "?") + " in " + lostHit.year());
+                    p.put("missingWord", true); p.put("form", "[" + t + "?]"); bad = true; surface = (surface == null ? "" : surface) + "[" + t + "?]"; gl.add(t); continue;
+                }
                 Map<String, Object> w = c.deref(w0);
                 if (w == null) {
                     gap(p, "'" + w0.get("gloss") + "' points to a word that doesn't exist: " + w0.get("form"));
@@ -293,7 +346,7 @@ public class SentenceService {
                     if (form == null && fy > year) { gap(p, "the '" + h.label() + "' form of '" + w.get("gloss") + "' is not in use until " + fy); }
                 }
                 if (form == null) {
-                    if (!p.containsKey("reason")) gap(p, "'" + w.get("gloss") + "' is not in " + access.language(c.langId).get("name") + " (coined after the split)");
+                    if (!p.containsKey("reason")) { gap(p, "'" + w.get("gloss") + "' is not in " + access.language(c.langId).get("name") + " (coined after the split)"); p.put("missingWord", true); }
                     p.put("form", "[" + t + "?]"); bad = true; surface = (surface == null ? "" : surface) + "[" + t + "?]"; gl.add(t); continue;
                 }
                 p.put("ok", true);
@@ -367,7 +420,7 @@ public class SentenceService {
             for (Map<String, Object> word : words) {
                 @SuppressWarnings("unchecked") List<Map<String, Object>> parts = (List<Map<String, Object>>) word.get("parts");
                 for (Map<String, Object> p : parts) {
-                    if (!Boolean.FALSE.equals(p.get("ok")) || !missingWord((String) p.get("reason"))) continue;
+                    if (!Boolean.FALSE.equals(p.get("ok")) || !(Boolean.TRUE.equals(p.get("missingWord")) || missingWord((String) p.get("reason")))) continue;
                     String meaning = ID.matcher(p.get("input").toString()).replaceAll("").trim();
                     if (meaning.isEmpty()) continue;
                     Map<String, Object> g = byMeaning.computeIfAbsent(meaning.toLowerCase(), k -> {

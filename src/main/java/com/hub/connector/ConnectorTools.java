@@ -75,7 +75,7 @@ public class ConnectorTools {
                 "Root and Rune: the dictionary of a language as shown on its Dictionary tab, including words inherited from its parent "
                         + "languages (inherited=true). Each word has gloss (meaning), pos (type), form (as coined; for inherited words "
                         + "as it reached this language), latest ({language name: form after all its sound changes} for this "
-                        + "language and each branch), year coined, notes and its forms. Optional query filters by meaning, form, type or note "
+                        + "language and each branch), year coined, lost_year (if it is no longer used in this language from that year), notes and its forms. Optional query filters by meaning, form, type or note "
                         + "(case-insensitive substring). At most " + MAX_WORDS + " words per call; use offset for more.",
                 schema(Map.of("language_id", lang, "query", prop("string", "Text to look for (optional)."),
                         "offset", prop("integer", "Skip this many matches (default 0)."), "limit", prop("integer", "At most this many (default 200, max " + MAX_WORDS + ").")),
@@ -134,7 +134,8 @@ public class ConnectorTools {
                 schema(Map.of("language_id", lang), "language_id"), (c, a) -> rune.sentenceList(id(a, "language_id"), c.session()));
         add("rune_build_sentence", "Build a sentence",
                 "Root and Rune: build a sentence in a language without saving it. Write each word as parts in parentheses, e.g. "
-                        + "'(to see)(you-obj) (water)'; a part is a dictionary meaning, 'meaning-label' picks a word form, '(=text)' stays as written.",
+                        + "'(to see)(you-obj) (water)'; a part is a dictionary meaning, 'meaning-label' picks a word form, '(=text)' stays as written. "
+                        + "Built as spoken in the given year: each word's form and meaning then; words coined later or lost by then are gaps, with the reason.",
                 schema(Map.of("language_id", lang, "source", prop("string", "The sentence in the builder's notation."),
                         "year", prop("integer", "The year to build it for (default 0).")), "language_id", "source"), (c, a) -> {
                     Map<String, Object> b = new LinkedHashMap<>();

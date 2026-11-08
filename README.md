@@ -196,6 +196,16 @@ Deleting a word also deletes its locked overrides, and Undo does not bring those
 ## v0.18.2
 - A form that starts earlier than its word is no longer reported as a problem: the word simply uses the form as it has evolved by the word's own year.
 
+## v1.6.0 (combined app)
+- **Lost words**: in a word's window, **Mark as lost** in a language from a year (with an optional note). From that
+  year the word is no longer used there: it shows greyed out with *lost 800* in the dictionary, sentences built for
+  later years can't use it, and it shows up in Missing words again. Branches that split off after that year never get
+  it (it isn't in their dictionary); branches that split off earlier keep it, unless it's marked lost there too.
+  Goes through approval and undo like other edits; part of Export / Import everything.
+- **Sentences at a given time**: the year field is now labelled *built as spoken in year*: each word is used as it was
+  then (its form after the sound changes up to then, its meaning then). A word that can't be used says why:
+  *'water' was lost in Proto in 800*, *'sky' isn't coined until 900*, or that it was coined after the split.
+
 ## v1.5.1 (combined app)
 - Importing sound changes (JSON) can **tag everything in the file**: fill in *tag all imported* next to the file (one tag
   or several, comma separated). New sound changes get it, changed ones get it with their changes, and ones already in
