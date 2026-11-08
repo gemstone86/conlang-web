@@ -307,6 +307,7 @@ public class ApiController {
         db.update("delete from shares where scope='LANGUAGE' and target_id=?", id);
         db.update("delete from word_overrides where lang_id=?", id);
         db.update("delete from word_meanings where lang_id=?", id);
+        db.update("delete from word_losses where lang_id=?", id);
         db.update("delete from sentences where language_id=?", id);
         db.update("delete from languages where id=?", id);
         return Map.of("ok", true);

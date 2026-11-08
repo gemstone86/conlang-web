@@ -221,6 +221,11 @@ public class DictService {
                 meaningsByWord.computeIfAbsent(Db.num(mm.get("word_id")), k -> new ArrayList<>()).add(meaningEv(mm));
             }
             boolean inherited = src != langId;
+            Map<Long, List<Losses.Loss>> lossesByWord = new HashMap<>();
+            for (Map<String, Object> x : db.rows("select x.* from word_losses x join words w on w.id=x.word_id where w.language_id=?", src)) {
+                lossesByWord.computeIfAbsent(Db.num(x.get("word_id")), k -> new ArrayList<>())
+                        .add(new Losses.Loss(Db.num(x.get("lang_id")), ((Number) x.get("year")).intValue()));
+            }
             Map<Long, List<Evolver.Override>> ovr = new HashMap<>();
             for (Map<String, Object> o : db.rows("select o.word_id, o.lang_id, o.year, o.form from word_overrides o join words w on w.id=o.word_id where w.language_id=?", src)) {
                 ovr.computeIfAbsent(Db.num(o.get("word_id")), k -> new ArrayList<>())
@@ -248,6 +253,9 @@ public class DictService {
                     late.put(id, lv);
                     continue;
                 }
+                Losses.Loss lost = Losses.lostAt(lossesByWord.get(id), subPath, cuts);
+                // lost in an ancestor before this language split off: it never got the word
+                if (lost != null && lost.langId() != langId) continue;
                 Map<String, Object> latest = latestPerBranch(rows, branchSet);
                 String shown = form;
                 if (inherited) {
@@ -257,6 +265,7 @@ public class DictService {
                 Map<String, Object> m = new LinkedHashMap<>(w);
                 m.put("form", shown);
                 m.put("inherited", inherited);
+                if (lost != null) m.put("lost_year", lost.year());
                 if (inherited) {
                     m.put("origin_lang", names.get(src));
                     m.put("origin_lang_id", src);
@@ -340,6 +349,7 @@ public class DictService {
         out.put("forms", forms);
         out.put("overrides", db.rows("select * from word_overrides where word_id=? order by year", wordId));
         out.put("meanings", db.rows("select * from word_meanings where word_id=? order by year, id", wordId));
+        out.put("losses", db.rows("select x.*, l.name as lang_name from word_losses x join languages l on l.id=x.lang_id where x.word_id=? order by x.year, x.id", wordId));
         Map<Long, Map<String, Object>> langMap = langsOf(Db.num(lang.get("world_id")));
         List<Meanings.Ev> evs = new ArrayList<>();
         for (Map<String, Object> mm : db.rows("select * from word_meanings where word_id=?", wordId)) evs.add(meaningEv(mm));

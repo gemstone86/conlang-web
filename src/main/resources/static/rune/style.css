@@ -83,3 +83,8 @@ tr.ruleoff td:last-child{opacity:1}
 .diffadd{background:#e7f4ea}
 .diffdel{background:#fbe9e7}
 td.diffdel{text-decoration:line-through}
+
+/* Lost words */
+tr.lostword td{opacity:.55}
+tr.lostword td:last-child{opacity:1}
+.lostbadge{background:#f3e3d3;color:#7a4a1c}

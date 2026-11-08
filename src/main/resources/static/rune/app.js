@@ -354,7 +354,7 @@ const TAB = {
       (<code>you-obj</code> = the “obj” form of “you”). Several parts in one word are joined together (hiatus drops the first vowel).
       Use <code>meaning#12</code> to pick a word by its id, and <code>(=text)</code> or plain text for something that must stay as written. Words appear in the order you write them.</p>
       <textarea id="s_src" rows="3" placeholder="(to see)(you-obj) …">${esc(S.sentSrc || '')}</textarea>
-      <div class="row"><input id="s_year" type="number" placeholder="year" size="8" value="${S.sentYear ?? 0}">
+      <div class="row"><label style="display:inline;margin:0" title="Each word is used as it was in that year: its form after the sound changes up to then, its meaning then. Words coined later, or lost by then, can't be used.">built as spoken in year</label><input id="s_year" type="number" placeholder="year" size="8" value="${S.sentYear ?? 0}">
       <input id="s_tr" placeholder="English" size="30" value="${esc(S.sentTr || '')}"><input id="s_kind" placeholder="type (e.g. greeting)" size="16" value="${esc(S.sentKind || '')}">
       <input id="s_group" type="number" placeholder="group (auto)" size="8"><input id="s_sub" type="number" placeholder="sub id (auto)" size="8"><input id="s_notes" placeholder="notes (optional)" size="24">
       <button class="primary" data-act="sentBuild">Build</button>${canEdit() ? '<button data-act="sentSave">Save sentence</button>' : ''}</div>
@@ -537,7 +537,8 @@ function wordRow(w) {
   const inh = w.inherited ? ` <span class="badge" title="Coined in ${esc(w.origin_lang)} as ${esc(w.origin_form)}">from ${esc(w.origin_lang)}</span>` : '';
   const act = w.inherited ? `<button data-act="goOrigin" data-id="${w.id}" data-lang="${w.origin_lang_id}">Open in ${esc(w.origin_lang)}</button>`
     : (canEdit() ? `<button data-act="editWord" data-id="${w.id}">Edit</button> <button class="danger" data-act="delWord" data-id="${w.id}">✕</button>` : '');
-  return `<tr class="${w.inherited ? 'inherited' : ''}"><td class="muted small">${w.id}</td><td><a data-act="openWord" data-id="${w.id}" style="cursor:pointer"><strong>${esc(w.gloss)}</strong></a>${inh}${w.meaning_changed ? `<div class="small muted">means: ${esc(w.meaning)}</div>` : ''}${w.loan_from ? `<div class="small muted">borrowed from <strong>${esc(w.loan_from)}</strong></div>` : ''}${w.ref_to ? `<div class="small muted">→ same as <strong>${esc(w.ref_gloss)}</strong> (#${w.ref_to})</div>` : ''}${(w.problems || []).map(p => `<div class="small gap">⚠ ${esc(p)}</div>`).join('')}</td><td>${esc(w.pos)}</td><td>${esc(w.build)}</td><td>${w.year}</td>
+  const lost = w.lost_year != null ? ` <span class="badge lostbadge" title="No longer used in ${esc(S.lang.name)} from ${w.lost_year}">lost ${w.lost_year}</span>` : '';
+  return `<tr class="${w.inherited ? 'inherited' : ''}${w.lost_year != null ? ' lostword' : ''}"><td class="muted small">${w.id}</td><td><a data-act="openWord" data-id="${w.id}" style="cursor:pointer"><strong>${esc(w.gloss)}</strong></a>${inh}${lost}${w.meaning_changed ? `<div class="small muted">means: ${esc(w.meaning)}</div>` : ''}${w.loan_from ? `<div class="small muted">borrowed from <strong>${esc(w.loan_from)}</strong></div>` : ''}${w.ref_to ? `<div class="small muted">→ same as <strong>${esc(w.ref_gloss)}</strong> (#${w.ref_to})</div>` : ''}${(w.problems || []).map(p => `<div class="small gap">⚠ ${esc(p)}</div>`).join('')}</td><td>${esc(w.pos)}</td><td>${esc(w.build)}</td><td>${w.year}</td>
     <td class="form">${esc(w.form)}</td><td>${d ? lines(d.latest) : '<span class="muted">—</span>'}${more ? ` <span class="badge">+${more}</span>` : ''}</td>
     <td>${w.length}</td><td>${esc(w.pronunciation)}</td><td>${esc((w.exists_in || []).join(', '))}</td>
     <td>${lines(w.latest)}${w.has_overrides ? ' <span class="badge">locked</span>' : ''}</td>
@@ -595,6 +596,14 @@ async function showWord() {
     <input id="m_year" type="number" placeholder="from year" size="8"><select id="m_mode"><option value="ADD">also means</option><option value="CHANGE">changes meaning to</option></select>
     <input id="m_text" placeholder="meaning"><button class="primary" data-act="addMeaning" data-w="${w.id}">Save</button>
     <p class="muted small">Applies to the chosen language and every branch that splits off after that year. “Changes to” replaces all earlier meanings.</p></div>`;
+  h += `<h3>Lost ${ce ? '<button data-act="toggleLoss">Mark as lost</button>' : ''}</h3>`;
+  h += (r.losses || []).length ? '<div class="small">' + r.losses.map(x => `<div>No longer used in <strong>${esc(x.lang_name)}</strong> from <strong>${x.year}</strong>${x.note ? ' · ' + esc(x.note) : ''} ${ce ? `<button class="danger" data-act="delLoss" data-id="${x.id}">✕</button>` : ''}</div>`).join('') + '</div>'
+    : '<p class="small muted">In use (not marked lost anywhere).</p>';
+  if (ce) h += `<div id="lform" class="row" hidden><select id="lo_lang">${langs.map(l => `<option value="${l[0]}">${esc(l[1])}</option>`).join('')}</select>
+    <input id="lo_year" type="number" placeholder="lost in year" size="10"><input id="lo_note" placeholder="note (optional), e.g. replaced by …" size="28">
+    <button class="primary" data-act="addLoss" data-w="${w.id}">Mark as lost</button>
+    <p class="muted small">From that year the word is no longer used in the chosen language: sentences built for later years can't use it, it shows as lost in the dictionary,
+    and branches that split off after that year never get it. Branches that split off earlier keep it (mark it lost there too if they lose it).</p></div>`;
   h += '<h3>Full history</h3><details open><summary>word</summary>' + histTable(r.history) + '</details>';
   for (const f of r.forms) h += `<details><summary>${esc(f.label)}</summary>${histTable(f.history)}</details>`;
   if (r.overrides.length) h += '<h3>Locked overrides (word)</h3>' + r.overrides.map(o => `<div>${esc((langs.find(l => l[0] === o.lang_id) || [0, '?'])[1])} ${o.year}: <span class="form">${esc(o.form)}</span> ${ce ? `<button class="danger" data-act="delOverride" data-id="${o.id}">Unlock</button>` : ''}</div>`).join('');
@@ -1106,6 +1115,13 @@ const A = {
     try { S.divergence = await api('GET', base() + '/divergence?' + q); drawDivergence(); }
     catch (e) { const o = $('#g_out'); if (o) o.innerHTML = ''; say(e.message, true); }
   },
+  toggleLoss: async () => { const f = $('#lform'); if (f) f.hidden = !f.hidden; },
+  addLoss: async d => {
+    if (val('lo_year') === '') { say('Give the year the word was lost.', true); return; }
+    const r = await api('POST', wbase() + '/edit', { entity: 'loss', action: 'CREATE', payload: { word_id: Number(d.w), lang_id: Number(val('lo_lang')), year: Number(val('lo_year')), note: val('lo_note') } });
+    say(r.status === 'pending' ? 'Submitted for approval.' : 'Marked as lost.'); await afterWordChange();
+  },
+  delLoss: async d => { const r = await api('POST', wbase() + '/edit', { entity: 'loss', action: 'DELETE', entityId: Number(d.id) }); say(r.status === 'pending' ? 'Submitted for approval.' : 'In use again.'); await afterWordChange(); },
   toggleMeaning: async () => { const f = $('#mform'); if (f) f.hidden = !f.hidden; },
   addMeaning: async d => {
     if (!val('m_year') || !val('m_text')) { say('Give a year and a meaning.', true); return; }
@@ -1289,7 +1305,7 @@ function drawAutoSounds(full) {
 document.addEventListener('input', e => {
   if (e.target.dataset.autoslider) { S.autoYear = Number(e.target.value); drawAutoSounds(false); }
 });
-const UI_VERSION = '1.5.1';   // keep equal to the version in pom.xml
+const UI_VERSION = '1.6.0';   // keep equal to the version in pom.xml
 api('GET', '/rune/api/version').then(v => {
   $('#ver').textContent = 'v' + v.version + (v.built ? ' · built ' + v.built.replace('T', ' ').replace('Z', ' UTC') : '');
   if (v.version !== UI_VERSION) {

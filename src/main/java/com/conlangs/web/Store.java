@@ -17,7 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class Store {
     private static final Map<String, String> TABLE = Map.of("word", "words", "rule", "rules", "override", "word_overrides", "form", "word_forms",
-            "gsection", "grammar_sections", "grammar", "grammar_entries", "phoneme", "phonemes", "formrule", "form_rules", "meaning", "word_meanings");
+            "gsection", "grammar_sections", "grammar", "grammar_entries", "phoneme", "phonemes", "formrule", "form_rules", "meaning", "word_meanings", "loss", "word_losses");
     private static final Map<String, List<String>> FIELDS = Map.of(
             "word", List.of("gloss", "pos", "build", "form", "year", "notes", "ref_word_id", "loan_word_id"),
             "rule", List.of("year", "ord", "name", "pattern", "replacement", "note", "tags"),
@@ -27,7 +27,8 @@ public class Store {
             "grammar", List.of("category", "name", "c1", "c2", "c3", "c4", "c5", "c6", "year", "ord"),
             "phoneme", List.of("symbol", "kind", "row_label", "col_label", "notes", "year", "year_to"),
             "formrule", List.of("grp", "label", "pos", "placement", "affix", "affix_word_id", "cond_re", "hiatus", "year", "ord"),
-            "meaning", List.of("word_id", "lang_id", "year", "mode", "meaning"));
+            "meaning", List.of("word_id", "lang_id", "year", "mode", "meaning"),
+            "loss", List.of("word_id", "lang_id", "year", "note"));
     private static final Set<String> LANG_OWNED = Set.of("word", "rule", "gsection", "grammar", "phoneme", "formrule");
     private static final Set<String> INTS = Set.of("year", "ord", "word_id", "lang_id", "year_to", "hiatus", "affix_word_id", "ref_word_id", "loan_word_id");
     private static final TypeReference<Map<String, Object>> MAP = new TypeReference<>() {};
@@ -65,7 +66,7 @@ public class Store {
 
     private Long rowLang(String entity, long id) {
         Map<String, Object> r = switch (entity) {
-            case "override", "form", "meaning" -> db.one("select w.language_id as lid from " + TABLE.get(entity) + " o join words w on w.id=o.word_id where o.id=?", id);
+            case "override", "form", "meaning", "loss" -> db.one("select w.language_id as lid from " + TABLE.get(entity) + " o join words w on w.id=o.word_id where o.id=?", id);
             default -> db.one("select language_id as lid from " + TABLE.get(entity) + " where id=?", id);
         };
         return r == null ? null : Db.num(r.get("lid"));
@@ -154,6 +155,15 @@ public class Store {
                     clean.put("mode", md);
                     clean.put("meaning", clean.get("meaning").toString().trim());
                 }
+                case "loss" -> {
+                    if (clean.get("word_id") == null || clean.get("lang_id") == null || clean.get("year") == null)
+                        throw new ApiException(400, "Marking a word lost needs word_id, lang_id and year.");
+                    if (clean.get("note") != null) {
+                        String n = clean.get("note").toString().trim();
+                        if (n.length() > 400) throw new ApiException(400, "The note can be at most 400 characters.");
+                        clean.put("note", n.isEmpty() ? null : n);
+                    }
+                }
                 case "override" -> {
                     if (clean.get("word_id") == null || clean.get("lang_id") == null || clean.get("year") == null || blank(clean.get("form")))
                         throw new ApiException(400, "An override needs word_id, lang_id, year and form.");
@@ -213,13 +223,20 @@ public class Store {
                 throw new ApiException(400, e.getMessage());
             }
         }
-        if ((entity.equals("override") || entity.equals("form") || entity.equals("meaning")) && action.equals("CREATE")) {
+        if ((entity.equals("override") || entity.equals("form") || entity.equals("meaning") || entity.equals("loss")) && action.equals("CREATE")) {
             Long wl = rowLang("word", ((Number) clean.get("word_id")).longValue());
             if (wl == null || wl != langId) throw new ApiException(404, "That word isn't in this language.");
         }
         if (entity.equals("form") && action.equals("CREATE")
                 && db.count("select count(*) from word_forms where word_id=? and lower(label)=lower(?)", clean.get("word_id"), clean.get("label")) > 0)
             throw new ApiException(409, "That word already has a '" + clean.get("label") + "' form.");
+        if (entity.equals("loss") && action.equals("CREATE")) {
+            long target = ((Number) clean.get("lang_id")).longValue();
+            if (target != langId && !access.descendants(langId).contains(target))
+                throw new ApiException(400, "A word can only be lost in its own language or in one of its branches.");
+            if (db.count("select count(*) from word_losses where word_id=? and lang_id=?", clean.get("word_id"), target) > 0)
+                throw new ApiException(409, "That word is already marked lost in that language; remove that first to change the year.");
+        }
         if ((entity.equals("override") || entity.equals("meaning")) && action.equals("CREATE")) {
             Map<String, Object> target = db.one("select l.world_id from languages l where l.id=?", clean.get("lang_id"));
             Map<String, Object> mine = access.language(langId);
