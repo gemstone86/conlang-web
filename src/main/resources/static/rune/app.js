@@ -105,7 +105,7 @@ function sideView() {
 }
 
 // ---------- panel ----------
-const TABS = [['dict', 'Dictionary'], ['rules', 'Sound changes'], ['grammar', 'Grammar'], ['forms', 'Word forms'], ['sounds', 'Sounds'], ['compound', 'Compound'], ['sentences', 'Sentences'], ['graphs', 'Graphs'], ['bulk', 'Bulk entry'],
+const TABS = [['dict', 'Dictionary'], ['missing', 'Missing words'], ['rules', 'Sound changes'], ['grammar', 'Grammar'], ['forms', 'Word forms'], ['sounds', 'Sounds'], ['compound', 'Compound'], ['sentences', 'Sentences'], ['graphs', 'Graphs'], ['bulk', 'Bulk entry'],
   ['changes', 'Changes'], ['log', 'Edit log'], ['share', 'Sharing'], ['settings', 'Settings']];
 function descendants(l) {
   const all = S.worlds.flatMap(w => w.languages), out = [];
@@ -275,6 +275,36 @@ const TAB = {
     return `<p class="muted small">Join existing words (by exact gloss) and literal pieces with +. Example: <code>hand + leaf</code>. Erosion uses the steps in Settings.</p>
     <div class="row"><input id="c_gloss" placeholder="gloss of the new word"><input id="c_parts" placeholder="part + part + part" size="40">
     <button class="primary" data-act="compPrev">Erode</button></div><div id="cprev"></div>`;
+  },
+  async missing() {
+    const r = S.missing = await api('GET', base() + '/missing');
+    const filled = r.entries.filter(e => e.word);
+    let h = `<div class="card"><p class="muted small">Meanings ${esc(S.lang.name)} has no word for yet. Mark them here as a to-do list;
+      <strong>Coin word</strong> opens the dictionary with the meaning filled in. An entry is ticked off once the language has a word
+      for it (its own or inherited). Below the list are the meanings your saved sentences need but can't find.</p>`;
+    if (canEdit()) h += `<div class="row"><input id="m_gloss" placeholder="meaning, e.g. to forgive" size="24"><input id="m_pos" placeholder="type" size="8">
+      <input id="m_notes" placeholder="note (optional)" size="30"><button class="primary" data-act="missAdd">Mark as missing</button></div>
+      <details><summary class="small">Add several at once</summary>
+      <p class="small muted">One per line: <code>meaning</code>, <code>meaning; type</code> or <code>meaning; type; note</code>.</p>
+      <textarea id="m_bulk" rows="5" placeholder="to forgive; verb&#10;thunder; noun; for the storm songs&#10;grandmother"></textarea>
+      <div class="row"><button data-act="missBulk">Add all</button></div></details>`;
+    h += '</div>';
+    h += `<h3>Missing words (${r.entries.length - filled.length})</h3>`;
+    h += r.entries.length ? `<table><tr><th>Meaning</th><th>Type</th><th>Note</th><th>Marked by</th><th></th></tr>` +
+      r.entries.map(e => `<tr class="${e.word ? 'muted' : ''}"><td><strong>${esc(e.gloss)}</strong></td><td>${esc(e.pos || '')}</td><td>${esc(e.notes || '')}</td>
+        <td class="small muted">${esc(e.created_by_name || '')}${e.created ? ' · ' + esc(String(e.created).slice(0, 10)) : ''}</td>
+        <td>${e.word ? `✓ now <span class="form">${esc(e.word.form)}</span> <a data-act="openWord" data-id="${e.word.id}" style="cursor:pointer" class="small">#${e.word.id}</a>`
+          : (canEdit() ? `<button class="primary" data-act="missCoin" data-g="${esc(e.gloss)}" data-p="${esc(e.pos || '')}">Coin word</button>` : '')}
+        ${canEdit() ? ` <button class="danger" data-act="missDel" data-id="${e.id}" title="Remove from the list">✕</button>` : ''}</td></tr>`).join('') + '</table>'
+      : '<p class="muted">Nothing marked as missing.</p>';
+    if (filled.length && canEdit()) h += `<div class="row"><button data-act="missClear">Remove the ${filled.length} that have a word now</button></div>`;
+    h += `<h3>Needed by sentences (${r.fromSentences.length})</h3>`;
+    h += r.fromSentences.length ? `<table><tr><th>Meaning</th><th>Why</th><th>Used in</th><th></th></tr>` +
+      r.fromSentences.map(g => `<tr><td><strong>${esc(g.meaning)}</strong></td><td class="small muted">${esc(g.reason)}</td>
+        <td class="small">${g.sentences.map(x => esc(x.translation || x.source)).join('<br>')}</td>
+        <td>${canEdit() ? `<button class="primary" data-act="missCoin" data-g="${esc(g.meaning)}" data-p="">Coin word</button> <button data-act="missMark" data-g="${esc(g.meaning)}">Mark as missing</button>` : ''}</td></tr>`).join('') + '</table>'
+      : '<p class="muted">Every word in the saved sentences is in the dictionary.</p>';
+    return h;
   },
   async sentences() {
     const list = S.sentList = await api('GET', base() + '/sentences');
@@ -629,6 +659,25 @@ const A = {
       + (data.warnings.length ? '\n\nNotes:\n' + data.warnings.join('\n') : ''));
     S.lang = null; say('');
     await boot();
+  },
+  missAdd: async () => {
+    await api('POST', base() + '/missing', { gloss: val('m_gloss'), pos: val('m_pos'), notes: val('m_notes') });
+    say('Marked as missing.'); await renderPanel(); $('#m_gloss').focus();
+  },
+  missBulk: async () => {
+    const r = await api('POST', base() + '/missing/bulk', { text: val('m_bulk') });
+    say('Added ' + r.added.length + '.' + (r.onList.length ? ' On the list already: ' + r.onList.join(', ') + '.' : '')
+      + (r.haveWord.length ? ' Has a word already: ' + r.haveWord.join(', ') + '.' : '') + (r.bad.length ? ' Not added (brackets or too long): ' + r.bad.join(', ') + '.' : ''));
+    await renderPanel();
+  },
+  missMark: async d => { await api('POST', base() + '/missing', { gloss: d.g }); say('Marked as missing.'); await renderPanel(); },
+  missDel: async d => { await api('DELETE', '/rune/api/missing/' + d.id); await renderPanel(); },
+  missClear: async () => { const r = await api('POST', base() + '/missing/clear-filled'); say('Removed ' + r.removed + '.'); await renderPanel(); },
+  missCoin: async d => {
+    S.tab = 'dict'; await renderPanel();
+    if (!$('#w_gloss')) return;
+    $('#w_gloss').value = d.g; if (d.p && $('#w_pos')) $('#w_pos').value = d.p;
+    $('#w_form').focus(); say('Give "' + d.g + '" a form, then add it. It is ticked off on the Missing words tab.');
   },
   resetCode: async () => {
     const u = prompt('Username to issue a reset code for:'); if (!u) return;
@@ -1096,7 +1145,7 @@ function drawAutoSounds(full) {
 document.addEventListener('input', e => {
   if (e.target.dataset.autoslider) { S.autoYear = Number(e.target.value); drawAutoSounds(false); }
 });
-const UI_VERSION = '1.1.0';   // keep equal to the version in pom.xml
+const UI_VERSION = '1.2.0';   // keep equal to the version in pom.xml
 api('GET', '/rune/api/version').then(v => {
   $('#ver').textContent = 'v' + v.version + (v.built ? ' · built ' + v.built.replace('T', ' ').replace('Z', ' UTC') : '');
   if (v.version !== UI_VERSION) {

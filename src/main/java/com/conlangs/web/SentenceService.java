@@ -1,6 +1,7 @@
 package com.conlangs.web;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -317,5 +318,77 @@ public class SentenceService {
         out.put("gloss", String.join(" ", glosses));
         out.put("gaps", gaps);
         return out;
+    }
+
+    // ---------------- missing words ----------------
+
+    /** A year after anything a language will have: "does the language ever get a word for this?". */
+    private static final int ANY_YEAR = 1_000_000;
+
+    /** Is the sentence builder's gap for this part a missing word (not a missing form)? */
+    private static boolean missingWord(String reason) {
+        return reason != null && (reason.equals("no word with that meaning") || reason.contains("(coined after the split)")
+                || reason.contains("points to a word that doesn't exist"));
+    }
+
+    /**
+     * For each meaning, the word this language uses for it (its own or inherited, any year) as
+     * {id, gloss, form}, or no entry if it has none. Same lookup as the sentence builder.
+     */
+    public Map<String, Map<String, Object>> wordsFor(long uid, long langId, Collection<String> meanings) {
+        access.need(uid, langId, Access.VIEWER);
+        Map<String, Map<String, Object>> out = new HashMap<>();
+        if (meanings.isEmpty()) return out;
+        Ctx c = new Ctx(langId);
+        for (String m : meanings) {
+            if (m == null || m.isBlank() || m.contains("(") || m.contains(")")) continue;
+            Map<String, Object> built = build(c, "(" + m.trim() + ")", ANY_YEAR);
+            if (((Number) built.get("gaps")).intValue() > 0) continue;
+            @SuppressWarnings("unchecked")
+            Map<String, Object> part = ((List<Map<String, Object>>) ((List<Map<String, Object>>) built.get("words")).get(0).get("parts")).get(0);
+            Map<String, Object> w = new LinkedHashMap<>();
+            w.put("id", part.get("word_id"));
+            w.put("gloss", part.get("gloss"));
+            w.put("form", built.get("surface"));
+            out.put(m, w);
+        }
+        return out;
+    }
+
+    /**
+     * Meanings the saved sentences use that this language has no word for, each with why and which
+     * sentences need it: [{meaning, reason, sentences: [{id, translation, source, year}]}].
+     */
+    public List<Map<String, Object>> sentenceGaps(long uid, long langId) {
+        Map<String, Map<String, Object>> byMeaning = new LinkedHashMap<>();
+        for (Map<String, Object> s : list(uid, langId)) {
+            @SuppressWarnings("unchecked") Map<String, Object> built = (Map<String, Object>) s.get("built");
+            @SuppressWarnings("unchecked") List<Map<String, Object>> words = (List<Map<String, Object>>) built.get("words");
+            for (Map<String, Object> word : words) {
+                @SuppressWarnings("unchecked") List<Map<String, Object>> parts = (List<Map<String, Object>>) word.get("parts");
+                for (Map<String, Object> p : parts) {
+                    if (!Boolean.FALSE.equals(p.get("ok")) || !missingWord((String) p.get("reason"))) continue;
+                    String meaning = ID.matcher(p.get("input").toString()).replaceAll("").trim();
+                    if (meaning.isEmpty()) continue;
+                    Map<String, Object> g = byMeaning.computeIfAbsent(meaning.toLowerCase(), k -> {
+                        Map<String, Object> m = new LinkedHashMap<>();
+                        m.put("meaning", meaning);
+                        m.put("reason", p.get("reason"));
+                        m.put("sentences", new ArrayList<Map<String, Object>>());
+                        return m;
+                    });
+                    @SuppressWarnings("unchecked") List<Map<String, Object>> used = (List<Map<String, Object>>) g.get("sentences");
+                    if (used.stream().noneMatch(x -> x.get("id").equals(s.get("id")))) {
+                        Map<String, Object> ref = new LinkedHashMap<>();
+                        ref.put("id", s.get("id"));
+                        ref.put("translation", s.get("translation"));
+                        ref.put("source", s.get("source"));
+                        ref.put("year", s.get("year"));
+                        used.add(ref);
+                    }
+                }
+            }
+        }
+        return new ArrayList<>(byMeaning.values());
     }
 }
