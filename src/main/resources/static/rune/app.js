@@ -1083,7 +1083,8 @@ const A = {
   cancelRule: async () => renderPanel(),
   excelDict: async () => {
     const d = await excelUpload('/rune/api/admin/import-elven');
-    const groups = Object.entries(d.perGroup || {}).map(([g, n]) => g + ': ' + n).join(', ');
+    const per = Object.entries(d.perGroup || {}).map(([g, n]) => (g === '(none)' ? S.lang.name : g) + ': ' + n);
+    const groups = per.length > 1 ? per.join(', ') : '';
     say('Imported ' + d.imported + ' words' + (groups ? ' (' + groups + ')' : '') + '.' + (d.alreadyThere ? ' ' + d.alreadyThere + ' were there already.' : '')
       + (d.skippedCount ? ' ' + d.skippedCount + ' rows skipped.' : ''));
     $('#gx_out').innerHTML = d.skippedCount ? '<p class="small"><strong>Skipped rows</strong>' + (d.skippedCount > d.skipped.length ? ' (first ' + d.skipped.length + ')' : '') + ':</p><ul class="small">'
