@@ -55,7 +55,7 @@ public class ImportService {
 
     public Map<String, Object> importDictionary(InputStream in, long langId, long uid) throws Exception {
         List<String> skipped = new ArrayList<>();
-        int imported = 0;
+        int imported = 0, already = 0;
         // Route each row to the language whose name equals its 'group' (case-insensitive); anything else goes to langId.
         Map<String, Long> byName = new HashMap<>();
         for (Map<String, Object> l : db.rows("select id, name from languages where world_id=(select world_id from languages where id=?)", langId)) {
@@ -91,6 +91,11 @@ public class ImportService {
                 if (b.equals("shifted") || b.equals("indexed")) continue;
                 String grp = col.containsKey("group") ? text(r.getCell(col.get("group"))) : null;
                 long target = grp == null ? langId : byName.getOrDefault(grp.trim().toLowerCase(), langId);
+                // importing the same file again doesn't add the words twice
+                if (db.count("select count(*) from words where language_id=? and lower(gloss)=lower(?) and form=?", target, gloss.trim(), form.trim()) > 0) {
+                    already++;
+                    continue;
+                }
                 Map<String, Object> p = new LinkedHashMap<>();
                 p.put("gloss", gloss.trim());
                 p.put("form", form.trim());
@@ -113,6 +118,7 @@ public class ImportService {
         for (long t : touched) db.update("delete from edit_log where language_id=?", t);
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("imported", imported);
+        out.put("alreadyThere", already);
         out.put("perGroup", perGroup);
         out.put("skipped", skipped.size() > 50 ? skipped.subList(0, 50) : skipped);
         out.put("skippedCount", skipped.size());

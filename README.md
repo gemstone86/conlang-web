@@ -196,6 +196,13 @@ Deleting a word also deletes its locked overrides, and Undo does not bring those
 ## v0.18.2
 - A form that starts earlier than its word is no longer reported as a problem: the word simply uses the form as it has evolved by the word's own year.
 
+## v1.8.0 (combined app)
+- **Import from Excel** (admins who own the language; on the Grammar and Bulk entry tabs): pick an .xlsx workbook, then
+  **Import dictionary** (sheet "Ygg Elven dict": *dictionary*, *elven*, *build*, *year*, optionally *type*, *notes*, *group*)
+  and/or **Import grammar and sounds** (sheet "Ygg Elven": grammar tables in columns A-G, consonant and vowel grids).
+  The two importers existed already but had no button. Importing the dictionary again skips words that are there with
+  the same meaning and form, so it doesn't add them twice; grammar asks before replacing what the language has.
+
 ## v1.7.0 (combined app)
 - **Dictionaries are kept between page loads**: a worked-out dictionary is handed out again until anything in the data
   changes (in the test: 0.25–0.5 s → 30–70 ms for a repeat load). Any edit anywhere (a word, sound change, setting,
