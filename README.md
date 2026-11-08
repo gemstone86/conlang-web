@@ -176,6 +176,12 @@ Deleting a word also deletes its locked overrides, and Undo does not bring those
 ## v0.18.2
 - A form that starts earlier than its word is no longer reported as a problem: the word simply uses the form as it has evolved by the word's own year.
 
+## v1.3.0 (combined app)
+- **Compound** tab: the language's missing words (and the meanings saved sentences need) are listed on the right, with a
+  filter. Click one to coin the compound for it: its meaning and type are filled in, and **Use as word** saves the eroded
+  form under that meaning, which takes it off the list. New *type* field for the compound.
+- **Missing words** tab: a **Compound** button next to *Coin word* opens the Compound tab with that meaning picked.
+
 ## v1.2.0 (combined app)
 - **Missing words** tab (next to Dictionary): mark meanings a language has no word for yet, one at a time or several at once
   (`meaning; type; note` per line). **Coin word** opens the dictionary with the meaning filled in; an entry is ticked off once the

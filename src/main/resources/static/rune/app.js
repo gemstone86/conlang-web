@@ -272,9 +272,15 @@ const TAB = {
   },
   async compound() {
     if (!canEdit()) return '<p class="muted">Editors only.</p>';
-    return `<p class="muted small">Join existing words (by exact gloss) and literal pieces with +. Example: <code>hand + leaf</code>. Erosion uses the steps in Settings.</p>
-    <div class="row"><input id="c_gloss" placeholder="gloss of the new word"><input id="c_parts" placeholder="part + part + part" size="40">
-    <button class="primary" data-act="compPrev">Erode</button></div><div id="cprev"></div>`;
+    let miss = { entries: [], fromSentences: [] };
+    try { miss = S.missing = await api('GET', base() + '/missing'); } catch (e) { /* the side list is optional */ }
+    return `<div class="compwrap"><div class="compmain">
+    <p class="muted small">Join existing words (by exact gloss) and literal pieces with +. Example: <code>hand + leaf</code>. Erosion uses the steps in Settings.
+    Pick a meaning from the missing words on the right to coin the compound for it.</p>
+    <div class="row"><input id="c_gloss" placeholder="gloss of the new word" value="${esc(S.compPick ? S.compPick.g : '')}"><input id="c_pos" placeholder="type" size="8" value="${esc(S.compPick ? S.compPick.p : '')}">
+    <input id="c_parts" placeholder="part + part + part" size="40">
+    <button class="primary" data-act="compPrev">Erode</button></div><div id="cprev"></div></div>
+    <aside class="card compside"><h3>Missing words</h3><input id="c_missq" placeholder="filter" size="16"><div id="c_misslist">${compMissList(miss)}</div></aside></div>`;
   },
   async missing() {
     const r = S.missing = await api('GET', base() + '/missing');
@@ -294,7 +300,7 @@ const TAB = {
       r.entries.map(e => `<tr class="${e.word ? 'muted' : ''}"><td><strong>${esc(e.gloss)}</strong></td><td>${esc(e.pos || '')}</td><td>${esc(e.notes || '')}</td>
         <td class="small muted">${esc(e.created_by_name || '')}${e.created ? ' · ' + esc(String(e.created).slice(0, 10)) : ''}</td>
         <td>${e.word ? `✓ now <span class="form">${esc(e.word.form)}</span> <a data-act="openWord" data-id="${e.word.id}" style="cursor:pointer" class="small">#${e.word.id}</a>`
-          : (canEdit() ? `<button class="primary" data-act="missCoin" data-g="${esc(e.gloss)}" data-p="${esc(e.pos || '')}">Coin word</button>` : '')}
+          : (canEdit() ? `<button class="primary" data-act="missCoin" data-g="${esc(e.gloss)}" data-p="${esc(e.pos || '')}">Coin word</button> <button data-act="missCompound" data-g="${esc(e.gloss)}" data-p="${esc(e.pos || '')}" title="Make it a compound of existing words">Compound</button>` : '')}
         ${canEdit() ? ` <button class="danger" data-act="missDel" data-id="${e.id}" title="Remove from the list">✕</button>` : ''}</td></tr>`).join('') + '</table>'
       : '<p class="muted">Nothing marked as missing.</p>';
     if (filled.length && canEdit()) h += `<div class="row"><button data-act="missClear">Remove the ${filled.length} that have a word now</button></div>`;
@@ -627,6 +633,20 @@ const TPL = {
   geminate: ['({C})\\1', '$1'], cluster: ['({C})({C})(?={C})', '$2']
 };
 
+// ---------- compound: missing words on the side ----------
+function compMissList(miss) {
+  const open = miss.entries.filter(e => !e.word), sel = S.compPick && S.compPick.g.toLowerCase();
+  const item = (g, p, note) => `<a class="misspick${sel === g.toLowerCase() ? ' on' : ''}" data-act="compPick" data-g="${esc(g)}" data-p="${esc(p || '')}" title="${esc(note || 'Coin the compound for this meaning')}">${esc(g)}${p ? ` <span class="small muted">${esc(p)}</span>` : ''}</a>`;
+  let h = open.length ? open.map(e => item(e.gloss, e.pos, e.notes)).join('') : '<p class="small muted">None marked as missing.</p>';
+  if (miss.fromSentences.length) h += '<h4 class="small muted">Needed by sentences</h4>' + miss.fromSentences.map(g => item(g.meaning, '', 'Used in: ' + g.sentences.map(x => x.translation || x.source).join(' / '))).join('');
+  return h;
+}
+function filterMissList() {
+  const q = (val('c_missq') || '').trim().toLowerCase();
+  document.querySelectorAll('#c_misslist .misspick').forEach(a => { a.hidden = !!q && !a.dataset.g.toLowerCase().includes(q); });
+}
+document.addEventListener('input', e => { if (e.target.id === 'c_missq') filterMissList(); });
+
 // ---------- actions ----------
 const A = {
   logout: async () => { await api('POST', '/api/auth/logout'); location.href = '/'; },
@@ -670,6 +690,7 @@ const A = {
       + (r.haveWord.length ? ' Has a word already: ' + r.haveWord.join(', ') + '.' : '') + (r.bad.length ? ' Not added (brackets or too long): ' + r.bad.join(', ') + '.' : ''));
     await renderPanel();
   },
+  missCompound: async d => { S.compPick = { g: d.g, p: d.p || '' }; S.tab = 'compound'; await renderPanel(); if ($('#c_parts')) $('#c_parts').focus(); },
   missMark: async d => { await api('POST', base() + '/missing', { gloss: d.g }); say('Marked as missing.'); await renderPanel(); },
   missDel: async d => { await api('DELETE', '/rune/api/missing/' + d.id); await renderPanel(); },
   missClear: async () => { const r = await api('POST', base() + '/missing/clear-filled'); say('Removed ' + r.removed + '.'); await renderPanel(); },
@@ -691,7 +712,7 @@ const A = {
     await api('POST', '/rune/api/languages', { worldId: Number(d.w), name: n }); await loadWorlds(); render();
   },
   pick: async d => { S.lang = S.worlds.flatMap(w => w.languages).find(l => l.id === Number(d.id)); S.tab = 'dict'; render(); },
-  tab: async d => { S.tab = d.t; if (d.t !== 'forms') S.prefill = null; renderPanel(); },
+  tab: async d => { S.tab = d.t; if (d.t !== 'compound') S.compPick = null; if (d.t !== 'forms') S.prefill = null; renderPanel(); },
   undo: async () => { const r = await api('POST', base() + '/undo'); say('Undid ' + r.undone); renderPanel(); },
   redo: async () => { const r = await api('POST', base() + '/redo'); say('Redid ' + r.redone); renderPanel(); },
 
@@ -1008,11 +1029,25 @@ const A = {
     $('#cprev').innerHTML = `<p class="small muted">From: ${esc(r.parts.join(' + '))}</p><table><tr><th>Form</th><th>Step</th><th></th></tr>` +
       r.steps.map((s, i) => `<tr><td class="form">${esc(s.form)}</td><td class="small">${esc(s.rule)}</td><td><button data-act="compUse" data-i="${i}">Use as word</button></td></tr>`).join('') + '</table>';
   },
+  compPick: async d => {
+    S.compPick = { g: d.g, p: d.p || '' };
+    $('#c_gloss').value = d.g; $('#c_pos').value = d.p || '';
+    document.querySelectorAll('#c_misslist .misspick').forEach(a => a.classList.toggle('on', a.dataset.g === d.g));
+    $('#c_parts').focus();
+    say('Now join words for "' + d.g + '" and click Erode.');
+  },
   compUse: async d => {
     const s = S.comp.steps[Number(d.i)];
-    if (!S.comp.gloss) { say('Enter a gloss first.', true); return; }
-    const r = await api('POST', base() + '/edit', { entity: 'word', action: 'CREATE', payload: { gloss: S.comp.gloss, build: 'compound', form: s.form, notes: 'compound: ' + S.comp.parts.join(' + ') } });
-    say(r.status === 'pending' ? 'Submitted for approval.' : 'Word added.');
+    const gloss = val('c_gloss').trim() || S.comp.gloss, pos = val('c_pos').trim();
+    if (!gloss) { say('Enter a gloss first, or pick a missing word on the right.', true); return; }
+    const payload = { gloss, build: 'compound', form: s.form, notes: 'compound: ' + S.comp.parts.join(' + ') };
+    if (pos) payload.pos = pos;
+    const r = await api('POST', base() + '/edit', { entity: 'word', action: 'CREATE', payload });
+    S.words = [];
+    if (r.status === 'pending') { say('Submitted for approval. "' + gloss + '" leaves the missing words once the owner approves it.'); return; }
+    say('Word added: ' + gloss + ' = ' + s.form + '.');
+    S.compPick = null; $('#c_gloss').value = ''; $('#c_pos').value = '';
+    try { S.missing = await api('GET', base() + '/missing'); $('#c_misslist').innerHTML = compMissList(S.missing); filterMissList(); } catch (e) { /* list refresh is optional */ }
   },
   bulkCheck: async () => {
     const r = await api('POST', base() + '/bulk', { text: val('b_text'), dryRun: true, skipExisting: $('#b_skip').checked });
@@ -1145,7 +1180,7 @@ function drawAutoSounds(full) {
 document.addEventListener('input', e => {
   if (e.target.dataset.autoslider) { S.autoYear = Number(e.target.value); drawAutoSounds(false); }
 });
-const UI_VERSION = '1.2.0';   // keep equal to the version in pom.xml
+const UI_VERSION = '1.3.0';   // keep equal to the version in pom.xml
 api('GET', '/rune/api/version').then(v => {
   $('#ver').textContent = 'v' + v.version + (v.built ? ' · built ' + v.built.replace('T', ' ').replace('Z', ' UTC') : '');
   if (v.version !== UI_VERSION) {
