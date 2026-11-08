@@ -190,7 +190,8 @@ const TAB = {
   async rules() {
     if (!S.ruleScope) { try { S.ruleScope = localStorage.getItem('ruleScope') || 'branches'; } catch (x) { S.ruleScope = 'branches'; } }
     const scope = S.ruleScope;
-    const rules = S.rules = await api('GET', base() + '/rules?scope=' + scope);
+    const [rules, versions] = await Promise.all([api('GET', base() + '/rules?scope=' + scope), api('GET', base() + '/rule-versions').catch(() => [])]);
+    S.rules = rules; S.ruleVersions = versions;
     const targets = [S.lang, ...descendants(S.lang)].filter(l => l.level >= 2);
     const seg = (v, t) => `<button data-act="ruleScope" data-v="${v}" class="${scope === v ? 'primary' : ''}">${t}</button>`;
     let h = `<div class="row"><span class="small muted">Show</span> ${seg('self', 'only ' + esc(S.lang.name))} ${seg('branches', esc(S.lang.name) + ' + all its branches')} ${seg('path', 'full path (ancestors + ' + esc(S.lang.name) + ')')}
@@ -206,12 +207,18 @@ const TAB = {
       <option value="haplology">Haplology</option><option value="geminate">Geminate simplification</option><option value="cluster">Cluster reduction</option></select>
       <input id="r_year" type="number" placeholder="year" size="6"><input id="r_ord" type="number" placeholder="order" size="4" value="0">
       <input id="r_name" placeholder="name"><input id="r_pat" placeholder="pattern (regex, {V} classes, # = word edge)" size="34" class="form">
-      <input id="r_rep" placeholder="replacement ($1)" size="14" class="form"><input id="r_id" type="hidden"></div>
+      <input id="r_rep" placeholder="replacement ($1)" size="14" class="form">
+      <input id="r_tags" placeholder="tags, e.g. vowel shift, experimental" size="26" list="r_taglist"><datalist id="r_taglist">${ruleTagList(rules).map(t => `<option value="${esc(t.tag)}">`).join('')}</datalist><input id="r_id" type="hidden"></div>
       <div class="row"><button data-act="previewRule">Preview effect</button><button class="primary" data-act="addRule" id="r_btn">Add rule</button><button data-act="cancelRule" id="r_cancel" hidden>Cancel edit</button>
       <span class="muted small">A rule on a branch only affects that branch and its own branches. Define classes like V=aeiou in Settings.</span></div><div id="rprev"></div></div>`;
-    h += '<table><tr><th>Year</th><th>Language</th><th>Order</th><th>Name</th><th>Pattern</th><th>Replacement</th><th></th></tr>';
-    for (const r of rules) h += `<tr><td>${r.year}</td><td>${esc(r.lang_name)}</td><td>${r.ord}</td><td>${esc(r.name)}</td><td class="form">${esc(r.pattern)}</td><td class="form">${esc(r.replacement)}</td>
+    h += ruleVersionsCard(versions);
+    h += ruleTagBar(rules);
+    const shown = S.ruleTag ? rules.filter(r => ruleTags(r).some(t => t.toLowerCase() === S.ruleTag)) : rules;
+    h += '<table><tr><th>Year</th><th>Language</th><th>Order</th><th>Name</th><th>Pattern</th><th>Replacement</th><th>Tags</th><th></th></tr>';
+    for (const r of shown) h += `<tr class="${r.off ? 'ruleoff' : ''}" ${r.off ? `title="Switched off in ${esc(r.off_in)}: left out when words evolve"` : ''}><td>${r.year}</td><td>${esc(r.lang_name)}</td><td>${r.ord}</td><td>${esc(r.name)}${r.off ? ' <span class="badge">off</span>' : ''}</td><td class="form">${esc(r.pattern)}</td><td class="form">${esc(r.replacement)}</td>
+      <td>${ruleTags(r).map(t => `<a class="tagchip small${S.ruleTag === t.toLowerCase() ? ' on' : ''}" data-act="ruleTagFilter" data-t="${esc(t)}">${esc(t)}</a>`).join(' ')}</td>
       <td>${r.level >= 2 ? `<button data-act="editRule" data-id="${r.id}">Edit</button> <button class="danger" data-act="delRule" data-id="${r.id}">✕</button>` : ''}</td></tr>`;
+    if (!shown.length) h += `<tr><td colspan="8" class="muted">${S.ruleTag ? 'No sound changes with that tag here.' : 'No sound changes yet.'}</td></tr>`;
     return h + '</table>';
   },
   async grammar() {
@@ -661,6 +668,50 @@ const TPL = {
   geminate: ['({C})\\1', '$1'], cluster: ['({C})({C})(?={C})', '$2']
 };
 
+// ---------- sound changes: tags and versions ----------
+const ruleTags = r => (r.tags || '').split(',').map(t => t.trim()).filter(Boolean);
+function ruleTagList(rules) {
+  const m = new Map();
+  for (const r of rules) for (const t of ruleTags(r)) { const k = t.toLowerCase(); const e = m.get(k) || { tag: t, n: 0, off: 0 }; e.n++; if (r.off) e.off++; m.set(k, e); }
+  for (const t of (S.lang.off_tags || '').split(',').map(x => x.trim()).filter(Boolean)) if (!m.has(t.toLowerCase())) m.set(t.toLowerCase(), { tag: t, n: 0, off: 0 });
+  return [...m.values()].sort((a, b) => a.tag.localeCompare(b.tag));
+}
+function ruleTagBar(rules) {
+  const tags = ruleTagList(rules);
+  if (!tags.length) return '';
+  const ownOff = new Set((S.lang.off_tags || '').split(',').map(x => x.trim().toLowerCase()).filter(Boolean));
+  return `<div class="card"><div class="row"><strong>Tags</strong> <span class="small muted">click one to show only those sound changes${isOwner() ? '; switching a tag off leaves its sound changes out (here and in all branches) until you switch it on again' : ''}</span>
+    ${S.ruleTag ? '<button data-act="ruleTagFilter" data-t="">Show all</button>' : ''}</div><div class="row">` + tags.map(t => {
+      const k = t.tag.toLowerCase(), mine = ownOff.has(k), inherited = !mine && t.off > 0;
+      return `<span class="tagbox${mine || inherited ? ' isoff' : ''}"><a class="tagchip${S.ruleTag === k ? ' on' : ''}" data-act="ruleTagFilter" data-t="${esc(t.tag)}">${esc(t.tag)} <span class="small">(${t.n})</span></a>`
+        + (mine ? ' <span class="small">off</span>' : inherited ? ' <span class="small" title="Switched off in a parent language">off above</span>' : '')
+        + (isOwner() && !inherited ? ` <button class="small" data-act="ruleTagSwitch" data-t="${esc(t.tag)}" data-off="${mine ? 'false' : 'true'}">${mine ? 'Switch on' : 'Switch off'}</button>` : '') + '</span>';
+    }).join(' ') + '</div></div>';
+}
+function ruleVersionsCard(versions) {
+  const when = v => esc(String(v.created || '').slice(0, 16).replace('T', ' '));
+  return `<details class="card" ${S.ruleVersionsOpen ? 'open' : ''} data-versions="1"><summary><strong>Versions</strong> <span class="small muted">(${versions.length}) save ${esc(S.lang.name)}'s sound changes as they are now, compare and restore</span></summary>
+    ${canEdit() ? `<div class="row"><input id="rv_name" placeholder="name, e.g. before the vowel shift" size="28"><input id="rv_note" placeholder="note (optional)" size="34">
+      <button class="primary" data-act="ruleVersionSave">Save version</button></div>` : ''}
+    <p class="small muted">A version holds ${esc(S.lang.name)}'s own sound changes (not its branches') and the tags switched off in it.${isOwner() ? ' Restoring one first saves the sound changes as they are now as a version, so you can always go back.' : ''}</p>`
+    + (versions.length ? '<table><tr><th>Name</th><th>Note</th><th>Saved</th><th>Rules</th><th></th></tr>' + versions.map(v => `<tr><td><strong>${esc(v.name)}</strong></td><td class="small">${esc(v.note || '')}</td>
+      <td class="small">${when(v)} · ${esc(v.created_by_name || '')}</td><td>${v.rule_count}</td>
+      <td><button data-act="ruleVersionCompare" data-id="${v.id}">Compare</button>${isOwner() ? ` <button data-act="ruleVersionRestore" data-id="${v.id}" data-n="${esc(v.name)}">Restore</button>` : ''}${isOwner() || (canEdit() && v.created_by === S.me.id) ? ` <button class="danger" data-act="ruleVersionDel" data-id="${v.id}" data-n="${esc(v.name)}">✕</button>` : ''}</td></tr>`).join('') + '</table>'
+      : '<p class="muted">No versions saved yet.</p>') + '<div id="rv_out"></div></details>';
+}
+function ruleRow(r) { return `<td>${r.year}</td><td>${r.ord ?? 0}</td><td>${esc(r.name || '')}</td><td class="form">${esc(r.pattern)}</td><td class="form">${esc(r.replacement || '')}</td><td class="small">${esc(r.tags || '')}</td>`; }
+function ruleCompareView(c) {
+  const v = c.version, head = '<tr><th>Year</th><th>Order</th><th>Name</th><th>Pattern</th><th>Replacement</th><th>Tags</th></tr>';
+  if (c.same) return `<p class="card">No changes since <strong>${esc(v.name)}</strong>.</p>`;
+  let h = `<div class="card"><h4>Since “${esc(v.name)}”: ${c.added.length} added, ${c.removed.length} removed, ${c.changed.length} changed</h4>`;
+  if (c.added.length) h += '<p><strong>Added since</strong></p><table>' + head + c.added.map(r => `<tr class="diffadd">${ruleRow(r)}</tr>`).join('') + '</table>';
+  if (c.removed.length) h += '<p><strong>Removed since</strong></p><table>' + head + c.removed.map(r => `<tr class="diffdel">${ruleRow(r)}</tr>`).join('') + '</table>';
+  if (c.changed.length) h += '<p><strong>Changed since</strong></p><table><tr><th>Sound change</th><th>What</th><th>Then</th><th>Now</th></tr>' + c.changed.map(x => x.fields.map((f, i) =>
+    `<tr>${i === 0 ? `<td rowspan="${x.fields.length}">${esc(x.now.name || x.now.pattern)} <span class="small muted">#${x.id}</span></td>` : ''}<td>${esc(f)}</td><td class="form diffdel">${esc(x.then[f] ?? '')}</td><td class="form diffadd">${esc(x.now[f] ?? '')}</td></tr>`).join('')).join('') + '</table>';
+  if ((c.offTags.then || '') !== (c.offTags.now || '')) h += `<p>Tags switched off then: <strong>${esc(c.offTags.then || 'none')}</strong>; now: <strong>${esc(c.offTags.now || 'none')}</strong></p>`;
+  return h + '</div>';
+}
+
 // ---------- compound: missing words on the side ----------
 function compMissList(miss) {
   const open = miss.entries.filter(e => !e.word), sel = S.compPick && S.compPick.g.toLowerCase();
@@ -674,6 +725,7 @@ function filterMissList() {
   document.querySelectorAll('#c_misslist .misspick').forEach(a => { a.hidden = !!q && !a.dataset.g.toLowerCase().includes(q); });
 }
 document.addEventListener('input', e => { if (e.target.id === 'c_missq') filterMissList(); });
+document.addEventListener('toggle', e => { if (e.target.dataset && e.target.dataset.versions) S.ruleVersionsOpen = e.target.open; }, true);
 
 // ---------- actions ----------
 const A = {
@@ -740,7 +792,7 @@ const A = {
     await api('POST', '/rune/api/languages', { worldId: Number(d.w), name: n }); await loadWorlds(); render();
   },
   pick: async d => { S.lang = S.worlds.flatMap(w => w.languages).find(l => l.id === Number(d.id)); S.tab = 'dict'; render(); },
-  tab: async d => { S.tab = d.t; if (d.t !== 'compound') S.compPick = null; if (d.t !== 'forms') S.prefill = null; renderPanel(); },
+  tab: async d => { S.tab = d.t; if (d.t !== 'rules') S.ruleTag = null; if (d.t !== 'compound') S.compPick = null; if (d.t !== 'forms') S.prefill = null; renderPanel(); },
   undo: async () => { const r = await api('POST', base() + '/undo'); say('Undid ' + r.undone); renderPanel(); },
   redo: async () => { const r = await api('POST', base() + '/redo'); say('Redid ' + r.redone); renderPanel(); },
 
@@ -983,16 +1035,36 @@ const A = {
   addRule: async () => {
     const id = val('r_id'), lang = val('r_lang') || S.lang.id;
     const r = await api('POST', '/rune/api/languages/' + lang + '/edit', { entity: 'rule', action: id ? 'UPDATE' : 'CREATE', entityId: id ? Number(id) : null,
-      payload: { year: Number(val('r_year')), ord: Number(val('r_ord') || 0), name: val('r_name'), pattern: val('r_pat'), replacement: val('r_rep') } });
+      payload: { year: Number(val('r_year')), ord: Number(val('r_ord') || 0), name: val('r_name'), pattern: val('r_pat'), replacement: val('r_rep'), tags: val('r_tags') } });
     say(r.status === 'pending' ? 'Submitted for the owner to approve.' : (id ? 'Rule saved.' : 'Rule added.')); renderPanel();
   },
   editRule: async d => {
     const r = S.rules.find(x => x.id === Number(d.id));
-    for (const [k, v] of [['year', r.year], ['ord', r.ord], ['name', r.name], ['pat', r.pattern], ['rep', r.replacement]]) $('#r_' + k).value = v ?? '';
+    for (const [k, v] of [['year', r.year], ['ord', r.ord], ['name', r.name], ['pat', r.pattern], ['rep', r.replacement], ['tags', r.tags]]) $('#r_' + k).value = v ?? '';
     $('#r_id').value = r.id; if (![...$('#r_lang').options].some(o => o.value === String(r.language_id))) $('#r_lang').add(new Option(r.lang_name, r.language_id));
     $('#r_lang').value = r.language_id; $('#r_lang').disabled = true; $('#r_btn').textContent = 'Save changes'; $('#r_cancel').hidden = false; window.scrollTo(0, 0);
   },
   cancelRule: async () => renderPanel(),
+  ruleTagFilter: async d => { const k = (d.t || '').toLowerCase(); S.ruleTag = !k || S.ruleTag === k ? null : k; await renderPanel(); },
+  ruleTagSwitch: async d => {
+    const r = await api('POST', base() + '/tag-switch', { tag: d.t, off: d.off === 'true' });
+    S.lang.off_tags = r.off_tags; say('Sound changes tagged "' + d.t + '" are ' + (d.off === 'true' ? 'switched off' : 'on again') + '.'); await renderPanel();
+  },
+  ruleVersionSave: async () => {
+    const r = await api('POST', base() + '/rule-versions', { name: val('rv_name'), note: val('rv_note') });
+    S.ruleVersionsOpen = true; say('Saved as version #' + r.id + '.'); await renderPanel();
+  },
+  ruleVersionCompare: async d => { $('#rv_out').innerHTML = ruleCompareView(await api('GET', '/rune/api/rule-versions/' + d.id + '/compare')); },
+  ruleVersionRestore: async d => {
+    if (!confirm('Restore "' + d.n + '"? ' + S.lang.name + "'s sound changes become as they were in that version. The sound changes as they are now are saved as a version first, so you can go back.")) return;
+    const r = await api('POST', '/rune/api/rule-versions/' + d.id + '/restore');
+    S.ruleVersionsOpen = true; await loadWorlds(); S.lang = S.worlds.flatMap(w => w.languages).find(l => l.id === S.lang.id) || S.lang;
+    say('Restored ' + r.restored + ' sound changes. The ones before were saved as version #' + r.savedFirst + '.'); await renderPanel();
+  },
+  ruleVersionDel: async d => {
+    if (!confirm('Delete the version "' + d.n + '"? The sound changes themselves are not touched.')) return;
+    await api('DELETE', '/rune/api/rule-versions/' + d.id); S.ruleVersionsOpen = true; await renderPanel();
+  },
   delRule: async d => {
     if (!confirm('Delete this rule?')) return;
     const rule = S.rules.find(x => x.id === Number(d.id));
@@ -1217,7 +1289,7 @@ function drawAutoSounds(full) {
 document.addEventListener('input', e => {
   if (e.target.dataset.autoslider) { S.autoYear = Number(e.target.value); drawAutoSounds(false); }
 });
-const UI_VERSION = '1.4.0';   // keep equal to the version in pom.xml
+const UI_VERSION = '1.5.0';   // keep equal to the version in pom.xml
 api('GET', '/rune/api/version').then(v => {
   $('#ver').textContent = 'v' + v.version + (v.built ? ' · built ' + v.built.replace('T', ' ').replace('Z', ' UTC') : '');
   if (v.version !== UI_VERSION) {

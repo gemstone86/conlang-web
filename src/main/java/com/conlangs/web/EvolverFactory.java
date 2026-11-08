@@ -23,7 +23,10 @@ public class EvolverFactory {
                     (String) l.get("classes")));
         }
         List<Evolver.Rule> rules = new ArrayList<>();
+        // sound changes with a tag switched off (in their language or an ancestor) are left out
+        Map<Long, Map<String, String>> off = RuleTags.effectiveOff(db, worldId);
         for (Map<String, Object> r : db.rows("select r.* from rules r join languages l on l.id=r.language_id where l.world_id=?", worldId)) {
+            if (RuleTags.offTag((String) r.get("tags"), off.getOrDefault(Db.num(r.get("language_id")), Map.of())) != null) continue;
             rules.add(new Evolver.Rule(Db.num(r.get("id")), Db.num(r.get("language_id")), ((Number) r.get("year")).intValue(),
                     ((Number) r.get("ord")).intValue(), (String) r.get("name"), (String) r.get("pattern"), (String) r.get("replacement")));
         }

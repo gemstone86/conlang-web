@@ -44,7 +44,8 @@ public class FullImport {
             "shares", List.of("user_id"),
             "changes", List.of("author_id", "decided_by"),
             "edit_log", List.of("user_id"),
-            "missing_words", List.of("created_by"));
+            "missing_words", List.of("created_by"),
+            "rule_versions", List.of("created_by"));
 
     private final DataSource ds;
     private final ObjectMapper json;

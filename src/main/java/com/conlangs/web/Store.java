@@ -20,7 +20,7 @@ public class Store {
             "gsection", "grammar_sections", "grammar", "grammar_entries", "phoneme", "phonemes", "formrule", "form_rules", "meaning", "word_meanings");
     private static final Map<String, List<String>> FIELDS = Map.of(
             "word", List.of("gloss", "pos", "build", "form", "year", "notes", "ref_word_id", "loan_word_id"),
-            "rule", List.of("year", "ord", "name", "pattern", "replacement", "note"),
+            "rule", List.of("year", "ord", "name", "pattern", "replacement", "note", "tags"),
             "override", List.of("word_id", "lang_id", "year", "form"),
             "form", List.of("word_id", "label", "form", "year"),
             "gsection", List.of("title", "headings", "ord"),
@@ -203,6 +203,7 @@ public class Store {
             }
         }
         if (clean.containsKey("ord") && clean.get("ord") == null) clean.remove("ord");
+        if (entity.equals("rule") && clean.containsKey("tags")) clean.put("tags", RuleTags.normalize(clean.get("tags")));
         if ((entity.equals("word") || entity.equals("form")) && clean.containsKey("form") && blank(clean.get("form")) && !action.equals("DELETE"))
             throw new ApiException(400, "Form can't be empty.");
         if (entity.equals("rule") && clean.containsKey("pattern")) {

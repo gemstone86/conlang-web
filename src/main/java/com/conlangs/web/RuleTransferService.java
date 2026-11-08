@@ -105,6 +105,7 @@ public class RuleTransferService {
                 payload.put("pattern", e.get("pattern").toString());
                 payload.put("replacement", e.get("replacement") == null ? "" : e.get("replacement").toString());
                 if (e.get("note") != null) payload.put("note", e.get("note").toString());
+                if (e.get("tags") != null) payload.put("tags", RuleDiff.tagsText(e.get("tags")));
             }
             touchedLangs.add(langId);
             if (access.level(uid, langId) < Access.EDITOR) { errors.add(where + "you can't edit rules in " + names.get(langId) + "."); continue; }

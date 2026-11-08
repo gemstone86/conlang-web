@@ -86,7 +86,8 @@ Lets Claude (claude.ai) read your languages and weather data while helping you. 
 at `/mcp/<key>`, with read-only tools:
 
 - Root and Rune: `rune_list_languages`, `rune_language`, `rune_words` (with a search), `rune_search_words` (all languages),
-  `rune_word_history`, `rune_sound_changes`, `rune_preview_sound_change` (needs editor access), `rune_word_form_rules`,
+  `rune_word_history`, `rune_sound_changes`, `rune_preview_sound_change` (needs editor access), `rune_sound_change_versions`,
+  `rune_compare_sound_change_version`, `rune_word_form_rules`,
   `rune_grammar`, `rune_sounds`, `rune_sentences`, `rune_build_sentence`, `rune_missing_words`, `rune_pending_changes`,
   `rune_edit_log`, `rune_suggest_roots`.
 - Weather generator: `weather_world` (regions, calendars), `weather_day`, `weather_month`, `weather_maps`,
@@ -194,6 +195,19 @@ Deleting a word also deletes its locked overrides, and Undo does not bring those
 
 ## v0.18.2
 - A form that starts earlier than its word is no longer reported as a problem: the word simply uses the form as it has evolved by the word's own year.
+
+## v1.5.0 (combined app)
+- **Tags on sound changes**: give a sound change tags (comma separated, e.g. `vowel shift, experimental`). The Sound changes
+  tab shows every tag in view with its count; click one to see only those sound changes. The language's owner can
+  **switch a tag off**: its sound changes are then left out wherever words evolve (dictionary, histories, sentences,
+  missing words) in that language and all its branches, and shown greyed out, until it's switched on again.
+- **Versions of sound changes**: *Versions* on the Sound changes tab saves a language's own sound changes (and its
+  switched-off tags) under a name and note. **Compare** shows what has been added, removed and changed since, field by
+  field; **Restore** (owner) puts them back as they were, after saving the current ones as a version, so a restore can
+  be undone. Restoring clears the undo steps for sound changes in that language. Versions are part of Export / Import
+  everything, and the Claude connector can list and compare them.
+- Endpoints: `GET/POST /rune/api/languages/{id}/rule-versions`, `GET /rune/api/rule-versions/{vid}/compare`,
+  `POST /rune/api/rule-versions/{vid}/restore`, `DELETE /rune/api/rule-versions/{vid}`, `POST /rune/api/languages/{id}/tag-switch`.
 
 ## v1.4.0 (combined app)
 - **Claude connector**: read-only access for Claude (claude.ai) to Root and Rune and the weather generator, as one

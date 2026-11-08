@@ -394,7 +394,13 @@ public class ApiController {
         String qs = String.join(",", java.util.Collections.nCopies(visible.size(), "?"));
         List<Map<String, Object>> rows = db.rows("select r.*, l.name as lang_name from rules r join languages l on l.id=r.language_id "
                 + "where r.language_id in (" + qs + ") order by r.year, lower(l.name), r.ord, r.id", visible.toArray());
-        for (Map<String, Object> r : rows) r.put("level", levels.get(Db.num(r.get("language_id"))));
+        Map<Long, Map<String, String>> off = RuleTags.effectiveOff(db, Db.num(access.language(id).get("world_id")));
+        for (Map<String, Object> r : rows) {
+            r.put("level", levels.get(Db.num(r.get("language_id"))));
+            String tag = RuleTags.offTag((String) r.get("tags"), off.getOrDefault(Db.num(r.get("language_id")), Map.of()));
+            r.put("off", tag != null);
+            if (tag != null) r.put("off_in", off.get(Db.num(r.get("language_id"))).get(tag.toLowerCase()) + " (" + tag + ")");
+        }
         return rows;
     }
 
@@ -622,6 +628,7 @@ public class ApiController {
             m.put("pattern", r.get("pattern"));
             m.put("replacement", r.get("replacement") == null ? "" : r.get("replacement"));
             if (r.get("note") != null && !r.get("note").toString().isEmpty()) m.put("note", r.get("note"));
+            if (r.get("tags") != null && !r.get("tags").toString().isEmpty()) m.put("tags", r.get("tags"));
             rules.add(m);
         }
         Map<String, Object> body = new LinkedHashMap<>();

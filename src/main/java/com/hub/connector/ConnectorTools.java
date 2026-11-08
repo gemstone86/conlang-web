@@ -3,6 +3,7 @@ package com.hub.connector;
 import com.conlangs.web.ApiController;
 import com.conlangs.web.ApiException;
 import com.conlangs.web.MissingService;
+import com.conlangs.web.RuleVersions;
 import com.eonweather.core.Api;
 import com.eonweather.core.Http;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -36,13 +37,15 @@ public class ConnectorTools {
 
     private final ApiController rune;
     private final MissingService missing;
+    private final RuleVersions versions;
     private final Api weather;
     private final ObjectMapper json;
     private final Map<String, Tool> tools = new LinkedHashMap<>();
 
-    public ConnectorTools(ApiController rune, MissingService missing, Api weather, ObjectMapper json) {
+    public ConnectorTools(ApiController rune, MissingService missing, RuleVersions versions, Api weather, ObjectMapper json) {
         this.rune = rune;
         this.missing = missing;
+        this.versions = versions;
         this.weather = weather;
         this.json = json;
         define();
@@ -87,9 +90,10 @@ public class ConnectorTools {
                         + "it with the year, locked overrides, its forms (plural, definite...) and meaning changes.",
                 schema(Map.of("word_id", prop("integer", "The word's id.")), "word_id"), (c, a) -> rune.history(id(a, "word_id"), c.session()));
         add("rune_sound_changes", "Sound changes",
-                "Root and Rune: a language's dated sound-change rules (pattern → replacement, year, order, note). Patterns are Java "
-                        + "regexes with {V}-style classes from the language settings and # for word edges. scope 'self' (default) is the "
-                        + "language's own rules; 'path' adds the rules of its ancestors that apply to it.",
+                "Root and Rune: a language's dated sound-change rules (pattern → replacement, year, order, note, tags). Patterns are Java "
+                        + "regexes with {V}-style classes from the language settings and # for word edges. off=true means one of the "
+                        + "rule's tags is switched off (off_in says where): it is left out when words evolve. scope 'self' (default) "
+                        + "is the language's own rules; 'path' adds the rules of its ancestors that apply to it.",
                 schema(Map.of("language_id", lang, "scope", Map.of("type", "string", "enum", List.of("self", "path"),
                         "description", "self (default) or path.")), "language_id"),
                 (c, a) -> rune.rules(id(a, "language_id"), text(a, "scope", "self"), c.session()));
@@ -107,6 +111,14 @@ public class ConnectorTools {
                     b.put("ord", a.path("order").asLong(0));
                     return rune.previewRule(id(a, "language_id"), b, c.session());
                 });
+        add("rune_sound_change_versions", "Sound-change versions",
+                "Root and Rune: the saved versions of a language's sound changes (name, note, when, how many rules), newest first.",
+                schema(Map.of("language_id", lang), "language_id"), (c, a) -> versions.list(c.uid(), id(a, "language_id")));
+        add("rune_compare_sound_change_version", "Compare with a version",
+                "Root and Rune: what changed in a language's sound changes since a saved version: rules added, removed and "
+                        + "changed (with the fields that differ, then and now), and the switched-off tags then and now.",
+                schema(Map.of("version_id", prop("integer", "The version's id (from rune_sound_change_versions).")), "version_id"),
+                (c, a) -> versions.compare(c.uid(), id(a, "version_id")));
         add("rune_word_form_rules", "Word form rules",
                 "Root and Rune: a language's word form rules (e.g. nouns get the suffix -n for plural), with conditions and years.",
                 schema(Map.of("language_id", lang), "language_id"), (c, a) -> rune.formRules(id(a, "language_id"), c.session()));

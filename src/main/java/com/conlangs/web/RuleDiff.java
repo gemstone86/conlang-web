@@ -31,6 +31,16 @@ public final class RuleDiff {
         for (String f : new String[]{"name", "pattern", "replacement", "note"}) {
             if (entry.containsKey(f) && !text(entry.get(f)).equals(text(stored.get(f)))) out.put(f, text(entry.get(f)));
         }
+        if (entry.containsKey("tags")) {
+            String now = RuleTags.normalize(tagsText(entry.get("tags")));
+            if (!text(now).equals(text(RuleTags.normalize(stored.get("tags"))))) out.put("tags", now == null ? "" : now);
+        }
         return out;
+    }
+
+    /** Tags in an imported entry: "a, b" or ["a", "b"]. */
+    public static String tagsText(Object o) {
+        if (o instanceof java.util.Collection<?> c) return String.join(", ", c.stream().map(String::valueOf).toList());
+        return o == null ? null : o.toString();
     }
 }

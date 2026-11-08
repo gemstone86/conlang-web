@@ -70,3 +70,16 @@ tr.filters input{font-size:.8rem;padding:2px 4px}
 .misspick.on{background:var(--accent);color:#fff}
 .misspick.on .muted{color:#e6efe9}
 @media (max-width:800px){.compwrap{grid-template-columns:1fr}.compside{position:static;max-height:none}}
+
+/* Sound changes: tags, switched-off changes, versions */
+.tagchip{display:inline-block;padding:.05rem .45rem;border:1px solid var(--line);border-radius:99px;cursor:pointer;color:inherit;text-decoration:none;background:#fff;white-space:nowrap}
+.tagchip:hover{border-color:var(--accent)}
+.tagchip.on{background:var(--accent);border-color:var(--accent);color:#fff}
+.tagbox{display:inline-flex;align-items:center;gap:.3rem;margin:.15rem .4rem .15rem 0}
+.tagbox.isoff .tagchip{text-decoration:line-through;opacity:.7}
+.tagbox button.small{font-size:.75rem;padding:.1rem .4rem}
+tr.ruleoff td{opacity:.45}
+tr.ruleoff td:last-child{opacity:1}
+.diffadd{background:#e7f4ea}
+.diffdel{background:#fbe9e7}
+td.diffdel{text-decoration:line-through}
