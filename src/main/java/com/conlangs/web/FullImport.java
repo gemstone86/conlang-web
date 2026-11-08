@@ -49,10 +49,12 @@ public class FullImport {
 
     private final DataSource ds;
     private final ObjectMapper json;
+    private final Db db;
 
-    public FullImport(DataSource ds, ObjectMapper json) {
+    public FullImport(DataSource ds, ObjectMapper json, Db db) {
         this.ds = ds;
         this.json = json;
+        this.db = db;
     }
 
     public Map<String, Object> importAll(InputStream in, boolean replace) throws Exception {
@@ -172,6 +174,8 @@ public class FullImport {
             } catch (Exception e) {
                 c.rollback();
                 throw e;
+            } finally {
+                db.changed();   // written past Db: kept dictionaries are out of date
             }
 
             // New rows must get ids after the imported ones. (Outside the transaction: a schema change commits.)

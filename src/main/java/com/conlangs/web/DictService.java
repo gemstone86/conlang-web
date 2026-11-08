@@ -183,11 +183,44 @@ public class DictService {
         return out;
     }
 
+    /** How many dictionaries are kept (the most recently used); each can be a few MB for a big language. */
+    private static final int KEEP_DICTIONARIES = 12;
+
+    private record Kept(long version, List<Map<String, Object>> words) {}
+
+    private final Map<String, Kept> kept = java.util.Collections.synchronizedMap(new LinkedHashMap<>(16, 0.75f, true) {
+        @Override
+        protected boolean removeEldestEntry(Map.Entry<String, Kept> eldest) {
+            return size() > KEEP_DICTIONARIES;
+        }
+    });
+
+    /**
+     * The dictionary of a language (see {@link #computeWords}). Working it out runs every word through the sound
+     * changes, so the result is kept and handed out again until anything in the data changes ({@link Db#version()}).
+     * It depends on which of the ancestors the viewer may see, so that is part of the key; the list is shared and must
+     * not be changed by callers.
+     */
+    public List<Map<String, Object>> words(long uid, long langId) {
+        access.need(uid, langId, Access.VIEWER);
+        StringBuilder key = new StringBuilder().append(langId);
+        for (long anc : access.ancestors(langId)) if (access.level(uid, anc) >= Access.VIEWER) key.append(',').append(anc);
+        long version = db.version();
+        Kept k = kept.get(key.toString());
+        if (k != null && k.version() == version) return k.words();
+        List<Map<String, Object>> fresh = new ArrayList<>();
+        for (Map<String, Object> m : computeWords(uid, langId)) fresh.add(java.util.Collections.unmodifiableMap(m));
+        fresh = java.util.Collections.unmodifiableList(fresh);
+        // kept with the version from before the work: if the data changed meanwhile, it's worked out again next time
+        kept.put(key.toString(), new Kept(version, fresh));
+        return fresh;
+    }
+
     /**
      * The dictionary of a language: the words entered in it, plus the words of its ancestors that had already
      * been coined when this language split off, shown in THEIR form in this language (inherited = true).
      */
-    public List<Map<String, Object>> words(long uid, long langId) {
+    private List<Map<String, Object>> computeWords(long uid, long langId) {
         Map<String, Object> lang = access.need(uid, langId, Access.VIEWER);
         long worldId = Db.num(lang.get("world_id"));
         String langName = (String) lang.get("name");

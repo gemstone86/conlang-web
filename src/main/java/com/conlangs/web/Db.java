@@ -6,7 +6,11 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Locale;
+import java.util.concurrent.atomic.AtomicLong;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.jdbc.support.GeneratedKeyHolder;
 import org.springframework.jdbc.support.KeyHolder;
 import org.springframework.stereotype.Component;
@@ -46,7 +50,37 @@ public class Db {
     }
 
     public int update(String sql, Object... args) {
-        return jdbc.update(sql, args);
+        int n = jdbc.update(sql, args);
+        changed(sql);
+        return n;
+    }
+
+    /**
+     * Goes up with every change to the data (not with the admin log or connector usage, which no page shows), so
+     * results worked out from the data (like the dictionaries in DictService) can be kept until it moves.
+     */
+    private final AtomicLong version = new AtomicLong();
+
+    public long version() {
+        return version.get();
+    }
+
+    /** Something changed the data without going through this class (e.g. Import everything). */
+    public void changed() {
+        version.incrementAndGet();
+    }
+
+    private void changed(String sql) {
+        String q = sql.toLowerCase(Locale.ROOT);
+        if (q.contains("app_log") || q.contains("connector_keys") || q.contains("reset_codes")) return;
+        version.incrementAndGet();
+        // in a transaction, others only see the change once it's committed: move the version again then, so nothing
+        // worked out in between (from the data as it was) is kept
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override public void afterCompletion(int status) { version.incrementAndGet(); }
+            });
+        }
     }
 
     public long insert(String sql, Object... args) {
@@ -56,6 +90,7 @@ public class Db {
             for (int i = 0; i < args.length; i++) ps.setObject(i + 1, args[i]);
             return ps;
         }, kh);
+        changed(sql);
         Number k = kh.getKey();
         return k == null ? -1 : k.longValue();
     }

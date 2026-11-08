@@ -234,6 +234,7 @@ const TAB = {
       <div class="row">${[1, 2, 3, 4, 5, 6].map(k => `<input id="gr_c${k}" placeholder="column ${k}" size="22">`).join('')}</div>
       <div class="row"><button class="primary" data-act="saveGrammar" id="gr_btn">Add row</button><button data-act="cancelGrammar" id="gr_cancel" hidden>Cancel edit</button>
       <button data-act="newSection">+ New section</button></div></div>`;
+    h += excelImportCard();
     h += '<div class="row"><input placeholder="Search grammar…" data-gfilter="1"></div>';
     for (const t of cats) {
       const hd = heads(t), list = g.entries.filter(e => e.category === t);
@@ -381,7 +382,7 @@ const TAB = {
   },
   async bulk() {
     if (!canEdit()) return '<p class="muted">Editors only.</p>';
-    return `<p class="muted small">One word per line: <code>gloss;type;form;year;notes</code> (tab-separated also works). Nothing is added if any line has an error.</p>
+    return excelImportCard() + `<p class="muted small">One word per line: <code>gloss;type;form;year;notes</code> (tab-separated also works). Nothing is added if any line has an error.</p>
     <textarea id="b_text" rows="12"></textarea><div class="row"><label style="display:inline;margin:0"><input type="checkbox" id="b_skip"> skip words that already exist here (same gloss)</label></div><div class="row"><button data-act="bulkCheck">Check only</button><button class="primary" data-act="bulkGo">Add all</button></div><div id="b_out"></div>`;
   },
   async changes() {
@@ -676,6 +677,32 @@ const TPL = {
   syncope: ['(?<={V}{C}){V}(?={C}{V})', ''], hiatus: ['{V}(?={V})', ''], haplology: ['(.{2,3})\\1', '$1'],
   geminate: ['({C})\\1', '$1'], cluster: ['({C})({C})(?={C})', '$2']
 };
+
+// ---------- import from Excel (admins, language owners) ----------
+function excelImportCard() {
+  if (!(S.me && S.me.is_admin && isOwner())) return '';
+  return `<details class="card"><summary><strong>Import from Excel</strong> <span class="small muted">a language's dictionary, grammar and sounds from an .xlsx workbook (admins)</span></summary>
+    <div class="row"><input type="file" id="gx_file" accept=".xlsx"></div>
+    <div class="row"><button class="primary" data-act="excelDict">Import dictionary</button>
+      <span class="small muted">Reads the sheet <strong>"Ygg Elven dict"</strong>: columns <em>dictionary</em> (meaning), <em>elven</em> (form), <em>build</em>, <em>year</em>,
+      and optionally <em>type</em>, <em>notes</em> and <em>group</em> (a row whose group is the name of another language in this world goes to that language).
+      Rows built as "shifted" or "indexed" are skipped (the sound changes make those). Words already here with the same meaning and form are skipped, so a file can be imported again.</span></div>
+    <div class="row"><button class="primary" data-act="excelGrammar">Import grammar and sounds</button>
+      <label style="display:inline;margin:0"><input type="checkbox" id="gx_replace"> replace the grammar and sounds this language already has</label>
+      <span class="small muted">Reads the sheet <strong>"Ygg Elven"</strong> (grammar tables in columns A-G, and the consonant and vowel grids if it has them).</span></div>
+    <div id="gx_out"></div></details>`;
+}
+async function excelUpload(url, extra) {
+  const f = $('#gx_file') && $('#gx_file').files[0];
+  if (!f) throw new Error('Choose an .xlsx file first.');
+  const fd = new FormData(); fd.append('file', f); fd.append('languageId', S.lang.id);
+  for (const [k, v] of Object.entries(extra || {})) fd.append(k, v);
+  say('Importing ' + f.name + '…');
+  const res = await fetch(url, { method: 'POST', body: fd });
+  let d = null; try { d = await res.json(); } catch (e) { /* no body */ }
+  if (!res.ok) throw new Error((d && (d.error || d.message)) || 'Import failed (' + res.status + ')');
+  return d;
+}
 
 // ---------- sound changes: tags and versions ----------
 const ruleTags = r => (r.tags || '').split(',').map(t => t.trim()).filter(Boolean);
@@ -1054,6 +1081,26 @@ const A = {
     $('#r_lang').value = r.language_id; $('#r_lang').disabled = true; $('#r_btn').textContent = 'Save changes'; $('#r_cancel').hidden = false; window.scrollTo(0, 0);
   },
   cancelRule: async () => renderPanel(),
+  excelDict: async () => {
+    const d = await excelUpload('/rune/api/admin/import-elven');
+    const per = Object.entries(d.perGroup || {}).map(([g, n]) => (g === '(none)' ? S.lang.name : g) + ': ' + n);
+    const groups = per.length > 1 ? per.join(', ') : '';
+    say('Imported ' + d.imported + ' words' + (groups ? ' (' + groups + ')' : '') + '.' + (d.alreadyThere ? ' ' + d.alreadyThere + ' were there already.' : '')
+      + (d.skippedCount ? ' ' + d.skippedCount + ' rows skipped.' : ''));
+    $('#gx_out').innerHTML = d.skippedCount ? '<p class="small"><strong>Skipped rows</strong>' + (d.skippedCount > d.skipped.length ? ' (first ' + d.skipped.length + ')' : '') + ':</p><ul class="small">'
+      + d.skipped.map(x => `<li>${esc(x)}</li>`).join('') + '</ul>' : '';
+    S.words = []; await loadWorlds();
+  },
+  excelGrammar: async () => {
+    let d;
+    try { d = await excelUpload('/rune/api/admin/import-grammar', { replace: $('#gx_replace').checked ? 'true' : 'false' }); }
+    catch (e) {
+      if (!/already has grammar/.test(e.message) || !confirm(S.lang.name + ' already has grammar or sounds. Replace them with the ones in the file?')) throw e;
+      d = await excelUpload('/rune/api/admin/import-grammar', { replace: 'true' });
+    }
+    say('Imported ' + d.sections + ' sections, ' + d.rows + ' rows and ' + d.sounds + ' sounds.');
+    await renderPanel();
+  },
   ruleTagFilter: async d => { const k = (d.t || '').toLowerCase(); S.ruleTag = !k || S.ruleTag === k ? null : k; await renderPanel(); },
   ruleTagSwitch: async d => {
     const r = await api('POST', base() + '/tag-switch', { tag: d.t, off: d.off === 'true' });
@@ -1305,7 +1352,7 @@ function drawAutoSounds(full) {
 document.addEventListener('input', e => {
   if (e.target.dataset.autoslider) { S.autoYear = Number(e.target.value); drawAutoSounds(false); }
 });
-const UI_VERSION = '1.6.1';   // keep equal to the version in pom.xml
+const UI_VERSION = '1.8.0';   // keep equal to the version in pom.xml
 api('GET', '/rune/api/version').then(v => {
   $('#ver').textContent = 'v' + v.version + (v.built ? ' · built ' + v.built.replace('T', ' ').replace('Z', ' UTC') : '');
   if (v.version !== UI_VERSION) {
