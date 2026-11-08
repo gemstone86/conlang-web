@@ -1305,7 +1305,7 @@ function drawAutoSounds(full) {
 document.addEventListener('input', e => {
   if (e.target.dataset.autoslider) { S.autoYear = Number(e.target.value); drawAutoSounds(false); }
 });
-const UI_VERSION = '1.6.0';   // keep equal to the version in pom.xml
+const UI_VERSION = '1.6.1';   // keep equal to the version in pom.xml
 api('GET', '/rune/api/version').then(v => {
   $('#ver').textContent = 'v' + v.version + (v.built ? ' · built ' + v.built.replace('T', ' ').replace('Z', ' UTC') : '');
   if (v.version !== UI_VERSION) {
