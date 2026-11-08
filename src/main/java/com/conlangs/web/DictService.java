@@ -211,6 +211,9 @@ public class DictService {
         String ipaMap = (String) lang.get("ipa_map");
         Map<Long, Map<String, Object>> langMap = langsOf(worldId);
         List<Long> fullPath = pathRootFirst(langId, langMap);
+        // only these languages are shown: the way down from the ancestors, this one and its branches
+        Set<Long> needed = new HashSet<>(fullPath);
+        needed.addAll(branchSet);
         List<Map<String, Object>> out = new ArrayList<>();
         Map<Long, Map<String, Object>> late = new HashMap<>();   // ancestor words coined after this language split off
         for (long src : sources) {
@@ -239,7 +242,7 @@ public class DictService {
                 long id = Db.num(w.get("id"));
                 String form = (String) w.get("form");
                 int wyear = ((Number) w.get("year")).intValue();
-                List<Evolver.Row> rows = ev.evolve(src, form, wyear, ovr.getOrDefault(id, List.of()));
+                List<Evolver.Row> rows = ev.evolve(src, form, wyear, ovr.getOrDefault(id, List.of()), needed);
                 if (inherited && rows.stream().noneMatch(r -> r.langId() == langId)) {   // coined after the split
                     String fin = form;
                     for (Evolver.Row rr : rows) if (rr.langId() == src && !rr.source().equals("ERROR")) fin = rr.form();
@@ -292,7 +295,7 @@ public class DictService {
                 for (Map<String, Object> f : formsByWord.getOrDefault(id, List.of())) {
                     Map<String, Object> fm = new LinkedHashMap<>(f);
                     int fy = f.get("year") == null ? wyear : ((Number) f.get("year")).intValue();
-                    fm.put("latest", latestPerBranch(ev.evolve(src, (String) f.get("form"), fy, List.of()), branchSet));
+                    fm.put("latest", latestPerBranch(ev.evolve(src, (String) f.get("form"), fy, List.of(), needed), branchSet));
                     fs.add(fm);
                 }
                 m.put("forms", fs);
