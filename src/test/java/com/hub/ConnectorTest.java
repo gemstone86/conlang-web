@@ -131,7 +131,7 @@ class ConnectorTest {
         JsonNode words = data(tool(key, "rune_words", "{\"language_id\":" + lang + ",\"query\":\"WAT\"}"));
         assertEquals(1, words.path("total").asInt(), words.toString());
         assertEquals("ata", words.path("words").get(0).path("form").asText());
-        assertEquals("ada", words.path("words").get(0).path("latest").asText(), "after the sound change t > d");
+        assertEquals("ada", words.path("words").get(0).path("latest").path("Elven").asText(), "after the sound change t > d: " + words);
         long wordId = words.path("words").get(0).path("id").asLong();
         assertTrue(data(tool(key, "rune_word_history", "{\"word_id\":" + wordId + "}")).toString().contains("ada"));
         JsonNode found = data(tool(key, "rune_search_words", "{\"query\":\"pira\"}"));

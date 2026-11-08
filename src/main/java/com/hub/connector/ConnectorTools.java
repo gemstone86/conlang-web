@@ -70,8 +70,9 @@ public class ConnectorTools {
                 schema(Map.of("language_id", lang), "language_id"), (c, a) -> rune.language(id(a, "language_id"), c.session()));
         add("rune_words", "Dictionary of a language",
                 "Root and Rune: the dictionary of a language as shown on its Dictionary tab, including words inherited from its parent "
-                        + "languages (inherited=true). Each word has gloss (meaning), pos (type), form (as coined), latest (form after "
-                        + "all sound changes), year coined, notes and its forms. Optional query filters by meaning, form, type or note "
+                        + "languages (inherited=true). Each word has gloss (meaning), pos (type), form (as coined; for inherited words "
+                        + "as it reached this language), latest ({language name: form after all its sound changes} for this "
+                        + "language and each branch), year coined, notes and its forms. Optional query filters by meaning, form, type or note "
                         + "(case-insensitive substring). At most " + MAX_WORDS + " words per call; use offset for more.",
                 schema(Map.of("language_id", lang, "query", prop("string", "Text to look for (optional)."),
                         "offset", prop("integer", "Skip this many matches (default 0)."), "limit", prop("integer", "At most this many (default 200, max " + MAX_WORDS + ").")),
