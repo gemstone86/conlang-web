@@ -151,9 +151,9 @@ class ConnectorTest {
         assertEquals(region, day.path("region").asText(), day.toString());
         assertTrue(day.has("temperature"));
         JsonNode month = data(tool(key, "weather_month", "{\"region\":\"" + region + "\",\"year\":1000,\"month\":3}"));
-        assertEquals(28, month.size(), month.toString().substring(0, 200));
+        assertEquals(28, month.size(), "days in the month");
         JsonNode maps = data(tool(key, "weather_maps", "{}"));
-        assertTrue(maps.toString().contains("@eon") && !maps.get(0).has("settings"), maps.toString().substring(0, 300));
+        assertTrue(maps.toString().contains("@eon") && !maps.get(0).has("settings"), maps.toString());
         long mapId = maps.get(0).path("id").asLong();
         assertTrue(data(tool(key, "weather_get", "{\"path\":\"/maps/" + mapId + "/anchors\"}")).isArray());
         assertTrue(tool(key, "weather_get", "{\"path\":\"/maps/" + mapId + "/image\"}").path("isError").asBoolean(), "images aren't data");
