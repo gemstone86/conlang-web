@@ -90,3 +90,7 @@ tr.lostword td:last-child{opacity:1}
 .lostbadge{background:#f3e3d3;color:#7a4a1c}
 a.badge{text-decoration:none;color:inherit}
 a.badge:hover{text-decoration:underline}
+
+/* Missing words: suggested roots under a meaning */
+tr.rootrow td{background:#f4f6f2}
+tr.rootrow button.form{margin:.15rem .2rem .15rem 0}

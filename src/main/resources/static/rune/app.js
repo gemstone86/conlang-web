@@ -336,7 +336,7 @@ const TAB = {
       r.entries.map(e => `<tr class="${e.word ? 'muted' : ''}"><td><strong>${esc(e.gloss)}</strong></td><td>${esc(e.pos || '')}</td><td>${esc(e.notes || '')}</td>
         <td class="small muted">${esc(e.created_by_name || '')}${e.created ? ' · ' + esc(String(e.created).slice(0, 10)) : ''}</td>
         <td>${e.word ? `✓ now <span class="form">${esc(e.word.form)}</span> <a data-act="openWord" data-id="${e.word.id}" style="cursor:pointer" class="small">#${e.word.id}</a>`
-          : (canEdit() ? `<button class="primary" data-act="missCoin" data-g="${esc(e.gloss)}" data-p="${esc(e.pos || '')}">Coin word</button> <button data-act="missCompound" data-g="${esc(e.gloss)}" data-p="${esc(e.pos || '')}" title="Make it a compound of existing words">Compound</button>` : '')}
+          : (canEdit() ? `<button class="primary" data-act="missCoin" data-g="${esc(e.gloss)}" data-p="${esc(e.pos || '')}">Coin word</button> <button data-act="missRoot" data-g="${esc(e.gloss)}" data-p="${esc(e.pos || '')}" title="Root forms that sound like the language; click one to add it as the word">Suggest root</button> <button data-act="missCompound" data-g="${esc(e.gloss)}" data-p="${esc(e.pos || '')}" title="Make it a compound of existing words">Compound</button>` : '')}
         ${canEdit() ? ` <button class="danger" data-act="missDel" data-id="${e.id}" title="Remove from the list">✕</button>` : ''}</td></tr>`).join('') + '</table>'
       : '<p class="muted">Nothing marked as missing.</p>';
     if (filled.length && canEdit()) h += `<div class="row"><button data-act="missClear">Remove the ${filled.length} that have a word now</button></div>`;
@@ -344,7 +344,7 @@ const TAB = {
     h += r.fromSentences.length ? `<table><tr><th>Meaning</th><th>Why</th><th>Used in</th><th></th></tr>` +
       r.fromSentences.map(g => `<tr><td><strong>${esc(g.meaning)}</strong></td><td class="small muted">${esc(g.reason)}</td>
         <td class="small">${g.sentences.map(x => esc(x.translation || x.source)).join('<br>')}</td>
-        <td>${canEdit() ? `<button class="primary" data-act="missCoin" data-g="${esc(g.meaning)}" data-p="">Coin word</button> <button data-act="missMark" data-g="${esc(g.meaning)}">Mark as missing</button>` : ''}</td></tr>`).join('') + '</table>'
+        <td>${canEdit() ? `<button class="primary" data-act="missCoin" data-g="${esc(g.meaning)}" data-p="">Coin word</button> <button data-act="missRoot" data-g="${esc(g.meaning)}" data-p="" title="Root forms that sound like the language; click one to add it as the word">Suggest root</button> <button data-act="missMark" data-g="${esc(g.meaning)}">Mark as missing</button>` : ''}</td></tr>`).join('') + '</table>'
       : '<p class="muted">Every word in the saved sentences is in the dictionary.</p>';
     return h;
   },
@@ -748,6 +748,17 @@ function ruleCompareView(c) {
   return h + '</div>';
 }
 
+// ---------- missing words: suggest a root ----------
+async function fillRoots(row) {
+  const [lo, hi] = row.querySelector('[data-rr=syl]').value.split('-');
+  const out = row.querySelector('[data-rr=out]');
+  out.innerHTML = '<span class="muted small">Finding roots…</span>';
+  const r = await api('GET', base() + '/suggest-roots?count=8&min=' + lo + '&max=' + hi);
+  const shape = r.shape ? `<span class="muted small">Shape ${esc(r.shape)}${r.mode === 'shape' ? ' (from the shape and the Sounds tab: too few words to learn from)' : ''}: </span>` : '';
+  out.innerHTML = shape + (r.roots.length ? r.roots.map(x => `<button class="form" data-act="missRootUse" data-form="${esc(x)}" title="Add as the word for “${esc(row.dataset.g)}”">${esc(x)}</button>`).join(' ')
+    : `<span class="muted small">${esc(r.reason || 'No free form was found. Try again or allow more syllables.')}</span>`);
+}
+
 // ---------- compound: missing words on the side ----------
 function compMissList(miss) {
   const open = miss.entries.filter(e => !e.word), sel = S.compPick && S.compPick.g.toLowerCase();
@@ -804,6 +815,34 @@ const A = {
     const r = await api('POST', base() + '/missing/bulk', { text: val('m_bulk') });
     say('Added ' + r.added.length + '.' + (r.onList.length ? ' On the list already: ' + r.onList.join(', ') + '.' : '')
       + (r.haveWord.length ? ' Has a word already: ' + r.haveWord.join(', ') + '.' : '') + (r.bad.length ? ' Not added (brackets or too long): ' + r.bad.join(', ') + '.' : ''));
+    await renderPanel();
+  },
+  missRoot: async (d, el) => {
+    const tr = el.closest('tr'), next = tr.nextElementSibling;
+    const open = next && next.classList.contains('rootrow') && next.dataset.g === d.g;
+    document.querySelectorAll('tr.rootrow').forEach(x => x.remove());
+    if (open) return;
+    const row = document.createElement('tr');
+    row.className = 'rootrow'; row.dataset.g = d.g; row.dataset.p = d.p || '';
+    const year = S.rootYear ?? (S.lang.split_year ?? '');
+    row.innerHTML = `<td colspan="${tr.children.length}"><div class="row"><strong>Roots for “${esc(d.g)}”</strong>
+      <select data-rr="syl"><option value="1-1">1 syllable</option><option value="2-2" selected>2 syllables</option><option value="2-3">2-3 syllables</option><option value="3-4">3-4 syllables</option></select>
+      <input data-rr="year" type="number" placeholder="year coined" size="10" value="${esc(year)}" title="The year the word is coined">
+      <button data-act="missRootMore">Other suggestions</button>
+      <span class="muted small">Click a root to add it as the word${d.p ? ' (' + esc(d.p) + ')' : ''}.</span></div><div class="row" data-rr="out"></div></td>`;
+    tr.after(row);
+    await fillRoots(row);
+  },
+  missRootMore: async (d, el) => fillRoots(el.closest('tr.rootrow')),
+  missRootUse: async (d, el) => {
+    const row = el.closest('tr.rootrow'), yearBox = row.querySelector('[data-rr=year]');
+    if (yearBox.value === '') { say('Give the year the word is coined.', true); yearBox.focus(); return; }
+    S.rootYear = Number(yearBox.value);
+    const payload = { gloss: row.dataset.g, form: d.form, year: S.rootYear, build: 'root' };
+    if (row.dataset.p) payload.pos = row.dataset.p;
+    const r = await api('POST', base() + '/edit', { entity: 'word', action: 'CREATE', payload });
+    S.words = [];
+    say(r.status === 'pending' ? 'Submitted for approval: ' + row.dataset.g + ' = ' + d.form + '.' : 'Added: ' + row.dataset.g + ' = ' + d.form + '.');
     await renderPanel();
   },
   missCompound: async d => { S.compPick = { g: d.g, p: d.p || '' }; S.tab = 'compound'; await renderPanel(); if ($('#c_parts')) $('#c_parts').focus(); },
@@ -1352,7 +1391,7 @@ function drawAutoSounds(full) {
 document.addEventListener('input', e => {
   if (e.target.dataset.autoslider) { S.autoYear = Number(e.target.value); drawAutoSounds(false); }
 });
-const UI_VERSION = '1.9.0';   // keep equal to the version in pom.xml
+const UI_VERSION = '1.10.0';   // keep equal to the version in pom.xml
 api('GET', '/rune/api/version').then(v => {
   $('#ver').textContent = 'v' + v.version + (v.built ? ' · built ' + v.built.replace('T', ' ').replace('Z', ' UTC') : '');
   if (v.version !== UI_VERSION) {
