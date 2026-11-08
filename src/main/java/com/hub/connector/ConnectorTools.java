@@ -74,8 +74,8 @@ public class ConnectorTools {
                         + "all sound changes), year coined, notes and its forms. Optional query filters by meaning, form, type or note "
                         + "(case-insensitive substring). At most " + MAX_WORDS + " words per call; use offset for more.",
                 schema(Map.of("language_id", lang, "query", prop("string", "Text to look for (optional)."),
-                        "offset", prop("integer", "Skip this many matches (default 0)."), "limit", prop("integer", "At most this many (default 200, max " + MAX_WORDS + ")."))),
-                "language_id"), (c, a) -> words(c, a));
+                        "offset", prop("integer", "Skip this many matches (default 0)."), "limit", prop("integer", "At most this many (default 200, max " + MAX_WORDS + ").")),
+                        "language_id"), (c, a) -> words(c, a));
         add("rune_search_words", "Search all languages",
                 "Root and Rune: look for a meaning or form in every language this account can see (or in one world). Returns the "
                         + "matching words with their language. Good for 'which languages have a word for X' or 'where does this form occur'.",
