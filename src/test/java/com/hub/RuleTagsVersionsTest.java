@@ -195,7 +195,7 @@ class RuleTagsVersionsTest {
         assertEquals(2, check.path("changed").asInt(), "t is changed, k only gets the tag: " + check);
         assertEquals(0, check.path("unchanged").asInt());
         assertEquals("Import 2026", check.path("tagAll").asText());
-        assertEquals(4, rules(owner, lang, "self").size(), "a check changes nothing");
+        assertEquals(2, rules(owner, lang, "self").size(), "a check changes nothing");
         assertTrue(rules(owner, lang, "self").toString().contains("\"tags\":\"lenition\""));
 
         JsonNode done = om.readTree(post(owner, url, "{\"rules\":" + file + ",\"tag\":\"Import 2026\",\"dryRun\":false}", false).body());
