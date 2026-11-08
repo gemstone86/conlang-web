@@ -8,6 +8,7 @@ One web app with a start page and one login for two tools:
 | `/rune/` | **Root and Rune**, the conlang builder (this README, below). API: `/rune/api/…` |
 | `/weather/` | **Weather generator** (Eon Weather): weather, calendars, the world map and campaign notes. See [WEATHER.md](WEATHER.md). API: `/weather/api/…` |
 | `/api/auth/…` | The shared login: `me`, `login`, `register`, `logout`, `password`, `reset` |
+| `/admin/` | Admin dashboard: all accounts (admins only); data from `/api/admin/users` |
 
 Spring Boot 3.3 · Java 21 · Maven · one embedded H2 2.3.232 database file via JDBC · plain-JS front ends.
 
@@ -195,6 +196,13 @@ Deleting a word also deletes its locked overrides, and Undo does not bring those
 
 ## v0.18.2
 - A form that starts earlier than its word is no longer reported as a problem: the word simply uses the form as it has evolved by the word's own year.
+
+## v1.9.0 (combined app)
+- **Admin dashboard** at `/admin/` (admins only): every account with its role (site admin, weather admin from
+  `EON_ADMINS`, user), when it joined and last logged in, and what it owns: worlds, languages and words in Root and
+  Rune, campaigns, maps and notes in the weather generator, how many worlds or languages are shared with it, and its
+  Claude connector addresses. Totals at the top; search and sort by any column. Linked from the start page (**Admin
+  dashboard**) and from the **admin** badge there and in Root and Rune's top bar. Logins are recorded from this version on.
 
 ## v1.8.0 (combined app)
 - **Import from Excel** (admins who own the language; on the Grammar and Bulk entry tabs): pick an .xlsx workbook, then

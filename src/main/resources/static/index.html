@@ -75,6 +75,9 @@
   .msg.ok { color: var(--moss); }
   .who { display: flex; align-items: center; gap: .8rem; flex-wrap: wrap; }
   .who strong { font-family: var(--serif); font-size: 1.25rem; font-weight: 400; }
+  a.badge { text-decoration: none; }
+  a.badge:hover { background: rgba(201,162,74,.15); }
+  .adminlink { color: var(--brass); font-size: .95rem; }
   .badge { font-size: .72rem; text-transform: uppercase; letter-spacing: .06em; color: var(--brass); border: 1px solid var(--brass-dim, #8f7536); border-radius: 99px; padding: .05rem .5rem; }
   details { margin-top: 1rem; color: var(--bone-dim); font-size: .9rem; }
   details summary { cursor: pointer; }
@@ -112,12 +115,13 @@
   <section class="card" id="account" aria-live="polite">
     <!-- logged in -->
     <div id="inView" hidden>
-      <div class="who"><span>Logged in as</span> <strong id="whoName"></strong> <span class="badge" id="whoAdmin" hidden>admin</span></div>
+      <div class="who"><span>Logged in as</span> <strong id="whoName"></strong> <a class="badge" id="whoAdmin" href="/admin/" title="Admin dashboard" hidden>admin</a></div>
       <div class="row">
         <button type="button" id="pwToggle">Change password</button>
         <div class="spacer"></div>
         <button type="button" id="logoutBtn">Log out</button>
       </div>
+      <div class="row" id="adminLink" hidden><a class="adminlink" href="/admin/">Admin dashboard: all users →</a></div>
       <form id="pwForm" hidden>
         <label for="pwCur">Current password</label><input id="pwCur" type="password" autocomplete="current-password" required>
         <label for="pwNew">New password (8+ characters)</label><input id="pwNew" type="password" autocomplete="new-password" minlength="8" required>
@@ -183,6 +187,7 @@ function render() {
   if (me) {
     $('whoName').textContent = me.username;
     $('whoAdmin').hidden = !me.is_admin;
+    $('adminLink').hidden = !me.is_admin;
   } else {
     const reg = state.mode === 'register';
     $('authTitle').textContent = reg ? 'Create an account' : 'Log in';

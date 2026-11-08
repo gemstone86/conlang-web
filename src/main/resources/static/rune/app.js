@@ -99,7 +99,7 @@ async function loadWorlds() {
   }
 }
 function render() {
-  $('#who').innerHTML = S.me ? esc(S.me.username) + (S.me.is_admin ? ' <span class="badge">admin</span>' : '') +
+  $('#who').innerHTML = S.me ? esc(S.me.username) + (S.me.is_admin ? ' <a class="badge" href="/admin/" title="Admin dashboard: all users">admin</a>' : '') +
     (S.me.is_admin ? ` <button data-act="page" data-p="work" class="${['log', 'connector'].includes(S.page) ? '' : 'primary'}">Workspace</button> <button data-act="page" data-p="log" class="${S.page === 'log' ? 'primary' : ''}">Log</button> <button data-act="page" data-p="connector" class="${S.page === 'connector' ? 'primary' : ''}" title="Let Claude read your languages and weather data">Claude connector</button> <button data-act="resetCode">Issue reset code</button> <button data-act="exportAll" title="All worlds, languages, words, rules, forms, grammar, sounds, sentences, sharing and accounts, as one file">Export everything</button> <button data-act="importAll" title="Read an Export everything file (e.g. from the separate Root and Rune app). Replaces Root and Rune's data here.">Import everything</button>` : '') + ' <button data-act="logout">Log out</button>' : '';
   if (!S.me) { location.href = '/?next=' + encodeURIComponent(location.pathname); return; }
   if (S.me.is_admin && S.page === 'log') { $('#app').innerHTML = logShell(); loadLog(true); return; }
@@ -1352,7 +1352,7 @@ function drawAutoSounds(full) {
 document.addEventListener('input', e => {
   if (e.target.dataset.autoslider) { S.autoYear = Number(e.target.value); drawAutoSounds(false); }
 });
-const UI_VERSION = '1.8.0';   // keep equal to the version in pom.xml
+const UI_VERSION = '1.9.0';   // keep equal to the version in pom.xml
 api('GET', '/rune/api/version').then(v => {
   $('#ver').textContent = 'v' + v.version + (v.built ? ' · built ' + v.built.replace('T', ' ').replace('Z', ' UTC') : '');
   if (v.version !== UI_VERSION) {

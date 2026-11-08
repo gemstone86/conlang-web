@@ -39,7 +39,7 @@ public class HubConfig implements WebMvcConfigurer {
     /** /rune and /weather open each app's page (its files use relative paths, so the trailing slash matters). */
     @Override
     public void addViewControllers(ViewControllerRegistry r) {
-        for (String app : new String[]{"rune", "weather"}) {
+        for (String app : new String[]{"rune", "weather", "admin"}) {
             r.addRedirectViewController("/" + app, "/" + app + "/");
             r.addViewController("/" + app + "/").setViewName("forward:/" + app + "/index.html");
         }

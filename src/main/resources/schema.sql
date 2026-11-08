@@ -225,3 +225,6 @@ CREATE TABLE IF NOT EXISTS word_losses (
   year INT NOT NULL,
   note VARCHAR(400)
 );
+
+-- When each account last logged in (shown on the admin dashboard)
+ALTER TABLE users ADD COLUMN IF NOT EXISTS last_login TIMESTAMP NULL;
