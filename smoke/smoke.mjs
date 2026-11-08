@@ -1,0 +1,37 @@
+import { chromium } from 'playwright';
+const B = 'http://localhost:8080', problems = [];
+const browser = await chromium.launch(); const page = await browser.newPage({ viewport: { width: 1400, height: 1000 } });
+page.on('pageerror', e => problems.push('pageerror: ' + e.message));
+page.on('console', m => { if (m.type() === 'error') problems.push('console: ' + m.text()); });
+page.on('response', r => { if (r.status() >= 400 && r.url().startsWith(B) && !r.url().endsWith('/api/auth/me')) problems.push('HTTP ' + r.status() + ' ' + r.url()); });
+const text = async sel => (await page.textContent(sel)).replace(/\s+/g, ' ').trim();
+await page.goto(B + '/'); await page.click('#authSwitch'); await page.fill('#u', 'Gemstone'); await page.fill('#p', 'secret-pass'); await page.click('#authSubmit'); await page.waitForSelector('#inView:not([hidden])');
+await page.evaluate(async () => {
+  const j = (u, b) => fetch(u, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(b) }).then(r => r.json());
+  const w = await j('/rune/api/worlds', { name: 'Ygg' }); const l = await j('/rune/api/languages', { worldId: w.id, name: 'Proto' });
+  for (const [g, f] of [['water', 'alama'], ['fire', 'peleno'], ['stone', 'karumi'], ['tree', 'talona'], ['sky', 'semira'], ['moon', 'lunaka'], ['sun', 'soreli'], ['wind', 'vanaru']])
+    await j('/rune/api/languages/' + l.id + '/edit', { entity: 'word', action: 'CREATE', payload: { gloss: g, form: f, year: 10 } });
+  await j('/rune/api/languages/' + l.id + '/missing/bulk', { text: 'thunder; noun\nto forgive; verb' });
+});
+await page.goto(B + '/rune/'); await page.waitForSelector('#side'); await page.click('#side >> text=Proto');
+await page.click('[data-act=tab][data-t=missing]'); await page.waitForSelector('[data-act=missRoot]');
+await page.click('[data-act=missRoot][data-g=thunder]'); await page.waitForSelector('tr.rootrow [data-act=missRootUse]');
+console.log('ROOTS:', await text('tr.rootrow'));
+const first = await page.locator('tr.rootrow [data-act=missRootUse]').first().textContent();
+await page.click('tr.rootrow [data-act=missRootMore]'); await page.waitForTimeout(600);
+console.log('MORE:', await text('tr.rootrow [data-rr=out]'));
+await page.fill('tr.rootrow [data-rr=year]', '');
+await page.locator('tr.rootrow [data-act=missRootUse]').first().click(); await page.waitForTimeout(400);
+console.log('NO YEAR:', await text('#msg'));
+await page.fill('tr.rootrow [data-rr=year]', '300');
+const pick = await page.locator('tr.rootrow [data-act=missRootUse]').first().textContent();
+await page.locator('tr.rootrow [data-act=missRootUse]').first().click(); await page.waitForTimeout(1200);
+console.log('ADDED:', await text('#msg'), '| picked', pick);
+console.log('ROW NOW:', await text('tr:has(strong:text-is("thunder"))'));
+await page.click('[data-act=missRoot][data-g="to forgive"]'); await page.waitForSelector('tr.rootrow');
+console.log('YEAR REMEMBERED:', await page.inputValue('tr.rootrow [data-rr=year]'));
+await page.click('[data-act=missRoot][data-g="to forgive"]'); console.log('TOGGLED SHUT:', await page.locator('tr.rootrow').count() === 0);
+const w = await page.evaluate(async () => { const l = (await (await fetch('/rune/api/worlds')).json())[0].languages[0]; return (await (await fetch('/rune/api/languages/' + l.id + '/words')).json()).find(x => x.gloss === 'thunder'); });
+console.log('WORD:', JSON.stringify({ gloss: w.gloss, form: w.form, pos: w.pos, build: w.build, year: w.year }));
+await browser.close();
+console.log(problems.length ? 'PROBLEMS:\n' + problems.join('\n') : 'NO PROBLEMS'); process.exit(problems.length ? 1 : 0);

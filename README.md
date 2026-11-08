@@ -197,6 +197,12 @@ Deleting a word also deletes its locked overrides, and Undo does not bring those
 ## v0.18.2
 - A form that starts earlier than its word is no longer reported as a problem: the word simply uses the form as it has evolved by the word's own year.
 
+## v1.10.0 (combined app)
+- **Suggest root** on the Missing words tab, for each missing meaning (and those the sentences need): shows root forms
+  built like the Dictionary's *Suggest new roots* (they sound like the language and aren't close to any word), with a
+  choice of syllables and *Other suggestions*. Click one to add it as the word for that meaning, with its type, built as
+  "root", in the year given (remembered for the next one); the meaning is then ticked off.
+
 ## v1.9.0 (combined app)
 - **Admin dashboard** at `/admin/` (admins only): every account with its role (site admin, weather admin from
   `EON_ADMINS`, user), when it joined and last logged in, and what it owns: worlds, languages and words in Root and
