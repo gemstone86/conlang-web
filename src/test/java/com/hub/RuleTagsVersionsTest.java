@@ -173,4 +173,48 @@ class RuleTagsVersionsTest {
         // versions are part of Export everything
         assertTrue(get(owner, "/rune/api/admin/export-all").body().contains("\"rule_versions\""));
     }
+
+    /** Importing sound changes with "tag all imported": new, changed and already-present ones all get the tag. */
+    @Test
+    void importWithTag() throws Exception {
+        HttpClient owner = client();
+        post(owner, "/api/auth/register", "{\"username\":\"importer1\",\"password\":\"secret-pass\"}", false);
+        long world = om.readTree(post(owner, "/rune/api/worlds", "{\"name\":\"Imp\"}", false).body()).path("id").asLong();
+        long lang = om.readTree(post(owner, "/rune/api/languages", "{\"worldId\":" + world + ",\"name\":\"Imperial\"}", false).body()).path("id").asLong();
+        edit(owner, lang, "CREATE", null, "{\"year\":100,\"pattern\":\"t\",\"replacement\":\"d\",\"tags\":\"lenition\"}");
+        edit(owner, lang, "CREATE", null, "{\"year\":200,\"pattern\":\"k\",\"replacement\":\"g\"}");
+        long tToD = ruleId(rules(owner, lang, "self"), "t");
+        // the file: rule t (by id, changed replacement), rule k (same as in the app, no id), two new ones (one with its own tag)
+        String file = "[{\"id\":" + tToD + ",\"year\":100,\"pattern\":\"t\",\"replacement\":\"th\"},"
+                + "{\"year\":200,\"pattern\":\"k\",\"replacement\":\"g\"},"
+                + "{\"year\":300,\"pattern\":\"p\",\"replacement\":\"f\"},"
+                + "{\"year\":400,\"pattern\":\"s\",\"replacement\":\"h\",\"tags\":\"debuccalisation\"}]";
+        String url = "/rune/api/languages/" + lang + "/rules/import";
+        JsonNode check = om.readTree(post(owner, url, "{\"rules\":" + file + ",\"tag\":\" Import 2026 \",\"dryRun\":true}", false).body());
+        assertEquals(2, check.path("added").asInt(), check.toString());
+        assertEquals(2, check.path("changed").asInt(), "t is changed, k only gets the tag: " + check);
+        assertEquals(0, check.path("unchanged").asInt());
+        assertEquals("Import 2026", check.path("tagAll").asText());
+        assertEquals(4, rules(owner, lang, "self").size(), "a check changes nothing");
+        assertTrue(rules(owner, lang, "self").toString().contains("\"tags\":\"lenition\""));
+
+        JsonNode done = om.readTree(post(owner, url, "{\"rules\":" + file + ",\"tag\":\"Import 2026\",\"dryRun\":false}", false).body());
+        assertTrue(done.path("applied").asBoolean(), done.toString());
+        java.util.Map<String, String> tags = new java.util.HashMap<>();
+        for (JsonNode r : rules(owner, lang, "self")) tags.put(r.path("pattern").asText(), r.path("tags").asText());
+        assertEquals("lenition, Import 2026", tags.get("t"), "own tags are kept");
+        assertEquals("Import 2026", tags.get("k"));
+        assertEquals("Import 2026", tags.get("p"));
+        assertEquals("debuccalisation, Import 2026", tags.get("s"));
+        assertEquals(4, tags.size(), "the identical rule wasn't added twice");
+
+        // the same import again, with the same tag (any letter case): nothing to do
+        JsonNode again = om.readTree(post(owner, url, "{\"rules\":" + file.replace("\"replacement\":\"th\"", "\"replacement\":\"th\"")
+                + ",\"tag\":\"import 2026\",\"dryRun\":true}", false).body());
+        assertEquals(0, again.path("added").asInt() + again.path("changed").asInt(), again.toString());
+        // and without a tag, the import works as before
+        JsonNode plain = om.readTree(post(owner, url, "{\"rules\":[{\"year\":500,\"pattern\":\"m\",\"replacement\":\"n\"}],\"dryRun\":true}", false).body());
+        assertEquals(1, plain.path("added").asInt());
+        assertEquals("", plain.path("tagAll").asText());
+    }
 }

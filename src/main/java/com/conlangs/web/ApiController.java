@@ -653,7 +653,7 @@ public class ApiController {
         }
         boolean removeMissing = Boolean.parseBoolean(String.valueOf(b.get("removeMissing")));
         boolean dry = !Boolean.FALSE.equals(b.get("dryRun"));
-        Map<String, Object> res = ruleTransfer.importRules(uid, id, entries, removeMissing, dry);
+        Map<String, Object> res = ruleTransfer.importRules(uid, id, entries, removeMissing, dry, b.get("tag") == null ? null : b.get("tag").toString());
         applog.info("edit", uid, "Sound change import in language #" + id + (dry ? " (check)" : "") + ": +" + res.get("added") + " ~" + res.get("changed") + " -" + res.get("removed") + ", errors " + ((List<?>) res.get("errors")).size());
         return res;
     }

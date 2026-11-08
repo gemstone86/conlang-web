@@ -196,6 +196,11 @@ Deleting a word also deletes its locked overrides, and Undo does not bring those
 ## v0.18.2
 - A form that starts earlier than its word is no longer reported as a problem: the word simply uses the form as it has evolved by the word's own year.
 
+## v1.5.1 (combined app)
+- Importing sound changes (JSON) can **tag everything in the file**: fill in *tag all imported* next to the file (one tag
+  or several, comma separated). New sound changes get it, changed ones get it with their changes, and ones already in
+  the app get it too (the check lists them as "changes tags"); their own tags are kept.
+
 ## v1.5.0 (combined app)
 - **Tags on sound changes**: give a sound change tags (comma separated, e.g. `vowel shift, experimental`). The Sound changes
   tab shows every tag in view with its count; click one to see only those sound changes. The language's owner can

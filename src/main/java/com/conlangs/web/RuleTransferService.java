@@ -48,6 +48,21 @@ public class RuleTransferService {
     }
 
     public Map<String, Object> importRules(long uid, long pathLang, List<Map<String, Object>> entries, boolean removeMissing, boolean dryRun) {
+        return importRules(uid, pathLang, entries, removeMissing, dryRun, null);
+    }
+
+    /** The rule's tags with the extra ones added (kept as they are if it has them all), in stored form. */
+    private static String withTags(Object have, List<String> add) {
+        String base = have == null ? "" : have.toString();
+        return RuleTags.normalize(base.isBlank() ? String.join(", ", add) : base + ", " + String.join(", ", add));
+    }
+
+    /**
+     * tagAll (optional, comma separated): tags every sound change in the file gets, on top of its own: new ones,
+     * changed ones, and ones that are in the app already (those then change only by getting the tags).
+     */
+    public Map<String, Object> importRules(long uid, long pathLang, List<Map<String, Object>> entries, boolean removeMissing, boolean dryRun, String tagAll) {
+        List<String> addTags = RuleTags.parse(tagAll);
         Map<String, Object> pl = access.need(uid, pathLang, Access.VIEWER);
         long worldId = Db.num(pl.get("world_id"));
         Map<String, Long> byName = new HashMap<>();
@@ -87,6 +102,11 @@ public class RuleTransferService {
                     continue;
                 }
                 payload = RuleDiff.changed(existing, e);
+                if (!addTags.isEmpty()) {
+                    String merged = withTags(payload.containsKey("tags") ? payload.get("tags") : existing.get("tags"), addTags);
+                    if (!java.util.Objects.equals(merged, RuleTags.normalize(existing.get("tags")))) payload.put("tags", merged);
+                    else payload.remove("tags");
+                }
                 if (payload.isEmpty()) { unchanged++; touchedLangs.add(langId); items.add(item("same", names.get(langId), e, "no change")); continue; }
                 action = "UPDATE";
             } else {
@@ -95,17 +115,29 @@ public class RuleTransferService {
                     continue;
                 }
                 Object ord = e.containsKey("order") ? e.get("order") : e.get("ord");
-                Map<String, Object> dup = db.one("select id from rules where language_id=? and year=? and ord=? and pattern=? and replacement=?", langId,
+                Map<String, Object> dup = db.one("select id, tags from rules where language_id=? and year=? and ord=? and pattern=? and replacement=?", langId,
                         lng(e.get("year")), ord == null ? 0L : lng(ord), e.get("pattern").toString(), e.get("replacement") == null ? "" : e.get("replacement").toString());
-                if (dup != null) { keep.add(Db.num(dup.get("id"))); unchanged++; touchedLangs.add(langId); items.add(item("same", names.get(langId), e, "already exists")); continue; }
-                action = "CREATE";
-                payload.put("year", lng(e.get("year")));
-                payload.put("ord", ord == null ? 0L : lng(ord));
-                payload.put("name", e.get("name") == null ? "" : e.get("name").toString());
-                payload.put("pattern", e.get("pattern").toString());
-                payload.put("replacement", e.get("replacement") == null ? "" : e.get("replacement").toString());
-                if (e.get("note") != null) payload.put("note", e.get("note").toString());
-                if (e.get("tags") != null) payload.put("tags", RuleDiff.tagsText(e.get("tags")));
+                String dupTags = dup == null || addTags.isEmpty() ? null : withTags(dup.get("tags"), addTags);
+                if (dup != null && (dupTags == null || dupTags.equals(RuleTags.normalize(dup.get("tags"))))) {
+                    keep.add(Db.num(dup.get("id"))); unchanged++; touchedLangs.add(langId); items.add(item("same", names.get(langId), e, "already exists")); continue;
+                }
+                if (dup != null) {
+                    // already in the app: it only gets the tags
+                    id = Db.num(dup.get("id"));
+                    keep.add(id);
+                    action = "UPDATE";
+                    payload.put("tags", dupTags);
+                } else {
+                    action = "CREATE";
+                    payload.put("year", lng(e.get("year")));
+                    payload.put("ord", ord == null ? 0L : lng(ord));
+                    payload.put("name", e.get("name") == null ? "" : e.get("name").toString());
+                    payload.put("pattern", e.get("pattern").toString());
+                    payload.put("replacement", e.get("replacement") == null ? "" : e.get("replacement").toString());
+                    if (e.get("note") != null) payload.put("note", e.get("note").toString());
+                    if (e.get("tags") != null) payload.put("tags", RuleDiff.tagsText(e.get("tags")));
+                    if (!addTags.isEmpty()) payload.put("tags", withTags(RuleTags.normalize(payload.get("tags")), addTags));
+                }
             }
             touchedLangs.add(langId);
             if (access.level(uid, langId) < Access.EDITOR) { errors.add(where + "you can't edit rules in " + names.get(langId) + "."); continue; }
@@ -119,8 +151,10 @@ public class RuleTransferService {
             if (action.equals("CREATE")) added++;
             else if (action.equals("UPDATE")) updated++;
             else removed++;
-            items.add(item(action.equals("CREATE") ? "add" : action.equals("UPDATE") ? "change" : "remove", names.get(langId), e,
-                    action.equals("UPDATE") ? "changes " + String.join(", ", payload.keySet()) : ""));
+            Map<String, Object> it = item(action.equals("CREATE") ? "add" : action.equals("UPDATE") ? "change" : "remove", names.get(langId), e,
+                    action.equals("UPDATE") ? "changes " + String.join(", ", payload.keySet()) : "");
+            if (payload.get("tags") != null) it.put("tags", payload.get("tags"));
+            items.add(it);
         }
         if (removeMissing) {
             for (long lid : touchedLangs) {
@@ -145,6 +179,7 @@ public class RuleTransferService {
         out.put("items", items);
         out.put("errors", errors);
         out.put("applied", false);
+        out.put("tagAll", String.join(", ", addTags));
         if (!errors.isEmpty() || dryRun) return out;
         int pending = 0;
         for (Object[] op : ops) {

@@ -197,7 +197,7 @@ const TAB = {
     let h = `<div class="row"><span class="small muted">Show</span> ${seg('self', 'only ' + esc(S.lang.name))} ${seg('branches', esc(S.lang.name) + ' + all its branches')} ${seg('path', 'full path (ancestors + ' + esc(S.lang.name) + ')')}
       <span class="small muted">${rules.length} rule${rules.length === 1 ? '' : 's'}</span></div>`;
     h += `<div class="card"><div class="row"><a href="/rune/api/languages/${S.lang.id}/rules/export.json?scope=${scope}"><button>Export these sound changes (JSON)</button></a>
-      ${canEdit() ? `<input type="file" id="ri_file" accept=".json,application/json"><label style="display:inline;margin:0"><input type="checkbox" id="ri_rm"> remove rules that are missing from the file</label>
+      ${canEdit() ? `<input type="file" id="ri_file" accept=".json,application/json"><input id="ri_tag" placeholder="tag all imported (optional)" size="22" list="r_taglist" title="Every sound change in the file gets this tag (or several, comma separated), on top of its own tags"><label style="display:inline;margin:0"><input type="checkbox" id="ri_rm"> remove rules that are missing from the file</label>
       <button data-act="ruleImportCheck">Check file</button>` : ''}</div>
       <div class="muted small">Edit the exported file and import it again: a rule with its id is adjusted, a rule without an id is added, <code>"delete": true</code> removes it. Nothing is changed until you have seen the check and pressed Apply.</div><div id="ri_out"></div></div>`;
     if (targets.length || rules.some(r => r.level >= 2)) h += `<div class="card"><div class="row"><label style="margin:0">Apply to</label>
@@ -888,14 +888,14 @@ const A = {
     try { data = JSON.parse(await f.text()); } catch (e) { say('That file is not valid JSON: ' + e.message, true); return; }
     const rules = Array.isArray(data) ? data : data.rules;
     if (!Array.isArray(rules)) { say('The file needs a "rules" list.', true); return; }
-    S.ruleImport = { rules, removeMissing: $('#ri_rm').checked };
+    S.ruleImport = { rules, removeMissing: $('#ri_rm').checked, tag: val('ri_tag').trim() };
     const res = await api('POST', base() + '/rules/import', { ...S.ruleImport, dryRun: true });
     const act = { add: 'add', change: 'change', remove: 'remove', same: 'same', skip: 'skip' };
-    let h = `<p><strong>${res.added}</strong> to add, <strong>${res.changed}</strong> to change, <strong>${res.removed}</strong> to remove, ${res.unchanged} unchanged.</p>`;
+    let h = `<p><strong>${res.added}</strong> to add, <strong>${res.changed}</strong> to change, <strong>${res.removed}</strong> to remove, ${res.unchanged} unchanged.${res.tagAll ? ` Every sound change in the file gets the tag <strong>${esc(res.tagAll)}</strong> (unchanged ones have it already).` : ''}</p>`;
     if (res.errors.length) h += '<div class="gap"><strong>Nothing will be imported until these are fixed:</strong><ul>' + res.errors.map(e => `<li>${esc(e)}</li>`).join('') + '</ul></div>';
     const shown = res.items.filter(i => i.action !== 'same');
-    if (shown.length) h += '<table><tr><th></th><th>Language</th><th>Year</th><th>Pattern</th><th>Replacement</th><th></th></tr>' +
-      shown.map(i => `<tr class="${i.action === 'remove' ? 'pending' : ''}"><td>${act[i.action]}</td><td>${esc(i.language)}</td><td>${i.year ?? ''}</td><td class="form">${esc(i.pattern)}</td><td class="form">${esc(i.replacement)}</td><td class="small muted">${esc(i.detail)}</td></tr>`).join('') + '</table>';
+    if (shown.length) h += '<table><tr><th></th><th>Language</th><th>Year</th><th>Pattern</th><th>Replacement</th><th>Tags</th><th></th></tr>' +
+      shown.map(i => `<tr class="${i.action === 'remove' ? 'pending' : ''}"><td>${act[i.action]}</td><td>${esc(i.language)}</td><td>${i.year ?? ''}</td><td class="form">${esc(i.pattern)}</td><td class="form">${esc(i.replacement)}</td><td class="small">${esc(i.tags || '')}</td><td class="small muted">${esc(i.detail)}</td></tr>`).join('') + '</table>';
     if (!res.errors.length && (res.added || res.changed || res.removed)) h += '<div class="row"><button class="primary" data-act="ruleImportApply">Apply these changes</button></div>';
     $('#ri_out').innerHTML = h;
   },
@@ -1289,7 +1289,7 @@ function drawAutoSounds(full) {
 document.addEventListener('input', e => {
   if (e.target.dataset.autoslider) { S.autoYear = Number(e.target.value); drawAutoSounds(false); }
 });
-const UI_VERSION = '1.5.0';   // keep equal to the version in pom.xml
+const UI_VERSION = '1.5.1';   // keep equal to the version in pom.xml
 api('GET', '/rune/api/version').then(v => {
   $('#ver').textContent = 'v' + v.version + (v.built ? ' · built ' + v.built.replace('T', ' ').replace('Z', ' UTC') : '');
   if (v.version !== UI_VERSION) {
