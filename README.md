@@ -196,6 +196,13 @@ Deleting a word also deletes its locked overrides, and Undo does not bring those
 ## v0.18.2
 - A form that starts earlier than its word is no longer reported as a problem: the word simply uses the form as it has evolved by the word's own year.
 
+## v1.6.1 (combined app)
+- **Faster dictionaries** (5–8× in a test with 6 languages, 240 sound changes, 2 300 words and 4 000 word forms:
+  2.6 s → 0.5 s): each sound change's pattern is compiled once per request instead of for every word, form and branch;
+  a branch gets its form at the split from the parent's run instead of running the parent's changes again; and a
+  dictionary only evolves words into the languages it shows. The results are the same. Word histories, sentences and
+  missing words use the same engine and get faster too.
+
 ## v1.6.0 (combined app)
 - **Lost words**: in a word's window, **Mark as lost** in a language from a year (with an optional note). From that
   year the word is no longer used there: it shows greyed out with *lost 800* in the dictionary, sentences built for
