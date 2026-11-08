@@ -28,7 +28,7 @@ function logShell() {
   const f = S.logFilter, opt = (v, t, cur) => `<option value="${v}" ${cur === v ? 'selected' : ''}>${t}</option>`;
   return `<div class="card"><h2>Log</h2>
     <div class="row"><select id="lg_level">${opt('', 'All levels', f.level)}${opt('WARN', 'Warnings and errors', f.level)}${opt('ERROR', 'Errors only', f.level)}</select>
-    <select id="lg_cat">${opt('', 'All categories', f.category)}${['api', 'auth', 'edit', 'export', 'import', 'share', 'system'].map(c => opt(c, c, f.category)).join('')}</select>
+    <select id="lg_cat">${opt('', 'All categories', f.category)}${['api', 'auth', 'connector', 'edit', 'export', 'import', 'share', 'system'].map(c => opt(c, c, f.category)).join('')}</select>
     <input id="lg_q" placeholder="Search message, request, user…" size="30" value="${esc(f.q)}">
     <button class="primary" data-act="logSearch">Search</button><button data-act="logSearch">Refresh</button>
     <label style="display:inline;margin:0"><input type="checkbox" id="lg_auto" data-logauto="1" ${S.logTimer ? 'checked' : ''}> auto-refresh (10 s)</label>
@@ -57,6 +57,33 @@ function drawLog(more) {
 }
 function stopLogTimer() { if (S.logTimer) { clearInterval(S.logTimer); S.logTimer = null; } }
 
+// ---------- Claude connector (admin) ----------
+async function connectorPage() {
+  const [keys, users] = await Promise.all([api('GET', '/rune/api/admin/connector-keys'), api('GET', '/rune/api/admin/users')]);
+  const fresh = S.connectorNew;
+  S.connectorNew = null;
+  $('#app').innerHTML = `<div class="card narrow" style="max-width:860px"><h2>Claude connector</h2>
+  <p>Lets Claude (claude.ai) read your languages and weather data, so it can look things up while helping you: words, sound
+  changes, word histories, missing words, sentences, and the weather generator's regions, days, maps and notes. It can't change anything.</p>
+  <p>Each connector address acts as one account and sees exactly what that account sees. Safest: register an account for it on
+  the start page (e.g. <em>Claude</em>) and share the worlds or languages it should read with it as <em>viewer</em>.
+  Or pick your own account to let it see everything you see.</p>
+  ${fresh ? `<div class="card pending"><strong>New connector address for ${esc(fresh.username)}</strong> (shown only now, copy it):
+    <div class="row"><input id="cn_url" value="${esc(fresh.url)}" readonly size="70" onclick="this.select()"><button data-act="connectorCopy">Copy</button></div>
+    <ol class="small"><li>In claude.ai open <strong>Settings → Connectors</strong> and click <strong>Add custom connector</strong>.</li>
+    <li>Give it a name (e.g. <em>Root and Rune</em>), paste the address as the URL and add it.</li>
+    <li>In a chat, turn the connector on in the tools menu, and ask away.</li></ol>
+    <p class="small muted">Anyone with the address can read what that account can see, so keep it to yourself. Revoke it below if it leaks.</p></div>` : ''}
+  <h3>Make an address</h3>
+  <div class="row"><select id="cn_user">${users.map(u => `<option value="${esc(u.username)}" ${u.username.toLowerCase() === 'claude' ? 'selected' : ''}>${esc(u.username)}${u.is_admin ? ' (admin)' : ''}</option>`).join('')}</select>
+  <input id="cn_label" placeholder="label, e.g. claude.ai" size="20"><button class="primary" data-act="connectorCreate">Make connector address</button></div>
+  <h3>Addresses in use</h3>` + (keys.length ? `<table><tr><th>#</th><th>Account</th><th>Label</th><th>Made</th><th>Last used</th><th>Calls</th><th></th></tr>` +
+    keys.map(k => `<tr><td class="muted small">${k.id}</td><td>${esc(k.username)}</td><td>${esc(k.label || '')}</td><td class="small">${esc(String(k.created || '').slice(0, 16).replace('T', ' '))}</td>
+      <td class="small">${k.last_used ? esc(String(k.last_used).slice(0, 16).replace('T', ' ')) : '<span class="muted">never</span>'}</td><td>${k.calls}</td>
+      <td><button class="danger" data-act="connectorRevoke" data-id="${k.id}">Revoke</button></td></tr>`).join('') + '</table>'
+    : '<p class="muted">None yet.</p>') + '<p class="small muted">Every call is in the Log (category <em>connector</em>).</p></div>';
+}
+
 // ---------- boot ----------
 async function boot() {
   const r = await api('GET', '/api/auth/me');
@@ -73,9 +100,10 @@ async function loadWorlds() {
 }
 function render() {
   $('#who').innerHTML = S.me ? esc(S.me.username) + (S.me.is_admin ? ' <span class="badge">admin</span>' : '') +
-    (S.me.is_admin ? ` <button data-act="page" data-p="work" class="${S.page === 'log' ? '' : 'primary'}">Workspace</button> <button data-act="page" data-p="log" class="${S.page === 'log' ? 'primary' : ''}">Log</button> <button data-act="resetCode">Issue reset code</button> <button data-act="exportAll" title="All worlds, languages, words, rules, forms, grammar, sounds, sentences, sharing and accounts, as one file">Export everything</button> <button data-act="importAll" title="Read an Export everything file (e.g. from the separate Root and Rune app). Replaces Root and Rune's data here.">Import everything</button>` : '') + ' <button data-act="logout">Log out</button>' : '';
+    (S.me.is_admin ? ` <button data-act="page" data-p="work" class="${['log', 'connector'].includes(S.page) ? '' : 'primary'}">Workspace</button> <button data-act="page" data-p="log" class="${S.page === 'log' ? 'primary' : ''}">Log</button> <button data-act="page" data-p="connector" class="${S.page === 'connector' ? 'primary' : ''}" title="Let Claude read your languages and weather data">Claude connector</button> <button data-act="resetCode">Issue reset code</button> <button data-act="exportAll" title="All worlds, languages, words, rules, forms, grammar, sounds, sentences, sharing and accounts, as one file">Export everything</button> <button data-act="importAll" title="Read an Export everything file (e.g. from the separate Root and Rune app). Replaces Root and Rune's data here.">Import everything</button>` : '') + ' <button data-act="logout">Log out</button>' : '';
   if (!S.me) { location.href = '/?next=' + encodeURIComponent(location.pathname); return; }
   if (S.me.is_admin && S.page === 'log') { $('#app').innerHTML = logShell(); loadLog(true); return; }
+  if (S.me.is_admin && S.page === 'connector') { $('#app').innerHTML = '<div class="card">Loading…</div>'; connectorPage().catch(e => say(e.message, true)); return; }
   $('#app').innerHTML = '<div class="layout"><div class="card tree" id="side">' + sideView() + '</div><div id="panel">' +
     (S.lang ? '<div class="card" id="panelbody">Loading…</div>' : '<div class="card"><h2>Welcome</h2><p>Create a world, then a language in it. Pick a language on the left to work on it.</p></div>') + '</div></div>';
   if (S.lang) renderPanel();
@@ -765,6 +793,15 @@ const A = {
     say(r.status === 'pending' ? 'Submitted for the owner to approve.' : 'Deleted. (Undo is available.)'); renderPanel();
   },
   page: async d => { S.page = d.p; stopLogTimer(); S.openId = null; const m = $('#modal'); if (m) m.hidden = true; render(); },
+  connectorCreate: async () => {
+    S.connectorNew = await api('POST', '/rune/api/admin/connector-keys', { username: val('cn_user'), label: val('cn_label') });
+    await connectorPage();
+  },
+  connectorCopy: async () => { const i = $('#cn_url'); i.select(); try { await navigator.clipboard.writeText(i.value); say('Copied.'); } catch (e) { document.execCommand('copy'); say('Copied.'); } },
+  connectorRevoke: async d => {
+    if (!confirm('Revoke connector address #' + d.id + '? Claude can no longer use it.')) return;
+    await api('DELETE', '/rune/api/admin/connector-keys/' + d.id); say('Revoked.'); await connectorPage();
+  },
   logSearch: async () => { S.logFilter = { level: val('lg_level'), category: val('lg_cat'), q: val('lg_q').trim() }; await loadLog(true); },
   logMore: async () => { await loadLog(false); },
   logRow: async d => {
@@ -1180,7 +1217,7 @@ function drawAutoSounds(full) {
 document.addEventListener('input', e => {
   if (e.target.dataset.autoslider) { S.autoYear = Number(e.target.value); drawAutoSounds(false); }
 });
-const UI_VERSION = '1.3.0';   // keep equal to the version in pom.xml
+const UI_VERSION = '1.4.0';   // keep equal to the version in pom.xml
 api('GET', '/rune/api/version').then(v => {
   $('#ver').textContent = 'v' + v.version + (v.built ? ' · built ' + v.built.replace('T', ' ').replace('Z', ' UTC') : '');
   if (v.version !== UI_VERSION) {

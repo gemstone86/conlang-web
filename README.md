@@ -80,6 +80,25 @@ replaces weather data people have already made here (notes, campaigns, own maps,
 anyway, start once with `EON_IMPORT=force`, then set it back. `EON_IMPORT=off` turns it off. The standard map is
 updated to this version's right after.
 
+## Claude connector
+
+Lets Claude (claude.ai) read your languages and weather data while helping you. It's an MCP server built into the app,
+at `/mcp/<key>`, with read-only tools:
+
+- Root and Rune: `rune_list_languages`, `rune_language`, `rune_words` (with a search), `rune_search_words` (all languages),
+  `rune_word_history`, `rune_sound_changes`, `rune_preview_sound_change` (needs editor access), `rune_word_form_rules`,
+  `rune_grammar`, `rune_sounds`, `rune_sentences`, `rune_build_sentence`, `rune_missing_words`, `rune_pending_changes`,
+  `rune_edit_log`, `rune_suggest_roots`.
+- Weather generator: `weather_world` (regions, calendars), `weather_day`, `weather_month`, `weather_maps`,
+  `weather_campaigns`, `weather_notes`, and `weather_get` for any other read-only data (rivers, nations, trips…).
+
+**Setting it up:** register an account for Claude on the start page (e.g. *Claude*) and share the worlds or languages
+it should read with it as *viewer* (or use your own account to let it see everything you see). In Root and Rune, an
+admin opens **Claude connector** in the top bar, picks the account and clicks **Make connector address**. In claude.ai,
+**Settings → Connectors → Add custom connector**, paste the address. The address is shown once; anyone who has it
+can read what that account can see, so revoke it on the same page if it leaks. Every call is in the Log (category
+*connector*). Only a hash of each key is stored (table `connector_keys`).
+
 ## How it works
 
 * **World → languages.** A language can branch from a parent at a split year. A branch inherits each word as it
@@ -175,6 +194,11 @@ Deleting a word also deletes its locked overrides, and Undo does not bring those
 
 ## v0.18.2
 - A form that starts earlier than its word is no longer reported as a problem: the word simply uses the form as it has evolved by the word's own year.
+
+## v1.4.0 (combined app)
+- **Claude connector**: read-only access for Claude (claude.ai) to Root and Rune and the weather generator, as one
+  account, through an MCP server at `/mcp/<key>`. Admins make and revoke the addresses on the new **Claude connector**
+  page. See *Claude connector* above.
 
 ## v1.3.0 (combined app)
 - **Compound** tab: the language's missing words (and the meanings saved sentences need) are listed on the right, with a
