@@ -36,21 +36,25 @@ public class GraphService {
         return p;
     }
 
+    /** When a language begins: its split year, or for a root language its earliest word (null if it has none). */
+    private static Integer start(long lang, Map<Long, Long> parent, Map<Long, Integer> splitYear, Map<Long, Integer> firstWord, Integer worldFirst) {
+        if (parent.get(lang) != null && splitYear.get(lang) != null) return splitYear.get(lang);
+        if (parent.get(lang) != null) return start(parent.get(lang), parent, splitYear, firstWord, worldFirst);
+        return firstWord.getOrDefault(lang, worldFirst);
+    }
+
     /** Pairs of languages in the subtree of langId (or just a/b when both are given). Years default to the span of the data. */
     public Map<String, Object> divergence(long uid, long langId, Long a, Long b, Integer from, Integer to) {
         Map<String, Object> lang = access.need(uid, langId, Access.VIEWER);
         long worldId = Db.num(lang.get("world_id"));
         Map<Long, String> names = new LinkedHashMap<>();
         Map<Long, Long> parent = new HashMap<>();
-        Integer firstSplit = null;
+        Map<Long, Integer> splitYear = new HashMap<>();
         for (Map<String, Object> l : db.rows("select id, name, parent_id, split_year from languages where world_id=? order by id", worldId)) {
             long id = Db.num(l.get("id"));
             names.put(id, (String) l.get("name"));
             parent.put(id, l.get("parent_id") == null ? null : Db.num(l.get("parent_id")));
-            if (l.get("split_year") != null) {
-                int sy = ((Number) l.get("split_year")).intValue();
-                firstSplit = firstSplit == null ? sy : Math.min(firstSplit, sy);
-            }
+            if (l.get("split_year") != null) splitYear.put(id, ((Number) l.get("split_year")).intValue());
         }
         List<Long> subtree = new ArrayList<>();
         subtree.add(langId);
@@ -72,20 +76,33 @@ public class GraphService {
         }
         List<Map<String, Object>> words = db.rows("select w.id, w.language_id, w.form, w.year from words w join languages l on l.id=w.language_id where l.world_id=?", worldId);
         Integer minYear = null, maxYear = null;
+        Map<Long, Integer> firstWord = new HashMap<>();
         for (Map<String, Object> w : words) {
             int y = ((Number) w.get("year")).intValue();
             minYear = minYear == null ? y : Math.min(minYear, y);
+            firstWord.merge(Db.num(w.get("language_id")), y, Math::min);
+        }
+        // When each language of a pair begins: a branch at its split, a root language at its earliest word. A pair is only
+        // drawn from when both exist (before a branch split off it was still its parent, so comparing them means nothing).
+        int[] pairStart = new int[pairs.size()];
+        Integer earliest = null;
+        for (int p = 0; p < pairs.size(); p++) {
+            Integer sa = start(pairs.get(p)[0], parent, splitYear, firstWord, minYear), sb = start(pairs.get(p)[1], parent, splitYear, firstWord, minYear);
+            pairStart[p] = sa == null && sb == null ? Integer.MIN_VALUE : Math.max(sa == null ? Integer.MIN_VALUE : sa, sb == null ? Integer.MIN_VALUE : sb);
+            if (pairStart[p] != Integer.MIN_VALUE) earliest = earliest == null ? pairStart[p] : Math.min(earliest, pairStart[p]);
         }
         for (Map<String, Object> r : db.rows("select r.year from rules r join languages l on l.id=r.language_id where l.world_id=?", worldId)) {
             int y = ((Number) r.get("year")).intValue();
             maxYear = maxYear == null ? y : Math.max(maxYear, y);
         }
-        int lo = from != null ? from : (firstSplit != null ? firstSplit - 500 : minYear != null ? minYear : -1000);
+        int lo = from != null ? from : earliest != null ? earliest : minYear != null ? minYear : -1000;
         int hi = to != null ? to : Math.max(maxYear != null ? maxYear + 200 : lo + 1000, lo + 100);
         if (hi <= lo) throw new ApiException(400, "'To' must be later than 'from'.");
         int step = niceStep((hi - lo) / 40.0);
         List<Integer> years = new ArrayList<>();
-        for (int y = Math.floorDiv(lo, step) * step; y <= hi; y += step) years.add(y);
+        // from the start year itself, then on round years
+        years.add(lo);
+        for (int y = Math.floorDiv(lo, step) * step + step; y <= hi; y += step) years.add(y);
 
         Evolver ev = evolvers.build(worldId, null);
         Map<Long, List<Long>> paths = new HashMap<>();
@@ -106,7 +123,7 @@ public class GraphService {
                 if (!reached.contains(pa) || !reached.contains(pb)) continue;
                 for (int yi = 0; yi < ny; yi++) {
                     int y = years.get(yi);
-                    if (wy > y) continue;
+                    if (wy > y || y < pairStart[p]) continue;
                     String fa = FormMath.formAt(rows, paths.get(pa), y), fb = FormMath.formAt(rows, paths.get(pb), y);
                     if (fa == null || fb == null) continue;
                     count[p][yi]++;
@@ -132,6 +149,9 @@ public class GraphService {
             series.add(s);
         }
         Map<String, Object> out = new LinkedHashMap<>();
+        List<Object> starts = new ArrayList<>();
+        for (int p : pairStart) starts.add(p == Integer.MIN_VALUE ? null : p);
+        for (int p = 0; p < np; p++) series.get(p).put("from", starts.get(p));
         out.put("years", years);
         out.put("series", series);
         out.put("step", step);

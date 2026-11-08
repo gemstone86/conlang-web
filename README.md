@@ -197,6 +197,12 @@ Deleting a word also deletes its locked overrides, and Undo does not bring those
 ## v0.18.2
 - A form that starts earlier than its word is no longer reported as a problem: the word simply uses the form as it has evolved by the word's own year.
 
+## v1.10.1 (combined app)
+- **Graphs start when the languages exist**: a language begins at its split year (a root language at its earliest word),
+  and the divergence between two languages is only drawn from when both exist. Before, a branch counted as its parent
+  before it split off, so pairs showed as identical for centuries before the branch existed, and the graph started 500
+  years before the world's first split. Without a "from" year, the graph now starts when the first pair exists.
+
 ## v1.10.0 (combined app)
 - **Suggest root** on the Missing words tab, for each missing meaning (and those the sentences need): shows root forms
   built like the Dictionary's *Suggest new roots* (they sound like the language and aren't close to any word), with a
