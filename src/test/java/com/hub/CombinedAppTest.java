@@ -73,7 +73,8 @@ class CombinedAppTest {
         HttpClient c = client();
 
         // logged out: Root and Rune refuses, the weather generator works (read-only) and has its standard map
-        assertEquals(401, get(c, "/rune/api/worlds").statusCode());
+        assertEquals("[]", get(c, "/rune/api/worlds").body(), "logged out: only public languages, and there are none");
+        assertEquals(401, post(c, "/rune/api/worlds", "{\"name\":\"X\"}", false).statusCode(), "making things needs a login");
         HttpResponse<String> world = get(c, "/weather/api/world");
         assertEquals(200, world.statusCode());
         assertTrue(world.body().contains("regions"));
@@ -110,7 +111,7 @@ class CombinedAppTest {
         assertEquals(403, post(c, "/api/auth/password", "{\"current\":\"wrong-pass\",\"password\":\"another-pass\"}", false).statusCode());
         assertEquals(200, post(c, "/api/auth/password", "{\"current\":\"secret-pass\",\"password\":\"another-pass\"}", false).statusCode());
         assertEquals(200, post(c, "/api/auth/logout", "", false).statusCode());
-        assertEquals(401, get(c, "/rune/api/worlds").statusCode());
+        assertEquals("[]", get(c, "/rune/api/worlds").body(), "logged out again: the private world isn't listed");
         assertTrue(get(c, "/weather/api/me").body().contains("\"user\":null"));
         assertEquals(401, post(c, "/api/auth/login", "{\"username\":\"" + user + "\",\"password\":\"secret-pass\"}", false).statusCode());
         assertEquals(200, post(c, "/api/auth/login", "{\"username\":\"" + user + "\",\"password\":\"another-pass\"}", false).statusCode());
