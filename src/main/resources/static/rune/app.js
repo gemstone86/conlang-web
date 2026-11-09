@@ -1515,7 +1515,7 @@ function textForm(t) {
   t = t || { title: '', years: '', body: '', notes: '' };
   $('#tx_edit').innerHTML = `<div class="card"><h3>${t.id ? 'Edit text' : 'New text'}</h3>
     <div class="row"><input id="tx_title" placeholder="title" size="30" value="${esc(t.title)}"><input id="tx_years" placeholder="years, e.g. 0, 500, 1000" size="24" value="${esc(t.saved_years ?? t.years ?? '')}" title="Up to 6 years, comma separated"></div>
-    <textarea id="tx_body" rows="10" style="width:100%" placeholder="One line per sentence: source | English translation&#10;e.g. the.DEF man see.PAST dog | The man saw a dog">${esc(t.body || '')}</textarea>
+    <textarea id="tx_body" rows="10" style="width:100%" placeholder="One line per sentence: source | English translation&#10;e.g. (man-definite)(to see-past)(dog) | The man saw a dog">${esc(t.body || '')}</textarea>
     <div class="row"><input id="tx_notes" placeholder="notes" size="40" value="${esc(t.notes || '')}"><input id="tx_id" type="hidden" value="${t.id || ''}">
     <button class="primary" data-act="textSave">Save</button><button data-act="textCancel">Cancel</button></div>
     <p class="muted small">Write each line the way you write a sentence on the Sentences tab (meanings, word forms and so on); after a | comes the translation.</p></div>`;
