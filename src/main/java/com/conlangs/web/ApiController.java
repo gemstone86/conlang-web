@@ -177,9 +177,13 @@ public class ApiController {
 
     // ---------------- worlds & languages ----------------
 
+    /**
+     * The worlds and languages this account can see: its own and those shared with it, then (community = true, at the
+     * end) the public languages of others, by world. A visitor who isn't logged in gets only the public ones.
+     */
     @GetMapping("/worlds")
     public List<Map<String, Object>> worlds(HttpSession s) {
-        long uid = auth.requireUid(s);
+        long uid = auth.viewerUid(s);
         Map<Long, Map<String, Object>> worlds = new LinkedHashMap<>();
         for (Map<String, Object> w : db.rows("select * from worlds where owner_id=? order by lower(name)", uid)) {
             w.put("mine", true);
@@ -202,11 +206,74 @@ public class ApiController {
                 worlds.put(wid, w);
             }
             l.put("level", access.level(uid, l));
+            l.put("can_suggest", access.canSuggest(uid, l));
             @SuppressWarnings("unchecked")
             List<Map<String, Object>> langs = (List<Map<String, Object>>) w.get("languages");
             langs.add(l);
         }
-        return new ArrayList<>(worlds.values());
+        java.util.Set<Long> listed = new java.util.HashSet<>();
+        for (Map<String, Object> w : worlds.values()) {
+            @SuppressWarnings("unchecked")
+            List<Map<String, Object>> langs = (List<Map<String, Object>>) w.get("languages");
+            for (Map<String, Object> l : langs) listed.add(Db.num(l.get("id")));
+        }
+        // community: public languages of others
+        Map<Long, Map<String, Object>> community = new LinkedHashMap<>();
+        for (Map<String, Object> l : db.rows("select l.*, w.name as world_name, w.owner_id as world_owner, u.username as owner_name from languages l "
+                + "join worlds w on w.id=l.world_id left join users u on u.id=l.owner_id where l.is_public=true order by lower(w.name), lower(l.name)")) {
+            if (listed.contains(Db.num(l.get("id")))) continue;
+            long wid = Db.num(l.get("world_id"));
+            Map<String, Object> w = community.computeIfAbsent(wid, k -> {
+                Map<String, Object> cw = new LinkedHashMap<>();
+                cw.put("id", wid);
+                cw.put("name", l.get("world_name"));
+                cw.put("mine", false);
+                cw.put("community", true);
+                cw.put("languages", new ArrayList<Map<String, Object>>());
+                return cw;
+            });
+            l.put("level", access.level(uid, l));
+            l.put("can_suggest", access.canSuggest(uid, l));
+            @SuppressWarnings("unchecked")
+            List<Map<String, Object>> langs = (List<Map<String, Object>>) w.get("languages");
+            langs.add(l);
+        }
+        List<Map<String, Object>> out = new ArrayList<>(worlds.values());
+        out.addAll(community.values());
+        return out;
+    }
+
+    /**
+     * {public, suggestions}: makes a language public (anyone can read it, also without logging in; admins only) and
+     * lets anyone logged in suggest changes to it (admins or the owner; only while it's public).
+     */
+    @PostMapping("/languages/{id}/publish")
+    public Map<String, Object> publish(@PathVariable long id, @RequestBody Map<String, Object> b, HttpSession s) {
+        Map<String, Object> me = auth.current(s);
+        if (me == null) throw new ApiException(401, "Please log in.");
+        long uid = Db.num(me.get("id"));
+        boolean admin = Boolean.TRUE.equals(me.get("is_admin"));
+        Map<String, Object> l = access.language(id);
+        boolean isPublic = Boolean.TRUE.equals(l.get("is_public")), sugg = Boolean.TRUE.equals(l.get("public_suggestions"));
+        if (b.containsKey("public")) {
+            boolean want = Boolean.parseBoolean(String.valueOf(b.get("public")));
+            if (want != isPublic) {
+                if (!admin) throw new ApiException(403, "Only admins can make a language public or private.");
+                isPublic = want;
+                if (!isPublic) sugg = false;
+            }
+        }
+        if (b.containsKey("suggestions")) {
+            boolean want = Boolean.parseBoolean(String.valueOf(b.get("suggestions")));
+            if (want != sugg) {
+                if (!admin && access.level(uid, l) < Access.OWNER) throw new ApiException(403, "Only admins and the owner can change that.");
+                if (want && !isPublic) throw new ApiException(400, "Make the language public first.");
+                sugg = want;
+            }
+        }
+        db.update("update languages set is_public=?, public_suggestions=? where id=?", isPublic, sugg, id);
+        applog.info("share", uid, "Language '" + l.get("name") + "' (#" + id + ") is " + (isPublic ? "public" + (sugg ? ", with public suggestions" : "") : "private"));
+        return Map.of("is_public", isPublic, "public_suggestions", sugg);
     }
 
     @PostMapping("/worlds")
@@ -267,7 +334,7 @@ public class ApiController {
 
     @GetMapping("/languages/{id}")
     public Map<String, Object> language(@PathVariable long id, HttpSession s) {
-        return access.need(auth.requireUid(s), id, Access.VIEWER);
+        return access.need(auth.viewerUid(s), id, Access.VIEWER);
     }
 
     @PutMapping("/languages/{id}")
@@ -366,18 +433,18 @@ public class ApiController {
 
     @GetMapping("/languages/{id}/words")
     public List<Map<String, Object>> words(@PathVariable long id, HttpSession s) {
-        return dict.words(auth.requireUid(s), id);
+        return dict.words(auth.viewerUid(s), id);
     }
 
     @GetMapping("/words/{id}/history")
     public Map<String, Object> history(@PathVariable long id, HttpSession s) {
-        return dict.history(auth.requireUid(s), id);
+        return dict.history(auth.viewerUid(s), id);
     }
 
     /** scope: self | branches (this language + all branches) | path (ancestors + this language). */
     @GetMapping("/languages/{id}/rules")
     public List<Map<String, Object>> rules(@PathVariable long id, @RequestParam(defaultValue = "self") String scope, HttpSession s) {
-        long uid = auth.requireUid(s);
+        long uid = auth.viewerUid(s);
         access.need(uid, id, Access.VIEWER);
         List<Long> ids = new ArrayList<>();
         ids.add(id);
@@ -407,7 +474,7 @@ public class ApiController {
 
     @GetMapping("/languages/{id}/grammar")
     public Map<String, Object> grammar(@PathVariable long id, HttpSession s) {
-        access.need(auth.requireUid(s), id, Access.VIEWER);
+        access.need(auth.viewerUid(s), id, Access.VIEWER);
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("sections", db.rows("select * from grammar_sections where language_id=? order by ord, id", id));
         out.put("entries", db.rows("select * from grammar_entries where language_id=? order by ord, id", id));
@@ -416,7 +483,7 @@ public class ApiController {
 
     @GetMapping("/languages/{id}/phonemes")
     public List<Map<String, Object>> phonemes(@PathVariable long id, HttpSession s) {
-        access.need(auth.requireUid(s), id, Access.VIEWER);
+        access.need(auth.viewerUid(s), id, Access.VIEWER);
         return db.rows("select * from phonemes where language_id=? order by id", id);
     }
 
@@ -431,7 +498,7 @@ public class ApiController {
 
     @GetMapping("/languages/{id}/formrules")
     public List<Map<String, Object>> formRules(@PathVariable long id, HttpSession s) {
-        access.need(auth.requireUid(s), id, Access.VIEWER);
+        access.need(auth.viewerUid(s), id, Access.VIEWER);
         return db.rows("select f.*, w.gloss as affix_gloss, w.form as affix_form from form_rules f left join words w on w.id=f.affix_word_id "
                 + "where f.language_id=? order by f.ord, f.id", id);
     }
@@ -439,7 +506,7 @@ public class ApiController {
     /** Words of this language and its ancestors (for picking a dictionary word as an affix). */
     @GetMapping("/languages/{id}/wordnames")
     public List<Map<String, Object>> wordNames(@PathVariable long id, HttpSession s) {
-        long uid = auth.requireUid(s);
+        long uid = auth.viewerUid(s);
         access.need(uid, id, Access.VIEWER);
         List<Map<String, Object>> out = new ArrayList<>();
         List<Long> langs = new ArrayList<>();
@@ -476,7 +543,7 @@ public class ApiController {
 
     @GetMapping("/languages/{id}/auto-sounds")
     public Map<String, Object> autoSounds(@PathVariable long id, @RequestParam(required = false) Integer to, HttpSession s) {
-        return dict.autoSounds(auth.requireUid(s), id, to);
+        return dict.autoSounds(auth.viewerUid(s), id, to);
     }
 
     @PostMapping("/languages/{id}/auto-sounds/apply")
@@ -556,7 +623,7 @@ public class ApiController {
 
     @GetMapping("/languages/{id}/export.xlsx")
     public ResponseEntity<byte[]> exportXlsx(@PathVariable long id, HttpSession s) throws Exception {
-        long uid = auth.requireUid(s);
+        long uid = auth.viewerUid(s);
         Map<String, Object> l = access.need(uid, id, Access.VIEWER);
         byte[] data = export.workbook(uid, id);
         String fn = ((String) l.get("name")).replaceAll("[^A-Za-z0-9_-]", "_") + ".xlsx";
@@ -570,13 +637,13 @@ public class ApiController {
 
     @GetMapping("/languages/{id}/sentences")
     public List<Map<String, Object>> sentenceList(@PathVariable long id, HttpSession s) {
-        return sentences.list(auth.requireUid(s), id);
+        return sentences.list(auth.viewerUid(s), id);
     }
 
     @PostMapping("/languages/{id}/sentences/build")
     public Map<String, Object> sentenceBuild(@PathVariable long id, @RequestBody Map<String, Object> b, HttpSession s) {
         Long y = lng(b, "year");
-        return sentences.preview(auth.requireUid(s), id, str(b, "source"), y == null ? 0 : y.intValue());
+        return sentences.preview(auth.viewerUid(s), id, str(b, "source"), y == null ? 0 : y.intValue());
     }
 
     @PostMapping("/languages/{id}/sentences")
@@ -595,7 +662,7 @@ public class ApiController {
 
     @GetMapping("/sentences/{id}/versions")
     public Map<String, Object> sentenceVersions(@PathVariable long id, HttpSession s) {
-        return sentences.versions(auth.requireUid(s), id);
+        return sentences.versions(auth.viewerUid(s), id);
     }
 
     @PutMapping("/sentences/{id}")
@@ -609,14 +676,14 @@ public class ApiController {
     @GetMapping("/languages/{id}/divergence")
     public Map<String, Object> divergence(@PathVariable long id, @RequestParam(required = false) Long a, @RequestParam(required = false) Long b,
                                           @RequestParam(required = false) Integer from, @RequestParam(required = false) Integer to, HttpSession s) {
-        return graphs.divergence(auth.requireUid(s), id, a, b, from, to);
+        return graphs.divergence(auth.viewerUid(s), id, a, b, from, to);
     }
 
     // ---------------- sound changes as JSON ----------------
 
     @GetMapping("/languages/{id}/rules/export.json")
     public ResponseEntity<Map<String, Object>> exportRulesJson(@PathVariable long id, @RequestParam(defaultValue = "branches") String scope, HttpSession s) {
-        long uid = auth.requireUid(s);
+        long uid = auth.viewerUid(s);
         Map<String, Object> l = access.need(uid, id, Access.VIEWER);
         List<Map<String, Object>> rules = new ArrayList<>();
         for (Map<String, Object> r : rules(id, scope, s)) {
@@ -662,16 +729,16 @@ public class ApiController {
     @GetMapping("/languages/{id}/suggest-roots")
     public Map<String, Object> suggestRoots(@PathVariable long id, @RequestParam(defaultValue = "10") int count, @RequestParam(defaultValue = "2") int min,
             @RequestParam(defaultValue = "3") int max, @RequestParam(required = false) Long seed, HttpSession s) {
-        return dict.suggestRoots(auth.requireUid(s), id, count, min, max, seed);
+        return dict.suggestRoots(auth.viewerUid(s), id, count, min, max, seed);
     }
 
     @GetMapping("/languages/{id}/tree-check")
     public Map<String, Object> treeCheck(@PathVariable long id, HttpSession s) {
-        return dict.treeCheck(auth.requireUid(s), id);
+        return dict.treeCheck(auth.viewerUid(s), id);
     }
 
     @GetMapping("/languages/{id}/mergers")
     public List<Map<String, Object>> mergers(@PathVariable long id, HttpSession s) {
-        return graphs.mergers(auth.requireUid(s), id);
+        return graphs.mergers(auth.viewerUid(s), id);
     }
 }

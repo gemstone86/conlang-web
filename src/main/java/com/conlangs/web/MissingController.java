@@ -29,7 +29,7 @@ public class MissingController {
 
     @GetMapping("/languages/{id}/missing")
     public Map<String, Object> list(@PathVariable long id, HttpSession s) {
-        return missing.list(auth.requireUid(s), id);
+        return missing.list(auth.viewerUid(s), id);
     }
 
     @PostMapping("/languages/{id}/missing")

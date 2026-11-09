@@ -197,6 +197,18 @@ Deleting a word also deletes its locked overrides, and Undo does not bring those
 ## v0.18.2
 - A form that starts earlier than its word is no longer reported as a problem: the word simply uses the form as it has evolved by the word's own year.
 
+## v1.11.0 (combined app)
+- **Public languages**: an admin ticks **Public** at the top of a language. Anyone can then read it, also without
+  logging in: dictionary, word histories, sound changes and versions, grammar, sounds, word forms, sentences (and
+  building them), missing words, graphs and the Excel export. Other people find it under **Community** at the bottom of
+  the language list, by world; visitors who aren't logged in see only the Community list and a *Log in* button.
+  Making it private again hides it from everyone it isn't shared with.
+- **Public suggestions**: a public language has a second switch, **Anyone can suggest changes** (admins and the owner).
+  Then anyone logged in can add and change words, meanings, word forms, lost words, sound changes, grammar rows,
+  sounds and form rules, and every such change waits for the owner's approval on the Changes tab. Things editors do
+  directly (missing words list, sentences, versions, undo, imports) stay with the owner and editors.
+- Endpoint: `POST /rune/api/languages/{id}/publish` `{public, suggestions}`.
+
 ## v1.10.1 (combined app)
 - **Graphs start when the languages exist**: a language begins at its split year (a root language at its earliest word),
   and the divergence between two languages is only drawn from when both exist. Before, a branch counted as its parent

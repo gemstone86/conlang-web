@@ -26,12 +26,22 @@ public class Access {
     }
 
     public int level(long uid, Map<String, Object> lang) {
-        if (Db.num(lang.get("owner_id")) == uid || Db.num(lang.get("world_owner")) == uid) return OWNER;
+        if (uid > 0 && (Db.num(lang.get("owner_id")) == uid || Db.num(lang.get("world_owner")) == uid)) return OWNER;
         int best = NONE;
-        for (Map<String, Object> s : shares(uid, lang)) {
+        if (uid > 0) for (Map<String, Object> s : shares(uid, lang)) {
             best = Math.max(best, "EDITOR".equals(s.get("level")) ? EDITOR : VIEWER);
         }
+        // a public language can be read by anyone, also without logging in (uid 0, see Auth.viewerUid)
+        if (Boolean.TRUE.equals(lang.get("is_public"))) best = Math.max(best, VIEWER);
         return best;
+    }
+
+    /**
+     * May this account suggest changes to the language without being an editor? Yes for anyone logged in when it's public
+     * and takes public suggestions; the suggestions wait for the owner's approval like an editor's.
+     */
+    public boolean canSuggest(long uid, Map<String, Object> lang) {
+        return uid > 0 && Boolean.TRUE.equals(lang.get("is_public")) && Boolean.TRUE.equals(lang.get("public_suggestions"));
     }
 
     public boolean autoApprove(long uid, long langId) {

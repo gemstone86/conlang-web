@@ -88,7 +88,7 @@ async function connectorPage() {
 async function boot() {
   const r = await api('GET', '/api/auth/me');
   S.me = r.user; S.regOpen = r.registrationOpen;
-  if (S.me) await loadWorlds();
+  await loadWorlds();
   render();
 }
 async function loadWorlds() {
@@ -100,12 +100,13 @@ async function loadWorlds() {
 }
 function render() {
   $('#who').innerHTML = S.me ? esc(S.me.username) + (S.me.is_admin ? ' <a class="badge" href="/admin/" title="Admin dashboard: all users">admin</a>' : '') +
-    (S.me.is_admin ? ` <button data-act="page" data-p="work" class="${['log', 'connector'].includes(S.page) ? '' : 'primary'}">Workspace</button> <button data-act="page" data-p="log" class="${S.page === 'log' ? 'primary' : ''}">Log</button> <button data-act="page" data-p="connector" class="${S.page === 'connector' ? 'primary' : ''}" title="Let Claude read your languages and weather data">Claude connector</button> <button data-act="resetCode">Issue reset code</button> <button data-act="exportAll" title="All worlds, languages, words, rules, forms, grammar, sounds, sentences, sharing and accounts, as one file">Export everything</button> <button data-act="importAll" title="Read an Export everything file (e.g. from the separate Root and Rune app). Replaces Root and Rune's data here.">Import everything</button>` : '') + ' <button data-act="logout">Log out</button>' : '';
-  if (!S.me) { location.href = '/?next=' + encodeURIComponent(location.pathname); return; }
-  if (S.me.is_admin && S.page === 'log') { $('#app').innerHTML = logShell(); loadLog(true); return; }
-  if (S.me.is_admin && S.page === 'connector') { $('#app').innerHTML = '<div class="card">Loading…</div>'; connectorPage().catch(e => say(e.message, true)); return; }
+    (S.me.is_admin ? ` <button data-act="page" data-p="work" class="${['log', 'connector'].includes(S.page) ? '' : 'primary'}">Workspace</button> <button data-act="page" data-p="log" class="${S.page === 'log' ? 'primary' : ''}">Log</button> <button data-act="page" data-p="connector" class="${S.page === 'connector' ? 'primary' : ''}" title="Let Claude read your languages and weather data">Claude connector</button> <button data-act="resetCode">Issue reset code</button> <button data-act="exportAll" title="All worlds, languages, words, rules, forms, grammar, sounds, sentences, sharing and accounts, as one file">Export everything</button> <button data-act="importAll" title="Read an Export everything file (e.g. from the separate Root and Rune app). Replaces Root and Rune's data here.">Import everything</button>` : '') + ' <button data-act="logout">Log out</button>' : '<a href="/?next=%2Frune%2F"><button class="primary">Log in</button></a>';
+  if (!S.me && !S.worlds.length) { location.href = '/?next=' + encodeURIComponent(location.pathname); return; }
+  if (S.me && S.me.is_admin && S.page === 'log') { $('#app').innerHTML = logShell(); loadLog(true); return; }
+  if (S.me && S.me.is_admin && S.page === 'connector') { $('#app').innerHTML = '<div class="card">Loading…</div>'; connectorPage().catch(e => say(e.message, true)); return; }
   $('#app').innerHTML = '<div class="layout"><div class="card tree" id="side">' + sideView() + '</div><div id="panel">' +
-    (S.lang ? '<div class="card" id="panelbody">Loading…</div>' : '<div class="card"><h2>Welcome</h2><p>Create a world, then a language in it. Pick a language on the left to work on it.</p></div>') + '</div></div>';
+    (S.lang ? '<div class="card" id="panelbody">Loading…</div>' : S.me ? '<div class="card"><h2>Welcome</h2><p>Create a world, then a language in it. Pick a language on the left to work on it.</p></div>'
+      : '<div class="card"><h2>Welcome</h2><p>These are the languages people have shared with everyone. Pick one on the left to read its dictionary, sound changes and grammar.</p><p><a href="/?next=%2Frune%2F">Log in</a> to build languages of your own.</p></div>') + '</div></div>';
   if (S.lang) renderPanel();
 }
 
@@ -117,19 +118,30 @@ function langTree(langs, parent) {
   const kids = langs.filter(l => (l.parent_id ?? null) === parent);
   if (!kids.length) return '';
   return '<ul>' + kids.map(l => `<li><a data-act="pick" data-id="${l.id}" class="${S.lang && S.lang.id === l.id ? 'on' : ''}">${esc(l.name)}</a>` +
-    `<span class="badge">${LEVELS[l.level]}</span>${l.split_year != null ? `<span class="muted small"> (splits ${l.split_year})</span>` : ''}` +
+    `<span class="badge">${LEVELS[l.level]}</span>${l.is_public ? ' <span class="badge public" title="Public: anyone can read it' + (l.public_suggestions ? ', and anyone logged in can suggest changes' : '') + '">public</span>' : ''}${l.split_year != null ? `<span class="muted small"> (splits ${l.split_year})</span>` : ''}` +
     langTree(langs, l.id) + '</li>').join('') + '</ul>';
 }
 function sideView() {
-  let h = '<h3>Worlds</h3>';
-  for (const w of S.worlds) {
+  let h = S.me ? '<h3>Worlds</h3>' : '';
+  const own = S.worlds.filter(w => !w.community), community = S.worlds.filter(w => w.community);
+  if (S.me && !own.length) h += '<p class="muted small">No worlds yet.</p>';
+  for (const w of own) {
     const roots = w.languages.filter(l => !l.parent_id || !w.languages.some(p => p.id === l.parent_id));
     h += `<div><strong>${esc(w.name)}</strong>${w.mine ? '' : ' <span class="badge">shared</span>'}
       ${w.mine ? `<button data-act="newLang" data-w="${w.id}" title="Add a root language">+ lang</button> <button class="danger" data-act="delWorld" data-w="${w.id}" title="Delete world">✕</button>` : ''}</div>`;
     const rootsOnly = w.languages.map(l => roots.includes(l) ? { ...l, parent_id: null } : l);
     h += langTree(rootsOnly, null);
   }
-  return h + '<div class="row"><button data-act="newWorld">+ New world</button></div>';
+  if (S.me) h += '<div class="row"><button data-act="newWorld">+ New world</button></div>';
+  if (community.length) {
+    h += '<h3 class="community">Community</h3><p class="muted small">Languages others have made public.</p>';
+    for (const w of community) {
+      h += `<div><strong>${esc(w.name)}</strong></div>`;
+      const roots = w.languages.filter(l => !l.parent_id || !w.languages.some(p => p.id === l.parent_id));
+      h += langTree(w.languages.map(l => roots.includes(l) ? { ...l, parent_id: null } : l), null);
+    }
+  }
+  return h;
 }
 
 // ---------- panel ----------
@@ -141,18 +153,36 @@ function descendants(l) {
   walk(l.id); return out;
 }
 function canEdit() { return S.lang && S.lang.level >= 2; }
+/** May change things that go through the owner's approval: editors, and anyone logged in on a public language that takes suggestions. */
+function canSuggest() { return canEdit() || !!(S.me && S.lang && S.lang.can_suggest); }
 function isOwner() { return S.lang && S.lang.level >= 3; }
 async function renderPanel() {
   const l = S.lang;
-  let h = `<h2>${esc(l.name)} <span class="badge">${LEVELS[l.level]}</span></h2>
+  let h = `<h2>${esc(l.name)} <span class="badge">${LEVELS[l.level]}</span>${l.is_public ? ' <span class="badge public">public</span>' : ''}${l.owner_name && l.level < 3 ? ` <span class="small muted">by ${esc(l.owner_name)}</span>` : ''}</h2>
+  ${publishRow(l)}
   <div class="row">${canEdit() ? '<button data-act="undo">↶ Undo</button><button data-act="redo">↷ Redo</button>' : ''}
   <a href="/rune/api/languages/${l.id}/export.xlsx"><button>Export Excel</button></a></div><div class="tabs">` +
-    TABS.filter(t => isOwner() || !['share', 'settings'].includes(t[0])).map(t => `<button data-act="tab" data-t="${t[0]}" class="${S.tab === t[0] ? 'on' : ''}">${t[1]}</button>`).join('') +
+    TABS.filter(t => (isOwner() || !['share', 'settings'].includes(t[0])) && (S.me || !['changes', 'log'].includes(t[0])) && (canEdit() || !['bulk', 'compound'].includes(t[0]))).map(t => `<button data-act="tab" data-t="${t[0]}" class="${S.tab === t[0] ? 'on' : ''}">${t[1]}</button>`).join('') +
     '</div><div id="tabbody">Loading…</div>';
   $('#panelbody').innerHTML = h;
   try { $('#tabbody').innerHTML = await TAB[S.tab](); if (AFTER[S.tab]) AFTER[S.tab](); } catch (e) { $('#tabbody').innerHTML = ''; say(e.message, true); }
 }
 const base = () => '/rune/api/languages/' + S.lang.id;
+
+/** The public switches (admins: public; admins and the owner: suggestions), or a note for readers. */
+function publishRow(l) {
+  const admin = S.me && S.me.is_admin;
+  if (admin || (isOwner() && l.is_public)) {
+    return `<div class="row publishrow">${admin ? `<label style="display:inline;margin:0" title="Anyone can read it, also without logging in; it is listed under Community"><input type="checkbox" data-publish="public" ${l.is_public ? 'checked' : ''}> Public</label>` : '<span class="badge public">public</span>'}
+      <label style="display:inline;margin:0" title="Anyone logged in can suggest changes; they wait for the owner's approval on the Changes tab"><input type="checkbox" data-publish="suggestions" ${l.public_suggestions ? 'checked' : ''} ${l.is_public ? '' : 'disabled'}> Anyone can suggest changes</label>
+      <span class="small muted">${l.is_public ? 'Anyone can read it, also without logging in' + (l.public_suggestions ? '; anyone logged in can suggest changes, which wait for approval on the Changes tab.' : '.') : 'Only you and the people it is shared with can see it.'}</span></div>`;
+  }
+  if (l.is_public && l.level < 2) {
+    if (l.can_suggest) return '<p class="small card pending">This language is public and takes suggestions: what you add or change is sent to its owner for approval (see the Changes tab).</p>';
+    if (!S.me && l.public_suggestions) return '<p class="small muted"><a href="/?next=%2Frune%2F">Log in</a> to suggest changes to this language.</p>';
+  }
+  return '';
+}
 
 const TAB = {
   async dict() {
@@ -161,7 +191,7 @@ const TAB = {
     let tree = { lineage: [], problems: [] };
     try { tree = await api('GET', base() + '/tree-check'); } catch (e) { /* the note is optional */ }
     let h = '';
-    if (canEdit()) h += `<div class="card"><div class="row">
+    if (canSuggest()) h += `<div class="card"><div class="row">
       <input id="w_gloss" placeholder="gloss" size="14"><input id="w_pos" placeholder="type" size="8"><input id="w_build" placeholder="build" size="8">
       <input id="w_form" placeholder="form" size="14" class="form"><input id="w_ref" list="w_refs" placeholder="refers to which word?" size="22" hidden><datalist id="w_refs">${S.words.filter(x => !x.ref_to).map(x => `<option value="${esc(x.gloss)} #${x.id}">${esc(x.form)}</option>`).join('')}</datalist><label style="display:inline;margin:0" title="The word has no form of its own: it shows the forms of another word"><input type="checkbox" id="w_isref" data-isref="1"> reference to another word</label>
       <label style="display:inline;margin:0" title="Take the word from another language, as it sounded there in the year you give"><input type="checkbox" id="w_isloan" data-isloan="1"> borrow</label>
@@ -192,7 +222,7 @@ const TAB = {
     const scope = S.ruleScope;
     const [rules, versions] = await Promise.all([api('GET', base() + '/rules?scope=' + scope), api('GET', base() + '/rule-versions').catch(() => [])]);
     S.rules = rules; S.ruleVersions = versions;
-    const targets = [S.lang, ...descendants(S.lang)].filter(l => l.level >= 2);
+    const targets = [S.lang, ...descendants(S.lang)].filter(l => l.level >= 2 || (S.me && l.can_suggest));
     const seg = (v, t) => `<button data-act="ruleScope" data-v="${v}" class="${scope === v ? 'primary' : ''}">${t}</button>`;
     let h = `<div class="row"><span class="small muted">Show</span> ${seg('self', 'only ' + esc(S.lang.name))} ${seg('branches', esc(S.lang.name) + ' + all its branches')} ${seg('path', 'full path (ancestors + ' + esc(S.lang.name) + ')')}
       <span class="small muted">${rules.length} rule${rules.length === 1 ? '' : 's'}</span></div>`;
@@ -217,7 +247,7 @@ const TAB = {
     h += '<table><tr><th>Year</th><th>Language</th><th>Order</th><th>Name</th><th>Pattern</th><th>Replacement</th><th>Tags</th><th></th></tr>';
     for (const r of shown) h += `<tr class="${r.off ? 'ruleoff' : ''}" ${r.off ? `title="Switched off in ${esc(r.off_in)}: left out when words evolve"` : ''}><td>${r.year}</td><td>${esc(r.lang_name)}</td><td>${r.ord}</td><td>${esc(r.name)}${r.off ? ' <span class="badge">off</span>' : ''}</td><td class="form">${esc(r.pattern)}</td><td class="form">${esc(r.replacement)}</td>
       <td>${ruleTags(r).map(t => `<a class="tagchip small${S.ruleTag === t.toLowerCase() ? ' on' : ''}" data-act="ruleTagFilter" data-t="${esc(t)}">${esc(t)}</a>`).join(' ')}</td>
-      <td>${r.level >= 2 ? `<button data-act="editRule" data-id="${r.id}">Edit</button> <button class="danger" data-act="delRule" data-id="${r.id}">✕</button>` : ''}</td></tr>`;
+      <td>${r.level >= 2 || (S.me && (S.worlds.flatMap(w => w.languages).find(x => x.id === r.language_id) || {}).can_suggest) ? `<button data-act="editRule" data-id="${r.id}">Edit</button> <button class="danger" data-act="delRule" data-id="${r.id}">✕</button>` : ''}</td></tr>`;
     if (!shown.length) h += `<tr><td colspan="8" class="muted">${S.ruleTag ? 'No sound changes with that tag here.' : 'No sound changes yet.'}</td></tr>`;
     return h + '</table>';
   },
@@ -229,7 +259,7 @@ const TAB = {
     let h = `<div class="card"><div class="row"><strong>Syllable shape</strong>
       ${isOwner() ? `<input id="gr_shape" value="${esc(S.lang.syllable_shape || '')}" placeholder="e.g. (V)C(C)V(C)" size="20" class="form"><button data-act="saveShape">Save</button>` : `<span class="form">${esc(S.lang.syllable_shape || 'not set')}</span>`}</div>
       <p class="muted small">C = consonant, V = vowel, brackets = optional. A leading (V) is an optional vowel at the start of a word only. sh, ch, gh, ng and diphthongs (ai, ou) count as one sound. "Suggest new roots" only proposes forms of this shape, and a language without its own shape uses its parent's.</p></div>`;
-    if (canEdit()) h += `<div class="card"><div class="row"><select id="gr_cat" data-grcat="1">${cats.map(c => `<option>${esc(c)}</option>`).join('')}</select>
+    if (canSuggest()) h += `<div class="card"><div class="row"><select id="gr_cat" data-grcat="1">${cats.map(c => `<option>${esc(c)}</option>`).join('')}</select>
       <input id="gr_name" placeholder="name" size="26"><input id="gr_year" type="number" placeholder="from year" size="8"><input id="gr_id" type="hidden"></div>
       <div class="row">${[1, 2, 3, 4, 5, 6].map(k => `<input id="gr_c${k}" placeholder="column ${k}" size="22">`).join('')}</div>
       <div class="row"><button class="primary" data-act="saveGrammar" id="gr_btn">Add row</button><button data-act="cancelGrammar" id="gr_cancel" hidden>Cancel edit</button>
@@ -239,10 +269,10 @@ const TAB = {
     for (const t of cats) {
       const hd = heads(t), list = g.entries.filter(e => e.category === t);
       const vis = [0, 1, 2, 3, 4, 5].filter(k => hd[k] || list.some(e => e['c' + (k + 1)]));
-      h += `<h3>${esc(t)} ${canEdit() ? `<button data-act="editHeadings" data-t="${esc(t)}">Edit columns</button> <button class="danger" data-act="delSection" data-t="${esc(t)}">Delete section</button>` : ''}</h3>
+      h += `<h3>${esc(t)} ${canSuggest() ? `<button data-act="editHeadings" data-t="${esc(t)}">Edit columns</button> <button class="danger" data-act="delSection" data-t="${esc(t)}">Delete section</button>` : ''}</h3>
         <table class="gt"><tr><th>${esc(t)}</th>${vis.map(k => `<th>${esc(hd[k])}</th>`).join('')}<th>From</th><th></th></tr>`;
       for (const e of list) h += `<tr><td><strong>${esc(e.name)}</strong></td>${vis.map(k => `<td>${esc(e['c' + (k + 1)])}</td>`).join('')}<td>${e.year ?? ''}</td>
-        <td>${canEdit() ? `<button data-act="editGrammar" data-id="${e.id}">Edit</button> <button data-act="rowToForm" data-id="${e.id}" title="Turn this row into a word form that is added to words automatically">→ word form</button> <button class="danger" data-act="delGrammar" data-id="${e.id}">✕</button>` : ''}</td></tr>`;
+        <td>${canSuggest() ? `<button data-act="editGrammar" data-id="${e.id}">Edit</button> <button data-act="rowToForm" data-id="${e.id}" title="Turn this row into a word form that is added to words automatically">→ word form</button> <button class="danger" data-act="delGrammar" data-id="${e.id}">✕</button>` : ''}</td></tr>`;
       h += '</table>';
     }
     return h || '<p class="muted">No grammar yet.</p>';
@@ -256,7 +286,7 @@ const TAB = {
       if a sound change turns tou into toe in year 300, words from then on get -toe, while older words change through the same sound change. The finished form is stored, so after you
       edit sound changes or the affix word, use <em>Rebuild all</em> to refresh the forms of existing words.</p>`;
     if (S.prefill) h += `<p class="card pending">From grammar row <strong>${esc(S.prefill.label)}</strong>${S.prefill.hint ? ' — ' + esc(S.prefill.hint) : ''}</p>`;
-    if (canEdit()) h += `<div class="card"><div class="row"><input id="fr_grp" list="fr_groups" placeholder="group (e.g. definers; new name creates it)" size="30"><datalist id="fr_groups">${[...new Set(rules.map(x => x.grp).filter(Boolean))].map(g => `<option value="${esc(g)}">`).join('')}</datalist><input id="fr_label" placeholder="form name (e.g. definite)" size="18"><input id="fr_pos" placeholder="applies to types (e.g. noun; blank = all)" size="26">
+    if (canSuggest()) h += `<div class="card"><div class="row"><input id="fr_grp" list="fr_groups" placeholder="group (e.g. definers; new name creates it)" size="30"><datalist id="fr_groups">${[...new Set(rules.map(x => x.grp).filter(Boolean))].map(g => `<option value="${esc(g)}">`).join('')}</datalist><input id="fr_label" placeholder="form name (e.g. definite)" size="18"><input id="fr_pos" placeholder="applies to types (e.g. noun; blank = all)" size="26">
       <select id="fr_place"><option>suffix</option><option>prefix</option></select></div>
       <div class="row"><input id="fr_link" list="fr_words" placeholder="affix = dictionary word (e.g. definite)" size="30"><datalist id="fr_words">${S.wordnames.map(w => `<option value="${esc(w.gloss)}">${esc(w.form)}</option>`).join('')}</datalist>
       <span class="muted small">or a fixed affix:</span><input id="fr_affix" placeholder="e.g. tou" size="10" class="form"></div>
@@ -270,7 +300,7 @@ const TAB = {
     order.sort((x, y) => (x === '') - (y === ''));
     const rowOf = r => `<tr><td><strong>${esc(r.label)}</strong></td><td>${esc(r.pos) || 'all types'}</td><td class="form">${r.affix_word_id ? `⛓ <span class="small">${esc(r.affix_gloss ?? '(deleted word)')}</span> ${r.affix_form ? esc(r.placement === 'prefix' ? r.affix_form + '-' : '-' + r.affix_form) : ''}` : (r.placement === 'prefix' ? esc(r.affix) + '-' : '-' + esc(r.affix))}</td>
       <td class="form">${esc(r.cond_re)}</td><td>${r.hiatus ? 'drop first vowel' : ''}</td><td>${r.year ?? ''}</td><td>${r.ord}</td>
-      <td>${canEdit() ? `<button data-act="editFormRule" data-id="${r.id}">Edit</button> <button class="danger" data-act="delFormRule" data-id="${r.id}">✕</button>` : ''}
+      <td>${canSuggest() ? `<button data-act="editFormRule" data-id="${r.id}">Edit</button> <button class="danger" data-act="delFormRule" data-id="${r.id}">✕</button>` : ''}
       ${isOwner() ? `<button data-act="rebuildForm" data-l="${esc(r.label)}" title="Recompute this form for every word (overwrites hand edits)">Rebuild all</button>` : ''}</td></tr>`;
     for (const g of order) {
       if (order.length > 1 || g) h += `<tr class="grouprow"><th colspan="8">${g ? esc(g) : 'Ungrouped'} ${isOwner() ? `<button data-act="rebuildGroup" data-g="${esc(g)}" title="Recompute every form in this group for every word (overwrites hand edits)">Rebuild group</button>` : ''}</th></tr>`;
@@ -293,7 +323,7 @@ const TAB = {
       <h3>Consonants</h3>${grid('consonant')}<h3>Vowels</h3>${grid('vowel')}`;
     h += `<h3>Build from the word list</h3><div class="card"><p class="muted small">Reads the forms of this language's words at every year one of its own sound changes starts, and lists the sounds they use. Letters you have already placed in the table above keep their place; digraphs (sh, ch, th, ng) and diphthongs (ai, ou) count as one sound.</p>
       <div class="row"><label style="margin:0">Up to year</label><input type="number" id="as_to" value="${S.autoTo ?? 900}" size="6"><button data-act="autoSoundsLoad">Build table</button></div><div id="as_out"></div></div>`;
-    if (canEdit()) h += `<h3>Add / edit a sound</h3><div class="card"><div class="row"><input id="ph_symbol" placeholder="symbol" size="6" class="form">
+    if (canSuggest()) h += `<h3>Add / edit a sound</h3><div class="card"><div class="row"><input id="ph_symbol" placeholder="symbol" size="6" class="form">
       <select id="ph_kind"><option>consonant</option><option>vowel</option></select>
       <input id="ph_row" list="ph_rows" placeholder="row (manner / height)" size="18"><datalist id="ph_rows">${[...new Set(ph.map(p => p.row_label).filter(Boolean))].map(x => `<option>${esc(x)}</option>`).join('')}</datalist>
       <input id="ph_col" list="ph_cols" placeholder="column (place / backness)" size="22"><datalist id="ph_cols">${[...new Set(ph.map(p => p.col_label).filter(Boolean))].map(x => `<option>${esc(x)}</option>`).join('')}</datalist>
@@ -303,7 +333,7 @@ const TAB = {
       <textarea id="si_text" rows="6" class="form"></textarea><div class="row"><input type="file" id="si_file" accept=".json,.txt,.csv,.tsv"><button data-act="soundImportCheck">Check</button></div><div id="si_out"></div></div>`;
     h += '<h3>All sounds</h3><table><tr><th>Symbol</th><th>Kind</th><th>Row</th><th>Column</th><th>Notes</th><th>From</th><th>Until</th><th></th></tr>' + ph.map(p =>
       `<tr><td class="form">${esc(p.symbol)}</td><td>${esc(p.kind)}</td><td>${esc(p.row_label)}</td><td>${esc(p.col_label)}</td><td>${esc(p.notes)}</td><td>${p.year ?? ''}</td><td>${p.year_to ?? ''}</td>
-      <td>${canEdit() ? `<button data-act="editPhoneme" data-id="${p.id}">Edit</button> <button class="danger" data-act="delPhoneme" data-id="${p.id}">✕</button>` : ''}</td></tr>`).join('') + '</table>';
+      <td>${canSuggest() ? `<button data-act="editPhoneme" data-id="${p.id}">Edit</button> <button class="danger" data-act="delPhoneme" data-id="${p.id}">✕</button>` : ''}</td></tr>`).join('') + '</table>';
     return h;
   },
   async compound() {
@@ -537,7 +567,7 @@ function wordRow(w) {
   const d = defForm(w), more = (w.forms || []).filter(f => f !== d).length;
   const inh = w.inherited ? ` <span class="badge" title="Coined in ${esc(w.origin_lang)} as ${esc(w.origin_form)}">from ${esc(w.origin_lang)}</span>` : '';
   const act = w.inherited ? `<button data-act="goOrigin" data-id="${w.id}" data-lang="${w.origin_lang_id}">Open in ${esc(w.origin_lang)}</button>`
-    : (canEdit() ? `<button data-act="editWord" data-id="${w.id}">Edit</button> <button class="danger" data-act="delWord" data-id="${w.id}">✕</button>` : '');
+    : (canSuggest() ? `<button data-act="editWord" data-id="${w.id}">Edit</button> <button class="danger" data-act="delWord" data-id="${w.id}">✕</button>` : '');
   const lost = w.lost_year != null ? ` <span class="badge lostbadge" title="No longer used in ${esc(S.lang.name)} from ${w.lost_year}">lost ${w.lost_year}</span>` : '';
   return `<tr class="${w.inherited ? 'inherited' : ''}${w.lost_year != null ? ' lostword' : ''}"><td class="muted small">${w.id}</td><td><a data-act="openWord" data-id="${w.id}" style="cursor:pointer"><strong>${esc(w.gloss)}</strong></a>${inh}${lost}${w.meaning_changed ? `<div class="small muted">means: ${esc(w.meaning)}</div>` : ''}${w.loan_from ? `<div class="small muted">borrowed from <strong>${esc(w.loan_from)}</strong></div>` : ''}${w.ref_to ? `<div class="small muted">→ same as <strong>${esc(w.ref_gloss)}</strong> (#${w.ref_to})</div>` : ''}${(w.problems || []).map(p => `<div class="small gap">⚠ ${esc(p)}</div>`).join('')}</td><td>${esc(w.pos)}</td><td>${esc(w.build)}</td><td>${w.year}</td>
     <td class="form">${esc(w.form)}</td><td>${d ? lines(d.latest) : '<span class="muted">—</span>'}${more ? ` <span class="badge">+${more}</span>` : ''}</td>
@@ -572,7 +602,7 @@ async function showWord() {
   const w = r.word;
   S.openLang = w.language_id; S.openWordYear = w.year;
   const ownLang = (S.worlds || []).flatMap(x => x.languages || []).find(l => l.id === w.language_id);
-  const ce = w.language_id === (S.lang && S.lang.id) ? canEdit() : !!(ownLang && ownLang.level >= 2);
+  const ce = w.language_id === (S.lang && S.lang.id) ? canSuggest() : !!(ownLang && (ownLang.level >= 2 || (S.me && ownLang.can_suggest)));
   const langs = [...new Map(r.history.map(x => [x.lang_id, x.lang])).entries()];
   let h = `<button class="modalx" data-act="closeModal">✕</button><h2>${esc(w.gloss)} <span class="badge">#${w.id}</span> <span class="badge">${esc(w.pos)}</span> <span class="badge">${esc(w.build)}</span></h2>
     <p class="muted small">${S.lang && w.language_id !== S.lang.id ? 'Coined in another language; ' + esc(S.lang.name) + "'s own version is shown in the branch table below. " : ''}Coined ${w.year}${r.loan_from ? ' · borrowed from <strong>' + esc(r.loan_from) + '</strong>' : ''}${w.notes ? ' · ' + esc(w.notes) : ''}</p>
@@ -772,6 +802,14 @@ function filterMissList() {
   document.querySelectorAll('#c_misslist .misspick').forEach(a => { a.hidden = !!q && !a.dataset.g.toLowerCase().includes(q); });
 }
 document.addEventListener('input', e => { if (e.target.id === 'c_missq') filterMissList(); });
+document.addEventListener('change', wrap(async e => {
+  const k = e.target.dataset && e.target.dataset.publish;
+  if (!k || !S.lang) return;
+  const r = await api('POST', base() + '/publish', { [k]: e.target.checked });
+  S.lang.is_public = r.is_public; S.lang.public_suggestions = r.public_suggestions;
+  say(r.is_public ? (r.public_suggestions ? 'Public, and anyone logged in can suggest changes.' : 'Public: anyone can read it.') : 'Private again.');
+  await loadWorlds(); render();
+}));
 document.addEventListener('toggle', e => { if (e.target.dataset && e.target.dataset.versions) S.ruleVersionsOpen = e.target.open; }, true);
 
 // ---------- actions ----------
@@ -1391,7 +1429,7 @@ function drawAutoSounds(full) {
 document.addEventListener('input', e => {
   if (e.target.dataset.autoslider) { S.autoYear = Number(e.target.value); drawAutoSounds(false); }
 });
-const UI_VERSION = '1.10.1';   // keep equal to the version in pom.xml
+const UI_VERSION = '1.11.0';   // keep equal to the version in pom.xml
 api('GET', '/rune/api/version').then(v => {
   $('#ver').textContent = 'v' + v.version + (v.built ? ' · built ' + v.built.replace('T', ' ').replace('Z', ' UTC') : '');
   if (v.version !== UI_VERSION) {
