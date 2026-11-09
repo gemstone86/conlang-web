@@ -39,7 +39,7 @@ public class FullExport {
     /** Root and Rune's tables, parents before children: the order an import must insert them in. */
     public static final List<String> TABLES = List.of(
             "users", "worlds", "languages", "shares", "words", "word_overrides", "rules", "changes", "edit_log",
-            "word_forms", "grammar_sections", "grammar_entries", "phonemes", "form_rules", "word_meanings", "word_losses", "sentences", "missing_words", "rule_versions");
+            "word_forms", "grammar_sections", "grammar_entries", "phonemes", "form_rules", "word_meanings", "word_losses", "sentences", "missing_words", "rule_versions", "texts");
 
     private final DataSource ds;
     private final ObjectMapper json;

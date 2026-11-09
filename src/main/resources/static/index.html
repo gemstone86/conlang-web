@@ -115,7 +115,7 @@
   <section class="card" id="account" aria-live="polite">
     <!-- logged in -->
     <div id="inView" hidden>
-      <div class="who"><span>Logged in as</span> <strong id="whoName"></strong> <a class="badge" id="whoAdmin" href="/admin/" title="Admin dashboard" hidden>admin</a></div>
+      <div class="who"><span>Logged in as</span> <strong id="whoName"></strong> <a class="badge" id="whoAdmin" href="/admin/" title="Admin dashboard" hidden>admin</a> <span id="bellHost"></span></div>
       <div class="row">
         <button type="button" id="pwToggle">Change password</button>
         <div class="spacer"></div>
@@ -154,6 +154,7 @@
 
 <footer>One account for both apps.</footer>
 
+<script src="/bell.js"></script>
 <script>
 'use strict';
 const $ = id => document.getElementById(id);
@@ -188,6 +189,7 @@ function render() {
     $('whoName').textContent = me.username;
     $('whoAdmin').hidden = !me.is_admin;
     $('adminLink').hidden = !me.is_admin;
+    if (!$('bellHost').firstChild && window.Bell) Bell.mount($('bellHost'));
   } else {
     const reg = state.mode === 'register';
     $('authTitle').textContent = reg ? 'Create an account' : 'Log in';
@@ -230,7 +232,7 @@ $('resetBtn').onclick = async () => {
 };
 $('logoutBtn').onclick = async () => {
   try { await api('POST', '/api/auth/logout'); } catch (e) { /* already logged out */ }
-  state.me = null; $('pwForm').hidden = true; msg($('inMsg'), ''); render();
+  state.me = null; $('bellHost').innerHTML = ''; $('pwForm').hidden = true; msg($('inMsg'), ''); render();
 };
 $('pwToggle').onclick = () => { $('pwForm').hidden = !$('pwForm').hidden; if (!$('pwForm').hidden) $('pwCur').focus(); };
 $('pwForm').onsubmit = async e => {

@@ -36,9 +36,11 @@ public class ApiController {
     private final AppLog applog;
     private final SentenceService sentences;
     private final GraphService graphs;
+    private final Notifications notifications;
     private final RuleTransferService ruleTransfer;
 
-    public ApiController(Db db, Auth auth, Access access, Store store, DictService dict, ExportService export, ImportService imports, GrammarImportService grammarImport, FormGenerator forms, AppLog applog, SentenceService sentences, GraphService graphs, RuleTransferService ruleTransfer) {
+    public ApiController(Db db, Auth auth, Access access, Store store, DictService dict, ExportService export, ImportService imports, GrammarImportService grammarImport, FormGenerator forms, AppLog applog, SentenceService sentences, GraphService graphs, RuleTransferService ruleTransfer, Notifications notifications) {
+        this.notifications = notifications;
         this.db = db;
         this.auth = auth;
         this.access = access;
@@ -361,6 +363,17 @@ public class ApiController {
                 b.containsKey("grammar") ? str(b, "grammar") : l.get("grammar"),
                 b.containsKey("defSuffix") ? str(b, "defSuffix") : l.get("def_suffix"),
                 shapeText == null || shapeText.isBlank() ? null : shapeText.strip(), id);
+        if (b.containsKey("speechVoice") || b.containsKey("speechStress") || b.containsKey("speechSpeed")) {
+            String voice = b.containsKey("speechVoice") ? str(b, "speechVoice") : (String) l.get("speech_voice");
+            String stress = b.containsKey("speechStress") ? str(b, "speechStress") : (String) l.get("speech_stress");
+            Long speed = b.containsKey("speechSpeed") ? lng(b, "speechSpeed") : l.get("speech_speed") == null ? null : Db.num(l.get("speech_speed"));
+            voice = voice == null || voice.isBlank() ? null : voice.trim();
+            stress = stress == null || stress.isBlank() ? null : stress.trim();
+            if (voice != null && !voice.matches("[a-z]{2,3}(-[a-z]{2,4})?")) throw new ApiException(400, "Unknown voice: " + voice);
+            if (stress != null && !java.util.Set.of("first", "last", "written").contains(stress)) throw new ApiException(400, "Stress is first, last or written.");
+            if (speed != null && (speed < 60 || speed > 400)) throw new ApiException(400, "Speed is 60 to 400 words a minute.");
+            db.update("update languages set speech_voice=?, speech_stress=?, speech_speed=? where id=?", voice, stress, speed, id);
+        }
         return Map.of("ok", true);
     }
 
@@ -415,6 +428,7 @@ public class ApiController {
         db.update("delete from shares where scope=? and target_id=? and user_id=?", scope, target, u.get("id"));
         db.insert("insert into shares(scope, target_id, user_id, level, auto_approve) values (?,?,?,?,?)", scope, target, u.get("id"), level, auto);
         applog.info("share", uid, "Shared " + scope.toLowerCase() + " #" + target + " with '" + str(b, "username") + "' as " + level.toLowerCase() + (auto ? " (auto-approve)" : ""));
+        notifications.shared(Db.num(u.get("id")), uid, scope, target, level);
         return Map.of("ok", true);
     }
 
