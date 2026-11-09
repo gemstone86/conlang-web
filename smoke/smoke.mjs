@@ -8,11 +8,13 @@ const out = await page.evaluate(async () => {
   const g = u => fetch(u).then(r => r.json());
   const w = await j('/rune/api/worlds', { name: 'Ygg' });
   const p = await j('/rune/api/languages', { worldId: w.id, name: 'Proto' });
+  const br = await j('/rune/api/languages', { worldId: w.id, name: 'Branch', parentId: p.id, splitYear: 500 });
   const e = (l, entity, payload) => j('/rune/api/languages/' + l + '/edit', { entity, action: 'CREATE', payload });
   const water = await e(p.id, 'word', { gloss: 'water', form: 'ata', year: 0 });
   await e(p.id, 'rule', { year: 100, pattern: 't', replacement: 'd' });
   await e(p.id, 'rule', { year: 700, pattern: 'a$', replacement: 'e' });
   const r = [];
+  r.push('dict ' + JSON.stringify(await g('/rune/api/languages/' + p.id + '/words')).slice(0, 500));
   r.push(JSON.stringify((await g('/rune/api/words/' + water.id + '/history')).history));
   for (const y of [50, 400, 800, 2000]) r.push(y + ': ' + JSON.stringify(await j('/rune/api/languages/' + p.id + '/sentences/build', { source: '(water)', year: y })).slice(0, 400));
   r.push('rules ' + JSON.stringify(await g('/rune/api/languages/' + p.id + '/rules')).slice(0, 600));
