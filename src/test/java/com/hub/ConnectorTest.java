@@ -121,7 +121,7 @@ class ConnectorTest {
             assertEquals("object", t.path("inputSchema").path("type").asText());
         }
         for (String n : java.util.List.of("rune_list_languages", "rune_words", "rune_search_words", "rune_word_history", "rune_sound_changes",
-                "rune_missing_words", "rune_build_sentence", "weather_world", "weather_day", "weather_month", "weather_maps", "weather_get"))
+                "rune_missing_words", "rune_build_sentence", "rune_check", "rune_etymology", "rune_texts", "rune_text", "weather_world", "weather_day", "weather_month", "weather_maps", "weather_get"))
             assertTrue(names.contains(n), n + " in " + names);
 
         // Root and Rune, as the Claude account

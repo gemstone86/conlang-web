@@ -4,6 +4,9 @@ import com.conlangs.web.ApiController;
 import com.conlangs.web.ApiException;
 import com.conlangs.web.MissingService;
 import com.conlangs.web.RuleVersions;
+import com.conlangs.web.EtymologyService;
+import com.conlangs.web.ProofreadService;
+import com.conlangs.web.TextService;
 import com.eonweather.core.Api;
 import com.eonweather.core.Http;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -38,11 +41,18 @@ public class ConnectorTools {
     private final ApiController rune;
     private final MissingService missing;
     private final RuleVersions versions;
+    private final ProofreadService proofread;
+    private final EtymologyService etymology;
+    private final TextService texts;
     private final Api weather;
     private final ObjectMapper json;
     private final Map<String, Tool> tools = new LinkedHashMap<>();
 
-    public ConnectorTools(ApiController rune, MissingService missing, RuleVersions versions, Api weather, ObjectMapper json) {
+    public ConnectorTools(ApiController rune, MissingService missing, RuleVersions versions, ProofreadService proofread, EtymologyService etymology,
+                          TextService texts, Api weather, ObjectMapper json) {
+        this.proofread = proofread;
+        this.etymology = etymology;
+        this.texts = texts;
         this.rune = rune;
         this.missing = missing;
         this.versions = versions;
@@ -119,6 +129,25 @@ public class ConnectorTools {
                         + "changed (with the fields that differ, then and now), and the switched-off tags then and now.",
                 schema(Map.of("version_id", prop("integer", "The version's id (from rune_sound_change_versions).")), "version_id"),
                 (c, a) -> versions.compare(c.uid(), id(a, "version_id")));
+        add("rune_check", "Check a language",
+                "Root and Rune: the Check tab: likely mistakes and loose ends in a language: word problems (no year, empty form, failing "
+                        + "sound change, broken reference or loan), words that sound the same today, sound changes that change nothing, "
+                        + "sounds missing from the Sounds tab, sentences with gaps, open missing words and pending changes.",
+                schema(Map.of("language_id", lang), "language_id"), (c, a) -> proofread.report(c.uid(), id(a, "language_id")));
+        add("rune_etymology", "One meaning in every language",
+                "Root and Rune: for a meaning (e.g. 'water'), every language of the world (that this account can see) with its word for "
+                        + "it: the form today, and whether it's the language's own, inherited (from where), borrowed (from where) or lost.",
+                schema(Map.of("language_id", lang, "meaning", prop("string", "The meaning to trace.")), "language_id", "meaning"),
+                (c, a) -> etymology.trace(c.uid(), id(a, "language_id"), text(a, "meaning", "")));
+        add("rune_texts", "Texts of a language",
+                "Root and Rune: the language's texts (stories, prayers...) on the Texts tab: id, title, years, number of lines.",
+                schema(Map.of("language_id", lang), "language_id"), (c, a) -> texts.list(c.uid(), id(a, "language_id")));
+        add("rune_text", "A text at its years",
+                "Root and Rune: one text built at each of its years side by side (or at the given years): each line's source, "
+                        + "translation and the built form per year, with any gaps.",
+                schema(Map.of("text_id", prop("integer", "The text's id (from rune_texts)."),
+                        "years", prop("string", "Years to show it at instead, e.g. '500, 900' (optional).")), "text_id"),
+                (c, a) -> texts.render(c.uid(), id(a, "text_id"), text(a, "years", null)));
         add("rune_word_form_rules", "Word form rules",
                 "Root and Rune: a language's word form rules (e.g. nouns get the suffix -n for plural), with conditions and years.",
                 schema(Map.of("language_id", lang), "language_id"), (c, a) -> rune.formRules(id(a, "language_id"), c.session()));

@@ -99,3 +99,13 @@ tr.rootrow button.form{margin:.15rem .2rem .15rem 0}
 .badge.public{background:#e6f0f7;color:#2a5b7a}
 h3.community{margin-top:1.4rem;border-top:1px solid var(--line);padding-top:.8rem}
 .publishrow{background:#f4f6f2;border-radius:6px;padding:.3rem .6rem}
+.etree { list-style:none; padding-left:1.1rem; margin:.2rem 0; border-left:1px dashed var(--line); }
+.etree > li { margin:.35rem 0; }
+.chip { display:inline-block; margin:.15rem .4rem .15rem 0; padding:.1rem .45rem; border:1px solid var(--line); border-radius:6px; background:#fafaf7; }
+.chip a { cursor:pointer; color:var(--accent); font-weight:600; }
+.chip.lost { opacity:.7; }
+.chip.lost a { text-decoration:line-through; }
+.badge.lostb, .badge.warnb { background:#f9e6e6; color:var(--warn); }
+.checkbox { margin:.5rem 0; }
+.checkbox summary { cursor:pointer; }
+.texttable td { min-width:9rem; }

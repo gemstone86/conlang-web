@@ -197,6 +197,23 @@ Deleting a word also deletes its locked overrides, and Undo does not bring those
 ## v0.18.2
 - A form that starts earlier than its word is no longer reported as a problem: the word simply uses the form as it has evolved by the word's own year.
 
+## v1.12.0 (combined app)
+- **Texts** tab: keep longer texts (a story, a prayer, a list of proverbs) as lines written like sentences, one per line
+  with the translation after a |, and give them up to six years. Opening a text builds every line at each year side by
+  side, so you can watch the language change; missing words are marked per year. You can also show it at other years
+  without saving them. Editors write texts; everyone who can read the language can read them. Part of Export everything.
+- **Etymology** tab: pick a meaning and see the word for it in every language of the world as a family tree: its form
+  today, and whether it is the language's own, inherited (from where and as what), borrowed (from where) or lost. Click
+  a form to open the word. The word window has the same thing in short under **In other languages**.
+- **Check** tab: likely mistakes and loose ends in one list: word problems, words that sound the same today, sound
+  changes that change nothing (a typo in a pattern, a change too early or late), sounds in words that aren't on the
+  Sounds tab, saved sentences with gaps, open missing words, family-tree problems and changes waiting for approval.
+- **Notifications**: a bell on the start page and in Root and Rune. You hear when someone suggests a change to your
+  language, when an editor changes it directly, when your suggestion is approved or turned down, and when a world or
+  language is shared with you. Several changes by the same person in a day become one line. Clicking one opens the
+  language on the right tab.
+- The Claude connector can read the Check tab, etymologies and texts too.
+
 ## v1.11.0 (combined app)
 - **Public languages**: an admin ticks **Public** at the top of a language. Anyone can then read it, also without
   logging in: dictionary, word histories, sound changes and versions, grammar, sounds, word forms, sentences (and

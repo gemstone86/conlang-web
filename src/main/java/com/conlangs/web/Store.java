@@ -39,7 +39,10 @@ public class Store {
     private final FormGenerator forms;
     private final AppLog applog;
 
-    public Store(Db db, Access access, ObjectMapper om, FormGenerator forms, AppLog applog) {
+    private final Notifications notifications;
+
+    public Store(Db db, Access access, ObjectMapper om, FormGenerator forms, AppLog applog, Notifications notifications) {
+        this.notifications = notifications;
         this.db = db;
         this.access = access;
         this.om = om;
@@ -359,10 +362,12 @@ public class Store {
         if (direct) {
             long id = apply(langId, uid, entity, action, entityId, clean);
             applog.info("edit", uid, "Applied: " + action.toLowerCase() + " " + entity + " #" + id + " in language " + langId);
+            if (level != Access.OWNER) notifications.edited(lang, uid, action, entity);
             return Map.of("status", "applied", "id", id);
         }
         long cid = db.insert("insert into changes(language_id, author_id, entity, action, entity_id, payload) values (?,?,?,?,?,?)",
                 langId, uid, entity, action, entityId, json(clean));
+        notifications.suggested(lang, uid, action, entity, describe(entity, clean));
         applog.info("edit", uid, "Pending approval: " + action.toLowerCase() + " " + entity + (entityId == null ? "" : " #" + entityId) + " in language " + langId + " (change #" + cid + ")");
         return Map.of("status", "pending", "changeId", cid);
     }
@@ -388,7 +393,18 @@ public class Store {
             }
         }
         db.update("update changes set status=?, decided_by=? where id=?", approve ? "APPROVED" : "DENIED", uid, changeId);
+        notifications.decided(access.language(langId), Db.num(c.get("author_id")), uid, approve, (String) c.get("action"), (String) c.get("entity"));
         applog.info("edit", uid, (approve ? "Approved" : "Denied") + " change #" + changeId + " (" + c.get("action") + " " + c.get("entity") + ") in language " + langId);
+    }
+
+    /** A few words about a suggested change, for the notification ("'fire' = pira"). */
+    private static String describe(String entity, Map<String, Object> c) {
+        Object g = c.get("gloss"), f = c.get("form"), p = c.get("pattern");
+        if (g != null && f != null) return "'" + g + "' = " + f;
+        if (g != null) return "'" + g + "'";
+        if (p != null) return p + " > " + c.getOrDefault("replacement", "");
+        if (c.get("meaning") != null) return "'" + c.get("meaning") + "'";
+        return null;
     }
 
     // ---------- undo / redo ----------

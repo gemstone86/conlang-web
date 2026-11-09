@@ -36,9 +36,11 @@ public class ApiController {
     private final AppLog applog;
     private final SentenceService sentences;
     private final GraphService graphs;
+    private final Notifications notifications;
     private final RuleTransferService ruleTransfer;
 
-    public ApiController(Db db, Auth auth, Access access, Store store, DictService dict, ExportService export, ImportService imports, GrammarImportService grammarImport, FormGenerator forms, AppLog applog, SentenceService sentences, GraphService graphs, RuleTransferService ruleTransfer) {
+    public ApiController(Db db, Auth auth, Access access, Store store, DictService dict, ExportService export, ImportService imports, GrammarImportService grammarImport, FormGenerator forms, AppLog applog, SentenceService sentences, GraphService graphs, RuleTransferService ruleTransfer, Notifications notifications) {
+        this.notifications = notifications;
         this.db = db;
         this.auth = auth;
         this.access = access;
@@ -415,6 +417,7 @@ public class ApiController {
         db.update("delete from shares where scope=? and target_id=? and user_id=?", scope, target, u.get("id"));
         db.insert("insert into shares(scope, target_id, user_id, level, auto_approve) values (?,?,?,?,?)", scope, target, u.get("id"), level, auto);
         applog.info("share", uid, "Shared " + scope.toLowerCase() + " #" + target + " with '" + str(b, "username") + "' as " + level.toLowerCase() + (auto ? " (auto-approve)" : ""));
+        notifications.shared(Db.num(u.get("id")), uid, scope, target, level);
         return Map.of("ok", true);
     }
 
