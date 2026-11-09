@@ -191,6 +191,50 @@ class ExtrasTest {
         assertEquals(0, json(get(owner, "/rune/api/languages/" + proto + "/texts")).size());
     }
 
+    /** Voice settings per language, and the speech engine's files served so the browser can run them. */
+    @Test
+    void speechSettingsAndEngineFiles() throws Exception {
+        HttpClient owner = client();
+        post(owner, "/api/auth/register", "{\"username\":\"speaker\",\"password\":\"secret-pass\"}", false);
+        long world = id(post(owner, "/rune/api/worlds", "{\"name\":\"Arda\"}", false));
+        long lang = lang(owner, world, "Quenya", null, null);
+        String L = "/rune/api/languages/" + lang;
+        assertEquals(200, put(owner, L, "{\"speechVoice\":\"qya\",\"speechStress\":\"last\",\"speechSpeed\":120}").statusCode());
+        JsonNode l = json(get(owner, L));
+        assertEquals("qya", l.path("speech_voice").asText());
+        assertEquals("last", l.path("speech_stress").asText());
+        assertEquals(120, l.path("speech_speed").asInt());
+        JsonNode listed = json(get(owner, "/rune/api/worlds")).get(0).path("languages").get(0);
+        assertEquals("qya", listed.path("speech_voice").asText(), "the page reads it from the language list");
+        assertEquals(400, put(owner, L, "{\"speechVoice\":\"x y\"}").statusCode());
+        assertEquals(400, put(owner, L, "{\"speechStress\":\"middle\"}").statusCode());
+        assertEquals(400, put(owner, L, "{\"speechSpeed\":5}").statusCode());
+        assertEquals(200, put(owner, L, "{\"speechVoice\":\"\",\"speechStress\":\"\",\"speechSpeed\":null}").statusCode());
+        assertTrue(json(get(owner, L)).path("speech_voice").isNull(), "empty = as the parent");
+        // other settings untouched by a speech-only save, and vice versa
+        assertEquals("Quenya", json(get(owner, L)).path("name").asText());
+
+        HttpResponse<byte[]> wasm = guestClient().send(HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/rune/speech/espeak-ng.wasm")).GET().build(),
+                HttpResponse.BodyHandlers.ofByteArray());
+        assertEquals(200, wasm.statusCode());
+        assertTrue(wasm.headers().firstValue("Content-Type").orElse("").contains("application/wasm"), wasm.headers().toString());
+        assertEquals(0x6d736100, java.nio.ByteBuffer.wrap(wasm.body(), 0, 4).order(java.nio.ByteOrder.LITTLE_ENDIAN).getInt(), "wasm magic");
+        HttpClient g = guestClient();
+        for (String f : new String[]{"espeak-ng.js", "speech.js", "maps.json"})
+            assertEquals(200, get(g, "/rune/speech/" + f).statusCode(), f);
+        JsonNode maps = om.readTree(get(g, "/rune/speech/maps.json").body());
+        for (String v : new String[]{"fi", "qya", "sjn", "en"}) assertTrue(maps.path(v).has("a") && maps.path(v).has("ʃ"), v);
+    }
+
+    private HttpClient guestClient() {
+        return HttpClient.newHttpClient();
+    }
+
+    private HttpResponse<String> put(HttpClient c, String path, String json) throws Exception {
+        return c.send(HttpRequest.newBuilder(URI.create("http://localhost:" + port + path)).header("Content-Type", "application/json")
+                .PUT(HttpRequest.BodyPublishers.ofString(json)).build(), HttpResponse.BodyHandlers.ofString());
+    }
+
     private HttpResponse<String> delete(HttpClient c, String path) throws Exception {
         return c.send(HttpRequest.newBuilder(URI.create("http://localhost:" + port + path)).DELETE().build(), HttpResponse.BodyHandlers.ofString());
     }

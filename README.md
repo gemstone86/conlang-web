@@ -197,6 +197,17 @@ Deleting a word also deletes its locked overrides, and Undo does not bring those
 ## v0.18.2
 - A form that starts earlier than its word is no longer reported as a problem: the word simply uses the form as it has evolved by the word's own year.
 
+## v1.13.0 (combined app)
+- **Pronunciation by sound**: a small ▶ next to forms (dictionary, word window and its history per year, sentences,
+  texts, etymology) reads them aloud. The spelling goes through the language's pronunciation map to IPA (no map: the
+  form is read as IPA), then [eSpeak NG](https://github.com/espeak-ng/espeak-ng) says it, right in the browser; nothing
+  is sent anywhere. Settings has **Voice** (the accent: Finnish, Quenya, Sindarin, Latin, English, German and more),
+  **Stress** (first syllable, last syllable, or only where the IPA has ˈ) and **Speed**, plus a box to try things out
+  that shows the IPA and what eSpeak was given. Branches use their parent's settings and map unless they have their
+  own. Sounds a voice lacks are replaced by the nearest one it has; ones with no match are named.
+- The speech engine (about 9 MB compressed) loads the first time you press ▶ and is cached after that. eSpeak NG is
+  GPL-3.0 licensed; its licence is in `static/rune/speech/`, and its source is at the link above.
+
 ## v1.12.0 (combined app)
 - **Texts** tab: keep longer texts (a story, a prayer, a list of proverbs) as lines written like sentences, one per line
   with the translation after a |, and give them up to six years. Opening a text builds every line at each year side by

@@ -466,6 +466,7 @@ const TAB = {
     <label>Erosion steps for compounds (one per line: pattern =&gt; replacement; // comment)</label><textarea id="g_erosion" rows="5">${esc(l.erosion)}</textarea>
     <label>Erosion target length (0 = run all steps)</label><input id="g_target" type="number" value="${l.erosion_target ?? 0}">
     <label>Pronunciation map (one per line: spelling=IPA)</label><textarea id="g_ipa" rows="4">${esc(l.ipa_map)}</textarea>
+    ${speechSettings(l)}
     <label>Grammar notes</label><textarea id="g_grammar" rows="5">${esc(l.grammar)}</textarea>
     <div class="row"><button class="primary" data-act="saveSettings">Save</button><button class="danger" data-act="delLang">Delete language</button></div>`;
   }
@@ -476,7 +477,7 @@ function applyHeadings() {
   for (let k = 1; k <= 6; k++) { const e = $('#gr_c' + k); if (e) e.placeholder = hd[k - 1] || 'column ' + k; }
 }
 const AFTER = { dict: () => drawDict(), grammar: () => { if ($('#gr_cat')) applyHeadings(); } };
-const lines = obj => Object.entries(obj || {}).map(([k, v]) => `<span class="small">${esc(k)}:</span> <span class="form">${esc(v)}</span>`).join('<br>');
+const lines = obj => Object.entries(obj || {}).map(([k, v]) => `<span class="small">${esc(k)}:</span> <span class="form">${esc(v)}</span>${sayBtn(v, langIdByName(k))}`).join('<br>');
 const defForm = w => (w.forms || []).find(f => f.label.toLowerCase() === 'definite');
 // ---------- graphs ----------
 const PALETTE = ['#2a6fdb', '#d9822b', '#2e8b57', '#b3261e', '#7b5ea7', '#008b8b', '#a0522d', '#667085'];
@@ -545,7 +546,7 @@ function wordTree(hist) {
 function sentView(b) {
   if (!b || !b.words || !b.words.length) return '<p class="muted small">Nothing to show.</p>';
   const cell = w => `<td class="${w.ok ? '' : 'gap'}"><div class="form"><strong>${esc(w.surface)}</strong></div><div class="small">${esc(w.gloss)}</div></td>`;
-  let h = `<table class="interlinear"><tr>${b.words.map(cell).join('')}</tr></table><p><span class="form">${esc(b.surface)}</span></p>`;
+  let h = `<table class="interlinear"><tr>${b.words.map(cell).join('')}</tr></table><p><span class="form">${esc(b.surface)}</span>${S.lang ? sayBtn(b.surface, S.lang.id) : ''}</p>`;
   const notes = b.words.flatMap(w => w.parts).filter(p => p.ok === false || p.note);
   if (b.gaps) h += `<p class="small gap">${b.gaps} word${b.gaps > 1 ? 's' : ''} could not be built:</p>`;
   if (notes.length) h += '<ul class="small">' + notes.map(p => `<li class="${p.ok === false ? 'gap' : 'muted'}"><code>${esc(p.input)}</code>: ${esc(p.reason || p.note)}</li>`).join('') + '</ul>';
@@ -582,7 +583,7 @@ function wordRow(w) {
   const lost = w.lost_year != null ? ` <span class="badge lostbadge" title="No longer used in ${esc(S.lang.name)} from ${w.lost_year}">lost ${w.lost_year}</span>` : '';
   return `<tr class="${w.inherited ? 'inherited' : ''}${w.lost_year != null ? ' lostword' : ''}"><td class="muted small">${w.id}</td><td><a data-act="openWord" data-id="${w.id}" style="cursor:pointer"><strong>${esc(w.gloss)}</strong></a>${inh}${lost}${w.meaning_changed ? `<div class="small muted">means: ${esc(w.meaning)}</div>` : ''}${w.loan_from ? `<div class="small muted">borrowed from <strong>${esc(w.loan_from)}</strong></div>` : ''}${w.ref_to ? `<div class="small muted">→ same as <strong>${esc(w.ref_gloss)}</strong> (#${w.ref_to})</div>` : ''}${(w.problems || []).map(p => `<div class="small gap">⚠ ${esc(p)}</div>`).join('')}</td><td>${esc(w.pos)}</td><td>${esc(w.build)}</td><td>${w.year}</td>
     <td class="form">${esc(w.form)}</td><td>${d ? lines(d.latest) : '<span class="muted">—</span>'}${more ? ` <span class="badge">+${more}</span>` : ''}</td>
-    <td>${w.length}</td><td>${esc(w.pronunciation)}</td><td>${esc((w.exists_in || []).join(', '))}</td>
+    <td>${w.length}</td><td>${esc(w.pronunciation)}${sayBtn((w.latest || {})[S.lang.name] || w.form, S.lang.id)}</td><td>${esc((w.exists_in || []).join(', '))}</td>
     <td>${lines(w.latest)}${w.has_overrides ? ' <span class="badge">locked</span>' : ''}</td>
     <td>${act}</td></tr>`;
 }
@@ -604,7 +605,7 @@ function lastPerLang(hist) {
   const m = {}; for (const x of hist) if (x.source !== 'ERROR') m[x.lang] = x.form; return m;
 }
 const histTable = hist => '<table><tr><th>Branch</th><th>Year</th><th>Form</th><th>How</th></tr>' + hist.map(x =>
-  `<tr class="${x.source === 'ERROR' ? 'pending' : ''}"><td>${esc(x.lang)}</td><td>${x.year}</td><td class="form">${esc(x.form)}</td><td class="small">${esc(x.source.toLowerCase())}${x.rule ? ': ' + esc(x.rule) : ''}</td></tr>`).join('') + '</table>';
+  `<tr class="${x.source === 'ERROR' ? 'pending' : ''}"><td>${esc(x.lang)}</td><td>${x.year}</td><td class="form">${esc(x.form)}${sayBtn(x.form, x.lang_id)}</td><td class="small">${esc(x.source.toLowerCase())}${x.rule ? ': ' + esc(x.rule) : ''}</td></tr>`).join('') + '</table>';
 
 async function showWord() {
   const r = await api('GET', '/rune/api/words/' + S.openId + '/history');
@@ -1368,7 +1369,8 @@ const A = {
   revoke: async d => { await api('DELETE', '/rune/api/shares/' + d.id); say('Access revoked.'); renderPanel(); },
   saveSettings: async () => {
     await api('PUT', base(), { name: val('g_name'), parentId: val('g_parent') || null, splitYear: val('g_split') === '' ? null : Number(val('g_split')),
-      classes: val('g_classes'), erosion: val('g_erosion'), erosionTarget: Number(val('g_target') || 0), ipaMap: val('g_ipa'), grammar: val('g_grammar') });
+      classes: val('g_classes'), erosion: val('g_erosion'), erosionTarget: Number(val('g_target') || 0), ipaMap: val('g_ipa'), grammar: val('g_grammar'),
+      speechVoice: val('g_voice'), speechStress: val('g_stress'), speechSpeed: val('g_speed') === '' ? null : Number(val('g_speed')) });
     say('Saved.'); await loadWorlds(); render();
   },
   delLang: async () => { if (!confirm('Delete this language and all its words and rules?')) return; await api('DELETE', base()); S.lang = null; await loadWorlds(); render(); }
@@ -1455,7 +1457,7 @@ function familyTree(langs, cell) {
 function etymWord(l, w) {
   const how = w.origin === 'inherited' ? `inherited from ${esc(w.from || '?')}${w.from_form ? ` <span class="form">${esc(w.from_form)}</span>` : ''}`
     : w.origin === 'borrowed' ? `borrowed from ${esc(w.from || '?')}` : `own word, coined ${w.coined ?? '?'}`;
-  return `<span class="chip${w.lost_year != null ? ' lost' : ''}"><a data-act="goOrigin" data-lang="${l.id}" data-id="${w.id}" class="form" title="Open the word">${esc(w.form)}</a>
+  return `<span class="chip${w.lost_year != null ? ' lost' : ''}"><a data-act="goOrigin" data-lang="${l.id}" data-id="${w.id}" class="form" title="Open the word">${esc(w.form)}</a>${sayBtn(w.form, l.id)}
     <span class="small muted">${esc(w.gloss)} · ${how}${w.lost_year != null ? ` · <span class="gap">lost ${w.lost_year}</span>` : ''}${w.note ? ' · ' + esc(w.note) : ''}</span></span>`;
 }
 const ETYM_STATUS = { has: '', none: '<span class="badge">no word</span>', lost: '<span class="badge lostb">lost</span>' };
@@ -1529,7 +1531,7 @@ function textView(r) {
   for (const l of r.lines) {
     if (!l.source) { h += `<tr><td colspan="${ys.length + 1}">&nbsp;</td></tr>`; continue; }
     h += `<tr><td class="small">${esc(l.translation || l.source)}${l.translation ? `<div class="muted">${esc(l.source)}</div>` : ''}</td>` +
-      ys.map(y => { const c = l.at[y] || {}; return `<td class="${c.gaps ? 'pending' : ''}" title="${esc((c.missing || []).join('\n'))}"><span class="form">${esc(c.surface || '')}</span>${c.gaps ? `<div class="small gap">${esc((c.missing || []).join('; '))}</div>` : ''}</td>`; }).join('') + '</tr>';
+      ys.map(y => { const c = l.at[y] || {}; return `<td class="${c.gaps ? 'pending' : ''}" title="${esc((c.missing || []).join('\n'))}"><span class="form">${esc(c.surface || '')}</span>${sayBtn(c.surface, S.lang.id)}${c.gaps ? `<div class="small gap">${esc((c.missing || []).join('; '))}</div>` : ''}</td>`; }).join('') + '</tr>';
   }
   return h + '</table></div>';
 }
@@ -1561,7 +1563,73 @@ Object.assign(A, {
   textYearsReset: async d => { S.textYears = ''; await A.textOpen(d); }
 });
 
-const UI_VERSION = '1.12.0';   // keep equal to the version in pom.xml
+// ---------- pronunciation by sound (eSpeak NG, see speech/speech.js) ----------
+const allLangs = () => (S.worlds || []).flatMap(w => w.languages || []);
+const langById = id => allLangs().find(l => l.id === Number(id));
+/** A language name in the current world (the evolution tables name languages, not ids). */
+function langIdByName(name) {
+  const wid = S.lang && S.lang.world_id;
+  const l = allLangs().find(x => x.name === name && (wid == null || x.world_id === wid)) || allLangs().find(x => x.name === name);
+  return l ? l.id : (S.lang && S.lang.id);
+}
+/** Pronunciation map and voice of a language, each taken from the nearest ancestor that has one. */
+function speechProfile(id) {
+  const p = {};
+  for (let l = langById(id), n = 0; l && n < 50; l = l.parent_id ? langById(l.parent_id) : null, n++) {
+    if (p.ipaMap == null && (l.ipa_map || '').trim()) p.ipaMap = l.ipa_map;
+    if (p.voice == null && l.speech_voice) p.voice = l.speech_voice;
+    if (p.stress == null && l.speech_stress) p.stress = l.speech_stress;
+    if (p.speed == null && l.speech_speed) p.speed = l.speech_speed;
+  }
+  return p;
+}
+function sayBtn(text, langId) {
+  if (!window.Speech || text == null || !String(text).trim() || /^\[.*\?\]$/.test(String(text).trim())) return '';
+  return ` <button class="say" data-act="say" data-t="${esc(text)}" data-l="${langId ?? ''}" title="Listen">▶</button>`;
+}
+let speechLoaded = false;
+async function speak(text, profile, btn) {
+  if (!window.Speech) throw new Error('The speech engine is not available.');
+  if (btn) btn.classList.add('busy');
+  if (!speechLoaded) say('Loading the speech engine (about 9 MB, only the first time)…');
+  try {
+    const r = await Speech.say(text, profile);
+    if (!speechLoaded) { speechLoaded = true; say(''); }
+    if (r.unknown.length) say('No sound for ' + r.unknown.join(' ') + ' in this voice, so it was left out. Add it to the pronunciation map, or try another voice.', true);
+    return r;
+  } finally { if (btn) btn.classList.remove('busy'); }
+}
+function speechSettings(l) {
+  const parent = l.parent_id ? speechProfile(l.parent_id) : {};
+  const inherit = what => l.parent_id ? `(as the parent: ${what})` : `(default: ${what})`;
+  const voiceName = v => (Speech.VOICES.find(x => x[0] === v) || [v, v])[1].split(':')[0];
+  if (!window.Speech) return '';
+  return `<h3>Pronunciation by sound</h3>
+    <p class="muted small">The ▶ buttons next to forms read them aloud: the spelling goes through the pronunciation map above to IPA (no map: the
+    form is read as IPA), then a voice of <a href="https://github.com/espeak-ng/espeak-ng" target="_blank" rel="noopener">eSpeak NG</a> says it. The voice is the accent:
+    it decides how each sound comes out. Branches use these settings unless they have their own.</p>
+    <div class="row"><div><label>Voice</label><select id="g_voice"><option value="">${esc(inherit(voiceName(parent.voice || Speech.DEFAULT.voice)))}</option>
+      ${Speech.VOICES.map(([v, n]) => `<option value="${v}" ${l.speech_voice === v ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select></div>
+    <div><label>Stress</label><select id="g_stress"><option value="">${esc(inherit(parent.stress || Speech.DEFAULT.stress))}</option>
+      ${[['first', 'first syllable'], ['last', 'last syllable'], ['written', 'only where the IPA has ˈ']].map(([v, n]) => `<option value="${v}" ${l.speech_stress === v ? 'selected' : ''}>${n}</option>`).join('')}</select></div>
+    <div><label>Speed (words a minute)</label><input id="g_speed" type="number" min="60" max="400" step="10" size="6" placeholder="${parent.speed || Speech.DEFAULT.speed}" value="${l.speech_speed ?? ''}"></div></div>
+    <div class="row"><input id="g_try" class="form" placeholder="type a form to hear it" size="30"><button data-act="sayTry">▶ Listen</button><span id="g_tryout" class="small muted"></span></div>
+    <p class="muted small">A word without ˈ in its IPA gets the stress set here. Sounds a voice doesn't have are replaced by the nearest one it has (ɬ by ʃ, ɛ by e…).</p>`;
+}
+Object.assign(A, {
+  say: async (d, el) => { await speak(d.t, speechProfile(d.l), el); },
+  sayTry: async (d, el) => {
+    const t = val('g_try').trim(); if (!t) return;
+    const p = Object.assign(speechProfile(S.lang.id), { ipaMap: val('g_ipa') || speechProfile(S.lang.parent_id || 0).ipaMap });
+    if (val('g_voice')) p.voice = val('g_voice');
+    if (val('g_stress')) p.stress = val('g_stress');
+    if (val('g_speed')) p.speed = Number(val('g_speed'));
+    const r = await speak(t, p, el);
+    $('#g_tryout').innerHTML = `IPA <span class="form">${esc(r.ipa)}</span> · eSpeak <code>${esc(r.codes)}</code>`;
+  }
+});
+
+const UI_VERSION = '1.13.0';   // keep equal to the version in pom.xml
 api('GET', '/rune/api/version').then(v => {
   $('#ver').textContent = 'v' + v.version + (v.built ? ' · built ' + v.built.replace('T', ' ').replace('Z', ' UTC') : '');
   if (v.version !== UI_VERSION) {

@@ -261,3 +261,8 @@ CREATE TABLE IF NOT EXISTS notifications (
   seen BOOLEAN NOT NULL DEFAULT FALSE
 );
 CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id, seen);
+
+-- v1.13: pronunciation by sound (eSpeak NG in the browser). Empty = use the parent language's settings.
+ALTER TABLE languages ADD COLUMN IF NOT EXISTS speech_voice VARCHAR(16);
+ALTER TABLE languages ADD COLUMN IF NOT EXISTS speech_stress VARCHAR(8);
+ALTER TABLE languages ADD COLUMN IF NOT EXISTS speech_speed INT;
