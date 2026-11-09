@@ -13,7 +13,11 @@ const out = await page.evaluate(async () => {
   const water = await e(p.id, 'word', { gloss: 'water', form: 'ata', year: 0 });
   await e(p.id, 'rule', { year: 100, pattern: 't', replacement: 'd' });
   await e(p.id, 'rule', { year: 700, pattern: 'a$', replacement: 'e' });
+  await e(p.id, 'word', { gloss: 'fire', form: 'pira', year: 0 });
+  await e(p.id, 'rule', { year: 200, pattern: 'q', replacement: 'k' });
   const r = [];
+  const t = await j('/rune/api/languages/' + p.id + '/texts', { title: 'T', years: '50, 400, 800', body: '(water) | Water.\n(fire) | Fire.' });
+  r.push('text ' + JSON.stringify(await g('/rune/api/texts/' + t.id)));
   r.push('dict ' + JSON.stringify(await g('/rune/api/languages/' + p.id + '/words')).slice(0, 500));
   r.push(JSON.stringify((await g('/rune/api/words/' + water.id + '/history')).history));
   for (const y of [50, 400, 800, 2000]) r.push(y + ': ' + JSON.stringify(await j('/rune/api/languages/' + p.id + '/sentences/build', { source: '(water)', year: y })).slice(0, 400));
