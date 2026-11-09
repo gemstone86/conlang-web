@@ -228,3 +228,8 @@ CREATE TABLE IF NOT EXISTS word_losses (
 
 -- When each account last logged in (shown on the admin dashboard)
 ALTER TABLE users ADD COLUMN IF NOT EXISTS last_login TIMESTAMP NULL;
+
+-- Public languages: anyone (even without logging in) can read them; with public_suggestions anyone logged in can
+-- suggest changes, which wait for the owner's approval
+ALTER TABLE languages ADD COLUMN IF NOT EXISTS is_public BOOLEAN DEFAULT FALSE NOT NULL;
+ALTER TABLE languages ADD COLUMN IF NOT EXISTS public_suggestions BOOLEAN DEFAULT FALSE NOT NULL;

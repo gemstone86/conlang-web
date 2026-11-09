@@ -350,9 +350,12 @@ public class Store {
     /** Entry point for user edits: applies immediately for owners / auto-approved editors, else queues as pending. */
     @Transactional
     public Map<String, Object> submit(long uid, long langId, String entity, String action, Long entityId, Map<String, Object> payload) {
-        Map<String, Object> lang = access.need(uid, langId, Access.EDITOR);
+        Map<String, Object> lang = access.language(langId);
+        int level = access.level(uid, lang);
+        // editors, or anyone logged in on a public language that takes public suggestions (always waits for approval)
+        if (level < Access.EDITOR && !access.canSuggest(uid, lang)) access.need(uid, langId, Access.EDITOR);
         Map<String, Object> clean = validate(langId, entity, action, entityId, payload);
-        boolean direct = (int) lang.get("level") == Access.OWNER || access.autoApprove(uid, langId);
+        boolean direct = level == Access.OWNER || (level >= Access.EDITOR && access.autoApprove(uid, langId));
         if (direct) {
             long id = apply(langId, uid, entity, action, entityId, clean);
             applog.info("edit", uid, "Applied: " + action.toLowerCase() + " " + entity + " #" + id + " in language " + langId);

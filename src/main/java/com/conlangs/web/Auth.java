@@ -179,6 +179,12 @@ public class Auth {
         return db.one("select id, username, is_admin from users where id=?", uid);
     }
 
+    /** The logged-in account, or 0 for a visitor who isn't logged in (who can then read only public languages). */
+    public long viewerUid(HttpSession s) {
+        Map<String, Object> u = current(s);
+        return u == null ? 0 : Db.num(u.get("id"));
+    }
+
     public long requireUid(HttpSession s) {
         Map<String, Object> u = current(s);
         if (u == null) throw new ApiException(401, "Please log in.");

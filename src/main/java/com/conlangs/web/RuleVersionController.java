@@ -30,7 +30,7 @@ public class RuleVersionController {
 
     @GetMapping("/languages/{id}/rule-versions")
     public List<Map<String, Object>> list(@PathVariable long id, HttpSession s) {
-        return versions.list(auth.requireUid(s), id);
+        return versions.list(auth.viewerUid(s), id);
     }
 
     @PostMapping("/languages/{id}/rule-versions")
@@ -40,7 +40,7 @@ public class RuleVersionController {
 
     @GetMapping("/rule-versions/{vid}/compare")
     public Map<String, Object> compare(@PathVariable long vid, HttpSession s) {
-        return versions.compare(auth.requireUid(s), vid);
+        return versions.compare(auth.viewerUid(s), vid);
     }
 
     @PostMapping("/rule-versions/{vid}/restore")
