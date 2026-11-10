@@ -275,3 +275,6 @@ CREATE TABLE IF NOT EXISTS form_groups (
   position INT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_form_groups_lang ON form_groups(language_id);
+
+-- v1.15: a text can be inherited by the branches of its language (built in the branch when opened there)
+ALTER TABLE texts ADD COLUMN IF NOT EXISTS inherit BOOLEAN DEFAULT FALSE NOT NULL;
