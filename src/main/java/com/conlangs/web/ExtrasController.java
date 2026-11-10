@@ -20,8 +20,13 @@ public class ExtrasController {
     private final ProofreadService proofread;
     private final EtymologyService etymology;
     private final TextService texts;
+    private final FormGroups formGroups;
+    private final SentenceService sentences;
 
-    public ExtrasController(Auth auth, ProofreadService proofread, EtymologyService etymology, TextService texts) {
+    public ExtrasController(Auth auth, ProofreadService proofread, EtymologyService etymology, TextService texts, FormGroups formGroups,
+                            SentenceService sentences) {
+        this.formGroups = formGroups;
+        this.sentences = sentences;
         this.auth = auth;
         this.proofread = proofread;
         this.etymology = etymology;
@@ -69,5 +74,28 @@ public class ExtrasController {
     public Map<String, Object> deleteText(@PathVariable long tid, HttpSession s) {
         texts.delete(auth.requireUid(s), tid);
         return Map.of("ok", true);
+    }
+
+    /** The order the groups' endings go on in when stacked (plural-definite). */
+    @GetMapping("/languages/{id}/form-groups")
+    public Map<String, Object> formGroups(@PathVariable long id, HttpSession s) {
+        return formGroups.list(auth.viewerUid(s), id);
+    }
+
+    /** {order: [group names, first = closest to the word]}; empty = use the parent language's order. */
+    @SuppressWarnings("unchecked")
+    @org.springframework.web.bind.annotation.PutMapping("/languages/{id}/form-groups")
+    public Map<String, Object> saveFormGroups(@PathVariable long id, @RequestBody Map<String, Object> b, HttpSession s) {
+        Object o = b == null ? null : b.get("order");
+        List<String> order = new java.util.ArrayList<>();
+        if (o instanceof List<?> l) for (Object x : l) if (x != null) order.add(x.toString());
+        formGroups.save(auth.requireUid(s), id, order);
+        return formGroups.list(auth.requireUid(s), id);
+    }
+
+    /** Every combination of endings of a word, built at a year (default: as late as the language goes). */
+    @GetMapping("/languages/{id}/words/{wid}/paradigm")
+    public Map<String, Object> paradigm(@PathVariable long id, @PathVariable long wid, @RequestParam(value = "year", required = false) Integer year, HttpSession s) {
+        return sentences.paradigm(auth.viewerUid(s), id, wid, year);
     }
 }

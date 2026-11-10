@@ -111,3 +111,6 @@ h3.community{margin-top:1.4rem;border-top:1px solid var(--line);padding-top:.8re
 .texttable td { min-width:9rem; }
 button.say { padding:0 .35rem; margin-left:.2rem; font-size:.7rem; line-height:1.3; border-radius:9px; color:var(--accent); vertical-align:middle; }
 button.say.busy { opacity:.5; cursor:progress; }
+table.paradigm td, table.paradigm th { padding:.15rem .5rem; }
+#sg_list li { margin:.2rem 0; }
+#sg_list button { padding:0 .4rem; margin-left:.2rem; }
