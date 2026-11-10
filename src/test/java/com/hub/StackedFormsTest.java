@@ -113,6 +113,15 @@ class StackedFormsTest {
         JsonNode shortName = built(owner, elven, "(stone-definite pl)", 600);
         assertEquals("talnai", shortName.path("surface").asText());
         assertTrue(shortName.path("parts").get(0).path("note").asText().contains("used 'definite plural'"), shortName.toString());
+        // two words mean "seal": the one that can take the endings is used, and the number picks one by hand
+        long sealAdj = om.readTree(edit(owner, elven, "word", "CREATE", null, "{\"gloss\":\"seal\",\"pos\":\"adjective\",\"form\":\"vor\",\"year\":10}").body()).path("id").asLong();
+        long sealNoun = om.readTree(edit(owner, elven, "word", "CREATE", null, "{\"gloss\":\"seal\",\"pos\":\"noun\",\"form\":\"hal\",\"year\":10}").body()).path("id").asLong();
+        JsonNode seal = built(owner, elven, "(seal-plural-definite)", 600);
+        assertEquals("halin", seal.path("surface").asText(), seal.toString());
+        assertTrue(seal.path("parts").get(0).path("note").asText().contains("#" + sealNoun + " (noun)"), seal.toString());
+        assertEquals("hali", built(owner, elven, "(seal-plural#" + sealNoun + ")", 600).path("surface").asText(), "the ending is kept with a number");
+        JsonNode adj = built(owner, elven, "(seal-plural#" + sealAdj + ")", 600);
+        assertTrue(adj.path("parts").get(0).path("reason").asText().contains(", adjective) has no 'plural' form"), adj.toString());
         // unknown ending
         assertTrue(built(owner, elven, "(stone-plural-ablative)", 600).path("parts").get(0).path("reason").asText().contains("no form rule called 'ablative'"));
 

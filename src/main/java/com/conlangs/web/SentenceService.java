@@ -328,20 +328,24 @@ public class SentenceService {
             Map<String, Object> w = c.words.get(Long.parseLong(idm.group(1)));
             if (w != null) {
                 String rest = t.substring(0, idm.start()).trim();
-                if (rest.startsWith("-")) label = rest.substring(1).trim();
+                int dash = rest.indexOf('-');   // "-plural#12" or "seal-plural#12": the number picks the word, the rest are endings
+                if (dash >= 0 && dash < rest.length() - 1) label = rest.substring(dash + 1).trim();
                 return new Hit(w, label, null);
             }
         }
         List<Map<String, Object>> hits = c.candidates(t, year);
-        if (!hits.isEmpty()) return new Hit(hits.get(0), null, hits.size() > 1 ? hits.size() + " words match; used #" + hits.get(0).get("id") + " (write " + t + "#id to choose)" : null);
+        if (!hits.isEmpty()) return new Hit(hits.get(0), null, hits.size() > 1 ? hits.size() + " words match; used #" + hits.get(0).get("id") + describeType(hits.get(0)) + " (write " + t + "#id to choose)" : null);
         int dash = t.lastIndexOf('-');
         while (dash > 0) {
             String g = t.substring(0, dash).trim(), lab = t.substring(dash + 1).trim();
             hits = c.candidates(g, year);
             if (!hits.isEmpty()) {
                 Map<String, Object> pick = hits.get(0);
-                for (Map<String, Object> cand : hits) if (findForm(c, Db.num(cand.get("id")), lab) != null) { pick = cand; break; }
-                return new Hit(pick, lab, hits.size() > 1 ? hits.size() + " words match; used #" + pick.get("id") : null);
+                for (Map<String, Object> cand : hits) if (storedForm(c, Db.num(cand.get("id")), lab) != null) { pick = cand; break; }
+                if (storedForm(c, Db.num(pick.get("id")), lab) == null)   // else: the first word that can take these endings (a noun for plural, not an adjective)
+                    for (Map<String, Object> cand : hits) if (canTake(c, cand, lab)) { pick = cand; break; }
+                return new Hit(pick, lab, hits.size() > 1 ? hits.size() + " words mean '" + g + "'; used #" + pick.get("id") + describeType(pick)
+                        + " (write " + g + "-" + lab + "#id to choose)" : null);
             }
             dash = t.lastIndexOf('-', dash - 1);
         }
@@ -369,7 +373,7 @@ public class SentenceService {
             if (parts.size() == 1 && c.stackRulesFor(w, label) != null) return stack(c, w, parts, year);   // a rule exists but the word has no stored form yet
             List<String> have = new ArrayList<>();
             for (Map<String, Object> f : c.forms.getOrDefault(wid, List.of())) have.add((String) f.get("label"));
-            return new Res(null, "'" + w.get("gloss") + "' (#" + wid + ") has no '" + label + "' form; it has: " + (have.isEmpty() ? "none" : String.join(", ", have)), null, null);
+            return new Res(null, "'" + w.get("gloss") + "' (#" + wid + (w.get("pos") == null || w.get("pos").toString().isBlank() ? "" : ", " + w.get("pos")) + ") has no '" + label + "' form; it has: " + (have.isEmpty() ? "none" : String.join(", ", have)), null, null);
         }
         String note = exact == null && !((String) fr.get("label")).equalsIgnoreCase(label.trim())
                 ? "'" + w.get("gloss") + "' has no '" + label.trim() + "' form; used '" + fr.get("label") + "'" : null;
@@ -378,6 +382,22 @@ public class SentenceService {
         String form = formAtYear(c, wid, (String) fr.get("form"), fy, year);
         if (form == null) return new Res(null, "'" + w.get("gloss") + "' is not in " + access.language(c.langId).get("name") + " (coined after the split)", note, null);
         return new Res(form, null, note, "." + fr.get("label"));
+    }
+
+    private static String describeType(Map<String, Object> w) {
+        Object pos = w.get("pos");
+        return pos == null || pos.toString().isBlank() ? "" : " (" + pos + ")";
+    }
+
+    /** Can the word take these endings: a stored form, or a form rule for its type for every one of them? */
+    private boolean canTake(Ctx c, Map<String, Object> w, String label) {
+        long wid = Db.num(w.get("id"));
+        if (storedForm(c, wid, label) != null || findForm(c, wid, label) != null) return true;
+        for (String part : label.split("-")) {
+            if (part.isBlank()) continue;
+            if (c.stackRulesFor(w, part) == null && storedForm(c, wid, part) == null) return false;
+        }
+        return true;
     }
 
     private Map<String, Object> storedForm(Ctx c, long wordId, String label) {
@@ -421,7 +441,8 @@ public class SentenceService {
             if (rules == null) {
                 Map<String, Object> st = storedForm(c, wid, part);
                 if (st != null && slots.isEmpty()) { slots.add(new Slot((String) st.get("label"), "", List.of())); continue; }
-                return new Res(null, "no form rule called '" + part + "' for " + (w.get("pos") == null || w.get("pos").toString().isBlank() ? "this word" : "words of type " + w.get("pos")) + " (Word forms tab)", null, null);
+                return new Res(null, "no form rule called '" + part + "' for '" + w.get("gloss") + "' (#" + wid + (w.get("pos") == null || w.get("pos").toString().isBlank() ? ", which has no type"
+                        : ", type " + w.get("pos")) + ") on the Word forms tab", null, null);
             }
             slots.add(new Slot((String) rules.get(0).get("label"), grp(rules.get(0)), rules));
         }
