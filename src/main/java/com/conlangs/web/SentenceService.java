@@ -110,6 +110,73 @@ public class SentenceService {
         final Map<Long, List<Evolver.Override>> overrides = new HashMap<>();
         final String vowels;
 
+        // ---- for stacking endings (loaded on first use)
+        static final Pattern BAD = Pattern.compile("(?!)");
+        List<Map<String, Object>> stackRules;
+        final Map<String, Integer> groupPos = new HashMap<>();
+        Map<String, String> stackClasses;
+        String stackVowels;
+        private final Map<Long, Pattern> conds = new HashMap<>();
+        private final Map<Long, List<Evolver.Row>> affixRows = new HashMap<>();
+
+        void loadStack() {
+            if (stackRules != null) return;
+            stackRules = new ArrayList<>();
+            for (long l : pathNearestFirst) {   // a branch's own rules come before its ancestors'
+                stackRules.addAll(db.rows("select * from form_rules where language_id=? order by ord, id", l));
+                for (Map<String, Object> g : db.rows("select name, position from form_groups where language_id=?", l))
+                    groupPos.putIfAbsent(((String) g.get("name")).trim().toLowerCase(), ((Number) g.get("position")).intValue());
+            }
+            int next = 100_000;   // groups without a position: in the order they first appear
+            for (Map<String, Object> r : stackRules) { String g = grp(r); if (!g.isEmpty() && !groupPos.containsKey(g)) groupPos.put(g, next++); }
+            stackClasses = new LinkedHashMap<>();
+            for (long l : pathRootFirst) stackClasses.putAll(Patterns.parseClasses((String) access.language(l).get("classes")));
+            String v = stackClasses.get("V");
+            stackVowels = v == null || v.isEmpty() ? "aeiouy" : v;
+        }
+
+        /** The rules for one ending name that fit the word's type: that exact name, else the first name starting with it. */
+        List<Map<String, Object>> stackRulesFor(Map<String, Object> w, String part) {
+            loadStack();
+            String want = part.trim().toLowerCase();
+            if (want.isEmpty()) return null;
+            List<Map<String, Object>> exact = new ArrayList<>();
+            String prefixLabel = null;
+            for (Map<String, Object> r : stackRules) {
+                if (!posMatches((String) r.get("pos"), (String) w.get("pos"))) continue;
+                String l = ((String) r.get("label")).toLowerCase();
+                if (l.equals(want)) exact.add(r);
+                else if (prefixLabel == null && l.startsWith(want)) prefixLabel = l;
+            }
+            if (!exact.isEmpty()) return exact;
+            if (prefixLabel == null) return null;
+            List<Map<String, Object>> pre = new ArrayList<>();
+            for (Map<String, Object> r : stackRules)
+                if (posMatches((String) r.get("pos"), (String) w.get("pos")) && ((String) r.get("label")).equalsIgnoreCase(prefixLabel)) pre.add(r);
+            return pre;
+        }
+
+        Pattern cond(Map<String, Object> r) {
+            String c = (String) r.get("cond_re");
+            if (c == null || c.isBlank()) return null;
+            return conds.computeIfAbsent(Db.num(r.get("id")), k -> {
+                try { return Patterns.compile(c, stackClasses); } catch (IllegalArgumentException e) { return BAD; }
+            });
+        }
+
+        /** The ending of a rule at a year: its linked dictionary word as it sounded then, or the fixed affix. */
+        String affixAt(Map<String, Object> r, int y) {
+            String affix = r.get("affix") == null ? "" : (String) r.get("affix");
+            if (r.get("affix_word_id") == null) return affix;
+            long aw = Db.num(r.get("affix_word_id"));
+            Map<String, Object> aword = words.containsKey(aw) ? words.get(aw) : db.one("select * from words where id=?", aw);
+            if (aword == null) return affix;
+            List<Evolver.Row> rows = affixRows.computeIfAbsent(aw, k -> ev.evolve(Db.num(aword.get("language_id")), (String) aword.get("form"),
+                    ((Number) aword.get("year")).intValue(), overrides.getOrDefault(k, List.of())));
+            String at = FormMath.formAt(rows, pathNearestFirst, y);
+            return at == null || at.isEmpty() ? affix : at;
+        }
+
         Ctx(long langId) {
             this.langId = langId;
             Map<String, Object> lang = access.language(langId);
@@ -274,6 +341,202 @@ public class SentenceService {
         return null;
     }
 
+    /** A labelled form: the form at the year (or why there is none), a note, and how it is glossed (".definite", "-plural-definite"). */
+    private record Res(String form, String reason, String note, String glossLabel) {}
+
+    /**
+     * The form of a word called label at a year. A stored form with that name wins (made by a rule, by hand, or irregular).
+     * Several endings joined by "-" (plural-definite) are stacked: put on one after the other in the order of their groups
+     * on the Word forms tab, whatever order they are written in.
+     */
+    private Res labelled(Ctx c, Map<String, Object> w, String label, int year) {
+        long wid = Db.num(w.get("id"));
+        int wyear = ((Number) w.get("year")).intValue();
+        Map<String, Object> exact = storedForm(c, wid, label);
+        List<String> parts = new ArrayList<>();
+        for (String x : label.split("-")) if (!x.isBlank()) parts.add(x.trim());
+        if (exact == null && parts.size() > 1) return stack(c, w, parts, year);
+        Map<String, Object> fr = exact != null ? exact : findForm(c, wid, label);
+        if (fr == null) {
+            if (parts.size() == 1 && c.stackRulesFor(w, label) != null) return stack(c, w, parts, year);   // a rule exists but the word has no stored form yet
+            List<String> have = new ArrayList<>();
+            for (Map<String, Object> f : c.forms.getOrDefault(wid, List.of())) have.add((String) f.get("label"));
+            return new Res(null, "'" + w.get("gloss") + "' (#" + wid + ") has no '" + label + "' form; it has: " + (have.isEmpty() ? "none" : String.join(", ", have)), null, null);
+        }
+        String note = exact == null && !((String) fr.get("label")).equalsIgnoreCase(label.trim())
+                ? "'" + w.get("gloss") + "' has no '" + label.trim() + "' form; used '" + fr.get("label") + "'" : null;
+        int fy = fr.get("year") == null ? wyear : ((Number) fr.get("year")).intValue();
+        if (fy > year) return new Res(null, "the '" + fr.get("label") + "' form of '" + w.get("gloss") + "' is not in use until " + fy, note, null);
+        String form = formAtYear(c, wid, (String) fr.get("form"), fy, year);
+        if (form == null) return new Res(null, "'" + w.get("gloss") + "' is not in " + access.language(c.langId).get("name") + " (coined after the split)", note, null);
+        return new Res(form, null, note, "." + fr.get("label"));
+    }
+
+    private Map<String, Object> storedForm(Ctx c, long wordId, String label) {
+        for (Map<String, Object> f : c.forms.getOrDefault(wordId, List.of()))
+            if (((String) f.get("label")).equalsIgnoreCase(label.trim())) return f;
+        return null;
+    }
+
+    private static boolean posMatches(String rulePos, String wordPos) {
+        if (rulePos == null || rulePos.isBlank()) return true;
+        if (wordPos == null) return false;
+        for (String p : rulePos.split(",")) if (p.trim().equalsIgnoreCase(wordPos.trim())) return true;
+        return false;
+    }
+
+    private static String grp(Map<String, Object> r) {
+        return r.get("grp") == null ? "" : ((String) r.get("grp")).trim().toLowerCase();
+    }
+
+    private static Integer ruleYear(Map<String, Object> r) {
+        return r.get("year") == null ? null : ((Number) r.get("year")).intValue();
+    }
+
+    /** The language this line of descent is in at a year: the deepest language on the path that has split off by then. */
+    private long langAt(Ctx c, int y) {
+        for (int i = c.pathRootFirst.size() - 1; i >= 1; i--) {
+            Integer sp = c.splits.get(i - 1);
+            if (sp != null && sp <= y) return c.pathRootFirst.get(i);
+        }
+        return c.pathRootFirst.get(0);
+    }
+
+    /** Endings stacked onto a word (or onto its stored form for the first of them), at a year. */
+    private Res stack(Ctx c, Map<String, Object> w, List<String> parts, int year) {
+        long wid = Db.num(w.get("id"));
+        int wyear = ((Number) w.get("year")).intValue();
+        record Slot(String label, String group, List<Map<String, Object>> rules) {}
+        List<Slot> slots = new ArrayList<>();
+        for (String part : parts) {
+            List<Map<String, Object>> rules = c.stackRulesFor(w, part);
+            if (rules == null) {
+                Map<String, Object> st = storedForm(c, wid, part);
+                if (st != null && slots.isEmpty()) { slots.add(new Slot((String) st.get("label"), "", List.of())); continue; }
+                return new Res(null, "no form rule called '" + part + "' for " + (w.get("pos") == null || w.get("pos").toString().isBlank() ? "this word" : "words of type " + w.get("pos")) + " (Word forms tab)", null, null);
+            }
+            slots.add(new Slot((String) rules.get(0).get("label"), grp(rules.get(0)), rules));
+        }
+        for (int i = 0; i < slots.size(); i++) for (int j = i + 1; j < slots.size(); j++)
+            if (!slots.get(i).group().isEmpty() && slots.get(i).group().equals(slots.get(j).group()))
+                return new Res(null, "'" + slots.get(i).label() + "' and '" + slots.get(j).label() + "' are both in the group '" + slots.get(i).group()
+                        + "': a word takes only one ending from a group", null, null);
+        List<Slot> ordered = new ArrayList<>(slots);
+        ordered.sort(java.util.Comparator.comparingInt(sl -> sl.rules().isEmpty() ? Integer.MIN_VALUE   // a stored form with no rule (irregular) is the base
+                : sl.group().isEmpty() ? Integer.MAX_VALUE : c.groupPos.getOrDefault(sl.group(), Integer.MAX_VALUE - 1)));
+        List<String> names = new ArrayList<>();
+        for (Slot sl : ordered) names.add(sl.label());
+        String gloss = "-" + String.join("-", names);
+
+        // start from the word, or from its stored form for the first ending (irregular or hand-made)
+        String start = (String) w.get("form");
+        int startYear = wyear, from = 0;
+        String note = null;
+        Map<String, Object> stored = storedForm(c, wid, ordered.get(0).label());
+        if (stored != null) {
+            start = (String) stored.get("form");
+            startYear = stored.get("year") == null ? wyear : ((Number) stored.get("year")).intValue();
+            from = 1;
+        }
+        // the combined form comes into use when the last of its endings does
+        int y0 = startYear;
+        for (int i = from; i < ordered.size(); i++) {
+            Integer earliest = null;
+            boolean open = false;
+            for (Map<String, Object> r : ordered.get(i).rules()) {
+                Integer ry = ruleYear(r);
+                if (ry == null) { open = true; break; }
+                earliest = earliest == null ? ry : Math.min(earliest, ry);
+            }
+            if (!open && earliest != null) y0 = Math.max(y0, earliest);
+        }
+        if (y0 > year) return new Res(null, "'" + w.get("gloss") + gloss + "' is not in use until " + y0, null, gloss);
+        String cur = formAtYear(c, wid, start, startYear, y0);
+        if (cur == null) return new Res(null, "'" + w.get("gloss") + "' is not in " + access.language(c.langId).get("name") + " (coined after the split)", null, gloss);
+        for (int i = from; i < ordered.size(); i++) {
+            Slot sl = ordered.get(i);
+            Map<String, Object> rule = null;
+            for (Map<String, Object> r : sl.rules()) {
+                Integer ry = ruleYear(r);
+                if (ry != null && ry > y0) continue;
+                Pattern cond = c.cond(r);
+                if (cond == Ctx.BAD) continue;
+                if (cond != null && !cond.matcher(cur).find()) continue;
+                rule = r;
+                break;
+            }
+            if (rule == null) return new Res(null, "no '" + sl.label() + "' rule fits '" + cur + "' in " + y0, note, gloss);
+            String affix = c.affixAt(rule, y0);
+            if (affix == null || affix.isEmpty()) return new Res(null, "the '" + sl.label() + "' ending has no form in " + y0, note, gloss);
+            cur = FormMath.attach(cur, (String) rule.get("placement"), affix, ((Number) rule.get("hiatus")).intValue() != 0, c.stackVowels);
+        }
+        List<Evolver.Row> rows = c.ev.evolve(langAt(c, y0), cur, y0, List.of());
+        String form = FormMath.formAt(rows, c.pathNearestFirst, year);
+        if (form == null) return new Res(null, "'" + w.get("gloss") + gloss + "' is not in " + access.language(c.langId).get("name"), note, gloss);
+        return new Res(form, null, note, gloss);
+    }
+
+    /**
+     * Every combination of endings a word can take (one or none from each group of the Word forms tab), built at a year:
+     * {word, year, groups: [{name, labels}], rows: [{labels, form, reason}]}.
+     */
+    @SuppressWarnings("unchecked")
+    public Map<String, Object> paradigm(long uid, long langId, long wordId, Integer yearOrNull) {
+        access.need(uid, langId, Access.VIEWER);
+        Ctx c = new Ctx(langId);
+        Map<String, Object> w0 = c.words.get(wordId);
+        if (w0 == null) throw new ApiException(404, "That word isn't in this language or its ancestors.");
+        Map<String, Object> w = c.deref(w0);
+        if (w == null) throw new ApiException(400, "The word points to a word that doesn't exist.");
+        c.loadStack();
+        int year = yearOrNull == null ? ANY_YEAR : yearOrNull;
+        Map<String, List<String>> groups = new LinkedHashMap<>();
+        List<String> groupOrder = new ArrayList<>();
+        for (Map<String, Object> r : c.stackRules) {
+            if (!posMatches((String) r.get("pos"), (String) w.get("pos"))) continue;
+            String g = grp(r), label = (String) r.get("label");
+            String key = g.isEmpty() ? "\u0000" + label.toLowerCase() : g;
+            List<String> ls = groups.computeIfAbsent(key, k -> { groupOrder.add(k); return new ArrayList<>(); });
+            if (ls.stream().noneMatch(x -> x.equalsIgnoreCase(label))) ls.add(label);
+        }
+        groupOrder.sort(java.util.Comparator.comparingInt(k -> k.startsWith("\u0000") ? Integer.MAX_VALUE : c.groupPos.getOrDefault(k, Integer.MAX_VALUE - 1)));
+        List<List<String>> combos = new ArrayList<>();
+        combos.add(new ArrayList<>());
+        for (String g : groupOrder) {
+            List<List<String>> next = new ArrayList<>();
+            for (List<String> base : combos) {
+                next.add(base);
+                for (String l : groups.get(g)) { List<String> x = new ArrayList<>(base); x.add(l); next.add(x); }
+                if (next.size() > 400) break;
+            }
+            combos = next;
+        }
+        List<Map<String, Object>> rows = new ArrayList<>();
+        for (List<String> combo : combos) {
+            if (rows.size() >= 200) break;
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("labels", combo);
+            if (combo.isEmpty()) {
+                row.put("form", formAtYear(c, Db.num(w.get("id")), (String) w.get("form"), ((Number) w.get("year")).intValue(), year));
+            } else {
+                Res r = labelled(c, w, String.join("-", combo), year);
+                row.put("form", r.form());
+                if (r.reason() != null) row.put("reason", r.reason());
+                if (r.note() != null) row.put("note", r.note());
+                if (combo.size() > 1 && storedForm(c, Db.num(w.get("id")), combo.get(0)) != null) row.put("from_stored", combo.get(0));
+            }
+            rows.add(row);
+        }
+        List<Map<String, Object>> gl = new ArrayList<>();
+        for (String g : groupOrder) gl.add(Map.of("name", g.startsWith("\u0000") ? "" : g, "labels", groups.get(g)));
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("word", Map.of("id", w.get("id"), "gloss", w.get("gloss"), "pos", w.get("pos") == null ? "" : w.get("pos")));
+        out.put("year", yearOrNull);
+        out.put("groups", gl);
+        out.put("rows", rows);
+        return out;
+    }
+
     /** Form of a word by label: exact match first, then a label that starts with the text (obj finds object). */
     private Map<String, Object> findForm(Ctx c, long wordId, String label) {
         Map<String, Object> prefix = null;
@@ -330,20 +593,18 @@ public class SentenceService {
                 p.put("word_id", Db.num(w0.get("id")));
                 if (w != w0) p.put("note", "'" + w0.get("gloss") + "' = see '" + w.get("gloss") + "'");
                 if (h.note() != null) p.put("note", h.note());
-                String form;
+                String form, glossLabel = null;
                 if (h.label() == null) {
                     form = formAtYear(c, wid, (String) w.get("form"), ((Number) w.get("year")).intValue(), year);
                 } else {
-                    Map<String, Object> fr = findForm(c, wid, h.label());
-                    if (fr == null) {
-                        List<String> have = new ArrayList<>();
-                        for (Map<String, Object> f : c.forms.getOrDefault(wid, List.of())) have.add((String) f.get("label"));
-                        gap(p, "'" + w.get("gloss") + "' (#" + wid + ") has no '" + h.label() + "' form; it has: " + (have.isEmpty() ? "none" : String.join(", ", have)));
+                    Res r = labelled(c, w, h.label(), year);
+                    if (r.note() != null) p.put("note", p.containsKey("note") ? p.get("note") + "; " + r.note() : r.note());
+                    if (r.reason() != null) {
+                        gap(p, r.reason());
                         p.put("form", "[" + t + "?]"); bad = true; surface = (surface == null ? "" : surface) + "[" + t + "?]"; gl.add(t); continue;
                     }
-                    int fy = fr.get("year") == null ? ((Number) w.get("year")).intValue() : ((Number) fr.get("year")).intValue();
-                    form = fy > year ? null : formAtYear(c, wid, (String) fr.get("form"), fy, year);
-                    if (form == null && fy > year) { gap(p, "the '" + h.label() + "' form of '" + w.get("gloss") + "' is not in use until " + fy); }
+                    form = r.form();
+                    glossLabel = r.glossLabel();
                 }
                 if (form == null) {
                     if (!p.containsKey("reason")) { gap(p, "'" + w.get("gloss") + "' is not in " + access.language(c.langId).get("name") + " (coined after the split)"); p.put("missingWord", true); }
@@ -351,7 +612,7 @@ public class SentenceService {
                 }
                 p.put("ok", true);
                 p.put("form", form);
-                p.put("gloss", h.label() == null ? w0.get("gloss") : w0.get("gloss") + "." + h.label());
+                p.put("gloss", glossLabel == null ? w0.get("gloss") : w0.get("gloss") + glossLabel);
                 gl.add(p.get("gloss").toString());
                 surface = surface == null ? form : FormMath.attach(surface, "suffix", form, true, c.vowels);
             }

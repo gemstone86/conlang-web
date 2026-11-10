@@ -197,6 +197,18 @@ Deleting a word also deletes its locked overrides, and Undo does not bring those
 ## v0.18.2
 - A form that starts earlier than its word is no longer reported as a problem: the word simply uses the form as it has evolved by the word's own year.
 
+## v1.14.0 (combined app)
+- **Stacked endings**: in a sentence, `(elf-plural-definite)` puts several endings on one word, one from each group of
+  the Word forms tab, in the group order set at the top of that tab (first = closest to the word), whatever order they
+  are written in. Each ending is chosen by its rules as usual (word type, condition on the word as it is so far, year);
+  linked endings sound as they did when the combined form comes into use (when its last ending does), and the result
+  then goes through the later sound changes like any form. A stored form for the first ending (an irregular plural)
+  is used as the base, and a form stored under a full name (e.g. *definite plural*) still wins. Two endings from one
+  group, or one that isn't in use yet, are reported. Nothing is stored, so there's no need to list every combination.
+- The word window has **All forms**: every combination of endings a word can take, built at a chosen year, with ▶.
+- When a form name is shortened and matches a longer one (e.g. *definite* finding *definite plural*), the sentence
+  builder now says so instead of using it silently.
+
 ## v1.13.0 (combined app)
 - **Pronunciation by sound**: a small ▶ next to forms (dictionary, word window and its history per year, sentences,
   texts, etymology) reads them aloud. The spelling goes through the language's pronunciation map to IPA (no map: the
