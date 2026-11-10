@@ -16,13 +16,11 @@ jobs:
           cache: maven
       # compiles both apps, runs EvolverTest and CombinedAppTest (the whole app on a fresh database), builds the jar
       - run: mvn -B package
+      # only when tests fail: their reports, kept briefly (the jar isn't kept: the deploy builds its own, and the
+      # speech engine makes it large enough to fill GitHub's artifact storage)
       - if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: test-reports
           path: target/surefire-reports/
-      - uses: actions/upload-artifact@v4
-        with:
-          name: root-and-rune-jar
-          path: target/root-and-rune.jar
-          retention-days: 7
+          retention-days: 3
