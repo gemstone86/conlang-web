@@ -363,12 +363,12 @@ public class SentenceService {
     private Res labelled(Ctx c, Map<String, Object> w, String label, int year) {
         long wid = Db.num(w.get("id"));
         int wyear = ((Number) w.get("year")).intValue();
-        Map<String, Object> exact = storedForm(c, wid, label);
+        Map<String, Object> exact = storedFor(c, w, label);
         List<String> parts = new ArrayList<>();
         for (String x : label.split("-")) if (!x.isBlank()) parts.add(x.trim());
         if (exact == null && parts.size() > 1) return stack(c, w, parts, year);
         if (exact == null && c.hasExactRule(w, label)) return stack(c, w, parts, year);   // a rule of that very name beats a longer stored name
-        Map<String, Object> fr = exact != null ? exact : findForm(c, wid, label);
+        Map<String, Object> fr = exact != null ? exact : findFor(c, w, label);
         if (fr == null) {
             if (parts.size() == 1 && c.stackRulesFor(w, label) != null) return stack(c, w, parts, year);   // a rule exists but the word has no stored form yet
             List<String> have = new ArrayList<>();
@@ -384,6 +384,30 @@ public class SentenceService {
         return new Res(form, null, note, "." + fr.get("label"));
     }
 
+    /**
+     * A reference (seal → holy) with a type of its own is used as that type: holy's form with the noun endings.
+     * The target's stored forms belong to the target's type, so they are left aside then.
+     */
+    private static Map<String, Object> asUsed(Map<String, Object> w0, Map<String, Object> w) {
+        if (w0 == w || w0 == null || w == null) return w;
+        Object own = w0.get("pos");
+        if (own == null || own.toString().isBlank() || own.toString().trim().equalsIgnoreCase(String.valueOf(w.get("pos")).trim())) return w;
+        Map<String, Object> x = new LinkedHashMap<>(w);
+        x.put("pos", own);
+        x.put(OWN_TYPE, true);
+        return x;
+    }
+
+    private static final String OWN_TYPE = "__reference_type";
+
+    private Map<String, Object> storedFor(Ctx c, Map<String, Object> w, String label) {
+        return Boolean.TRUE.equals(w.get(OWN_TYPE)) ? null : storedForm(c, Db.num(w.get("id")), label);
+    }
+
+    private Map<String, Object> findFor(Ctx c, Map<String, Object> w, String label) {
+        return Boolean.TRUE.equals(w.get(OWN_TYPE)) ? null : findForm(c, Db.num(w.get("id")), label);
+    }
+
     private static String describeType(Map<String, Object> w) {
         Object pos = w.get("pos");
         return pos == null || pos.toString().isBlank() ? "" : " (" + pos + ")";
@@ -392,10 +416,10 @@ public class SentenceService {
     /** Can the word take these endings: a stored form, or a form rule for its type for every one of them? */
     private boolean canTake(Ctx c, Map<String, Object> w, String label) {
         long wid = Db.num(w.get("id"));
-        if (storedForm(c, wid, label) != null || findForm(c, wid, label) != null) return true;
+        if (storedFor(c, w, label) != null || findFor(c, w, label) != null) return true;
         for (String part : label.split("-")) {
             if (part.isBlank()) continue;
-            if (c.stackRulesFor(w, part) == null && storedForm(c, wid, part) == null) return false;
+            if (c.stackRulesFor(w, part) == null && storedFor(c, w, part) == null) return false;
         }
         return true;
     }
@@ -439,7 +463,7 @@ public class SentenceService {
         for (String part : parts) {
             List<Map<String, Object>> rules = c.stackRulesFor(w, part);
             if (rules == null) {
-                Map<String, Object> st = storedForm(c, wid, part);
+                Map<String, Object> st = storedFor(c, w, part);
                 if (st != null && slots.isEmpty()) { slots.add(new Slot((String) st.get("label"), "", List.of())); continue; }
                 return new Res(null, "no form rule called '" + part + "' for '" + w.get("gloss") + "' (#" + wid + (w.get("pos") == null || w.get("pos").toString().isBlank() ? ", which has no type"
                         : ", type " + w.get("pos")) + ") on the Word forms tab", null, null);
@@ -461,7 +485,7 @@ public class SentenceService {
         String start = (String) w.get("form");
         int startYear = wyear, from = 0;
         String note = null;
-        Map<String, Object> stored = storedForm(c, wid, ordered.get(0).label());
+        Map<String, Object> stored = storedFor(c, w, ordered.get(0).label());
         if (stored != null) {
             start = (String) stored.get("form");
             startYear = stored.get("year") == null ? wyear : ((Number) stored.get("year")).intValue();
@@ -517,6 +541,7 @@ public class SentenceService {
         if (w0 == null) throw new ApiException(404, "That word isn't in this language or its ancestors.");
         Map<String, Object> w = c.deref(w0);
         if (w == null) throw new ApiException(400, "The word points to a word that doesn't exist.");
+        w = asUsed(w0, w);
         c.loadStack();
         int year = yearOrNull == null ? ANY_YEAR : yearOrNull;
         Map<String, List<String>> groups = new LinkedHashMap<>();
@@ -552,7 +577,7 @@ public class SentenceService {
                 row.put("form", r.form());
                 if (r.reason() != null) row.put("reason", r.reason());
                 if (r.note() != null) row.put("note", r.note());
-                if (combo.size() > 1 && storedForm(c, Db.num(w.get("id")), combo.get(0)) != null) row.put("from_stored", combo.get(0));
+                if (combo.size() > 1 && storedFor(c, w, combo.get(0)) != null) row.put("from_stored", combo.get(0));
             }
             rows.add(row);
         }
@@ -618,6 +643,7 @@ public class SentenceService {
                     gap(p, "'" + w0.get("gloss") + "' points to a word that doesn't exist: " + w0.get("form"));
                     p.put("form", "[" + t + "?]"); bad = true; surface = (surface == null ? "" : surface) + "[" + t + "?]"; gl.add(t); continue;
                 }
+                w = asUsed(w0, w);
                 long wid = Db.num(w.get("id"));
                 p.put("word_id", Db.num(w0.get("id")));
                 if (w != w0) p.put("note", "'" + w0.get("gloss") + "' = see '" + w.get("gloss") + "'");

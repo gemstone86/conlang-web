@@ -122,6 +122,15 @@ class StackedFormsTest {
         assertEquals("hali", built(owner, elven, "(seal-plural#" + sealNoun + ")", 600).path("surface").asText(), "the ending is kept with a number");
         JsonNode adj = built(owner, elven, "(seal-plural#" + sealAdj + ")", 600);
         assertTrue(adj.path("parts").get(0).path("reason").asText().contains(", adjective) has no 'plural' form"), adj.toString());
+        // a noun that refers to an adjective (relic = holy) takes the noun endings on holy's form
+        long holy = om.readTree(edit(owner, elven, "word", "CREATE", null, "{\"gloss\":\"holy\",\"pos\":\"adjective\",\"form\":\"aer\",\"year\":10}").body()).path("id").asLong();
+        long relic = om.readTree(edit(owner, elven, "word", "CREATE", null, "{\"gloss\":\"relic\",\"pos\":\"noun\",\"ref_word_id\":" + holy + ",\"year\":10}").body()).path("id").asLong();
+        JsonNode rel = built(owner, elven, "(relic-plural-definite)", 600);
+        assertEquals("aerin", rel.path("surface").asText(), rel.toString());
+        assertEquals("relic-plural-definite", rel.path("gloss").asText());
+        assertFalse(built(owner, elven, "(holy-plural)", 600).path("parts").get(0).path("ok").asBoolean(), "holy itself stays an adjective");
+        JsonNode relPara = json(get(owner, "/rune/api/languages/" + elven + "/words/" + relic + "/paradigm?year=600"));
+        assertEquals(3, relPara.path("groups").size(), relPara.toString());
         // unknown ending
         assertTrue(built(owner, elven, "(stone-plural-ablative)", 600).path("parts").get(0).path("reason").asText().contains("no form rule called 'ablative'"));
 
