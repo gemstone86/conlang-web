@@ -27,7 +27,7 @@ public class Store {
             "grammar", List.of("category", "name", "c1", "c2", "c3", "c4", "c5", "c6", "year", "ord"),
             "phoneme", List.of("symbol", "kind", "row_label", "col_label", "notes", "year", "year_to"),
             "formrule", List.of("grp", "label", "pos", "placement", "affix", "affix_word_id", "cond_re", "hiatus", "year", "ord"),
-            "meaning", List.of("word_id", "lang_id", "year", "mode", "meaning"),
+            "meaning", List.of("word_id", "lang_id", "year", "mode", "meaning", "pos"),
             "loss", List.of("word_id", "lang_id", "year", "note"));
     private static final Set<String> LANG_OWNED = Set.of("word", "rule", "gsection", "grammar", "phoneme", "formrule");
     private static final Set<String> INTS = Set.of("year", "ord", "word_id", "lang_id", "year_to", "hiatus", "affix_word_id", "ref_word_id", "loan_word_id");

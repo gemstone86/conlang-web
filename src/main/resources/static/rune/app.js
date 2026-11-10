@@ -636,11 +636,11 @@ async function showWord() {
   h += `<details id="w_para" data-w="${w.id}"><summary><strong>All forms</strong> <span class="small muted">(endings stacked by group)</span></summary><div id="w_parabody" class="small muted">Opening…</div></details>`;
   h += `<h3>Meaning ${ce ? '<button data-act="toggleMeaning">Change meaning</button>' : ''}</h3>`;
   h += '<table><tr><th>Language</th><th>Meaning now</th></tr>' + Object.entries(r.meaning_by_lang || {}).map(([k, v]) => `<tr><td>${esc(k)}</td><td>${esc(v)}</td></tr>`).join('') + '</table>';
-  if ((r.meanings || []).length) h += '<div class="small">' + r.meanings.map(m => `<div>${esc((langs.find(l => l[0] === m.lang_id) || [0, '?'])[1])} from ${m.year}: ${m.mode === 'CHANGE' ? 'changes to' : 'also means'} <strong>${esc(m.meaning)}</strong> ${ce ? `<button class="danger" data-act="delMeaning" data-id="${m.id}">✕</button>` : ''}</div>`).join('') + '</div>';
+  if ((r.meanings || []).length) h += '<div class="small">' + r.meanings.map(m => `<div>${esc((langs.find(l => l[0] === m.lang_id) || [0, '?'])[1])} from ${m.year}: ${m.mode === 'CHANGE' ? 'changes to' : 'also means'} <strong>${esc(m.meaning)}</strong>${m.pos ? ` <span class="badge" title="The word's type in this meaning">${esc(m.pos)}</span>` : ''} ${ce ? `<button class="danger" data-act="delMeaning" data-id="${m.id}">✕</button>` : ''}</div>`).join('') + '</div>';
   if (ce) h += `<div id="mform" class="row" hidden><select id="m_lang">${langs.map(l => `<option value="${l[0]}">${esc(l[1])}</option>`).join('')}</select>
     <input id="m_year" type="number" placeholder="from year" size="8"><select id="m_mode"><option value="ADD">also means</option><option value="CHANGE">changes meaning to</option></select>
-    <input id="m_text" placeholder="meaning"><button class="primary" data-act="addMeaning" data-w="${w.id}">Save</button>
-    <p class="muted small">Applies to the chosen language and every branch that splits off after that year. “Changes to” replaces all earlier meanings.</p></div>`;
+    <input id="m_text" placeholder="meaning"><input id="m_pos" list="m_poslist" placeholder="as type (optional)" size="14" title="The word's type in this meaning, if it differs: holy also means seal, as a noun. Sentences that use the word in this meaning use that type's endings."><datalist id="m_poslist">${[...new Set((S.words || []).map(x => x.pos).filter(Boolean))].map(p => `<option value="${esc(p)}">`).join('')}</datalist><button class="primary" data-act="addMeaning" data-w="${w.id}">Save</button>
+    <p class="muted small">Applies to the chosen language and every branch that splits off after that year. “Changes to” replaces all earlier meanings. A type is optional: give one when the word behaves differently in this meaning (an adjective used as a noun); sentences that use the word in this meaning then get that type's endings.</p></div>`;
   h += `<h3>Lost ${ce ? '<button data-act="toggleLoss">Mark as lost</button>' : ''}</h3>`;
   h += (r.losses || []).length ? '<div class="small">' + r.losses.map(x => `<div>No longer used in <strong>${esc(x.lang_name)}</strong> from <strong>${x.year}</strong>${x.note ? ' · ' + esc(x.note) : ''} ${ce ? `<button class="danger" data-act="delLoss" data-id="${x.id}">✕</button>` : ''}</div>`).join('') + '</div>'
     : '<p class="small muted">In use (not marked lost anywhere).</p>';
@@ -1265,7 +1265,7 @@ const A = {
   toggleMeaning: async () => { const f = $('#mform'); if (f) f.hidden = !f.hidden; },
   addMeaning: async d => {
     if (!val('m_year') || !val('m_text')) { say('Give a year and a meaning.', true); return; }
-    const r = await api('POST', wbase() + '/edit', { entity: 'meaning', action: 'CREATE', payload: { word_id: Number(d.w), lang_id: Number(val('m_lang')), year: Number(val('m_year')), mode: val('m_mode'), meaning: val('m_text') } });
+    const r = await api('POST', wbase() + '/edit', { entity: 'meaning', action: 'CREATE', payload: { word_id: Number(d.w), lang_id: Number(val('m_lang')), year: Number(val('m_year')), mode: val('m_mode'), meaning: val('m_text'), pos: val('m_pos').trim() || null } });
     say(r.status === 'pending' ? 'Submitted for approval.' : 'Meaning saved.'); await afterWordChange();
   },
   delMeaning: async d => { await api('POST', wbase() + '/edit', { entity: 'meaning', action: 'DELETE', entityId: Number(d.id) }); await afterWordChange(); },

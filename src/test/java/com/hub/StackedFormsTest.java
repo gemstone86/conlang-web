@@ -131,6 +131,13 @@ class StackedFormsTest {
         assertFalse(built(owner, elven, "(holy-plural)", 600).path("parts").get(0).path("ok").asBoolean(), "holy itself stays an adjective");
         JsonNode relPara = json(get(owner, "/rune/api/languages/" + elven + "/words/" + relic + "/paradigm?year=600"));
         assertEquals(3, relPara.path("groups").size(), relPara.toString());
+        // a meaning with its own type: bright (adjective) also means "star" as a noun from 300
+        long bright = om.readTree(edit(owner, elven, "word", "CREATE", null, "{\"gloss\":\"bright\",\"pos\":\"adjective\",\"form\":\"lim\",\"year\":10}").body()).path("id").asLong();
+        assertEquals(200, edit(owner, elven, "meaning", "CREATE", null, "{\"word_id\":" + bright + ",\"lang_id\":" + elven + ",\"year\":300,\"mode\":\"ADD\",\"meaning\":\"star\",\"pos\":\"noun\"}").statusCode());
+        JsonNode star = built(owner, elven, "(star-plural-definite)", 600);
+        assertEquals("limin", star.path("surface").asText(), star.toString());
+        assertFalse(built(owner, elven, "(star-plural)", 200).path("parts").get(0).path("ok").asBoolean(), "not a star before 300");
+        assertFalse(built(owner, elven, "(bright-plural)", 600).path("parts").get(0).path("ok").asBoolean(), "as 'bright' it is still an adjective");
         // unknown ending
         assertTrue(built(owner, elven, "(stone-plural-ablative)", 600).path("parts").get(0).path("reason").asText().contains("no form rule called 'ablative'"));
 

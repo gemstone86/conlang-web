@@ -202,6 +202,11 @@ Deleting a word also deletes its locked overrides, and Undo does not bring those
 - **Inherited texts**: tick **Branches inherit it** on a text and every branch of its language lists it too
   (marked *from Proto*). Opened in a branch, it is built with the branch's own words and sound changes, so the same
   story can be read side by side in each daughter language. It is edited in the language it belongs to.
+- **Word types follow use**: a reference word keeps its own type (seal, a noun, pointing to holy, an adjective, gets
+  the noun endings on holy's form), and a meaning change can give the word a type for that meaning (holy *also means*
+  seal, as a noun). Sentences that reach the word through that meaning use that type's endings.
+- **Several words, one meaning**: the sentence builder now picks the one that can take the endings asked for, and says
+  which (by number and type); `seal-plural#12` keeps its endings.
 - **Moving texts**: the edit form has **Move to another language…** (any language of the world you can edit).
 
 ## v1.14.0 (combined app)

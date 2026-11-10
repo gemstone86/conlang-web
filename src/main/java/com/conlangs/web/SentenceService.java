@@ -203,6 +203,7 @@ public class SentenceService {
             for (long l : pathNearestFirst) {
                 for (Map<String, Object> w : db.rows("select * from words where language_id=? order by year, id", l)) words.put(Db.num(w.get("id")), w);
                 for (Map<String, Object> m : db.rows("select m.* from word_meanings m join words w on w.id=m.word_id where w.language_id=?", l)) {
+                    if (m.get("pos") != null && !m.get("pos").toString().isBlank()) meaningTypes.computeIfAbsent(Db.num(m.get("word_id")), k -> new ArrayList<>()).add(m);
                     meanings.computeIfAbsent(Db.num(m.get("word_id")), k -> new ArrayList<>())
                             .add(new Meanings.Ev(Db.num(m.get("lang_id")), ((Number) m.get("year")).intValue(), (String) m.get("mode"), (String) m.get("meaning")));
                 }
@@ -263,6 +264,23 @@ public class SentenceService {
                 if (norm(sense).equals(norm(text))) return true;
             }
             return false;
+        }
+
+        /** Meanings that come with a word type of their own, by word. */
+        final Map<Long, List<Map<String, Object>>> meaningTypes = new HashMap<>();
+
+        /** The type the word has in this meaning here at this year (from a meaning change with a type), or null. */
+        String typeFor(Map<String, Object> w, String text, int year) {
+            String out = null;
+            int best = Integer.MIN_VALUE;
+            for (Map<String, Object> m : meaningTypes.getOrDefault(Db.num(w.get("id")), List.of())) {
+                int y = ((Number) m.get("year")).intValue();
+                if (y > year || y < best || !pathNearestFirst.contains(Db.num(m.get("lang_id")))) continue;
+                if (!norm((String) m.get("meaning")).equals(norm(text))) continue;
+                best = y;
+                out = m.get("pos").toString().trim();
+            }
+            return out;
         }
 
         /** When the word stops being used in this language (its own loss or one that keeps it from reaching here), or null. */
@@ -340,6 +358,8 @@ public class SentenceService {
             String g = t.substring(0, dash).trim(), lab = t.substring(dash + 1).trim();
             hits = c.candidates(g, year);
             if (!hits.isEmpty()) {
+                final String meant = g;
+                hits = hits.stream().map(x -> typed(c, x, meant, year)).toList();
                 Map<String, Object> pick = hits.get(0);
                 for (Map<String, Object> cand : hits) if (storedForm(c, Db.num(cand.get("id")), lab) != null) { pick = cand; break; }
                 if (storedForm(c, Db.num(pick.get("id")), lab) == null)   // else: the first word that can take these endings (a noun for plural, not an adjective)
@@ -399,6 +419,16 @@ public class SentenceService {
     }
 
     private static final String OWN_TYPE = "__reference_type";
+
+    /** The word as used in this meaning: with the meaning's own type when it has one (holy, used as "seal", is a noun). */
+    private static Map<String, Object> typed(Ctx c, Map<String, Object> w, String text, int year) {
+        String t = c.typeFor(w, text, year);
+        if (t == null || t.equalsIgnoreCase(String.valueOf(w.get("pos")).trim())) return w;
+        Map<String, Object> x = new LinkedHashMap<>(w);
+        x.put("pos", t);
+        x.put(OWN_TYPE, true);
+        return x;
+    }
 
     private Map<String, Object> storedFor(Ctx c, Map<String, Object> w, String label) {
         return Boolean.TRUE.equals(w.get(OWN_TYPE)) ? null : storedForm(c, Db.num(w.get("id")), label);
