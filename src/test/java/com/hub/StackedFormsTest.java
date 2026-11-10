@@ -106,6 +106,13 @@ class StackedFormsTest {
         assertTrue(early.path("parts").get(0).path("reason").asText().contains("not in use until 500"), early.toString());
         // the stored (irregular) plural is the base
         assertEquals("nerin", built(owner, elven, "(woman-plural-definite)", 600).path("surface").asText());
+        // a rule of the exact name beats a longer stored name; a shortened name that only matches a stored form says so
+        assertEquals(200, edit(owner, elven, "form", "CREATE", null, "{\"word_id\":" + tal + ",\"label\":\"definite plural\",\"form\":\"talnai\"}").statusCode());
+        assertEquals("taln", built(owner, elven, "(stone-definite)", 600).path("surface").asText());
+        assertEquals("talnai", built(owner, elven, "(stone-definite plural)", 600).path("surface").asText());
+        JsonNode shortName = built(owner, elven, "(stone-definite pl)", 600);
+        assertEquals("talnai", shortName.path("surface").asText());
+        assertTrue(shortName.path("parts").get(0).path("note").asText().contains("used 'definite plural'"), shortName.toString());
         // unknown ending
         assertTrue(built(owner, elven, "(stone-plural-ablative)", 600).path("parts").get(0).path("reason").asText().contains("no form rule called 'ablative'"));
 

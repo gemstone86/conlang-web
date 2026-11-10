@@ -156,6 +156,13 @@ public class SentenceService {
             return pre;
         }
 
+        boolean hasExactRule(Map<String, Object> w, String label) {
+            loadStack();
+            for (Map<String, Object> r : stackRules)
+                if (posMatches((String) r.get("pos"), (String) w.get("pos")) && ((String) r.get("label")).equalsIgnoreCase(label.trim())) return true;
+            return false;
+        }
+
         Pattern cond(Map<String, Object> r) {
             String c = (String) r.get("cond_re");
             if (c == null || c.isBlank()) return null;
@@ -356,6 +363,7 @@ public class SentenceService {
         List<String> parts = new ArrayList<>();
         for (String x : label.split("-")) if (!x.isBlank()) parts.add(x.trim());
         if (exact == null && parts.size() > 1) return stack(c, w, parts, year);
+        if (exact == null && c.hasExactRule(w, label)) return stack(c, w, parts, year);   // a rule of that very name beats a longer stored name
         Map<String, Object> fr = exact != null ? exact : findForm(c, wid, label);
         if (fr == null) {
             if (parts.size() == 1 && c.stackRulesFor(w, label) != null) return stack(c, w, parts, year);   // a rule exists but the word has no stored form yet
