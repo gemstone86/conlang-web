@@ -197,6 +197,16 @@ Deleting a word also deletes its locked overrides, and Undo does not bring those
 ## v0.18.2
 - A form that starts earlier than its word is no longer reported as a problem: the word simply uses the form as it has evolved by the word's own year.
 
+## v1.16.0 (combined app)
+- **Derivations**: a form rule can **make a new word of type** (e.g. *verb*) with a meaning pattern (*to {gloss}*).
+  It isn't stored as a form. In a sentence, `(seal-verb-past)` or, with the verb maker written as its own part,
+  `(verbmaker)(seal-past)` builds the noun into a verb first and then takes the **verb** endings. Derivations always
+  go on first, whatever order they are written in, and more than one can follow each other.
+- **Save as a word** (on demand): the sentence result and the word window's **All forms → Derived words** offer to
+  add the derived word to the dictionary (*to seal*, verb, linked to *seal*, from the year the derivation is in
+  use). From then on sentences use that word, with its own irregular forms, meanings and losses; `(to seal-past)`
+  works too.
+
 ## v1.15.0 (combined app)
 - **Texts**: an open text has its own **Edit** button, and the edit form scrolls into view.
 - **Inherited texts**: tick **Branches inherit it** on a text and every branch of its language lists it too

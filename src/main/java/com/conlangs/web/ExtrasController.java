@@ -22,9 +22,11 @@ public class ExtrasController {
     private final TextService texts;
     private final FormGroups formGroups;
     private final SentenceService sentences;
+    private final Store store;
 
     public ExtrasController(Auth auth, ProofreadService proofread, EtymologyService etymology, TextService texts, FormGroups formGroups,
-                            SentenceService sentences) {
+                            SentenceService sentences, Store store) {
+        this.store = store;
         this.formGroups = formGroups;
         this.sentences = sentences;
         this.auth = auth;
@@ -108,5 +110,33 @@ public class ExtrasController {
     @GetMapping("/languages/{id}/words/{wid}/paradigm")
     public Map<String, Object> paradigm(@PathVariable long id, @PathVariable long wid, @RequestParam(value = "year", required = false) Integer year, HttpSession s) {
         return sentences.paradigm(auth.viewerUid(s), id, wid, year);
+    }
+
+    /** What saving a derivation (seal + verb) as a word of its own would give: {gloss, pos, year, form, ...}. */
+    @GetMapping("/languages/{id}/words/{wid}/derive")
+    public Map<String, Object> derivePreview(@PathVariable long id, @PathVariable long wid, @RequestParam("label") String label, HttpSession s) {
+        return sentences.derivedPreview(auth.viewerUid(s), id, wid, label);
+    }
+
+    /**
+     * {label}: saves the derivation as a dictionary word of this language (through approval like any new word), linked to
+     * the word it comes from. Sentences then use it, with its own forms. {gloss} may give it another meaning.
+     */
+    @PostMapping("/languages/{id}/words/{wid}/derive")
+    public Map<String, Object> derive(@PathVariable long id, @PathVariable long wid, @RequestBody Map<String, Object> b, HttpSession s) {
+        long uid = auth.requireUid(s);
+        Map<String, Object> d = sentences.derivedPreview(uid, id, wid, str(b, "label"));
+        String gloss = str(b, "gloss") == null || str(b, "gloss").isBlank() ? (String) d.get("gloss") : str(b, "gloss").trim();
+        Map<String, Object> payload = new java.util.LinkedHashMap<>();
+        payload.put("gloss", gloss);
+        payload.put("pos", d.get("pos"));
+        payload.put("form", d.get("form"));
+        payload.put("year", d.get("year"));
+        payload.put("notes", "Derived from '" + d.get("from_gloss") + "' (#" + wid + ") with '" + d.get("label") + "'");
+        payload.put("derived_from", wid);
+        payload.put("derived_label", d.get("label"));
+        Map<String, Object> r = new java.util.LinkedHashMap<>(store.submit(uid, id, "word", "CREATE", null, payload));
+        r.put("gloss", gloss);
+        return r;
     }
 }

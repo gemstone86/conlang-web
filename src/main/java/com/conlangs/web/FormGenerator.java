@@ -93,6 +93,7 @@ public class FormGenerator {
         out.put("removed", 0);
         List<Map<String, Object>> rules = new ArrayList<>();
         for (Map<String, Object> r : db.rows("select * from form_rules where language_id=? order by ord, id", langId)) {
+            if (r.get("new_pos") != null && !r.get("new_pos").toString().isBlank()) continue;   // derivations make new words (on demand), not forms
             String grp = r.get("grp") == null ? "" : ((String) r.get("grp")).trim();
             if ((onlyLabel == null || onlyLabel.equalsIgnoreCase((String) r.get("label"))) && (onlyGroup == null || onlyGroup.equalsIgnoreCase(grp))) rules.add(r);
         }
