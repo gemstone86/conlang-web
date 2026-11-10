@@ -226,6 +226,55 @@ class ExtrasTest {
         for (String v : new String[]{"fi", "qya", "sjn", "en"}) assertTrue(maps.path(v).has("a") && maps.path(v).has("ʃ"), v);
     }
 
+    /** Texts inherited by branches (built in the branch) and moved between languages. */
+    @Test
+    void textsInheritAndMove() throws Exception {
+        HttpClient owner = client();
+        post(owner, "/api/auth/register", "{\"username\":\"scribe\",\"password\":\"secret-pass\"}", false);
+        HttpClient reader = client();
+        post(reader, "/api/auth/register", "{\"username\":\"reader\",\"password\":\"secret-pass\"}", false);
+        long world = id(post(owner, "/rune/api/worlds", "{\"name\":\"Ygg\"}", false));
+        long proto = lang(owner, world, "Proto", null, null);
+        long branch = lang(owner, world, "Branch", proto, 500);
+        long other = lang(owner, world, "Other", null, null);
+        long elsewhere = lang(owner, id(post(owner, "/rune/api/worlds", "{\"name\":\"Far\"}", false)), "Far", null, null);
+        edit(owner, proto, "word", "CREATE", null, "{\"gloss\":\"water\",\"form\":\"ata\",\"year\":0}");
+        edit(owner, proto, "rule", "CREATE", null, "{\"year\":100,\"pattern\":\"t\",\"replacement\":\"d\"}");
+        edit(owner, branch, "rule", "CREATE", null, "{\"year\":600,\"pattern\":\"d\",\"replacement\":\"z\"}");
+        String body = "{\"title\":\"Rain\",\"years\":\"800\",\"body\":\"(water) | Water.\"";
+        long text = id(post(owner, "/rune/api/languages/" + proto + "/texts", body + "}", false));
+
+        // not inherited: the branch doesn't have it
+        assertEquals(0, json(get(owner, "/rune/api/languages/" + branch + "/texts")).size());
+        assertEquals(404, get(owner, "/rune/api/texts/" + text + "?lang=" + branch).statusCode());
+        // inherited: listed in the branch, built with the branch's own sound changes
+        assertEquals(text, id(post(owner, "/rune/api/languages/" + proto + "/texts", body + ",\"id\":" + text + ",\"inherit\":true}", false)));
+        JsonNode bl = json(get(owner, "/rune/api/languages/" + branch + "/texts"));
+        assertEquals(1, bl.size(), bl.toString());
+        assertTrue(bl.get(0).path("inherited").asBoolean());
+        assertEquals("Proto", bl.get(0).path("from_lang").asText());
+        assertFalse(json(get(owner, "/rune/api/languages/" + proto + "/texts")).get(0).path("inherited").asBoolean());
+        JsonNode inBranch = json(get(owner, "/rune/api/texts/" + text + "?lang=" + branch));
+        assertEquals("aza", inBranch.path("lines").get(0).path("at").path("800").path("surface").asText(), inBranch.toString());
+        assertEquals("Branch", inBranch.path("built_in").asText());
+        assertEquals("ada", json(get(owner, "/rune/api/texts/" + text)).path("lines").get(0).path("at").path("800").path("surface").asText());
+        assertEquals(404, get(owner, "/rune/api/texts/" + text + "?lang=" + other).statusCode(), "not a branch of Proto");
+        // saving without the flag keeps it
+        post(owner, "/rune/api/languages/" + proto + "/texts", body + ",\"id\":" + text + "}", false);
+        assertEquals(1, json(get(owner, "/rune/api/languages/" + branch + "/texts")).size());
+
+        // moving: editors of both languages, within the world
+        post(owner, "/rune/api/shares", "{\"scope\":\"WORLD\",\"targetId\":" + world + ",\"username\":\"reader\",\"level\":\"VIEWER\"}", false);
+        assertEquals(403, post(reader, "/rune/api/texts/" + text + "/move", "{\"language_id\":" + branch + "}", false).statusCode());
+        assertEquals(400, post(owner, "/rune/api/texts/" + text + "/move", "{\"language_id\":" + elsewhere + "}", false).statusCode());
+        assertEquals(200, post(owner, "/rune/api/texts/" + text + "/move", "{\"language_id\":" + branch + "}", false).statusCode());
+        assertEquals(0, json(get(owner, "/rune/api/languages/" + proto + "/texts")).size());
+        JsonNode moved = json(get(owner, "/rune/api/languages/" + branch + "/texts"));
+        assertEquals(1, moved.size());
+        assertFalse(moved.get(0).path("inherited").asBoolean(), "it is Branch's own now");
+        assertEquals("aza", json(get(owner, "/rune/api/texts/" + text)).path("lines").get(0).path("at").path("800").path("surface").asText());
+    }
+
     private HttpClient guestClient() {
         return HttpClient.newHttpClient();
     }

@@ -1,8 +1,10 @@
 name: Build and test
 
+# Runs for pull requests only (pushes to main are tested by the deploy workflow, which builds with the tests).
+# "Run workflow" on the Actions page (or gh workflow run) checks any branch by hand.
 on:
-  push:
   pull_request:
+  workflow_dispatch:
 
 jobs:
   build:

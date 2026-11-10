@@ -106,6 +106,38 @@ class StackedFormsTest {
         assertTrue(early.path("parts").get(0).path("reason").asText().contains("not in use until 500"), early.toString());
         // the stored (irregular) plural is the base
         assertEquals("nerin", built(owner, elven, "(woman-plural-definite)", 600).path("surface").asText());
+        // a rule of the exact name beats a longer stored name; a shortened name that only matches a stored form says so
+        assertEquals(200, edit(owner, elven, "form", "CREATE", null, "{\"word_id\":" + tal + ",\"label\":\"definite plural\",\"form\":\"talnai\"}").statusCode());
+        assertEquals("taln", built(owner, elven, "(stone-definite)", 600).path("surface").asText());
+        assertEquals("talnai", built(owner, elven, "(stone-definite plural)", 600).path("surface").asText());
+        JsonNode shortName = built(owner, elven, "(stone-definite pl)", 600);
+        assertEquals("talnai", shortName.path("surface").asText());
+        assertTrue(shortName.path("parts").get(0).path("note").asText().contains("used 'definite plural'"), shortName.toString());
+        // two words mean "seal": the one that can take the endings is used, and the number picks one by hand
+        long sealAdj = om.readTree(edit(owner, elven, "word", "CREATE", null, "{\"gloss\":\"seal\",\"pos\":\"adjective\",\"form\":\"vor\",\"year\":10}").body()).path("id").asLong();
+        long sealNoun = om.readTree(edit(owner, elven, "word", "CREATE", null, "{\"gloss\":\"seal\",\"pos\":\"noun\",\"form\":\"hal\",\"year\":10}").body()).path("id").asLong();
+        JsonNode seal = built(owner, elven, "(seal-plural-definite)", 600);
+        assertEquals("halin", seal.path("surface").asText(), seal.toString());
+        assertTrue(seal.path("parts").get(0).path("note").asText().contains("#" + sealNoun + " (noun)"), seal.toString());
+        assertEquals("hali", built(owner, elven, "(seal-plural#" + sealNoun + ")", 600).path("surface").asText(), "the ending is kept with a number");
+        JsonNode adj = built(owner, elven, "(seal-plural#" + sealAdj + ")", 600);
+        assertTrue(adj.path("parts").get(0).path("reason").asText().contains(", adjective) has no 'plural' form"), adj.toString());
+        // a noun that refers to an adjective (relic = holy) takes the noun endings on holy's form
+        long holy = om.readTree(edit(owner, elven, "word", "CREATE", null, "{\"gloss\":\"holy\",\"pos\":\"adjective\",\"form\":\"aer\",\"year\":10}").body()).path("id").asLong();
+        long relic = om.readTree(edit(owner, elven, "word", "CREATE", null, "{\"gloss\":\"relic\",\"pos\":\"noun\",\"ref_word_id\":" + holy + ",\"year\":10}").body()).path("id").asLong();
+        JsonNode rel = built(owner, elven, "(relic-plural-definite)", 600);
+        assertEquals("aerin", rel.path("surface").asText(), rel.toString());
+        assertEquals("relic-plural-definite", rel.path("gloss").asText());
+        assertFalse(built(owner, elven, "(holy-plural)", 600).path("parts").get(0).path("ok").asBoolean(), "holy itself stays an adjective");
+        JsonNode relPara = json(get(owner, "/rune/api/languages/" + elven + "/words/" + relic + "/paradigm?year=600"));
+        assertEquals(3, relPara.path("groups").size(), relPara.toString());
+        // a meaning with its own type: bright (adjective) also means "star" as a noun from 300
+        long bright = om.readTree(edit(owner, elven, "word", "CREATE", null, "{\"gloss\":\"bright\",\"pos\":\"adjective\",\"form\":\"lim\",\"year\":10}").body()).path("id").asLong();
+        assertEquals(200, edit(owner, elven, "meaning", "CREATE", null, "{\"word_id\":" + bright + ",\"lang_id\":" + elven + ",\"year\":300,\"mode\":\"ADD\",\"meaning\":\"star\",\"pos\":\"noun\"}").statusCode());
+        JsonNode star = built(owner, elven, "(star-plural-definite)", 600);
+        assertEquals("limin", star.path("surface").asText(), star.toString());
+        assertFalse(built(owner, elven, "(star-plural)", 200).path("parts").get(0).path("ok").asBoolean(), "not a star before 300");
+        assertFalse(built(owner, elven, "(bright-plural)", 600).path("parts").get(0).path("ok").asBoolean(), "as 'bright' it is still an adjective");
         // unknown ending
         assertTrue(built(owner, elven, "(stone-plural-ablative)", 600).path("parts").get(0).path("reason").asText().contains("no form rule called 'ablative'"));
 

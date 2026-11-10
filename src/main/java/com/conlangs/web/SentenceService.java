@@ -156,6 +156,13 @@ public class SentenceService {
             return pre;
         }
 
+        boolean hasExactRule(Map<String, Object> w, String label) {
+            loadStack();
+            for (Map<String, Object> r : stackRules)
+                if (posMatches((String) r.get("pos"), (String) w.get("pos")) && ((String) r.get("label")).equalsIgnoreCase(label.trim())) return true;
+            return false;
+        }
+
         Pattern cond(Map<String, Object> r) {
             String c = (String) r.get("cond_re");
             if (c == null || c.isBlank()) return null;
@@ -196,6 +203,7 @@ public class SentenceService {
             for (long l : pathNearestFirst) {
                 for (Map<String, Object> w : db.rows("select * from words where language_id=? order by year, id", l)) words.put(Db.num(w.get("id")), w);
                 for (Map<String, Object> m : db.rows("select m.* from word_meanings m join words w on w.id=m.word_id where w.language_id=?", l)) {
+                    if (m.get("pos") != null && !m.get("pos").toString().isBlank()) meaningTypes.computeIfAbsent(Db.num(m.get("word_id")), k -> new ArrayList<>()).add(m);
                     meanings.computeIfAbsent(Db.num(m.get("word_id")), k -> new ArrayList<>())
                             .add(new Meanings.Ev(Db.num(m.get("lang_id")), ((Number) m.get("year")).intValue(), (String) m.get("mode"), (String) m.get("meaning")));
                 }
@@ -256,6 +264,23 @@ public class SentenceService {
                 if (norm(sense).equals(norm(text))) return true;
             }
             return false;
+        }
+
+        /** Meanings that come with a word type of their own, by word. */
+        final Map<Long, List<Map<String, Object>>> meaningTypes = new HashMap<>();
+
+        /** The type the word has in this meaning here at this year (from a meaning change with a type), or null. */
+        String typeFor(Map<String, Object> w, String text, int year) {
+            String out = null;
+            int best = Integer.MIN_VALUE;
+            for (Map<String, Object> m : meaningTypes.getOrDefault(Db.num(w.get("id")), List.of())) {
+                int y = ((Number) m.get("year")).intValue();
+                if (y > year || y < best || !pathNearestFirst.contains(Db.num(m.get("lang_id")))) continue;
+                if (!norm((String) m.get("meaning")).equals(norm(text))) continue;
+                best = y;
+                out = m.get("pos").toString().trim();
+            }
+            return out;
         }
 
         /** When the word stops being used in this language (its own loss or one that keeps it from reaching here), or null. */
@@ -321,20 +346,26 @@ public class SentenceService {
             Map<String, Object> w = c.words.get(Long.parseLong(idm.group(1)));
             if (w != null) {
                 String rest = t.substring(0, idm.start()).trim();
-                if (rest.startsWith("-")) label = rest.substring(1).trim();
+                int dash = rest.indexOf('-');   // "-plural#12" or "seal-plural#12": the number picks the word, the rest are endings
+                if (dash >= 0 && dash < rest.length() - 1) label = rest.substring(dash + 1).trim();
                 return new Hit(w, label, null);
             }
         }
         List<Map<String, Object>> hits = c.candidates(t, year);
-        if (!hits.isEmpty()) return new Hit(hits.get(0), null, hits.size() > 1 ? hits.size() + " words match; used #" + hits.get(0).get("id") + " (write " + t + "#id to choose)" : null);
+        if (!hits.isEmpty()) return new Hit(hits.get(0), null, hits.size() > 1 ? hits.size() + " words match; used #" + hits.get(0).get("id") + describeType(hits.get(0)) + " (write " + t + "#id to choose)" : null);
         int dash = t.lastIndexOf('-');
         while (dash > 0) {
             String g = t.substring(0, dash).trim(), lab = t.substring(dash + 1).trim();
             hits = c.candidates(g, year);
             if (!hits.isEmpty()) {
+                final String meant = g;
+                hits = hits.stream().map(x -> typed(c, x, meant, year)).toList();
                 Map<String, Object> pick = hits.get(0);
-                for (Map<String, Object> cand : hits) if (findForm(c, Db.num(cand.get("id")), lab) != null) { pick = cand; break; }
-                return new Hit(pick, lab, hits.size() > 1 ? hits.size() + " words match; used #" + pick.get("id") : null);
+                for (Map<String, Object> cand : hits) if (storedForm(c, Db.num(cand.get("id")), lab) != null) { pick = cand; break; }
+                if (storedForm(c, Db.num(pick.get("id")), lab) == null)   // else: the first word that can take these endings (a noun for plural, not an adjective)
+                    for (Map<String, Object> cand : hits) if (canTake(c, cand, lab)) { pick = cand; break; }
+                return new Hit(pick, lab, hits.size() > 1 ? hits.size() + " words mean '" + g + "'; used #" + pick.get("id") + describeType(pick)
+                        + " (write " + g + "-" + lab + "#id to choose)" : null);
             }
             dash = t.lastIndexOf('-', dash - 1);
         }
@@ -352,16 +383,17 @@ public class SentenceService {
     private Res labelled(Ctx c, Map<String, Object> w, String label, int year) {
         long wid = Db.num(w.get("id"));
         int wyear = ((Number) w.get("year")).intValue();
-        Map<String, Object> exact = storedForm(c, wid, label);
+        Map<String, Object> exact = storedFor(c, w, label);
         List<String> parts = new ArrayList<>();
         for (String x : label.split("-")) if (!x.isBlank()) parts.add(x.trim());
         if (exact == null && parts.size() > 1) return stack(c, w, parts, year);
-        Map<String, Object> fr = exact != null ? exact : findForm(c, wid, label);
+        if (exact == null && c.hasExactRule(w, label)) return stack(c, w, parts, year);   // a rule of that very name beats a longer stored name
+        Map<String, Object> fr = exact != null ? exact : findFor(c, w, label);
         if (fr == null) {
             if (parts.size() == 1 && c.stackRulesFor(w, label) != null) return stack(c, w, parts, year);   // a rule exists but the word has no stored form yet
             List<String> have = new ArrayList<>();
             for (Map<String, Object> f : c.forms.getOrDefault(wid, List.of())) have.add((String) f.get("label"));
-            return new Res(null, "'" + w.get("gloss") + "' (#" + wid + ") has no '" + label + "' form; it has: " + (have.isEmpty() ? "none" : String.join(", ", have)), null, null);
+            return new Res(null, "'" + w.get("gloss") + "' (#" + wid + (w.get("pos") == null || w.get("pos").toString().isBlank() ? "" : ", " + w.get("pos")) + ") has no '" + label + "' form; it has: " + (have.isEmpty() ? "none" : String.join(", ", have)), null, null);
         }
         String note = exact == null && !((String) fr.get("label")).equalsIgnoreCase(label.trim())
                 ? "'" + w.get("gloss") + "' has no '" + label.trim() + "' form; used '" + fr.get("label") + "'" : null;
@@ -370,6 +402,56 @@ public class SentenceService {
         String form = formAtYear(c, wid, (String) fr.get("form"), fy, year);
         if (form == null) return new Res(null, "'" + w.get("gloss") + "' is not in " + access.language(c.langId).get("name") + " (coined after the split)", note, null);
         return new Res(form, null, note, "." + fr.get("label"));
+    }
+
+    /**
+     * A reference (seal → holy) with a type of its own is used as that type: holy's form with the noun endings.
+     * The target's stored forms belong to the target's type, so they are left aside then.
+     */
+    private static Map<String, Object> asUsed(Map<String, Object> w0, Map<String, Object> w) {
+        if (w0 == w || w0 == null || w == null) return w;
+        Object own = w0.get("pos");
+        if (own == null || own.toString().isBlank() || own.toString().trim().equalsIgnoreCase(String.valueOf(w.get("pos")).trim())) return w;
+        Map<String, Object> x = new LinkedHashMap<>(w);
+        x.put("pos", own);
+        x.put(OWN_TYPE, true);
+        return x;
+    }
+
+    private static final String OWN_TYPE = "__reference_type";
+
+    /** The word as used in this meaning: with the meaning's own type when it has one (holy, used as "seal", is a noun). */
+    private static Map<String, Object> typed(Ctx c, Map<String, Object> w, String text, int year) {
+        String t = c.typeFor(w, text, year);
+        if (t == null || t.equalsIgnoreCase(String.valueOf(w.get("pos")).trim())) return w;
+        Map<String, Object> x = new LinkedHashMap<>(w);
+        x.put("pos", t);
+        x.put(OWN_TYPE, true);
+        return x;
+    }
+
+    private Map<String, Object> storedFor(Ctx c, Map<String, Object> w, String label) {
+        return Boolean.TRUE.equals(w.get(OWN_TYPE)) ? null : storedForm(c, Db.num(w.get("id")), label);
+    }
+
+    private Map<String, Object> findFor(Ctx c, Map<String, Object> w, String label) {
+        return Boolean.TRUE.equals(w.get(OWN_TYPE)) ? null : findForm(c, Db.num(w.get("id")), label);
+    }
+
+    private static String describeType(Map<String, Object> w) {
+        Object pos = w.get("pos");
+        return pos == null || pos.toString().isBlank() ? "" : " (" + pos + ")";
+    }
+
+    /** Can the word take these endings: a stored form, or a form rule for its type for every one of them? */
+    private boolean canTake(Ctx c, Map<String, Object> w, String label) {
+        long wid = Db.num(w.get("id"));
+        if (storedFor(c, w, label) != null || findFor(c, w, label) != null) return true;
+        for (String part : label.split("-")) {
+            if (part.isBlank()) continue;
+            if (c.stackRulesFor(w, part) == null && storedFor(c, w, part) == null) return false;
+        }
+        return true;
     }
 
     private Map<String, Object> storedForm(Ctx c, long wordId, String label) {
@@ -411,9 +493,10 @@ public class SentenceService {
         for (String part : parts) {
             List<Map<String, Object>> rules = c.stackRulesFor(w, part);
             if (rules == null) {
-                Map<String, Object> st = storedForm(c, wid, part);
+                Map<String, Object> st = storedFor(c, w, part);
                 if (st != null && slots.isEmpty()) { slots.add(new Slot((String) st.get("label"), "", List.of())); continue; }
-                return new Res(null, "no form rule called '" + part + "' for " + (w.get("pos") == null || w.get("pos").toString().isBlank() ? "this word" : "words of type " + w.get("pos")) + " (Word forms tab)", null, null);
+                return new Res(null, "no form rule called '" + part + "' for '" + w.get("gloss") + "' (#" + wid + (w.get("pos") == null || w.get("pos").toString().isBlank() ? ", which has no type"
+                        : ", type " + w.get("pos")) + ") on the Word forms tab", null, null);
             }
             slots.add(new Slot((String) rules.get(0).get("label"), grp(rules.get(0)), rules));
         }
@@ -432,7 +515,7 @@ public class SentenceService {
         String start = (String) w.get("form");
         int startYear = wyear, from = 0;
         String note = null;
-        Map<String, Object> stored = storedForm(c, wid, ordered.get(0).label());
+        Map<String, Object> stored = storedFor(c, w, ordered.get(0).label());
         if (stored != null) {
             start = (String) stored.get("form");
             startYear = stored.get("year") == null ? wyear : ((Number) stored.get("year")).intValue();
@@ -488,6 +571,7 @@ public class SentenceService {
         if (w0 == null) throw new ApiException(404, "That word isn't in this language or its ancestors.");
         Map<String, Object> w = c.deref(w0);
         if (w == null) throw new ApiException(400, "The word points to a word that doesn't exist.");
+        w = asUsed(w0, w);
         c.loadStack();
         int year = yearOrNull == null ? ANY_YEAR : yearOrNull;
         Map<String, List<String>> groups = new LinkedHashMap<>();
@@ -523,7 +607,7 @@ public class SentenceService {
                 row.put("form", r.form());
                 if (r.reason() != null) row.put("reason", r.reason());
                 if (r.note() != null) row.put("note", r.note());
-                if (combo.size() > 1 && storedForm(c, Db.num(w.get("id")), combo.get(0)) != null) row.put("from_stored", combo.get(0));
+                if (combo.size() > 1 && storedFor(c, w, combo.get(0)) != null) row.put("from_stored", combo.get(0));
             }
             rows.add(row);
         }
@@ -589,6 +673,7 @@ public class SentenceService {
                     gap(p, "'" + w0.get("gloss") + "' points to a word that doesn't exist: " + w0.get("form"));
                     p.put("form", "[" + t + "?]"); bad = true; surface = (surface == null ? "" : surface) + "[" + t + "?]"; gl.add(t); continue;
                 }
+                w = asUsed(w0, w);
                 long wid = Db.num(w.get("id"));
                 p.put("word_id", Db.num(w0.get("id")));
                 if (w != w0) p.put("note", "'" + w0.get("gloss") + "' = see '" + w.get("gloss") + "'");

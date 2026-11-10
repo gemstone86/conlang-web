@@ -32,12 +32,45 @@ public class TextService {
         this.json = json;
     }
 
+    /**
+     * The language's own texts, then the texts of its ancestors that are marked "branches inherit it" (built in this
+     * language when opened). Each has language_id, from (the language it belongs to) and inherited.
+     */
     public List<Map<String, Object>> list(long uid, long langId) {
         access.need(uid, langId, Access.VIEWER);
-        List<Map<String, Object>> out = db.rows("select t.id, t.title, t.years, t.notes, t.updated, u.username as created_by_name, t.lines_json from texts t "
-                + "left join users u on u.id=t.created_by where t.language_id=? order by lower(t.title), t.id", langId);
-        for (Map<String, Object> t : out) t.put("lines", lines((String) t.remove("lines_json")).size());
+        List<Long> langs = new ArrayList<>();
+        langs.add(langId);
+        langs.addAll(access.ancestors(langId));
+        List<Map<String, Object>> out = new ArrayList<>();
+        for (long l : langs) {
+            boolean own = l == langId;
+            for (Map<String, Object> t : db.rows("select t.id, t.language_id, t.title, t.years, t.notes, t.inherit, t.updated, u.username as created_by_name, t.lines_json, l.name as from_lang "
+                    + "from texts t join languages l on l.id=t.language_id left join users u on u.id=t.created_by where t.language_id=?"
+                    + (own ? "" : " and t.inherit=true") + " order by lower(t.title), t.id", l)) {
+                t.put("lines", lines((String) t.remove("lines_json")).size());
+                t.put("inherited", !own);
+                out.add(t);
+            }
+        }
         return out;
+    }
+
+    /** May the text be read as part of this language: its own, or inherited from an ancestor? */
+    private boolean visibleIn(Map<String, Object> t, long langId) {
+        long tl = Db.num(t.get("language_id"));
+        return tl == langId || (Boolean.TRUE.equals(t.get("inherit")) && access.ancestors(langId).contains(tl));
+    }
+
+    /** Moves a text to another language of the same world (editors of both). */
+    public void move(long uid, long id, long targetLangId) {
+        Map<String, Object> t = text(id);
+        long from = Db.num(t.get("language_id"));
+        Map<String, Object> a = access.need(uid, from, Access.EDITOR);
+        Map<String, Object> b = access.need(uid, targetLangId, Access.EDITOR);
+        if (Db.num(a.get("world_id")) != Db.num(b.get("world_id"))) throw new ApiException(400, "A text can only move within its world.");
+        if (from == targetLangId) return;
+        db.update("update texts set language_id=?, updated=? where id=?", targetLangId, new Timestamp(System.currentTimeMillis()), id);
+        applog.info("edit", uid, "Moved text '" + t.get("title") + "' (#" + id + ") from " + a.get("name") + " to " + b.get("name"));
     }
 
     private List<Map<String, Object>> lines(String js) {
@@ -91,7 +124,7 @@ public class TextService {
         return t;
     }
 
-    public long save(long uid, long langId, Long id, String title, String years, String body, String notes) {
+    public long save(long uid, long langId, Long id, String title, String years, String body, String notes, Boolean inherit) {
         access.need(uid, langId, Access.EDITOR);
         String tt = title == null ? "" : title.trim();
         if (tt.isEmpty()) throw new ApiException(400, "Give the text a title.");
@@ -110,13 +143,15 @@ public class TextService {
         String yStr = String.join(", ", ys.stream().map(String::valueOf).toList());
         String nt = notes == null || notes.isBlank() ? null : notes.trim();
         if (id == null) {
-            long nid = db.insert("insert into texts(language_id, title, lines_json, years, notes, created_by) values (?,?,?,?,?,?)", langId, tt, js, yStr, nt, uid);
+            long nid = db.insert("insert into texts(language_id, title, lines_json, years, notes, created_by, inherit) values (?,?,?,?,?,?,?)", langId, tt, js, yStr, nt, uid,
+                    Boolean.TRUE.equals(inherit));
             applog.info("edit", uid, "Added text '" + tt + "' (#" + nid + ") in language #" + langId);
             return nid;
         }
         Map<String, Object> t = text(id);
         if (Db.num(t.get("language_id")) != langId) throw new ApiException(404, "No such text.");
-        db.update("update texts set title=?, lines_json=?, years=?, notes=?, updated=? where id=?", tt, js, yStr, nt, new Timestamp(System.currentTimeMillis()), id);
+        db.update("update texts set title=?, lines_json=?, years=?, notes=?, inherit=?, updated=? where id=?", tt, js, yStr, nt,
+                inherit == null ? Boolean.TRUE.equals(t.get("inherit")) : inherit, new Timestamp(System.currentTimeMillis()), id);
         applog.info("edit", uid, "Changed text '" + tt + "' (#" + id + ") in language #" + langId);
         return id;
     }
@@ -134,9 +169,19 @@ public class TextService {
      */
     @SuppressWarnings("unchecked")
     public Map<String, Object> render(long uid, long id, String yearsOverride) {
+        return render(uid, id, yearsOverride, null);
+    }
+
+    /** As above, built in viewLang (a branch that inherits the text) instead of the text's own language. */
+    public Map<String, Object> render(long uid, long id, String yearsOverride, Long viewLang) {
         Map<String, Object> t = text(id);
-        long langId = Db.num(t.get("language_id"));
-        access.need(uid, langId, Access.VIEWER);
+        long own = Db.num(t.get("language_id"));
+        long langId = own;
+        if (viewLang != null && viewLang != own) {
+            access.need(uid, viewLang, Access.VIEWER);
+            if (!visibleIn(t, viewLang)) throw new ApiException(404, "That text isn't part of this language.");
+            langId = viewLang;
+        } else access.need(uid, langId, Access.VIEWER);
         List<Integer> ys = yearsOverride == null || yearsOverride.isBlank() ? years((String) t.get("years")) : years(yearsOverride);
         List<Map<String, Object>> lines = lines((String) t.get("lines_json"));
         Map<String, Integer> gapCount = new LinkedHashMap<>();
@@ -172,6 +217,10 @@ public class TextService {
         out.put("notes", t.get("notes"));
         out.put("years", ys);
         out.put("saved_years", t.get("years"));
+        out.put("language_id", own);
+        out.put("from_lang", access.language(own).get("name"));
+        out.put("built_in", access.language(langId).get("name"));
+        out.put("inherit", Boolean.TRUE.equals(t.get("inherit")));
         out.put("body", body.toString().stripTrailing());
         out.put("lines", lines);
         out.put("gaps", gapCount);

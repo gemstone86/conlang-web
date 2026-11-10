@@ -62,12 +62,23 @@ public class ExtrasController {
     @PostMapping("/languages/{id}/texts")
     public Map<String, Object> saveText(@PathVariable long id, @RequestBody Map<String, Object> b, HttpSession s) {
         Long tid = b.get("id") == null || b.get("id").toString().isBlank() ? null : Long.valueOf(b.get("id").toString());
-        return Map.of("id", texts.save(auth.requireUid(s), id, tid, str(b, "title"), str(b, "years"), str(b, "body"), str(b, "notes")));
+        Boolean inherit = b.get("inherit") == null ? null : Boolean.valueOf(b.get("inherit").toString());
+        return Map.of("id", texts.save(auth.requireUid(s), id, tid, str(b, "title"), str(b, "years"), str(b, "body"), str(b, "notes"), inherit));
     }
 
     @GetMapping("/texts/{tid}")
-    public Map<String, Object> text(@PathVariable long tid, @RequestParam(value = "years", required = false) String years, HttpSession s) {
-        return texts.render(auth.viewerUid(s), tid, years);
+    public Map<String, Object> text(@PathVariable long tid, @RequestParam(value = "years", required = false) String years,
+                                    @RequestParam(value = "lang", required = false) Long lang, HttpSession s) {
+        return texts.render(auth.viewerUid(s), tid, years, lang);
+    }
+
+    /** {language_id}: move the text to another language of the world. */
+    @PostMapping("/texts/{tid}/move")
+    public Map<String, Object> moveText(@PathVariable long tid, @RequestBody Map<String, Object> b, HttpSession s) {
+        Object l = b == null ? null : b.get("language_id");
+        if (l == null || l.toString().isBlank()) throw new ApiException(400, "Choose the language to move it to.");
+        texts.move(auth.requireUid(s), tid, Long.parseLong(l.toString()));
+        return Map.of("ok", true);
     }
 
     @DeleteMapping("/texts/{tid}")
