@@ -124,7 +124,7 @@ class StackedFormsTest {
         assertEquals("talni", built(owner, elven, "(stone-plural-definite)", 700).path("surface").asText());
         assertEquals("talne", built(owner, elven, "(stone-plural-definite)", 900).path("surface").asText());
         long branch = lang(owner, world, "Wood", elven, 650);
-        assertEquals("talne", built(owner, branch, "(stone-plural-definite)", 900).path("surface").asText(), "made before the split, changed in the parent before it");
+        assertEquals("talni", built(owner, branch, "(stone-plural-definite)", 900).path("surface").asText(), "the branch splits off in 650, before the parent's change in 800");
 
         // every combination in a table
         JsonNode para = json(get(owner, "/rune/api/languages/" + elven + "/words/" + tal + "/paradigm?year=600"));
