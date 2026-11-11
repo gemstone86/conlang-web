@@ -9,8 +9,8 @@ import com.conlangs.web.ProofreadService;
 import com.conlangs.web.TextService;
 import com.eonweather.core.Api;
 import com.eonweather.core.Http;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -398,7 +398,7 @@ public class ConnectorTools {
     private Object weatherMaps(Ctx c) {
         JsonNode maps = (JsonNode) weatherGet(c, "/maps", Map.of());
         // the settings hold the map's drawing setup (zoom tiles, scales); not useful here and long
-        for (JsonNode m : maps) if (m.isObject()) ((com.fasterxml.jackson.databind.node.ObjectNode) m).remove("settings");
+        for (JsonNode m : maps) if (m.isObject()) ((tools.jackson.databind.node.ObjectNode) m).remove("settings");
         return maps;
     }
 }

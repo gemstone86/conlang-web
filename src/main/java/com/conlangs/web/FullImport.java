@@ -1,7 +1,7 @@
 package com.conlangs.web;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 import java.io.InputStream;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
