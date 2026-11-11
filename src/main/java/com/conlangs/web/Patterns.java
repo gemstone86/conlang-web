@@ -54,11 +54,85 @@ public final class Patterns {
     }
 
     public static String apply(Pattern p, String replacement, String form) {
-        Matcher m = p.matcher(form);
+        checkNotSlow(p);
+        Matcher m = p.matcher(new Timed(form, p));
         try {
             return m.replaceAll(replacement == null ? "" : replacement);
+        } catch (TooSlow e) {
+            throw e;
         } catch (IndexOutOfBoundsException | IllegalArgumentException e) {
             throw new IllegalArgumentException("Bad replacement '" + replacement + "': " + e.getMessage());
+        }
+    }
+
+    /** Does the pattern match somewhere in the text? (With the same time limit as apply.) */
+    public static boolean found(Pattern p, String text) {
+        checkNotSlow(p);
+        return p.matcher(new Timed(text, p)).find();
+    }
+
+    // ---- a time limit, so a pattern that backtracks without end (like (.*a){12}b on a long word without b)
+    // gives an error on the word instead of tying the server up
+
+    static final long LIMIT_NANOS = 200_000_000L;   // per word; normal patterns take microseconds
+    private static final long REMEMBER_MS = 60_000;
+    /** Patterns that just ran out of time: they fail at once for a minute, so a whole dictionary doesn't wait for each word. */
+    private static final Map<String, Long> SLOW = new java.util.concurrent.ConcurrentHashMap<>();
+
+    /** Thrown when a pattern takes too long; an IllegalArgumentException, so it is reported like any other bad pattern. */
+    public static final class TooSlow extends IllegalArgumentException {
+        TooSlow(Pattern p) {
+            super("The pattern '" + p.pattern() + "' takes too long (it tries too many combinations). Simplify it, e.g. avoid a repeat inside a repeat like (.*a)+.");
+        }
+    }
+
+    private static void checkNotSlow(Pattern p) {
+        Long until = SLOW.get(p.pattern());
+        if (until == null) return;
+        if (until < System.currentTimeMillis()) SLOW.remove(p.pattern());
+        else throw new TooSlow(p);
+    }
+
+    /** The text as the matcher reads it; reading it checks the clock now and then. */
+    private static final class Timed implements CharSequence {
+        private final CharSequence s;
+        private final Pattern p;
+        private final long deadline;
+        private int reads;
+
+        Timed(CharSequence s, Pattern p) {
+            this(s, p, System.nanoTime() + LIMIT_NANOS);
+        }
+
+        private Timed(CharSequence s, Pattern p, long deadline) {
+            this.s = s;
+            this.p = p;
+            this.deadline = deadline;
+        }
+
+        @Override
+        public char charAt(int i) {
+            if ((++reads & 0x3FF) == 0 && System.nanoTime() > deadline) {
+                if (SLOW.size() > 500) SLOW.clear();
+                SLOW.put(p.pattern(), System.currentTimeMillis() + REMEMBER_MS);
+                throw new TooSlow(p);
+            }
+            return s.charAt(i);
+        }
+
+        @Override
+        public int length() {
+            return s.length();
+        }
+
+        @Override
+        public CharSequence subSequence(int a, int b) {
+            return new Timed(s.subSequence(a, b), p, deadline);
+        }
+
+        @Override
+        public String toString() {
+            return s.toString();
         }
     }
 

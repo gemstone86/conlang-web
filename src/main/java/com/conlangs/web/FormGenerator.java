@@ -93,6 +93,7 @@ public class FormGenerator {
         out.put("removed", 0);
         List<Map<String, Object>> rules = new ArrayList<>();
         for (Map<String, Object> r : db.rows("select * from form_rules where language_id=? order by ord, id", langId)) {
+            if (r.get("new_pos") != null && !r.get("new_pos").toString().isBlank()) continue;   // derivations make new words (on demand), not forms
             String grp = r.get("grp") == null ? "" : ((String) r.get("grp")).trim();
             if ((onlyLabel == null || onlyLabel.equalsIgnoreCase((String) r.get("label"))) && (onlyGroup == null || onlyGroup.equalsIgnoreCase(grp))) rules.add(r);
         }
@@ -144,7 +145,7 @@ public class FormGenerator {
                 long rid = Db.num(r.get("id"));
                 if (conds.containsKey(rid)) {
                     Pattern p = conds.get(rid);
-                    if (p == null || !p.matcher(base).find()) continue;
+                    if (p == null || !Patterns.found(p, base)) continue;
                 }
                 String affix = r.get("affix") == null ? "" : (String) r.get("affix");
                 int start = r.get("year") == null ? wyear : Math.max(wyear, ((Number) r.get("year")).intValue());

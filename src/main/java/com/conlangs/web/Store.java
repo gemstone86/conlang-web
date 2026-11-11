@@ -19,18 +19,18 @@ public class Store {
     private static final Map<String, String> TABLE = Map.of("word", "words", "rule", "rules", "override", "word_overrides", "form", "word_forms",
             "gsection", "grammar_sections", "grammar", "grammar_entries", "phoneme", "phonemes", "formrule", "form_rules", "meaning", "word_meanings", "loss", "word_losses");
     private static final Map<String, List<String>> FIELDS = Map.of(
-            "word", List.of("gloss", "pos", "build", "form", "year", "notes", "ref_word_id", "loan_word_id"),
+            "word", List.of("gloss", "pos", "build", "form", "year", "notes", "ref_word_id", "loan_word_id", "derived_from", "derived_label"),
             "rule", List.of("year", "ord", "name", "pattern", "replacement", "note", "tags"),
             "override", List.of("word_id", "lang_id", "year", "form"),
             "form", List.of("word_id", "label", "form", "year"),
             "gsection", List.of("title", "headings", "ord"),
             "grammar", List.of("category", "name", "c1", "c2", "c3", "c4", "c5", "c6", "year", "ord"),
             "phoneme", List.of("symbol", "kind", "row_label", "col_label", "notes", "year", "year_to"),
-            "formrule", List.of("grp", "label", "pos", "placement", "affix", "affix_word_id", "cond_re", "hiatus", "year", "ord"),
+            "formrule", List.of("grp", "label", "pos", "placement", "affix", "affix_word_id", "cond_re", "hiatus", "year", "ord", "new_pos", "new_gloss"),
             "meaning", List.of("word_id", "lang_id", "year", "mode", "meaning", "pos"),
             "loss", List.of("word_id", "lang_id", "year", "note"));
     private static final Set<String> LANG_OWNED = Set.of("word", "rule", "gsection", "grammar", "phoneme", "formrule");
-    private static final Set<String> INTS = Set.of("year", "ord", "word_id", "lang_id", "year_to", "hiatus", "affix_word_id", "ref_word_id", "loan_word_id");
+    private static final Set<String> INTS = Set.of("year", "ord", "word_id", "lang_id", "year_to", "hiatus", "affix_word_id", "ref_word_id", "loan_word_id", "derived_from");
     private static final TypeReference<Map<String, Object>> MAP = new TypeReference<>() {};
 
     private final Db db;

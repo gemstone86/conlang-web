@@ -43,6 +43,16 @@ public class SentenceService {
         return build(new Ctx(langId), source, year);
     }
 
+    /**
+     * For building many sentences of one language (a text at several years): the dictionary and the sound changes are
+     * loaded once, and each word is evolved once, instead of once per sentence. Use within one request.
+     */
+    public java.util.function.BiFunction<String, Integer, Map<String, Object>> builder(long uid, long langId) {
+        access.need(uid, langId, Access.VIEWER);
+        Ctx c = new Ctx(langId);
+        return (source, year) -> build(c, source, year);
+    }
+
     public long save(long uid, long langId, String source, int year, String translation, String notes, Integer group, Integer sub, String kind) {
         access.need(uid, langId, Access.EDITOR);
         if (source == null || source.isBlank()) throw new ApiException(400, "Write a sentence first.");
@@ -108,6 +118,8 @@ public class SentenceService {
         final Map<Long, String> langNames = new HashMap<>();
         final Map<Long, List<Map<String, Object>>> forms = new HashMap<>();
         final Map<Long, List<Evolver.Override>> overrides = new HashMap<>();
+        /** A word or form run through the sound changes, kept for the next sentence or year that needs it. */
+        final Map<String, List<Evolver.Row>> evolved = new HashMap<>();
         final String vowels;
 
         // ---- for stacking endings (loaded on first use)
@@ -118,6 +130,8 @@ public class SentenceService {
         String stackVowels;
         private final Map<Long, Pattern> conds = new HashMap<>();
         private final Map<Long, List<Evolver.Row>> affixRows = new HashMap<>();
+        /** Set by stack() when a derivation was built on the fly (not saved as a word): what "Save as a word" would save. */
+        Map<String, Object> lastDerive;
 
         void loadStack() {
             if (stackRules != null) return;
@@ -137,13 +151,17 @@ public class SentenceService {
 
         /** The rules for one ending name that fit the word's type: that exact name, else the first name starting with it. */
         List<Map<String, Object>> stackRulesFor(Map<String, Object> w, String part) {
+            return stackRulesFor((String) w.get("pos"), part);
+        }
+
+        List<Map<String, Object>> stackRulesFor(String wordPos, String part) {
             loadStack();
             String want = part.trim().toLowerCase();
             if (want.isEmpty()) return null;
             List<Map<String, Object>> exact = new ArrayList<>();
             String prefixLabel = null;
             for (Map<String, Object> r : stackRules) {
-                if (!posMatches((String) r.get("pos"), (String) w.get("pos"))) continue;
+                if (!posMatches((String) r.get("pos"), wordPos)) continue;
                 String l = ((String) r.get("label")).toLowerCase();
                 if (l.equals(want)) exact.add(r);
                 else if (prefixLabel == null && l.startsWith(want)) prefixLabel = l;
@@ -152,7 +170,7 @@ public class SentenceService {
             if (prefixLabel == null) return null;
             List<Map<String, Object>> pre = new ArrayList<>();
             for (Map<String, Object> r : stackRules)
-                if (posMatches((String) r.get("pos"), (String) w.get("pos")) && ((String) r.get("label")).equalsIgnoreCase(prefixLabel)) pre.add(r);
+                if (posMatches((String) r.get("pos"), wordPos) && ((String) r.get("label")).equalsIgnoreCase(prefixLabel)) pre.add(r);
             return pre;
         }
 
@@ -447,10 +465,11 @@ public class SentenceService {
     private boolean canTake(Ctx c, Map<String, Object> w, String label) {
         long wid = Db.num(w.get("id"));
         if (storedFor(c, w, label) != null || findFor(c, w, label) != null) return true;
-        for (String part : label.split("-")) {
-            if (part.isBlank()) continue;
-            if (c.stackRulesFor(w, part) == null && storedFor(c, w, part) == null) return false;
-        }
+        List<String> parts = new ArrayList<>();
+        for (String part : label.split("-")) if (!part.isBlank()) parts.add(part.trim());
+        Plan p = plan(c, w, parts);
+        for (String part : p.rest())
+            if (c.stackRulesFor(p.finalPos(), part) == null && (!p.chain().isEmpty() || storedFor(c, w, part) == null)) return false;
         return true;
     }
 
@@ -485,27 +504,184 @@ public class SentenceService {
     }
 
     /** Endings stacked onto a word (or onto its stored form for the first of them), at a year. */
+    /**
+     * (verb)(seal-past): a part that is the dictionary word linked to a derivation rule (the "verb" maker) becomes that
+     * derivation on its neighbour, as if written (seal-verb-past). Only when the neighbour can take it; else parts are joined as before.
+     */
+    private List<String> mergeDerivations(Ctx c, List<String> group, int year) {
+        if (group.size() < 2) return group;
+        c.loadStack();
+        Map<Long, Map<String, Object>> byAffix = new HashMap<>();
+        for (Map<String, Object> r : c.stackRules) if (isDerivation(r) && r.get("affix_word_id") != null) byAffix.putIfAbsent(Db.num(r.get("affix_word_id")), r);
+        if (byAffix.isEmpty()) return group;
+        List<String> out = new ArrayList<>(group);
+        for (int i = 0; i < out.size(); i++) {
+            String t = out.get(i);
+            if (t.startsWith("=") || t.contains("-")) continue;
+            List<Map<String, Object>> hits;
+            Matcher idm = ID.matcher(t);
+            if (idm.find()) {
+                Map<String, Object> byId = c.words.get(Long.parseLong(idm.group(1)));
+                hits = byId == null ? List.of() : List.of(byId);
+            } else hits = c.candidates(t, year);
+            Map<String, Object> rule = null;
+            for (Map<String, Object> h : hits) { rule = byAffix.get(Db.num(h.get("id"))); if (rule != null) break; }
+            if (rule == null) continue;
+            int k = "prefix".equalsIgnoreCase((String) rule.get("placement")) ? i + 1 : i - 1;
+            if (k < 0 || k >= out.size() || out.get(k).startsWith("=")) continue;
+            String target = withLabel(out.get(k), (String) rule.get("label"));
+            Hit th = lookup(c, target, year);
+            if (th == null || th.label() == null || !canTake(c, th.word(), th.label())) continue;
+            out.set(k, target);
+            out.remove(i);
+            i--;
+        }
+        return out;
+    }
+
+    private static String withLabel(String t, String label) {
+        Matcher m = ID.matcher(t);
+        return m.find() ? t.substring(0, m.start()).trim() + "-" + label + t.substring(m.start()) : t + "-" + label;
+    }
+
+    /**
+     * What saving a derivation of a word as a word of its own gives: {word_id, label, gloss, pos, year, form, from_gloss}.
+     * The year is when the derivation comes into use (not before the language splits off); the form is the one then.
+     */
+    public Map<String, Object> derivedPreview(long uid, long langId, long wordId, String label) {
+        access.need(uid, langId, Access.VIEWER);
+        Ctx c = new Ctx(langId);
+        Map<String, Object> w0 = c.words.get(wordId);
+        if (w0 == null) throw new ApiException(404, "That word isn't in this language or its ancestors.");
+        Map<String, Object> w = c.deref(w0);
+        if (w == null) throw new ApiException(400, "The word points to a word that doesn't exist.");
+        w = asUsed(w0, w);
+        List<String> parts = new ArrayList<>();
+        for (String x : String.valueOf(label).split("-")) if (!x.isBlank()) parts.add(x.trim());
+        Plan p = plan(c, w, parts);
+        if (p.chain().isEmpty() || !p.rest().isEmpty() || p.chain().size() != 1)
+            throw new ApiException(400, "'" + label + "' isn't a derivation for '" + w0.get("gloss") + "' (a form rule that makes a new word, on the Word forms tab).");
+        Map<String, Object> saved = savedDerived(c, wordId, p.chain().get(0).label());
+        if (saved != null) throw new ApiException(409, "Already saved as '" + saved.get("gloss") + "' (#" + saved.get("id") + ").");
+        int y = ((Number) w.get("year")).intValue();
+        Integer earliest = null;
+        boolean open = false;
+        for (Map<String, Object> r : p.chain().get(0).rules()) {
+            Integer ry = ruleYear(r);
+            if (ry == null) { open = true; break; }
+            earliest = earliest == null ? ry : Math.min(earliest, ry);
+        }
+        if (!open && earliest != null) y = Math.max(y, earliest);
+        Object split = access.language(langId).get("split_year");
+        if (split != null && ((Number) split).intValue() > y && Db.num(w0.get("language_id")) != langId) y = ((Number) split).intValue();
+        Res r = labelled(c, w, p.chain().get(0).label(), y);
+        if (r.form() == null) throw new ApiException(400, r.reason() == null ? "It can't be built." : r.reason());
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("word_id", wordId);
+        out.put("label", p.chain().get(0).label());
+        out.put("gloss", p.chain().get(0).newGloss().replace("{gloss}", String.valueOf(w0.get("gloss"))));
+        out.put("pos", p.chain().get(0).newPos());
+        out.put("year", y);
+        out.put("form", r.form());
+        out.put("from_gloss", w0.get("gloss"));
+        return out;
+    }
+
+    private static boolean isDerivation(Map<String, Object> r) {
+        return r.get("new_pos") != null && !r.get("new_pos").toString().isBlank();
+    }
+
+    /** A derivation step: the rules for it and the type and meaning the word gets. */
+    private record Der(String label, List<Map<String, Object>> rules, String newPos, String newGloss) {}
+
+    /** How endings apply to a word: derivations first (each changes the type), then the rest, looked up for the final type. */
+    private record Plan(List<Der> chain, List<String> rest, String finalPos) {}
+
+    private Plan plan(Ctx c, Map<String, Object> w, List<String> parts) {
+        List<String> rest = new ArrayList<>(parts);
+        List<Der> chain = new ArrayList<>();
+        String pos = (String) w.get("pos");
+        for (boolean more = true; more; ) {
+            more = false;
+            for (String part : rest) {
+                List<Map<String, Object>> rules = c.stackRulesFor(pos, part);
+                if (rules == null || !isDerivation(rules.get(0))) continue;
+                Map<String, Object> r0 = rules.get(0);
+                String g = r0.get("new_gloss") == null || r0.get("new_gloss").toString().isBlank() ? "{gloss}" : r0.get("new_gloss").toString().trim();
+                chain.add(new Der((String) r0.get("label"), rules, r0.get("new_pos").toString().trim(), g));
+                pos = r0.get("new_pos").toString().trim();
+                rest.remove(part);
+                more = true;
+                break;
+            }
+        }
+        return new Plan(chain, rest, pos);
+    }
+
+    /** A word saved from a derivation of this word (derived_from, derived_label), or null. */
+    private Map<String, Object> savedDerived(Ctx c, long wordId, String label) {
+        Map<String, Object> best = null;
+        for (Map<String, Object> x : c.words.values()) {
+            if (x.get("derived_from") == null || Db.num(x.get("derived_from")) != wordId) continue;
+            if (!label.equalsIgnoreCase(String.valueOf(x.get("derived_label")).trim())) continue;
+            if (best == null || Db.num(x.get("language_id")) == c.langId) best = x;
+        }
+        return best;
+    }
+
+    /** Endings stacked onto a word (or onto its stored form for the first of them), at a year. */
     private Res stack(Ctx c, Map<String, Object> w, List<String> parts, int year) {
         long wid = Db.num(w.get("id"));
         int wyear = ((Number) w.get("year")).intValue();
-        record Slot(String label, String group, List<Map<String, Object>> rules) {}
-        List<Slot> slots = new ArrayList<>();
-        for (String part : parts) {
-            List<Map<String, Object>> rules = c.stackRulesFor(w, part);
-            if (rules == null) {
-                Map<String, Object> st = storedFor(c, w, part);
-                if (st != null && slots.isEmpty()) { slots.add(new Slot((String) st.get("label"), "", List.of())); continue; }
-                return new Res(null, "no form rule called '" + part + "' for '" + w.get("gloss") + "' (#" + wid + (w.get("pos") == null || w.get("pos").toString().isBlank() ? ", which has no type"
-                        : ", type " + w.get("pos")) + ") on the Word forms tab", null, null);
+        Plan plan = plan(c, w, parts);
+        if (!plan.chain().isEmpty()) {
+            // saved as a word of its own: that word is used, with its own forms, meaning changes and losses
+            Map<String, Object> saved = savedDerived(c, wid, plan.chain().get(0).label());
+            if (saved != null && ((Number) saved.get("year")).intValue() <= year) {
+                Losses.Loss lost = c.lostIn(saved);
+                String sg = "-" + plan.chain().get(0).label();
+                if (lost != null && lost.year() <= year)
+                    return new Res(null, "'" + saved.get("gloss") + "' (#" + saved.get("id") + ") was lost in " + c.langNames.getOrDefault(lost.langId(), "?") + " in " + lost.year(), null, sg);
+                List<String> after = new ArrayList<>();
+                for (int i = 1; i < plan.chain().size(); i++) after.add(plan.chain().get(i).label());
+                after.addAll(plan.rest());
+                String note = "used the saved word '" + saved.get("gloss") + "' (#" + saved.get("id") + ")";
+                if (after.isEmpty()) {
+                    String f = formAtYear(c, Db.num(saved.get("id")), (String) saved.get("form"), ((Number) saved.get("year")).intValue(), year);
+                    return f == null ? new Res(null, "'" + saved.get("gloss") + "' is not in " + access.language(c.langId).get("name"), note, sg) : new Res(f, null, note, sg);
+                }
+                Res r = labelled(c, saved, String.join("-", after), year);
+                return new Res(r.form(), r.reason(), r.note() == null ? note : note + "; " + r.note(), sg + (r.glossLabel() == null ? "" : r.glossLabel().replaceFirst("^\\.", "-")));
             }
-            slots.add(new Slot((String) rules.get(0).get("label"), grp(rules.get(0)), rules));
+            Der first = plan.chain().get(0);
+            Map<String, Object> d = new LinkedHashMap<>();
+            d.put("word_id", wid);
+            d.put("label", first.label());
+            d.put("gloss", first.newGloss().replace("{gloss}", String.valueOf(w.get("gloss"))));
+            d.put("pos", first.newPos());
+            c.lastDerive = d;
+        }
+        record Slot(String label, String group, List<Map<String, Object>> rules, int deriv) {}
+        List<Slot> slots = new ArrayList<>();
+        for (int i = 0; i < plan.chain().size(); i++) slots.add(new Slot(plan.chain().get(i).label(), "", plan.chain().get(i).rules(), i));
+        for (String part : plan.rest()) {
+            List<Map<String, Object>> rules = c.stackRulesFor(plan.finalPos(), part);
+            if (rules == null) {
+                Map<String, Object> st = plan.chain().isEmpty() ? storedFor(c, w, part) : null;
+                if (st != null && slots.isEmpty()) { slots.add(new Slot((String) st.get("label"), "", List.of(), -1)); continue; }
+                String pos = plan.finalPos();
+                return new Res(null, "no form rule called '" + part + "' for '" + w.get("gloss") + "' (#" + wid + (pos == null || pos.isBlank() ? ", which has no type"
+                        : plan.chain().isEmpty() ? ", type " + pos : ", made a " + pos + " by '" + plan.chain().get(plan.chain().size() - 1).label() + "'") + ") on the Word forms tab", null, null);
+            }
+            slots.add(new Slot((String) rules.get(0).get("label"), grp(rules.get(0)), rules, -1));
         }
         for (int i = 0; i < slots.size(); i++) for (int j = i + 1; j < slots.size(); j++)
-            if (!slots.get(i).group().isEmpty() && slots.get(i).group().equals(slots.get(j).group()))
+            if (slots.get(i).deriv() < 0 && slots.get(j).deriv() < 0 && !slots.get(i).group().isEmpty() && slots.get(i).group().equals(slots.get(j).group()))
                 return new Res(null, "'" + slots.get(i).label() + "' and '" + slots.get(j).label() + "' are both in the group '" + slots.get(i).group()
                         + "': a word takes only one ending from a group", null, null);
         List<Slot> ordered = new ArrayList<>(slots);
-        ordered.sort(java.util.Comparator.comparingInt(sl -> sl.rules().isEmpty() ? Integer.MIN_VALUE   // a stored form with no rule (irregular) is the base
+        ordered.sort(java.util.Comparator.comparingInt(sl -> sl.deriv() >= 0 ? Integer.MIN_VALUE + 1 + sl.deriv()   // derivations first, in turn
+                : sl.rules().isEmpty() ? Integer.MIN_VALUE   // a stored form with no rule (irregular) is the base
                 : sl.group().isEmpty() ? Integer.MAX_VALUE : c.groupPos.getOrDefault(sl.group(), Integer.MAX_VALUE - 1)));
         List<String> names = new ArrayList<>();
         for (Slot sl : ordered) names.add(sl.label());
@@ -515,7 +691,7 @@ public class SentenceService {
         String start = (String) w.get("form");
         int startYear = wyear, from = 0;
         String note = null;
-        Map<String, Object> stored = storedFor(c, w, ordered.get(0).label());
+        Map<String, Object> stored = plan.chain().isEmpty() ? storedFor(c, w, ordered.get(0).label()) : null;
         if (stored != null) {
             start = (String) stored.get("form");
             startYear = stored.get("year") == null ? wyear : ((Number) stored.get("year")).intValue();
@@ -544,7 +720,7 @@ public class SentenceService {
                 if (ry != null && ry > y0) continue;
                 Pattern cond = c.cond(r);
                 if (cond == Ctx.BAD) continue;
-                if (cond != null && !cond.matcher(cur).find()) continue;
+                if (cond != null && !Patterns.found(cond, cur)) continue;
                 rule = r;
                 break;
             }
@@ -576,8 +752,10 @@ public class SentenceService {
         int year = yearOrNull == null ? ANY_YEAR : yearOrNull;
         Map<String, List<String>> groups = new LinkedHashMap<>();
         List<String> groupOrder = new ArrayList<>();
+        List<String> derivLabels = new ArrayList<>();
         for (Map<String, Object> r : c.stackRules) {
             if (!posMatches((String) r.get("pos"), (String) w.get("pos"))) continue;
+            if (isDerivation(r)) { if (derivLabels.stream().noneMatch(x -> x.equalsIgnoreCase((String) r.get("label")))) derivLabels.add((String) r.get("label")); continue; }
             String g = grp(r), label = (String) r.get("label");
             String key = g.isEmpty() ? "\u0000" + label.toLowerCase() : g;
             List<String> ls = groups.computeIfAbsent(key, k -> { groupOrder.add(k); return new ArrayList<>(); });
@@ -618,6 +796,21 @@ public class SentenceService {
         out.put("year", yearOrNull);
         out.put("groups", gl);
         out.put("rows", rows);
+        List<Map<String, Object>> derived = new ArrayList<>();
+        for (String dl : derivLabels) {
+            Map<String, Object> d = new LinkedHashMap<>();
+            Plan pl = plan(c, w, List.of(dl));
+            d.put("label", dl);
+            d.put("pos", pl.finalPos());
+            d.put("gloss", pl.chain().isEmpty() ? w.get("gloss") : pl.chain().get(0).newGloss().replace("{gloss}", String.valueOf(w0.get("gloss"))));
+            Res r = labelled(c, w, dl, year);
+            d.put("form", r.form());
+            if (r.reason() != null) d.put("reason", r.reason());
+            Map<String, Object> sv = savedDerived(c, Db.num(w0.get("id")), dl);
+            if (sv != null) { d.put("saved_id", sv.get("id")); d.put("saved_gloss", sv.get("gloss")); d.put("saved_lang", sv.get("language_id")); }
+            derived.add(d);
+        }
+        out.put("derived", derived);
         return out;
     }
 
@@ -636,7 +829,8 @@ public class SentenceService {
     private String formAtYear(Ctx c, long wordId, String form, int startYear, int year) {
         Map<String, Object> w = c.words.get(wordId);
         long src = Db.num(w.get("language_id"));
-        List<Evolver.Row> rows = c.ev.evolve(src, form, startYear, c.overrides.getOrDefault(wordId, List.of()));
+        List<Evolver.Row> rows = c.evolved.computeIfAbsent(wordId + "|" + startYear + "|" + form,
+                k -> c.ev.evolve(src, form, startYear, c.overrides.getOrDefault(wordId, List.of())));
         if (src != c.langId && rows.stream().noneMatch(r -> r.langId() == c.langId)) return null;
         return FormMath.formAt(rows, c.pathNearestFirst, year);
     }
@@ -646,6 +840,7 @@ public class SentenceService {
         List<String> surfaces = new ArrayList<>(), glosses = new ArrayList<>();
         int gaps = 0;
         for (List<String> group : SentenceParser.parse(source)) {
+            group = mergeDerivations(c, group, year);
             String surface = null;
             List<String> gl = new ArrayList<>();
             List<Map<String, Object>> parts = new ArrayList<>();
@@ -682,7 +877,9 @@ public class SentenceService {
                 if (h.label() == null) {
                     form = formAtYear(c, wid, (String) w.get("form"), ((Number) w.get("year")).intValue(), year);
                 } else {
+                    c.lastDerive = null;
                     Res r = labelled(c, w, h.label(), year);
+                    if (c.lastDerive != null) p.put("derive", c.lastDerive);
                     if (r.note() != null) p.put("note", p.containsKey("note") ? p.get("note") + "; " + r.note() : r.note());
                     if (r.reason() != null) {
                         gap(p, r.reason());

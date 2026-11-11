@@ -302,6 +302,9 @@ const TAB = {
       <select id="fr_place"><option>suffix</option><option>prefix</option></select></div>
       <div class="row"><input id="fr_link" list="fr_words" placeholder="affix = dictionary word (e.g. definite)" size="30"><datalist id="fr_words">${S.wordnames.map(w => `<option value="${esc(w.gloss)}">${esc(w.form)}</option>`).join('')}</datalist>
       <span class="muted small">or a fixed affix:</span><input id="fr_affix" placeholder="e.g. tou" size="10" class="form"></div>
+      <div class="row"><label style="display:inline;margin:0" title="A derivation: the result is a different word (seal → to seal) with its own type and endings. It isn't stored on every word; sentences build it, and you can save it as a word"><input type="checkbox" id="fr_derive" data-frderive="1"> Makes a new word of another type</label>
+        <span id="fr_derivebox" hidden><input id="fr_newpos" list="fr_poslist" placeholder="new type, e.g. verb" size="16"><datalist id="fr_poslist">${[...new Set(S.wordnames.map(w => w.pos).concat(rules.map(r => r.pos), rules.map(r => r.new_pos)).filter(Boolean).flatMap(p => String(p).split(',')).map(p => p.trim()).filter(Boolean))].map(p => `<option value="${esc(p)}">`).join('')}</datalist>
+        <input id="fr_newgloss" placeholder="meaning, e.g. to {gloss}" size="22" title="{gloss} is the old word's meaning"></span></div>
       <div class="row"><input id="fr_cond" placeholder="only if the word matches (regex, optional; e.g. ^a  or  {V}$)" size="44" class="form">
       <label style="display:inline;margin:0"><input type="checkbox" id="fr_hiatus"> drop the first vowel when two vowels meet</label>
       <input id="fr_year" type="number" placeholder="from year" size="8" data-yearcheck="rule"><span id="fr_warn" class="gap small"></span><input id="fr_ord" type="number" placeholder="order" size="5" value="0"><input id="fr_id" type="hidden"></div>
@@ -310,10 +313,10 @@ const TAB = {
     h += '<table><tr><th>Form</th><th>Applies to</th><th>Affix</th><th>Condition</th><th>Vowel clash</th><th>From</th><th>Order</th><th></th></tr>';
     const order = []; for (const r of rules) { const g = r.grp || ''; if (!order.includes(g)) order.push(g); }
     order.sort((x, y) => (x === '') - (y === ''));
-    const rowOf = r => `<tr><td><strong>${esc(r.label)}</strong></td><td>${esc(r.pos) || 'all types'}</td><td class="form">${r.affix_word_id ? `⛓ <span class="small">${esc(r.affix_gloss ?? '(deleted word)')}</span> ${r.affix_form ? esc(r.placement === 'prefix' ? r.affix_form + '-' : '-' + r.affix_form) : ''}` : (r.placement === 'prefix' ? esc(r.affix) + '-' : '-' + esc(r.affix))}</td>
+    const rowOf = r => `<tr><td><strong>${esc(r.label)}</strong>${r.new_pos ? `<div class="small"><span class="badge" title="Derivation: makes a new word">→ ${esc(r.new_pos)}</span> ${esc((r.new_gloss || '{gloss}'))}</div>` : ''}</td><td>${esc(r.pos) || 'all types'}</td><td class="form">${r.affix_word_id ? `⛓ <span class="small">${esc(r.affix_gloss ?? '(deleted word)')}</span> ${r.affix_form ? esc(r.placement === 'prefix' ? r.affix_form + '-' : '-' + r.affix_form) : ''}` : (r.placement === 'prefix' ? esc(r.affix) + '-' : '-' + esc(r.affix))}</td>
       <td class="form">${esc(r.cond_re)}</td><td>${r.hiatus ? 'drop first vowel' : ''}</td><td>${r.year ?? ''}</td><td>${r.ord}</td>
       <td>${canSuggest() ? `<button data-act="editFormRule" data-id="${r.id}">Edit</button> <button class="danger" data-act="delFormRule" data-id="${r.id}">✕</button>` : ''}
-      ${isOwner() ? `<button data-act="rebuildForm" data-l="${esc(r.label)}" title="Recompute this form for every word (overwrites hand edits)">Rebuild all</button>` : ''}</td></tr>`;
+      ${isOwner() && !r.new_pos ? `<button data-act="rebuildForm" data-l="${esc(r.label)}" title="Recompute this form for every word (overwrites hand edits)">Rebuild all</button>` : ''}</td></tr>`;
     for (const g of order) {
       if (order.length > 1 || g) h += `<tr class="grouprow"><th colspan="8">${g ? esc(g) : 'Ungrouped'} ${isOwner() ? `<button data-act="rebuildGroup" data-g="${esc(g)}" title="Recompute every form in this group for every word (overwrites hand edits)">Rebuild group</button>` : ''}</th></tr>`;
       for (const r of rules.filter(x => (x.grp || '') === g)) h += rowOf(r);
@@ -551,6 +554,9 @@ function sentView(b) {
   const notes = b.words.flatMap(w => w.parts).filter(p => p.ok === false || p.note);
   if (b.gaps) h += `<p class="small gap">${b.gaps} word${b.gaps > 1 ? 's' : ''} could not be built:</p>`;
   if (notes.length) h += '<ul class="small">' + notes.map(p => `<li class="${p.ok === false ? 'gap' : 'muted'}"><code>${esc(p.input)}</code>: ${esc(p.reason || p.note)}</li>`).join('') + '</ul>';
+  const derived = b.words.flatMap(w => w.parts).filter(p => p.derive);
+  if (derived.length && canSuggest()) h += '<div class="row small">' + derived.map(p => `<button data-act="deriveSave" data-w="${p.derive.word_id}" data-l="${esc(p.derive.label)}" data-g="${esc(p.derive.gloss)}"
+    title="Add it to the dictionary as a ${esc(p.derive.pos)} of its own, linked to the word it comes from; sentences then use it, and it can get its own forms, meanings and losses">Save “${esc(p.derive.gloss)}” (${esc(p.derive.pos)}) as a word</button>`).join(' ') + '</div>';
   return h;
 }
 function yearMatches(spec, y) {
@@ -1078,15 +1084,16 @@ const A = {
       if (aw && y !== '' && Number(y) < aw.year && !confirm('The year ' + y + ' is older than the word "' + aw.gloss + '" (' + aw.year + '). Continue anyway?')) return;
     }
     const p = { grp: val('fr_grp').trim(), label: val('fr_label'), pos: val('fr_pos'), placement: val('fr_place'), affix: val('fr_affix'), affix_word_id: awid, cond_re: val('fr_cond'),
-      hiatus: $('#fr_hiatus').checked ? 1 : 0, year: val('fr_year'), ord: Number(val('fr_ord') || 0) };
+      hiatus: $('#fr_hiatus').checked ? 1 : 0, year: val('fr_year'), ord: Number(val('fr_ord') || 0), new_pos: $('#fr_derive').checked ? val('fr_newpos').trim() || null : null, new_gloss: $('#fr_derive').checked ? val('fr_newgloss').trim() || null : null };
+    if ($('#fr_derive').checked && !p.new_pos) { say('Give the type of the new word (e.g. verb), or untick "Makes a new word".', true); return; }
     const r = await api('POST', base() + '/edit', { entity: 'formrule', action: id ? 'UPDATE' : 'CREATE', entityId: id ? Number(id) : null, payload: p });
     S.prefill = null;
     say(r.status === 'pending' ? 'Submitted for the owner to approve.' : 'Saved. New words will use it; owners can add it to existing words with the button below.'); renderPanel();
   },
   editFormRule: async d => {
     const r = S.formrules.find(x => x.id === Number(d.id));
-    for (const [k, v] of [['grp', r.grp], ['label', r.label], ['pos', r.pos], ['place', r.placement], ['affix', r.affix], ['link', r.affix_gloss], ['cond', r.cond_re], ['year', r.year], ['ord', r.ord]]) $('#fr_' + k).value = v ?? '';
-    $('#fr_hiatus').checked = !!r.hiatus; $('#fr_id').value = r.id; $('#fr_btn').textContent = 'Save changes'; $('#fr_cancel').hidden = false; window.scrollTo(0, 0);
+    for (const [k, v] of [['grp', r.grp], ['label', r.label], ['pos', r.pos], ['place', r.placement], ['affix', r.affix], ['link', r.affix_gloss], ['cond', r.cond_re], ['year', r.year], ['ord', r.ord], ['newpos', r.new_pos], ['newgloss', r.new_gloss]]) $('#fr_' + k).value = v ?? '';
+    $('#fr_hiatus').checked = !!r.hiatus; $('#fr_derive').checked = !!r.new_pos; $('#fr_derivebox').hidden = !r.new_pos; $('#fr_id').value = r.id; $('#fr_btn').textContent = 'Save changes'; $('#fr_cancel').hidden = false; window.scrollTo(0, 0);
   },
   cancelFormRule: async () => { S.prefill = null; renderPanel(); },
   delFormRule: async d => {
@@ -1686,9 +1693,19 @@ async function drawParadigm(wordId) {
     const cells = r.groups.map(g => { const l = row.labels.find(x => g.labels.some(y => y.toLowerCase() === x.toLowerCase())); return `<td>${l ? esc(l) : '<span class="muted">–</span>'}</td>`; }).join('');
     h += `<tr class="${row.reason ? 'pending' : ''}">${cells}<td>${row.form ? `<span class="form">${esc(row.form)}</span>${sayBtn(row.form, langId)}` : ''}${row.reason ? `<div class="gap small">${esc(row.reason)}</div>` : ''}${row.from_stored ? `<div class="small muted">on the stored ${esc(row.from_stored)} form</div>` : ''}</td></tr>`;
   }
+  h += '</table>';
+  if ((r.derived || []).length) {
+    h += '<h4>Derived words</h4><table><tr><th>Derivation</th><th>New word</th><th>Form</th><th></th></tr>' + r.derived.map(d => `<tr class="${d.reason ? 'pending' : ''}"><td>${esc(d.label)}</td>
+      <td>${esc(d.gloss)} <span class="badge">${esc(d.pos)}</span></td>
+      <td>${d.form ? `<span class="form">${esc(d.form)}</span>${sayBtn(d.form, langId)}` : ''}${d.reason ? `<div class="gap small">${esc(d.reason)}</div>` : ''}</td>
+      <td>${d.saved_id ? `saved as <a data-act="openWord" data-id="${d.saved_id}" style="cursor:pointer">${esc(d.saved_gloss)} #${d.saved_id}</a>`
+        : canSuggest() && d.form ? `<button data-act="deriveSave" data-w="${wordId}" data-l="${esc(d.label)}" data-g="${esc(d.gloss)}" data-lang="${langId}">Save as a word</button>` : ''}</td></tr>`).join('') + '</table>'
+      + `<p class="muted small">In a sentence: <code>(${esc(r.word.gloss)}-${esc(r.derived[0].label)})</code>, with its endings after it. Saving one adds it to the dictionary, so it can get its own forms, meanings and losses.</p>`;
+  }
   box.className = 'small';
-  box.innerHTML = h + '</table>';
+  box.innerHTML = h;
 }
+document.addEventListener('change', e => { if (e.target.dataset && e.target.dataset.frderive) { $('#fr_derivebox').hidden = !e.target.checked; if (e.target.checked) $('#fr_newpos').focus(); } });
 document.addEventListener('toggle', e => {
   if (e.target.id === 'w_para' && e.target.open) drawParadigm(Number(e.target.dataset.w)).catch(err => { const b = $('#w_parabody'); if (b) b.textContent = err.message; });
 }, true);
@@ -1704,10 +1721,20 @@ Object.assign(A, {
   },
   sgSave: async () => { await api('PUT', base() + '/form-groups', { order: S.stackGroups }); say('Order saved.'); renderPanel(); },
   sgReset: async () => { await api('PUT', base() + '/form-groups', { order: [] }); say('Using the parent language\'s order.'); renderPanel(); },
-  paraYear: async d => { S.paraYear = val('w_parayear').trim(); await drawParadigm(Number(d.w)); }
+  paraYear: async d => { S.paraYear = val('w_parayear').trim(); await drawParadigm(Number(d.w)); },
+  deriveSave: async d => {
+    const lang = Number(d.lang) || S.lang.id;
+    const g = prompt('Meaning of the new word:', d.g);
+    if (g === null) return;
+    const r = await api('POST', '/rune/api/languages/' + lang + '/words/' + d.w + '/derive', { label: d.l, gloss: g.trim() || d.g });
+    say(r.status === 'pending' ? 'Sent for approval: “' + r.gloss + '”.' : 'Saved “' + r.gloss + '” as a word (#' + r.id + ').');
+    if ($('#w_parabody') && $('#w_para') && $('#w_para').open) await drawParadigm(Number($('#w_para').dataset.w));
+    else if (S.tab === 'sentences' && $('#s_src')) await A.sentBuild();
+    else if (S.tab === 'dict') await refreshDict();
+  }
 });
 
-const UI_VERSION = '1.15.0';   // keep equal to the version in pom.xml
+const UI_VERSION = '1.16.1';   // keep equal to the version in pom.xml
 api('GET', '/rune/api/version').then(v => {
   $('#ver').textContent = 'v' + v.version + (v.built ? ' · built ' + v.built.replace('T', ' ').replace('Z', ' UTC') : '');
   if (v.version !== UI_VERSION) {

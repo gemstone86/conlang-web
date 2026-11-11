@@ -281,3 +281,9 @@ ALTER TABLE texts ADD COLUMN IF NOT EXISTS inherit BOOLEAN DEFAULT FALSE NOT NUL
 
 -- v1.15: a meaning can come with its own word type (holy also means "seal", as a noun)
 ALTER TABLE word_meanings ADD COLUMN IF NOT EXISTS pos VARCHAR(40);
+
+-- v1.16: derivation rules make a word of another type (seal -> to seal); saved derived words remember where they came from
+ALTER TABLE form_rules ADD COLUMN IF NOT EXISTS new_pos VARCHAR(40);
+ALTER TABLE form_rules ADD COLUMN IF NOT EXISTS new_gloss VARCHAR(200);
+ALTER TABLE words ADD COLUMN IF NOT EXISTS derived_from BIGINT NULL;
+ALTER TABLE words ADD COLUMN IF NOT EXISTS derived_label VARCHAR(64);

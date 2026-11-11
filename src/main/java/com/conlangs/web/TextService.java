@@ -187,13 +187,14 @@ public class TextService {
         Map<String, Integer> gapCount = new LinkedHashMap<>();
         for (int y : ys) gapCount.put(String.valueOf(y), 0);
         StringBuilder body = new StringBuilder();
+        var build = sentences.builder(uid, langId);   // the dictionary is loaded once for the whole text
         for (Map<String, Object> l : lines) {
             String src = String.valueOf(l.getOrDefault("source", ""));
             String tr = String.valueOf(l.getOrDefault("translation", ""));
             body.append(src).append(tr.isEmpty() ? "" : " | " + tr).append('\n');
             Map<String, Object> at = new LinkedHashMap<>();
             if (!src.isBlank()) for (int y : ys) {
-                Map<String, Object> b = sentences.preview(uid, langId, src, y);
+                Map<String, Object> b = build.apply(src, y);
                 Map<String, Object> cell = new LinkedHashMap<>();
                 cell.put("surface", b.get("surface"));
                 cell.put("gloss", b.get("gloss"));
