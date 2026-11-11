@@ -198,7 +198,7 @@ Deleting a word also deletes its locked overrides, and Undo does not bring those
 - A form that starts earlier than its word is no longer reported as a problem: the word simply uses the form as it has evolved by the word's own year.
 
 ## v1.16.0 (combined app)
-- **Derivations**: a form rule can **make a new word of type** (e.g. *verb*) with a meaning pattern (*to {gloss}*).
+- **Derivations**: a form rule with the switch **Makes a new word of another type** ticked gets a new type (e.g. *verb*) with a meaning pattern (*to {gloss}*).
   It isn't stored as a form. In a sentence, `(seal-verb-past)` or, with the verb maker written as its own part,
   `(verbmaker)(seal-past)` builds the noun into a verb first and then takes the **verb** endings. Derivations always
   go on first, whatever order they are written in, and more than one can follow each other.

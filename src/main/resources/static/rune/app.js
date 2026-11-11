@@ -302,8 +302,9 @@ const TAB = {
       <select id="fr_place"><option>suffix</option><option>prefix</option></select></div>
       <div class="row"><input id="fr_link" list="fr_words" placeholder="affix = dictionary word (e.g. definite)" size="30"><datalist id="fr_words">${S.wordnames.map(w => `<option value="${esc(w.gloss)}">${esc(w.form)}</option>`).join('')}</datalist>
       <span class="muted small">or a fixed affix:</span><input id="fr_affix" placeholder="e.g. tou" size="10" class="form"></div>
-      <div class="row"><label style="display:inline;margin:0" title="A derivation: the result is a different word (seal → to seal), with its own type and endings. It isn't stored as a form; sentences build it, and you can save it as a word">makes a new word of type</label>
-        <input id="fr_newpos" placeholder="(blank = an ordinary form)" size="18"><input id="fr_newgloss" placeholder="meaning, e.g. to {gloss}" size="22" title="{gloss} is the old word's meaning"></div>
+      <div class="row"><label style="display:inline;margin:0" title="A derivation: the result is a different word (seal → to seal) with its own type and endings. It isn't stored on every word; sentences build it, and you can save it as a word"><input type="checkbox" id="fr_derive" data-frderive="1"> Makes a new word of another type</label>
+        <span id="fr_derivebox" hidden><input id="fr_newpos" list="fr_poslist" placeholder="new type, e.g. verb" size="16"><datalist id="fr_poslist">${[...new Set(S.wordnames.map(w => w.pos).concat(rules.map(r => r.pos), rules.map(r => r.new_pos)).filter(Boolean).flatMap(p => String(p).split(',')).map(p => p.trim()).filter(Boolean))].map(p => `<option value="${esc(p)}">`).join('')}</datalist>
+        <input id="fr_newgloss" placeholder="meaning, e.g. to {gloss}" size="22" title="{gloss} is the old word's meaning"></span></div>
       <div class="row"><input id="fr_cond" placeholder="only if the word matches (regex, optional; e.g. ^a  or  {V}$)" size="44" class="form">
       <label style="display:inline;margin:0"><input type="checkbox" id="fr_hiatus"> drop the first vowel when two vowels meet</label>
       <input id="fr_year" type="number" placeholder="from year" size="8" data-yearcheck="rule"><span id="fr_warn" class="gap small"></span><input id="fr_ord" type="number" placeholder="order" size="5" value="0"><input id="fr_id" type="hidden"></div>
@@ -1083,7 +1084,8 @@ const A = {
       if (aw && y !== '' && Number(y) < aw.year && !confirm('The year ' + y + ' is older than the word "' + aw.gloss + '" (' + aw.year + '). Continue anyway?')) return;
     }
     const p = { grp: val('fr_grp').trim(), label: val('fr_label'), pos: val('fr_pos'), placement: val('fr_place'), affix: val('fr_affix'), affix_word_id: awid, cond_re: val('fr_cond'),
-      hiatus: $('#fr_hiatus').checked ? 1 : 0, year: val('fr_year'), ord: Number(val('fr_ord') || 0), new_pos: val('fr_newpos').trim() || null, new_gloss: val('fr_newgloss').trim() || null };
+      hiatus: $('#fr_hiatus').checked ? 1 : 0, year: val('fr_year'), ord: Number(val('fr_ord') || 0), new_pos: $('#fr_derive').checked ? val('fr_newpos').trim() || null : null, new_gloss: $('#fr_derive').checked ? val('fr_newgloss').trim() || null : null };
+    if ($('#fr_derive').checked && !p.new_pos) { say('Give the type of the new word (e.g. verb), or untick "Makes a new word".', true); return; }
     const r = await api('POST', base() + '/edit', { entity: 'formrule', action: id ? 'UPDATE' : 'CREATE', entityId: id ? Number(id) : null, payload: p });
     S.prefill = null;
     say(r.status === 'pending' ? 'Submitted for the owner to approve.' : 'Saved. New words will use it; owners can add it to existing words with the button below.'); renderPanel();
@@ -1091,7 +1093,7 @@ const A = {
   editFormRule: async d => {
     const r = S.formrules.find(x => x.id === Number(d.id));
     for (const [k, v] of [['grp', r.grp], ['label', r.label], ['pos', r.pos], ['place', r.placement], ['affix', r.affix], ['link', r.affix_gloss], ['cond', r.cond_re], ['year', r.year], ['ord', r.ord], ['newpos', r.new_pos], ['newgloss', r.new_gloss]]) $('#fr_' + k).value = v ?? '';
-    $('#fr_hiatus').checked = !!r.hiatus; $('#fr_id').value = r.id; $('#fr_btn').textContent = 'Save changes'; $('#fr_cancel').hidden = false; window.scrollTo(0, 0);
+    $('#fr_hiatus').checked = !!r.hiatus; $('#fr_derive').checked = !!r.new_pos; $('#fr_derivebox').hidden = !r.new_pos; $('#fr_id').value = r.id; $('#fr_btn').textContent = 'Save changes'; $('#fr_cancel').hidden = false; window.scrollTo(0, 0);
   },
   cancelFormRule: async () => { S.prefill = null; renderPanel(); },
   delFormRule: async d => {
@@ -1703,6 +1705,7 @@ async function drawParadigm(wordId) {
   box.className = 'small';
   box.innerHTML = h;
 }
+document.addEventListener('change', e => { if (e.target.dataset && e.target.dataset.frderive) { $('#fr_derivebox').hidden = !e.target.checked; if (e.target.checked) $('#fr_newpos').focus(); } });
 document.addEventListener('toggle', e => {
   if (e.target.id === 'w_para' && e.target.open) drawParadigm(Number(e.target.dataset.w)).catch(err => { const b = $('#w_parabody'); if (b) b.textContent = err.message; });
 }, true);
