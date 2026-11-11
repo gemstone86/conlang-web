@@ -177,7 +177,7 @@ public class SentenceService {
         boolean hasExactRule(Map<String, Object> w, String label) {
             loadStack();
             for (Map<String, Object> r : stackRules)
-                if (posMatches((String) r.get("pos"), wordPos) && ((String) r.get("label")).equalsIgnoreCase(label.trim())) return true;
+                if (posMatches((String) r.get("pos"), (String) w.get("pos")) && ((String) r.get("label")).equalsIgnoreCase(label.trim())) return true;
             return false;
         }
 
