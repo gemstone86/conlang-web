@@ -9,6 +9,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Builds word forms (definite, plural, tenses ...) from form rules: "words of type X get affix Y".
@@ -78,6 +79,7 @@ public class FormGenerator {
      * Owner rebuild. With prune, forms whose word no longer fits any rule of that form type (wrong word type, condition no longer
      * matches, no affix) are removed; forms with no rule at all are never touched. With dryRun nothing is changed, the stale forms are only listed.
      */
+    @Transactional
     public Map<String, Object> rebuild(long langId, String onlyLabel, String onlyGroup, boolean overwrite, boolean prune, boolean dryRun) {
         List<Map<String, Object>> stale = new ArrayList<>();
         Map<String, Integer> counts = run(langId, null, onlyLabel, onlyGroup, overwrite, prune, dryRun, stale);

@@ -6,6 +6,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * The order in which the endings of the Word forms tab's groups go onto a word when they are stacked
@@ -65,6 +66,7 @@ public class FormGroups {
     }
 
     /** Saves the order (group names, first = closest to the word). An empty list goes back to the parent's order. */
+    @Transactional
     public void save(long uid, long langId, List<String> order) {
         access.need(uid, langId, Access.EDITOR);
         db.update("delete from form_groups where language_id=?", langId);

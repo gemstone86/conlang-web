@@ -407,6 +407,26 @@ public class Store {
         return null;
     }
 
+    // ---------- deleting a world or a language: all of it or none of it ----------
+
+    @Transactional
+    public void deleteWorld(long id) {
+        db.update("update languages set parent_id=null where world_id=?", id);
+        db.update("delete from shares where scope='LANGUAGE' and target_id in (select id from languages where world_id=?)", id);
+        db.update("delete from shares where scope='WORLD' and target_id=?", id);
+        db.update("delete from worlds where id=?", id);
+    }
+
+    @Transactional
+    public void deleteLanguage(long id) {
+        db.update("delete from shares where scope='LANGUAGE' and target_id=?", id);
+        db.update("delete from word_overrides where lang_id=?", id);
+        db.update("delete from word_meanings where lang_id=?", id);
+        db.update("delete from word_losses where lang_id=?", id);
+        db.update("delete from sentences where language_id=?", id);
+        db.update("delete from languages where id=?", id);
+    }
+
     // ---------- undo / redo ----------
 
     @Transactional

@@ -63,7 +63,15 @@ class CombinedAppTest {
         assertTrue(weather.body().contains("app.js"));
 
         assertEquals(302, get(c, "/rune").statusCode(), "/rune redirects to /rune/");
-        assertEquals(200, get(c, "/rune/app.js").statusCode());
+        // every script the Root and Rune page asks for is there
+        java.util.regex.Matcher scripts = java.util.regex.Pattern.compile("<script src=\"([^\"]+)\"").matcher(get(c, "/rune/").body());
+        int found = 0;
+        while (scripts.find()) {
+            String src = scripts.group(1);
+            assertEquals(200, get(c, src.startsWith("/") ? src : "/rune/" + src).statusCode(), src);
+            found++;
+        }
+        assertTrue(found >= 9, "the page lists its scripts");
         assertEquals(200, get(c, "/weather/app.js").statusCode());
         assertEquals(200, get(c, "/weather/tiles/mundana-1/manifest.json").statusCode());
     }

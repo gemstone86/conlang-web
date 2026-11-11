@@ -293,10 +293,7 @@ public class ApiController {
         long uid = auth.requireUid(s);
         Map<String, Object> w = db.one("select * from worlds where id=?", id);
         if (w == null || Db.num(w.get("owner_id")) != uid) throw new ApiException(404, "No such world.");
-        db.update("update languages set parent_id=null where world_id=?", id);
-        db.update("delete from shares where scope='LANGUAGE' and target_id in (select id from languages where world_id=?)", id);
-        db.update("delete from shares where scope='WORLD' and target_id=?", id);
-        db.update("delete from worlds where id=?", id);
+        store.deleteWorld(id);
         applog.info("edit", uid, "Deleted world #" + id + " ('" + w.get("name") + "')");
         return Map.of("ok", true);
     }
@@ -384,12 +381,7 @@ public class ApiController {
         applog.info("edit", uidD, "Deleting language #" + id);
         if (db.count("select count(*) from languages where parent_id=?", id) > 0)
             throw new ApiException(409, "Delete or re-parent its branches first.");
-        db.update("delete from shares where scope='LANGUAGE' and target_id=?", id);
-        db.update("delete from word_overrides where lang_id=?", id);
-        db.update("delete from word_meanings where lang_id=?", id);
-        db.update("delete from word_losses where lang_id=?", id);
-        db.update("delete from sentences where language_id=?", id);
-        db.update("delete from languages where id=?", id);
+        store.deleteLanguage(id);
         return Map.of("ok", true);
     }
 
