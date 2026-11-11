@@ -4,9 +4,9 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ArrayNode;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.node.ArrayNode;
 import java.io.ByteArrayOutputStream;
 import java.net.CookieManager;
 import java.nio.charset.StandardCharsets;
@@ -64,7 +64,7 @@ class PublicLanguagesTest {
     /** The language in someone's list, with whether it was listed under Community. */
     private JsonNode find(JsonNode worlds, long lang) {
         for (JsonNode w : worlds) for (JsonNode l : w.path("languages")) if (l.path("id").asLong() == lang) {
-            ((com.fasterxml.jackson.databind.node.ObjectNode) l).put("_community", w.path("community").asBoolean());
+            ((tools.jackson.databind.node.ObjectNode) l).put("_community", w.path("community").asBoolean());
             return l;
         }
         return null;
