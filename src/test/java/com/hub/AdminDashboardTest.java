@@ -110,6 +110,6 @@ class AdminDashboardTest {
         assertTrue(page.body().contains("/api/admin/users"));
         assertEquals(302, get(admin, "/admin").statusCode());
         assertTrue(get(admin, "/").body().contains("href=\"/admin/\""), "start page links the dashboard");
-        assertTrue(get(admin, "/rune/app.js").body().contains("href=\"/admin/\""), "Root and Rune's admin badge links it");
+        assertTrue(get(admin, "/rune/js/core.js").body().contains("href=\"/admin/\""), "Root and Rune's admin badge links it");
     }
 }

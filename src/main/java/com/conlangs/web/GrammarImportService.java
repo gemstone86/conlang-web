@@ -13,6 +13,7 @@ import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.ss.usermodel.WorkbookFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * One-time import of the grammar / phonology tables from the "Ygg Elven" sheet (columns A-G):
@@ -66,6 +67,7 @@ public class GrammarImportService {
         return out;
     }
 
+    @Transactional(rollbackFor = Exception.class)
     public Map<String, Object> importSheet(InputStream in, long langId, boolean replace) throws Exception {
         long existing = db.count("select count(*) from grammar_entries where language_id=?", langId)
                 + db.count("select count(*) from grammar_sections where language_id=?", langId)
