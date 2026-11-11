@@ -7,7 +7,7 @@
   <parent>
     <groupId>org.springframework.boot</groupId>
     <artifactId>spring-boot-starter-parent</artifactId>
-    <version>3.3.5</version>
+    <version>3.5.16</version>
     <relativePath/>
   </parent>
 
@@ -19,7 +19,7 @@
 
   <properties>
     <java.version>21</java.version>
-    <!-- Spring Boot 3.3 defaults to H2 2.2.224 (file corruption bugs); use 2.3.232 -->
+    <!-- Pinned: the database file is written by this H2 version; change it only on purpose (older 2.2.224 had file corruption bugs) -->
     <h2.version>2.3.232</h2.version>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
   </properties>
