@@ -2,6 +2,13 @@
 
 Newest first. Versions from 1.x on are the combined app (Root and Rune + Weather generator).
 
+## v1.17.0 (combined app)
+No visible changes.
+- Spring Boot 3.5.16 → 4.1.2 (Spring Framework 7, Jackson 3), the line that gets free security fixes. The JSON the app
+  reads and writes is kept as before (timestamps as `...+00:00`); the database engine (H2 2.3.232) is unchanged.
+- Checked beyond the tests: the same 40 requests against the old and the new build give the same answers; the new
+  build opens a database written by the old one (login, undo, redo); an export from the old build imports into the new.
+
 ## v1.16.2 (combined app)
 No visible changes; housekeeping.
 - Root and Rune's page script is split into nine files by area (`static/rune/js/`), loaded in order.
