@@ -145,7 +145,7 @@ public class FormGenerator {
                 long rid = Db.num(r.get("id"));
                 if (conds.containsKey(rid)) {
                     Pattern p = conds.get(rid);
-                    if (p == null || !p.matcher(base).find()) continue;
+                    if (p == null || !Patterns.found(p, base)) continue;
                 }
                 String affix = r.get("affix") == null ? "" : (String) r.get("affix");
                 int start = r.get("year") == null ? wyear : Math.max(wyear, ((Number) r.get("year")).intValue());

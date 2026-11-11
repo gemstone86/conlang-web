@@ -197,6 +197,14 @@ Deleting a word also deletes its locked overrides, and Undo does not bring those
 ## v0.18.2
 - A form that starts earlier than its word is no longer reported as a problem: the word simply uses the form as it has evolved by the word's own year.
 
+## v1.16.1 (combined app)
+- **Texts open much faster**: the dictionary and sound changes are loaded once per text instead of once per line and
+  year, and each word is run through the sound changes once.
+- **Runaway patterns are stopped**: a sound-change pattern or form-rule condition that tries endless combinations
+  (a repeat inside a repeat) now gives an error on the word after a fraction of a second instead of tying the server up.
+- **Protective headers** on every answer: other sites can't show the app in a frame, browsers don't guess file types,
+  and over HTTPS browsers are told to stay on HTTPS.
+
 ## v1.16.0 (combined app)
 - **Derivations**: a form rule with the switch **Makes a new word of another type** ticked gets a new type (e.g. *verb*) with a meaning pattern (*to {gloss}*).
   It isn't stored as a form. In a sentence, `(seal-verb-past)` or, with the verb maker written as its own part,

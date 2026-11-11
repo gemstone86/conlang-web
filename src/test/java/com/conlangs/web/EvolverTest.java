@@ -1,6 +1,7 @@
 package com.conlangs.web;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.List;
@@ -323,5 +324,22 @@ class EvolverTest {
         java.util.Random rnd = new java.util.Random(3);
         List<String> cons = List.of("b", "t", "k", "g", "r", "m", "n", "ch"), vows = List.of("a", "o", "u");
         for (int i = 0; i < 50; i++) assertTrue(sh.fits(sh.generate(rnd, 1 + i % 3, cons, List.of("r"), cons, vows)));
+    }
+
+    /** A pattern that backtracks without end gives an error quickly instead of hanging, and then fails at once for a while. */
+    @Test
+    void runawayPatternIsStopped() {
+        java.util.regex.Pattern bad = Patterns.compile("(.*a){12}b", java.util.Map.of());
+        String word = "a".repeat(40) + "c";
+        long t0 = System.nanoTime();
+        assertThrows(Patterns.TooSlow.class, () -> Patterns.apply(bad, "x", word));
+        assertTrue((System.nanoTime() - t0) / 1_000_000 < 3000, "stopped in time");
+        long t1 = System.nanoTime();
+        assertThrows(Patterns.TooSlow.class, () -> Patterns.found(bad, word));
+        assertTrue((System.nanoTime() - t1) / 1_000_000 < 50, "remembered as slow");
+        // ordinary patterns are untouched
+        assertEquals("ada", Patterns.apply(Patterns.compile("t", java.util.Map.of()), "d", "ata"));
+        assertEquals("xa-xa", Patterns.apply(Patterns.compile("(t)(a)", java.util.Map.of()), "x$2", "ta-ta"));
+        assertTrue(Patterns.found(Patterns.compile("{V}$", java.util.Map.of("V", "aeiou")), "ata"));
     }
 }

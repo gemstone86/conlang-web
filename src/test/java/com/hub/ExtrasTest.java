@@ -219,6 +219,13 @@ class ExtrasTest {
         assertEquals(200, wasm.statusCode());
         assertTrue(wasm.headers().firstValue("Content-Type").orElse("").contains("application/wasm"), wasm.headers().toString());
         assertEquals(0x6d736100, java.nio.ByteBuffer.wrap(wasm.body(), 0, 4).order(java.nio.ByteOrder.LITTLE_ENDIAN).getInt(), "wasm magic");
+        // protective headers on pages, files and API answers
+        for (String path : new String[]{"/", "/rune/speech/speech.js", "/api/auth/me"}) {
+            HttpResponse<String> hr = get(guestClient(), path);
+            assertEquals("nosniff", hr.headers().firstValue("X-Content-Type-Options").orElse(""), path);
+            assertEquals("SAMEORIGIN", hr.headers().firstValue("X-Frame-Options").orElse(""), path);
+            assertTrue(hr.headers().firstValue("Content-Security-Policy").orElse("").contains("frame-ancestors 'self'"), path);
+        }
         HttpClient g = guestClient();
         for (String f : new String[]{"espeak-ng.js", "speech.js", "maps.json"})
             assertEquals(200, get(g, "/rune/speech/" + f).statusCode(), f);

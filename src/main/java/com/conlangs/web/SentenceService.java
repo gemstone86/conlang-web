@@ -43,6 +43,16 @@ public class SentenceService {
         return build(new Ctx(langId), source, year);
     }
 
+    /**
+     * For building many sentences of one language (a text at several years): the dictionary and the sound changes are
+     * loaded once, and each word is evolved once, instead of once per sentence. Use within one request.
+     */
+    public java.util.function.BiFunction<String, Integer, Map<String, Object>> builder(long uid, long langId) {
+        access.need(uid, langId, Access.VIEWER);
+        Ctx c = new Ctx(langId);
+        return (source, year) -> build(c, source, year);
+    }
+
     public long save(long uid, long langId, String source, int year, String translation, String notes, Integer group, Integer sub, String kind) {
         access.need(uid, langId, Access.EDITOR);
         if (source == null || source.isBlank()) throw new ApiException(400, "Write a sentence first.");
@@ -108,6 +118,8 @@ public class SentenceService {
         final Map<Long, String> langNames = new HashMap<>();
         final Map<Long, List<Map<String, Object>>> forms = new HashMap<>();
         final Map<Long, List<Evolver.Override>> overrides = new HashMap<>();
+        /** A word or form run through the sound changes, kept for the next sentence or year that needs it. */
+        final Map<String, List<Evolver.Row>> evolved = new HashMap<>();
         final String vowels;
 
         // ---- for stacking endings (loaded on first use)
@@ -708,7 +720,7 @@ public class SentenceService {
                 if (ry != null && ry > y0) continue;
                 Pattern cond = c.cond(r);
                 if (cond == Ctx.BAD) continue;
-                if (cond != null && !cond.matcher(cur).find()) continue;
+                if (cond != null && !Patterns.found(cond, cur)) continue;
                 rule = r;
                 break;
             }
@@ -817,7 +829,8 @@ public class SentenceService {
     private String formAtYear(Ctx c, long wordId, String form, int startYear, int year) {
         Map<String, Object> w = c.words.get(wordId);
         long src = Db.num(w.get("language_id"));
-        List<Evolver.Row> rows = c.ev.evolve(src, form, startYear, c.overrides.getOrDefault(wordId, List.of()));
+        List<Evolver.Row> rows = c.evolved.computeIfAbsent(wordId + "|" + startYear + "|" + form,
+                k -> c.ev.evolve(src, form, startYear, c.overrides.getOrDefault(wordId, List.of())));
         if (src != c.langId && rows.stream().noneMatch(r -> r.langId() == c.langId)) return null;
         return FormMath.formAt(rows, c.pathNearestFirst, year);
     }
