@@ -51,6 +51,8 @@ default-map/
   symbols/*.png   one per aspect or force, e.g. Kryotropi.png
 ```
 
+**Base map and layers (from 1.18):** `map.jpg` is the plain world map and nothing else. Every regional map is a see-through layer in `tiles/mundana-1/layers/<id>/` (zoom pieces plus `map.webp`, its part of the map picture), listed in `manifest.json`. The manifest has `"flat": true`: there are no pre-merged zoom images, so the page draws the base picture and, over it, the chosen layers (the ones marked `default` when nothing is chosen). The older paragraphs below describe the earlier way, where the regional maps were merged into the map picture and the zoom images.
+
 **Sharp detail when zoomed in:** the full Mundana map is 43 807 × 22 545 pixels, far too big to load at once. Most of it is the older map enlarged, but the pasted-in regional maps (Ebhron, Jargien, Menon Aun, Mio–Enara, Stora arkipelagen and others) have real detail. Those parts are cut into 512-pixel tiles at 1/4, 1/2 and full size, in `src/main/resources/static/weather/tiles/mundana-1/` (about 1 700 tiles, 32 MB, plus `manifest.json` listing them). The page fetches the tiles for what's on screen as you zoom in, and draws them over the map image. Parts without tiles just show the map image. The map's `"tiles": "tiles/mundana-1/"` setting turns this on.
 
 **Your own maps can use these tiles too:** in *Placera områden*, set **Zoombilder** to *Från Mundana*. That only makes sense for a map of the same world with the same framing; the image itself can be any size, even the old 3192-pixel one. The tiles are placed relative to the whole map, so they line up whatever the image's resolution.

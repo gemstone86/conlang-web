@@ -2,6 +2,15 @@
 
 Newest first. Versions from 1.x on are the combined app (Root and Rune + Weather generator).
 
+## v1.18.0 (combined app)
+- Weather map: the base map is now the plain world map (the whole known world, `default-map/map.jpg`, the
+  3192 px picture with the added labels, stretched to the app's 5476 px size, which keeps every position, scale and
+  the wrap width as they were). "Bara grundkartan" shows only that.
+- The regional maps are drawn over it as layers only. The pre-merged zoom images and the old base's own zoom images
+  are gone (`manifest.json` now has `"flat": true`); the default layers are the ones marked default, as before.
+- Regional maps that were pasted straight into the old base and never were layers (e.g. Menon Aun, Mio–Enara) are
+  not in the picture any more; they come back as layers later.
+
 ## v1.17.2 (combined app)
 - Fixed: after removing the last sound change with a tag you had selected as a filter, the sound changes list stayed
   empty and the filter could not be cleared. The filter now clears itself.

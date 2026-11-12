@@ -174,6 +174,7 @@
         const sets = (o) => Object.fromEntries(Object.entries(o || {}).map(([k, a]) => [k, new Set(a)]));
         T.baseMap = m.base ? { tiles: sets(m.base.tiles), hide: sets(m.base.hide), map: m.base.map || null } : null;
         T.layers = T.baseMap ? (m.layers || []).map((v) => ({ id: String(v.id), name: v.name || v.id, def: !!v.default, tiles: sets(v.tiles), map: v.map || null })) : [];
+        T.flat = !!m.flat;                                     // flat: no pre-merged zoom images; the base map picture plus see-through layers only
         T.chosen = null;                                       // null: the default layers (the zoom images as they are)
         /** The images that make zoom image level/x_y for the chosen layers, bottom first ([] = none). */
         T.srcs = (level, id) => {
@@ -196,7 +197,11 @@
       const T = this.tiles;
       if (!T) return;
       let chosen = null;
-      if (this._tileLayers && T.layers.length) {
+      if (T.flat && T.layers.length) {
+        // the base map picture is the plain world map; the chosen layers (the default ones when nothing is chosen) lie on top
+        const want = this._tileLayers ? new Set(this._tileLayers) : null;
+        chosen = T.layers.filter((v) => (want ? want.has(v.id) : v.def));   // in drawing order
+      } else if (this._tileLayers && T.layers.length) {
         const want = new Set(this._tileLayers);
         const same = T.layers.every((v) => v.def === want.has(v.id));
         if (!same) chosen = T.layers.filter((v) => want.has(v.id));      // in drawing order
