@@ -2,6 +2,9 @@
 
 Newest first. Versions from 1.x on are the combined app (Root and Rune + Weather generator).
 
+## v1.18.2 (combined app)
+- The map layer "Egor–Nermada (Ivani, Ara)" is now called "Thalamur–Nermada". Its id is unchanged, so saved layer choices still work.
+
 ## v1.18.1 (combined app)
 - The layer "Första Mundanakartan" is now the whole first Mundana map, made from the original picture (it was
   only the fragments left between the other regional maps, and was called "where it was blurry"). It lies under
