@@ -2,6 +2,10 @@
 
 Newest first. Versions from 1.x on are the combined app (Root and Rune + Weather generator).
 
+## v1.17.1 (combined app)
+- The word popup has a Type section: the word's type and where it comes from (set on the word, made by a derivation
+  from another word, a cross-reference keeping its own type, or a different type in a particular meaning).
+
 ## v1.17.0 (combined app)
 No visible changes.
 - Spring Boot 3.5.16 → 4.1.2 (Spring Framework 7, Jackson 3), the line that gets free security fixes. The JSON the app

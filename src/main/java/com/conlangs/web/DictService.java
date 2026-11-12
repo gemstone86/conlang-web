@@ -380,6 +380,11 @@ public class DictService {
             Map<String, Object> lw = db.one("select w.gloss, l.name as lname from words w join languages l on l.id=w.language_id where w.id=?", Db.num(w.get("loan_word_id")));
             out.put("loan_from", lw == null ? "a word that no longer exists" : lw.get("lname") + ": " + lw.get("gloss"));
         }
+        if (w.get("derived_from") != null) {
+            Map<String, Object> df = db.one("select w.gloss, w.pos from words w where w.id=?", Db.num(w.get("derived_from")));
+            out.put("derived", df == null ? Map.of("id", w.get("derived_from"), "label", String.valueOf(w.get("derived_label"))) :
+                    Map.of("id", w.get("derived_from"), "gloss", df.get("gloss"), "pos", String.valueOf(df.get("pos")), "label", String.valueOf(w.get("derived_label"))));
+        }
         if (target != null) out.put("ref", Map.of("id", target.get("id"), "gloss", target.get("gloss"), "form", target.get("form")));
         out.put("history", historyMaps(rows));
         out.put("forms", forms);
