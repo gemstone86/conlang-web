@@ -2,6 +2,11 @@
 
 Newest first. Versions from 1.x on are the combined app (Root and Rune + Weather generator).
 
+## v1.18.3 (combined app)
+- The Colostro inset in the Jargien map layer is moved to where Colostro really is (12 map pixels east and 49.5 north:
+  the town square, the mountains and the coast now line up with the first Mundana map). New
+  `tools/move-layer-piece.py` moves one piece of a layer and rewrites only the zoom pieces it touches.
+
 ## v1.18.2 (combined app)
 - The map layer "Egor–Nermada (Ivani, Ara)" is now called "Thalamur–Nermada". Its id is unchanged, so saved layer choices still work.
 
