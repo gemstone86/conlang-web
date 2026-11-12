@@ -98,6 +98,7 @@ const TAB = {
       <div class="row"><button data-act="previewRule">Preview effect</button><button class="primary" data-act="addRule" id="r_btn">Add rule</button><button data-act="cancelRule" id="r_cancel" hidden>Cancel edit</button>
       <span class="muted small">A rule on a branch only affects that branch and its own branches. Define classes like V=aeiou in Settings.</span></div><div id="rprev"></div></div>`;
     h += ruleVersionsCard(versions);
+    if (S.ruleTag && !rules.some(r => ruleTags(r).some(t => t.toLowerCase() === S.ruleTag))) S.ruleTag = null;   // its last sound change is gone: don't stay stuck on an empty filter
     h += ruleTagBar(rules);
     const shown = S.ruleTag ? rules.filter(r => ruleTags(r).some(t => t.toLowerCase() === S.ruleTag)) : rules;
     h += '<table><tr><th>Year</th><th>Language</th><th>Order</th><th>Name</th><th>Pattern</th><th>Replacement</th><th>Tags</th><th></th></tr>';
