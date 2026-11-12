@@ -2,6 +2,12 @@
 
 Newest first. Versions from 1.x on are the combined app (Root and Rune + Weather generator).
 
+## v1.18.1 (combined app)
+- The layer "Första Mundanakartan" is now the whole first Mundana map, made from the original picture (it was
+  only the fragments left between the other regional maps, and was called "where it was blurry"). It lies under
+  the other layers, so they still cover it where they overlap. New `tools/layer-from-image.py` makes or replaces a
+  layer from one whole image.
+
 ## v1.18.0 (combined app)
 - Weather map: the base map is now the plain world map (the whole known world, `default-map/map.jpg`, the
   3192 px picture with the added labels, stretched to the app's 5476 px size, which keeps every position, scale and
