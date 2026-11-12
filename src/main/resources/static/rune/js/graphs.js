@@ -131,6 +131,16 @@ function lastPerLang(hist) {
 const histTable = hist => '<table><tr><th>Branch</th><th>Year</th><th>Form</th><th>How</th></tr>' + hist.map(x =>
   `<tr class="${x.source === 'ERROR' ? 'pending' : ''}"><td>${esc(x.lang)}</td><td>${x.year}</td><td class="form">${esc(x.form)}${sayBtn(x.form, x.lang_id)}</td><td class="small">${esc(x.source.toLowerCase())}${x.rule ? ': ' + esc(x.rule) : ''}</td></tr>`).join('') + '</table>';
 
+function typeSection(r, w) {
+  const why = [];
+  if (r.derived) why.push(`Made from <strong>${esc(r.derived.gloss || 'a deleted word')}</strong>${r.derived.pos && r.derived.gloss ? ' (' + esc(r.derived.pos) + ')' : ''} by the <strong>${esc(r.derived.label)}</strong> derivation, which sets the type to ${esc(w.pos)}.`);
+  else why.push(`Set on the word itself when it was added or last edited.`);
+  if (r.ref) why.push(`It is a cross-reference to <strong>${esc(r.ref.gloss)}</strong>: it takes that word's forms, but keeps its own type (${esc(w.pos)}) in sentences.`);
+  const ms = (r.meanings || []).filter(m => m.pos);
+  if (ms.length) why.push('Other types in particular meanings: ' + ms.map(m => `<strong>${esc(m.meaning)}</strong> as ${esc(m.pos)} (from ${m.year})`).join('; ') + '.');
+  return `<div class="small" id="w_type"><h3>Type</h3><p><span class="badge">${esc(w.pos)}</span></p>${why.map(x => '<p class="small">' + x + '</p>').join('')}</div>`;
+}
+
 async function showWord() {
   const r = await api('GET', '/rune/api/words/' + S.openId + '/history');
   r.forms = r.forms || [];
@@ -156,6 +166,7 @@ async function showWord() {
     h += '<h3>Evolution tree</h3>' + wordTree(r.history);
     for (const f of r.forms) if (f.history && f.history.length > 1) h += `<details><summary>tree: ${esc(f.label)}</summary>${wordTree(f.history)}</details>`;
   }
+  h += typeSection(r, w);
   h += `<details id="w_para" data-w="${w.id}"><summary><strong>All forms</strong> <span class="small muted">(endings stacked by group)</span></summary><div id="w_parabody" class="small muted">Opening…</div></details>`;
   h += `<h3>Meaning ${ce ? '<button data-act="toggleMeaning">Change meaning</button>' : ''}</h3>`;
   h += '<table><tr><th>Language</th><th>Meaning now</th></tr>' + Object.entries(r.meaning_by_lang || {}).map(([k, v]) => `<tr><td>${esc(k)}</td><td>${esc(v)}</td></tr>`).join('') + '</table>';
