@@ -2,6 +2,9 @@
 
 Newest first. Versions from 1.x on are the combined app (Root and Rune + Weather generator).
 
+## v1.22.0 (combined app)
+- Weather travel, sea voyages: **Landa var som helst** (a third box next to *Havsresa*): the ship may come ashore anywhere, with 4 hours' landing delay outside a harbour (settings: *Landstigning utanför hamn*). Ships also **keep within sight of a coast** when that isn't much further (open sea counts 1.5 times, sight 40 km, both in the settings), and out of sight of land their course **wiggles**, more in a strong wind. The weather page is v2.23.
+
 ## v1.21.5 (combined app)
 - Weather travel: a sea voyage now also has to **end** in a harbour (it came ashore anywhere before). Where the map has harbours, ships set out from one and come ashore at one; a map with no harbours keeps the old rule. The weather page is v2.22.
 

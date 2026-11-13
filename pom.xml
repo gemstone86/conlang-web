@@ -13,7 +13,7 @@
 
   <groupId>com.conlangs</groupId>
   <artifactId>conlang-web</artifactId>
-  <version>1.21.5</version>
+  <version>1.22.0</version>
   <name>Root and Rune + Weather generator</name>
   <description>One app with a shared login: Root and Rune (conlang builder) and the Eon weather generator</description>
 

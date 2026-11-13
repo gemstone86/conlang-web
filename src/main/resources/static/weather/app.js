@@ -3518,7 +3518,7 @@
   }
 
   // ── Version in the corner: the server's, and this page's if they differ (old files cached) ──
-  const CLIENT_VERSION = "2.22";
+  const CLIENT_VERSION = "2.23";
   function showVersion(server) {
     const el = $("appVersion");
     if (!el) return;
