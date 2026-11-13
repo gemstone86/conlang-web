@@ -255,9 +255,34 @@
     }
     c.putImageData(img, x0, y0);
   };
+  /**
+   * Forest and marshland are never painted on water: a pixel of the painter's map at or below the sea level
+   * of the height map (the one shown; none: no limit) keeps what it had when the stroke began.
+   */
+  P._hpWaterMask = function () {
+    const E = this.hp, G = this.heightGrid && this.seaLevel != null ? this.heightGrid() : null;
+    if (!G) return null;
+    if (E.water && E.waterKey === G.key + ":" + G.sea) return E.water;
+    const m = new Uint8Array(E.w * E.h);
+    for (let y = 0; y < E.h; y++) {
+      const gy = Math.min(G.h - 1, Math.floor((y + 0.5) * G.h / E.h)), r = gy * G.w;
+      for (let x = 0; x < E.w; x++) m[y * E.w + x] = G.d[r + Math.min(G.w - 1, Math.floor((x + 0.5) * G.w / E.w))] <= G.sea ? 1 : 0;
+    }
+    E.water = m; E.waterKey = G.key + ":" + G.sea;
+    return m;
+  };
+  P._hpKeepDry = function (x0, y0, x1, y1) {
+    const E = this.hp, m = this._hpWaterMask();
+    if (!m || !E.before) return;
+    for (let y = Math.max(0, y0); y < Math.min(E.h, y1); y++) for (let x = Math.max(0, x0); x < Math.min(E.w, x1); x++) {
+      const i = y * E.w + x;
+      if (m[i]) E.data[i] = E.before[i];
+    }
+  };
   P._hpRefresh = function (x0, y0, x1, y1) {
     const E = this.hp;
     x0 = Math.floor(x0); y0 = Math.floor(y0); x1 = Math.ceil(x1); y1 = Math.ceil(y1);
+    if (E.bbox && (E.target === "forest" || E.target === "marsh")) this._hpKeepDry(x0, y0, x1, y1);
     this._hpPaintRect(E.view, E.lut, x0, y0, x1, y1);
     this._hpPaintRect(E.grey, this._greyLut || (this._greyLut = greyLut()), x0, y0, x1, y1);
     const b = E.bbox;

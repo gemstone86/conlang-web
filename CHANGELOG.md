@@ -2,6 +2,9 @@
 
 Newest first. Versions from 1.x on are the combined app (Root and Rune + Weather generator).
 
+## v1.21.2 (combined app)
+- Weather map painter: forest and marshland are no longer painted on water. A pixel at or below the sea level of the height map keeps what it had, with every tool (brush, fill, polygon, …). Ice can still be painted on water (sea ice). Forest already painted on water stays until you paint it away.
+
 ## v1.21.1 (combined app)
 - Standard map updated from an admin export: height map (1 217 changed pixels), forest and roads (53).
 
