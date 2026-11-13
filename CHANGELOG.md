@@ -2,6 +2,9 @@
 
 Newest first. Versions from 1.x on are the combined app (Root and Rune + Weather generator).
 
+## v1.21.5 (combined app)
+- Weather travel: a sea voyage now also has to **end** in a harbour (it came ashore anywhere before). Where the map has harbours, ships set out from one and come ashore at one; a map with no harbours keeps the old rule. The weather page is v2.22.
+
 ## v1.21.4 (combined app)
 - Fix: on the standard map, admins couldn't pick *Städer* or *Sumpmark* in the edit list (the options were greyed out: the list of modes open to people who don't own the map didn't include them). The owner and the admins now can; other people still can't (they can't save them). The weather page is now **v2.21** (shown bottom right; the page and the server must match).
 - Forest painter: **Visa trädgräns** switch. On, the ground above the tree line is tinted red and the tree line itself is a strong red edge (follows the *Trädgräns (m)* value, default 3000 m).

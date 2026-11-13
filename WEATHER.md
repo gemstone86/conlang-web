@@ -373,7 +373,7 @@ Painted like forest and ice: *Redigera* → **Sumpmark**, 0 = dry … 100 = mars
 Edited in *Redigera* → **Städer**, shown with the **Städer** layer. Each city has a **name**, a **population** (the disc grows with it) and a **harbour** switch (a blue ring).
 - **Placing:** click on the map. Close to a road (10 px) the city is put on the road line, so the road runs through the city. Click a city to choose it, drag it to move it (it snaps to a road line the same way); *Delete* removes it, *Esc* lets go.
 - **Roads and cities:** a road point dropped on a city, or a new road started on one, snaps to the city. In the travel calculator the roads passing through or ending at a city (within 2.5 map pixels) are joined there, so a road network connected by a city can be travelled as one.
-- **Harbours:** **a sea voyage can only set out from a city with a harbour** (boarding a ship, also from a river mouth); going ashore is possible anywhere. On a map with no harbours at all the old rule stays (a ship can set out from any coast), so existing maps keep working until you mark some.
+- **Harbours:** **a sea voyage can only set out from and end at a city with a harbour** (boarding a ship, also from a river mouth, and coming ashore). On a map with no harbours at all the old rule stays (a ship can set out from any coast), so existing maps keep working until you mark some.
 - **Saving:** like the roads. **Exportera städer** downloads them. Stored in `map_cities`; `GET/PUT /weather/api/maps/{id}/cities`; each city is `{ id, name, population, harbour, x, y }` (0–1). Part of the admin export (`cities.json`), shipped as `default-map/cities.json` (`"cities"` and `citiesRelease` in `map.json`).
 
 ### Roads and paths (vägar)

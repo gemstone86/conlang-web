@@ -605,7 +605,9 @@
           const v = j * gw + i;
           if (wet || G.water[v]) {
             // at sea (and out to sea from the shore, or ashore): a ship
-            if (sea && (wet || !G.hasHarbours || G.harbour[u])) relaxC(u, v, 5, boatCost(kmOf(u, v), cfg.sea.normal / seaF, !wet));   // a ship sets out from a harbour only
+            // a ship sets out from a harbour and comes ashore at one (where the map has harbours)
+            const landing = wet && !G.water[v];
+            if (sea && (landing ? !G.hasHarbours || G.harbour[v] : wet || !G.hasHarbours || G.harbour[u])) relaxC(u, v, 5, boatCost(kmOf(u, v), cfg.sea.normal / seaF, !wet));
             continue;
           }
           const side = DX[d] && DY[d] ? Math.max(G.steep[uj * gw + i], G.steep[j * gw + ui]) : 0;
