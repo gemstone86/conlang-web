@@ -2,6 +2,10 @@
 
 Newest first. Versions from 1.x on are the combined app (Root and Rune + Weather generator).
 
+## v1.21.4 (combined app)
+- Fix: on the standard map, admins couldn't pick *Städer* or *Sumpmark* in the edit list (the options were greyed out: the list of modes open to people who don't own the map didn't include them). The owner and the admins now can; other people still can't (they can't save them). The weather page is now **v2.21** (shown bottom right; the page and the server must match).
+- Forest painter: **Visa trädgräns** switch. On, the ground above the tree line is tinted red and the tree line itself is a strong red edge (follows the *Trädgräns (m)* value, default 3000 m).
+
 ## v1.21.3 (combined app)
 - Weather map: a **tree line** (trädgräns). When painting forest, the painter has *Trädgräns (m)* (default 3000 m, kept per user; 0 = none): forest isn't painted on ground higher than that, with any tool, and *Ta bort över gränsen* removes forest already above it (undoable).
 - Fix: the page scripts (`app.js`, `fieldmap.js`, …) kept their old `?v=` numbers, so a browser with cached copies mixed old scripts with the new `cities.js` and cities / marshland couldn't be placed. All weather scripts now have a new number; **bump it whenever a weather script changes**.

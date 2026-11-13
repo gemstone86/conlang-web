@@ -54,7 +54,7 @@
   function snapshot() {
     return { region: S.region, year: S.year, month: S.month, day: S.day, lang: S.lang, calendar: S.calendar,
       campaignId: S.campaignId, mapId: S.mapId, layers: S.layers, hour: S.hour, opacity: S.opacity,
-      rainFx: S.rainFx, cloudFx: S.cloudFx, religion: S.religion, leyHidden: S.leyHidden, riversKnown: true, nationsKnown: true, rangesKnown: true, roadsKnown: true, marshKnown: true, cityKnown: true, treeLine: S.treeLine, mapLayers: S.mapLayers || null, w3Rivers: S.w3Rivers !== false, heightPick: S.heightPick || "base", rvSuggest: !!S.rvSuggest, rvSuggestAmt: S.rvSuggestAmt || "many", travel: S.travel || null };
+      rainFx: S.rainFx, cloudFx: S.cloudFx, religion: S.religion, leyHidden: S.leyHidden, riversKnown: true, nationsKnown: true, rangesKnown: true, roadsKnown: true, marshKnown: true, cityKnown: true, treeLine: S.treeLine, showTreeLine: !!S.showTreeLine, mapLayers: S.mapLayers || null, w3Rivers: S.w3Rivers !== false, heightPick: S.heightPick || "base", rvSuggest: !!S.rvSuggest, rvSuggestAmt: S.rvSuggestAmt || "many", travel: S.travel || null };
   }
   function applySnapshot(s) {
     if (!s) return;
@@ -74,6 +74,7 @@
     if (Array.isArray(s.layers) && !s.marshKnown && !S.layers.includes("marsh")) S.layers = [...S.layers, "marsh"];   // marshland came later: shown from the start
     if (Array.isArray(s.layers) && !s.cityKnown && !S.layers.includes("city")) S.layers = [...S.layers, "city"];   // cities came later: shown from the start
     if (Number.isFinite(s.treeLine)) S.treeLine = s.treeLine;
+    if (typeof s.showTreeLine === "boolean") S.showTreeLine = s.showTreeLine;
     if (Number.isInteger(s.hour)) S.hour = s.hour;
     if (typeof s.opacity === "number" && s.opacity >= 0.1 && s.opacity <= 1) S.opacity = s.opacity;
     if (typeof s.rainFx === "boolean") S.rainFx = s.rainFx;
@@ -776,7 +777,8 @@
     // on a map you don't own (the default map, as an admin) only the rivers can be edited here
     const ownerOnly = !!(S.map && !S.map.mine);
     // while suggesting a change, only the layer it is for
-    const ownerModes = ["river", "nation", "range", "forest", "ice", "road"];
+    // modes open to someone who doesn't own the map (they suggest changes); the owner, and the admins on the standard map, also place cities and paint marshland
+    const ownerModes = ["river", "nation", "range", "forest", "ice", "road", ...(S.map && (S.map.mine || (S.map.isDefault && S.admin)) ? ["city", "marsh"] : [])];
     [...$("editMode").options].forEach((o) => { o.disabled = SG.suggesting ? o.value !== SG.layer : ownerOnly && !ownerModes.includes(o.value); });
     if (on && ownerOnly && !SG.suggesting && !ownerModes.includes($("editMode").value)) $("editMode").value = "river";
     if (!on && fieldMap.ntDrawing) fieldMap.ntFinish();
@@ -1210,7 +1212,8 @@
         $("hpUndo").disabled = !fieldMap.hpCanUndo();
       }, 30);
     };
-    $("hpTreeLine").onchange = (e) => { const v = Math.max(0, Math.min(20000, +String(e.target.value).replace(",", ".") || 0)); e.target.value = v; S.treeLine = v; fieldMap.hpSettings().treeLine = v; if (fieldMap.hp) fieldMap.hp.water = null; saveState(); };
+    $("hpTreeLine").onchange = (e) => { const v = Math.max(0, Math.min(20000, +String(e.target.value).replace(",", ".") || 0)); e.target.value = v; S.treeLine = v; fieldMap.hpSettings().treeLine = v; if (fieldMap.hp) fieldMap.hp.water = null; saveState(); fieldMap.draw(); };
+    $("hpTreeShow").onchange = (e) => { S.showTreeLine = e.target.checked; fieldMap.hpSettings().showTreeLine = e.target.checked; saveState(); fieldMap.draw(); };
     $("hpTreeClear").onclick = () => {
       const n = fieldMap.hpClearAboveTreeLine();
       setStatus(n ? T("hpTreeCleared", n.toLocaleString(S.lang === "EN" ? "en-GB" : "sv-SE")) : T("hpTreeNone"));
@@ -2666,7 +2669,8 @@
     $("anchorRegionBox").hidden = !regions; $("unplacedBox").hidden = !regions; $("leyAspectBox").hidden = regions || height;
     $("zoneNew").hidden = mode !== "zone";
     $("heightBar").hidden = !height;
-    $("hpTreeLineBox").hidden = $("hpTreeClear").hidden = mode !== "forest";
+    $("hpTreeLineBox").hidden = $("hpTreeClear").hidden = $("hpTreeShowBox").hidden = mode !== "forest";
+    $("hpTreeShow").checked = !!S.showTreeLine; fieldMap.hpSettings().showTreeLine = !!S.showTreeLine;
     $("hpTreeLine").value = S.treeLine != null ? S.treeLine : 3000;
     fieldMap.hpSettings().treeLine = S.treeLine != null ? S.treeLine : 3000;
     $("editBar").classList.toggle("mode-height", height);
@@ -3514,7 +3518,7 @@
   }
 
   // ── Version in the corner: the server's, and this page's if they differ (old files cached) ──
-  const CLIENT_VERSION = "2.20";
+  const CLIENT_VERSION = "2.21";
   function showVersion(server) {
     const el = $("appVersion");
     if (!el) return;

@@ -1018,6 +1018,31 @@
   };
 
   // ── drawing: the height map over the map, the polygon being drawn, the brush outline ──
+  /** The tree line as a see-through picture: the ground above it tinted red, its edge (the tree line itself) strong red. */
+  P._hpTreeLineCanvas = function () {
+    const E = this.hp, S = this.hpSettings(), G = this.heightGrid && this.seaLevel != null ? this.heightGrid() : null;
+    const limit = Math.max(0, +S.treeLine || 0);
+    if (!E || !G || !limit) return null;
+    const key = G.key + ":" + G.sea + ":" + limit;
+    if (E.tl && E.tl.key === key) return E.tl.canvas;
+    const w = E.w, h = E.h, hi = G.sea + limit / G.mps, up = new Uint8Array(w * h);
+    for (let y = 0; y < h; y++) {
+      const r = Math.min(G.h - 1, Math.floor((y + 0.5) * G.h / h)) * G.w;
+      for (let x = 0; x < w; x++) if (G.d[r + Math.min(G.w - 1, Math.floor((x + 0.5) * G.w / w))] > hi) up[y * w + x] = 1;
+    }
+    const cv = document.createElement("canvas"); cv.width = w; cv.height = h;
+    const c = cv.getContext("2d"), img = c.createImageData(w, h), out = new Uint32Array(img.data.buffer);
+    const FILL = ((90 << 24) | (50 << 16) | (50 << 8) | 235) >>> 0, EDGE = ((255 << 24) | (20 << 16) | (20 << 8) | 255) >>> 0;
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+      const i = y * w + x;
+      if (!up[i]) continue;
+      const edge = x === 0 || y === 0 || x === w - 1 || y === h - 1 || !up[i - 1] || !up[i + 1] || !up[i - w] || !up[i + w];
+      out[i] = edge ? EDGE : FILL;
+    }
+    c.putImageData(img, 0, 0);
+    E.tl = { key, canvas: cv };
+    return cv;
+  };
   P._hpDraw = function () {
     const E = this.hp;
     if (!E) return;
@@ -1027,6 +1052,10 @@
     ctx.imageSmoothingEnabled = s * this.imgW / E.w < 8;   // smooth; single pixels show only when zoomed far in
     ctx.drawImage(E.view, ox, oy, this.imgW * s, this.imgH * s);
     ctx.restore();
+    if (S.showTreeLine && E.target === "forest") {
+      const tl = this._hpTreeLineCanvas();
+      if (tl) { ctx.save(); ctx.imageSmoothingEnabled = false; ctx.drawImage(tl, ox, oy, this.imgW * s, this.imgH * s); ctx.restore(); }
+    }
     if (E.poly.length && S.tool === "coast") {
       // coast: each pair as an arrow from inland (green) to the coast (blue); joined pairs outlined
       ctx.save();

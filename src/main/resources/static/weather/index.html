@@ -400,7 +400,8 @@
           <span data-i18n="hpTreeLine">Trädgräns (m)</span>
           <input type="number" id="hpTreeLine" min="0" max="20000" step="50" value="3000" class="num-small" style="width:5.5rem">
         </label>
-        <button type="button" id="hpTreeClear" hidden data-i18n="hpTreeClear" data-i18n-title="hpTreeClearTip" title="Tar bort all skog som ligger över trädgränsen (kan ångras).">Ta bort över gränsen</button>
+        <label class="check" id="hpTreeShowBox" style="white-space:nowrap" hidden data-i18n-title="hpTreeShowTip" title="Visar trädgränsen i rött: marken över gränsen är rödtonad och gränsen själv en stark röd linje."><input type="checkbox" id="hpTreeShow"><span data-i18n="hpTreeShow">Visa trädgräns</span></label>
+        <button type="button" id="hpTreeClear" style="white-space:nowrap" hidden data-i18n="hpTreeClear" data-i18n-title="hpTreeClearTip" title="Tar bort all skog som ligger över trädgränsen (kan ångras).">Ta bort över gränsen</button>
         <label class="check" id="hpCoastBox" hidden><input type="checkbox" id="hpCoast" checked><span data-i18n="hpCoast">Stanna vid kusten</span></label>
         <button type="button" id="hpPolyFill" hidden data-i18n="hpPolyFill">Fyll polygonen</button>
         <button type="button" id="hpRiverCarve" hidden data-i18n="hpRiverCarve">Gräv floden</button>
@@ -635,20 +636,20 @@
   </form>
 </dialog>
 
-<script src="i18n.js?v=130"></script>
-<script src="fieldmap.js?v=130"></script>
-<script src="terrain.js?v=130"></script>
-<script src="heightpaint.js?v=130"></script>
-<script src="rivers.js?v=130"></script>
+<script src="i18n.js?v=132"></script>
+<script src="fieldmap.js?v=132"></script>
+<script src="terrain.js?v=132"></script>
+<script src="heightpaint.js?v=132"></script>
+<script src="rivers.js?v=132"></script>
 <script src="vendor/polygon-clipping-0.15.7.umd.min.js"></script>
-<script src="nations.js?v=130"></script>
-<script src="ranges.js?v=130"></script>
-<script src="roads.js?v=130"></script>
-<script src="cities.js?v=130"></script>
-<script src="layersugg.js?v=130"></script>
-<script src="travel.js?v=130"></script>
-<script src="events.js?v=130"></script>
-<script src="app.js?v=130"></script>
+<script src="nations.js?v=132"></script>
+<script src="ranges.js?v=132"></script>
+<script src="roads.js?v=132"></script>
+<script src="cities.js?v=132"></script>
+<script src="layersugg.js?v=132"></script>
+<script src="travel.js?v=132"></script>
+<script src="events.js?v=132"></script>
+<script src="app.js?v=132"></script>
 <a id="tilesWarn" class="tiles-warn" hidden target="_blank" rel="noopener"></a>
 <div id="appVersion" class="app-version" aria-label="Version"></div>
 </body>

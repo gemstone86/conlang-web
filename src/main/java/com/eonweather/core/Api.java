@@ -19,7 +19,7 @@ import java.util.regex.Pattern;
  */
 public final class Api {
     /** Shown in the page's corner. Keep in step with CLIENT_VERSION in app.js and ?v= in index.html. */
-    public static final String VERSION = "2.20";
+    public static final String VERSION = "2.21";
     public static final int MAX_IMAGE_BYTES = 30 * 1024 * 1024;
 
     // The world is rebuilt when regions are made or changed in the app; these three are swapped together.
