@@ -2,6 +2,14 @@
 
 Newest first. Versions from 1.x on are the combined app (Root and Rune + Weather generator).
 
+## v1.20.0 (combined app)
+- Weather travel: a fourth suggested route, **Säkrast** (safest). It keeps to roads, paths and nations and avoids
+  open wilderness: off the roads a stretch counts 2 times its time, plus 0.01 per km from the nearest road or nation
+  (at most 6 times), and more for forest; inside a nation's borders only 1.4 times. So from the open plains it goes
+  south to the settled land, west along the roads and nations and north again rather than straight across.
+  It is never allowed to take more than 3 times the time of Snabbast (otherwise the caution is eased off until it
+  fits). All the numbers are in the travel settings (⚙, "Säkrast: …", `safe` in `travel.yaml`).
+
 ## v1.19.0 (combined app)
 - Weather map: admins can set which regional map lies over which. In the "Kartbild" list on the standard map, each layer
   has ▲ ▼ buttons (a place further down lies over the ones above); the order is saved for everyone as

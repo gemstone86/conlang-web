@@ -38,7 +38,7 @@
   const DIRS = { N: 0, NE: 45, E: 90, SE: 135, S: 180, SW: 225, W: 270, NW: 315 };
   const CELL = 4;                       // map px per routing grid cell
   const LAPSE = 6.5 / 1000;
-  const MODE_COL = { fast: "#ff5fa2", easy: "#5fd38a", short: "#ffb347" }, MODE_TXT = { fast: "trFast", easy: "trEasy", short: "trShort" };
+  const MODE_COL = { fast: "#ff5fa2", easy: "#5fd38a", short: "#ffb347", safe: "#5fb6ff" }, MODE_TXT = { fast: "trFast", easy: "trEasy", short: "trShort", safe: "trSafe" };
   const COLOURS = ["#e8833a", "#ff5fa2", "#c678dd", "#7bd88f", "#ef6f6c", "#ffd166", "#56c2b6", "#d4a373"];
 
   const DEFAULTS = {
@@ -58,6 +58,10 @@
     sea: { normal: 9.9, good: 14.8, bad: 4.9 },
     // how much routes off the roads and rivers wander (1 = normal, 0 = straight, 2 = twice as much)
     wiggle: 1,
+    // Säkrast: off the roads the time counts (off + perKm × km from anything civilised, at most max) times as
+    // much (nation: inside a nation's borders instead; path: on a path), plus forest × the share of trees;
+    // the route is never allowed to take more than maxTimes the time of Snabbast
+    safe: { off: 2, perKm: 0.01, max: 6, nation: 1.4, path: 1.2, forest: 0.5, maxTimes: 3 },
     boatMinFlow: 4, boardHours: 1, seaAllDay: 1, windGood: 5, windCalm: 2,
   };
   const copy = (o) => JSON.parse(JSON.stringify(o));
@@ -289,6 +293,52 @@
     for (let c = 0; c < steep.length; c++) steep[c] = water[c] || !cnt[c] ? 0 : (steep[c] + sum[c] / cnt[c]) / 2;
   }
 
+  function inPoly(x, y, pts) {
+    let inside = false;
+    for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+      const a = pts[i], b = pts[j];
+      if ((a.y > y) !== (b.y > y) && x < (b.x - a.x) * (y - a.y) / (b.y - a.y) + a.x) inside = !inside;
+    }
+    return inside;
+  }
+  /**
+   * How civilised each grid cell is, for Säkrast: nat[cell] 1 inside a nation's borders, and civ[cell] the
+   * distance (km, 8-way) to the nearest road point or nation cell. Made once for the roads and nations as they are.
+   */
+  function buildCivil(fm, G, RD) {
+    const sig = (fm.nations || []).length + ":" + (fm.nations || []).reduce((a, n) => a + (n.parts || []).reduce((b, q) => b + q.length, 0) + (n.subs || []).length, 0);
+    if (G.civ && G.civRD === RD && G.civSig === sig) return;
+    const { gw, gh, n, W, H } = G, nat = new Uint8Array(n), civ = new Float32Array(n).fill(1e9), cellKm = CELL * fm.kmPerMapPx();
+    for (const nt of fm.nations || []) {
+      const parts = (nt.parts || []).filter((q) => q.length >= 3);
+      for (const q of parts) {
+        let x0 = 1, y0 = 1, x1 = 0, y1 = 0;
+        for (const c of q) { x0 = Math.min(x0, c.x); y0 = Math.min(y0, c.y); x1 = Math.max(x1, c.x); y1 = Math.max(y1, c.y); }
+        const i0 = Math.max(0, Math.floor(x0 * W / CELL)), i1 = Math.min(gw - 1, Math.ceil(x1 * W / CELL));
+        const j0 = Math.max(0, Math.floor(y0 * H / CELL)), j1 = Math.min(gh - 1, Math.ceil(y1 * H / CELL));
+        for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
+          const k = j * gw + i;
+          if (!nat[k] && inPoly(Math.min(1, (i + 0.5) * CELL / W), Math.min(1, (j + 0.5) * CELL / H), q)) nat[k] = 1;
+        }
+      }
+    }
+    for (let k = 0; k < n; k++) if (nat[k]) civ[k] = 0;
+    for (let p = 0; p < RD.R; p++) civ[RD.cell[p]] = 0;
+    // two chamfer passes over the grid
+    const D = 1.4142, relax = (k, o, w) => { const v = civ[o] + w * cellKm; if (v < civ[k]) civ[k] = v; };
+    for (let j = 0; j < gh; j++) for (let i = 0; i < gw; i++) {
+      const k = j * gw + i;
+      if (i > 0) relax(k, k - 1, 1);
+      if (j > 0) { relax(k, k - gw, 1); if (i > 0) relax(k, k - gw - 1, D); if (i + 1 < gw) relax(k, k - gw + 1, D); }
+    }
+    for (let j = gh - 1; j >= 0; j--) for (let i = gw - 1; i >= 0; i--) {
+      const k = j * gw + i;
+      if (i + 1 < gw) relax(k, k + 1, 1);
+      if (j + 1 < gh) { relax(k, k + gw, 1); if (i + 1 < gw) relax(k, k + gw + 1, D); if (i > 0) relax(k, k + gw - 1, D); }
+    }
+    G.nat = nat; G.civ = civ; G.civRD = RD; G.civSig = sig;
+  }
+
   /** Road points every map pixel: x, y (0–1), kind (1–3), the grid cell, and who they connect to. */
   function buildRoads(fm, G, climate) {
     const W = fm.imgW, H = fm.imgH, xs = [], ys = [], kinds = [], hs = [], fo = [], sn = [], nb = [];
@@ -450,6 +500,20 @@
     };
     const s = landNear(a), t = landNear(b);
     if (s < 0 || t < 0) return null;
+    const safe = mode === "safe", sc = clamp(opt.safeScale == null ? 1 : opt.safeScale, 0, 1);
+    if (safe) buildCivil(fm, G, RD);
+    // how many times as much a stretch counts for Säkrast (1 on roads; more the farther from anything civilised)
+    const risk = (u, v, kind, fo) => {
+      let m;
+      if (kind >= 2) m = 1;
+      else if (kind === 1) m = cfg.safe.path;
+      else {
+        const cu = u < n ? u : RD.cell[u - n], cv = v < n ? v : RD.cell[v - n];
+        m = (G.nat[cu] && G.nat[cv]) ? cfg.safe.nation : clamp(cfg.safe.off + (G.civ[cu] + G.civ[cv]) / 2 * cfg.safe.perKm, 1, Math.max(1, cfg.safe.max));
+      }
+      return 1 + sc * (Math.max(1, m * (1 + cfg.safe.forest * fo * (kind >= 2 ? 0 : 1))) - 1);
+    };
+    let rc = 0;                                  // the time a stretch really takes, without Säkrast's extra
     const pos = (v) => v < n ? [((v % gw) + 0.5) * CELL / W, (Math.floor(v / gw) + 0.5) * CELL / H] : v < nB ? [RD.xs[v - n], RD.ys[v - n]] : [BT.xs[v - nB], BT.ys[v - nB]];
     const attr = (v) => v < n ? [G.h[v], G.forest[v], G.snow[v], G.steep[v]] : [RD.hs[v - n], RD.fo[v - n], RD.sn[v - n], G.steep[RD.cell[v - n]]];
     const vmax = Math.max(pace + cfg.road.highway, BT ? cfg.boat.still + cfg.boat.downShare * BT.maxCur : 0, sea ? Math.max(cfg.sea.normal, cfg.sea.good) / seaF : 0);
@@ -468,6 +532,10 @@
       if (mode === "short") return kind === 0 && sp < 0.5 ? km * 20 : km;
       // fording a river off the roads: hours per size of the river there (a road or path has its bridge)
       const ford = kind === 0 ? fordsOn(u, v) : 0;
+      if (safe) {
+        rc = km / sp + ford;
+        return (km / sp) * risk(u, v, kind, (fu + fv) / 2) + ford;
+      }
       if (mode === "easy") {
         // the easiest way: roads count as shorter than they are, open ground as longer (a path between),
         // and every 250 m up costs an hour more, so it keeps to roads and low ground even if that is slower
@@ -476,17 +544,18 @@
       }
       return km / sp + ford;
     };
-    const g = new Float64Array(N).fill(Infinity), from = new Int32Array(N).fill(-1), via = new Int8Array(N), done = new Uint8Array(N);
+    const g = new Float64Array(N).fill(Infinity), tm = new Float64Array(N), from = new Int32Array(N).fill(-1), via = new Int8Array(N), done = new Uint8Array(N);
     const heap = Heap();
     g[s] = 0; heap.push(heur(s), s);
     const DX = [-1, 0, 1, -1, 1, -1, 0, 1], DY = [-1, -1, -1, 0, 0, 1, 1, 1];
     const relax = (u, v, kind, side) => {
       if (v < n && G.water[v]) return;
-      relaxC(u, v, kind, cost(u, v, kind, side));
+      const c = cost(u, v, kind, side);
+      relaxC(u, v, kind, c, safe ? rc : c);
     };
-    const relaxC = (u, v, kind, c) => {
+    const relaxC = (u, v, kind, c, real) => {
       c += g[u];
-      if (c < g[v]) { g[v] = c; from[v] = u; via[v] = kind; heap.push(c + heur(v), v); }
+      if (c < g[v]) { g[v] = c; tm[v] = tm[u] + (real == null ? c - g[u] : real); from[v] = u; via[v] = kind; heap.push(c + heur(v), v); }
     };
     const fordsOn = (u, v) => {
       let h = 0;
@@ -559,7 +628,7 @@
     pts = wiggle(fm, G, pts, cfg.wiggle, (q) => (G.rivers && G.rivers.seg.length ? routeCrossings(fm, q, G.rivers).reduce((t, c) => t + fordHours(cfg, c.flow, BT != null), 0) : 0));
     let km = 0;
     for (let i = 1; i < pts.length; i++) km += Math.hypot((pts[i].x - pts[i - 1].x) * W, (pts[i].y - pts[i - 1].y) * H) * kmpx;
-    return { pts, km };
+    return { pts, km, hours: tm[t] };
   }
   /**
    * The meander: stretches off the roads and rivers (on foot, or at sea) are bent sideways by a few gentle
@@ -1002,8 +1071,19 @@
       const pace = cfg.pace.normal;
       const out = [], opt = { ferry: !!this.ferry, sea: !!this.sea, boats: this.ferry ? this._ensureBoats() : null,
         hours: clamp(+String(this._lastHours || cfg.hoursPerDay).replace(",", ".") || cfg.hoursPerDay, 0.5, 24) };
-      for (const mode of ["fast", "easy", "short"]) {
-        const r = findRoute(fm, this._grid, this._roads, tv.start, tv.end, mode, cfg, pace, opt);
+      for (const mode of ["fast", "easy", "short", "safe"]) {
+        let r = findRoute(fm, this._grid, this._roads, tv.start, tv.end, mode, cfg, pace, opt);
+        // Säkrast may not take more than maxTimes the time of Snabbast: otherwise ease the extra caution
+        // off (halving the gap each time) until it fits; at nothing it is Snabbast itself
+        const fast = out.find((o) => o.mode === "fast");
+        if (r && mode === "safe" && fast && fast.hours > 0 && r.hours > cfg.safe.maxTimes * fast.hours) {
+          let lo = 0, hi = 1, best = null;
+          for (let i = 0; i < 5; i++) {
+            const mid = (lo + hi) / 2, q = findRoute(fm, this._grid, this._roads, tv.start, tv.end, "safe", cfg, pace, { ...opt, safeScale: mid });
+            if (q && q.hours <= cfg.safe.maxTimes * fast.hours) { lo = mid; best = q; } else hi = mid;
+          }
+          r = best || fast;
+        }
         if (r) out.push({ mode, ...r, sum: routeSummary(fm, r.pts, this._grid.rivers, cfg, opt.ferry) });
       }
       if (!out.length) { this.msg(this.T(opt.sea ? "trNoWayAtAll" : "trNoWay")); tv.end = null; this.picking = "end"; this.render(); fm.draw(); return; }
@@ -1306,7 +1386,7 @@
         ["steep.path", T("trSetSteepPath")], ["steep.road", T("trSetSteepRoad")], ["steep.highway", T("trSetSteepHighway")],
         ["boat.still", T("trSetBoatStill")], ["boat.downShare", T("trSetBoatShare")], ["boat.minUp", T("trSetBoatMinUp")], ["boatMinFlow", T("trSetBoatMin")],
         ["sea.normal", T("trSetSeaNormal")], ["sea.good", T("trSetSeaGood")], ["sea.bad", T("trSetSeaBad")],
-        ["wiggle", T("trSetWiggle")], ["windGood", T("trSetWindGood")], ["windCalm", T("trSetWindCalm")], ["seaAllDay", T("trSetSeaAllDay")], ["boardHours", T("trSetBoard")],
+        ["wiggle", T("trSetWiggle")], ["safe.off", T("trSetSafeOff")], ["safe.perKm", T("trSetSafePerKm")], ["safe.max", T("trSetSafeMax")], ["safe.nation", T("trSetSafeNation")], ["safe.path", T("trSetSafePath")], ["safe.forest", T("trSetSafeForest")], ["safe.maxTimes", T("trSetSafeMaxTimes")], ["windGood", T("trSetWindGood")], ["windCalm", T("trSetWindCalm")], ["seaAllDay", T("trSetSeaAllDay")], ["boardHours", T("trSetBoard")],
       ];
       const get = (k) => k.split(".").reduce((o, p) => o[p], cfg);
       const dlg = this.$("trSettings"), body = this.$("trSettingsBody");
@@ -1567,6 +1647,6 @@
   // for tests
   Travel._steepAt = steepAt;
   Travel._seaSpeed = seaSpeed; Travel._buildBoats = buildBoats;
-  Travel._speedAt = speedAt; Travel._simulate = simulate; Travel._findRoute = findRoute; Travel._buildGrid = buildGrid; Travel._buildRoads = buildRoads; Travel._tripAt = tripAt;
+  Travel._speedAt = speedAt; Travel._simulate = simulate; Travel._findRoute = findRoute; Travel._buildGrid = buildGrid; Travel._buildRoads = buildRoads; Travel._tripAt = tripAt; Travel._defaults = DEFAULTS;
   window.Travel = Travel;
 })();
