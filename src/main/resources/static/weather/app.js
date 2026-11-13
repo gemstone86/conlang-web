@@ -659,6 +659,7 @@
     try { await img.decode(); } catch (e) { emptyState(e.message); return; }
     fieldMap.setImage(img, S.map.width, S.map.height);
     fieldMap.setTileLayers(S.mapLayers || null);
+    fieldMap.setLayerOrder(layerOrderFor(S.map));
     fieldMap.setTiles(S.map.settings && typeof S.map.settings.tiles === "string" ? S.map.settings.tiles : null);
     renderTileChoices();
     renderMapViews();
@@ -2455,6 +2456,26 @@
    * the chosen ids, or null for the default ones (as the zoom images are made). Only shown when the
    * map's zoom images come with layers.
    */
+  /** The order of the map layers (bottom first): the standard map's, also for a map that borrows its zoom images. */
+  function layerOrderFor(map) {
+    const def = map && map.isDefault ? map : (S.maps || []).find((m) => m.isDefault);
+    const o = def && def.settings && def.settings.layerOrder;
+    return Array.isArray(o) ? o : null;
+  }
+  /** Admins: move a layer one place in the list (a place further down lies over the ones above); saved for everyone. */
+  async function moveMapLayer(id, dir) {
+    const ids = fieldMap.tileLayers().map((v) => v.id), i = ids.indexOf(id), j = i + dir;
+    if (i < 0 || j < 0 || j >= ids.length) return;
+    [ids[i], ids[j]] = [ids[j], ids[i]];
+    try {
+      const m = await api("PUT", `/maps/${S.map.id}/layer-order`, { order: ids });
+      S.map.settings = m.settings;
+      const d = (S.maps || []).find((x) => x.id === S.map.id);
+      if (d) d.settings = m.settings;
+      fieldMap.setLayerOrder(ids);
+      renderMapViews();
+    } catch (e) { setStatus(e.message); }
+  }
   function renderMapViews() {
     let layers = [];
     try { layers = fieldMap.tileLayers(); } catch (e) { return; } // called before the map exists
@@ -2465,6 +2486,7 @@
     const lang = S.lang === "EN" ? "en" : "sv";
     const on = new Set(S.mapLayers || layers.filter((v) => v.def).map((v) => v.id));
     list.innerHTML = "";
+    const canOrder = !!(S.admin && S.map && S.map.isDefault);   // only the admins set the order, and only on the standard map
     for (const v of layers) {
       const lab = document.createElement("label");
       const cb = document.createElement("input"); cb.type = "checkbox"; cb.checked = on.has(v.id);
@@ -2476,9 +2498,20 @@
       const name = document.createElement("span");
       name.textContent = typeof v.name === "string" ? v.name : (v.name[lang] || v.name.sv || v.id);
       lab.append(cb, name);
+      if (canOrder) {
+        const idx = layers.indexOf(v), moves = document.createElement("span");
+        moves.className = "ml-moves";
+        const mk = (txt, title, dir, off) => {
+          const b = document.createElement("button"); b.type = "button"; b.className = "ml-move"; b.textContent = txt; b.title = title; b.disabled = off;
+          b.onclick = (e) => { e.preventDefault(); e.stopPropagation(); moveMapLayer(v.id, dir); };
+          return b;
+        };
+        moves.append(mk("▲", T("mlUp"), -1, idx === 0), mk("▼", T("mlDown"), 1, idx === layers.length - 1));
+        lab.append(moves);
+      }
       list.append(lab);
     }
-    const hint = document.createElement("div"); hint.className = "ml-hint"; hint.textContent = T("mlHint");
+    const hint = document.createElement("div"); hint.className = "ml-hint"; hint.textContent = T("mlHint") + (canOrder ? " " + T("mlAdminHint") : "");
     list.append(hint);
     const n = layers.filter((v) => on.has(v.id)).length, isDef = layers.every((v) => v.def === on.has(v.id));
     $("mapLayerSummary").textContent = isDef ? T("mlSumDefault") : n === 0 ? T("mlSumNone") : T("mlSumSome", n, layers.length);

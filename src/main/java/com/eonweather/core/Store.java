@@ -449,6 +449,30 @@ public final class Store {
         });
     }
 
+    /**
+     * Sets keys in the standard map's settings and nothing else (for parts only the admins edit, like the layer order).
+     * A null value removes the key. The map must be the built-in default map.
+     */
+    public void putDefaultMapSettings(long mapId, Map<String, Object> keys) {
+        tx(c -> {
+            String owner = null, json = null;
+            try (PreparedStatement ps = prep(c, "SELECT u.username, m.settings_json FROM maps m JOIN users u ON u.id = m.owner_id WHERE m.id = ?", mapId);
+                 ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) { owner = rs.getString(1); json = rs.getString(2); }
+            }
+            if (owner == null) throw new ApiException(404, "No such map");
+            if (!SYSTEM_USER.equals(owner)) throw new ApiException(400, "Only the standard map has this setting");
+            Map<String, Object> st = new LinkedHashMap<>();
+            if (json != null && !json.isBlank()) Json.parseObject(json).forEach((k, v) -> st.put(String.valueOf(k), v));
+            for (Map.Entry<String, Object> e : keys.entrySet()) {
+                if (e.getValue() == null) st.remove(e.getKey()); else st.put(e.getKey(), e.getValue());
+            }
+            String out = Json.write(st);
+            if (out.length() > 4000) throw new ApiException(400, "Settings too large");
+            return update(c, "UPDATE maps SET settings_json = ? WHERE id = ?", out, mapId);
+        });
+    }
+
     public void replaceMapImage(long ownerId, long id, String type, byte[] image, int w, int h) {
         tx(c -> {
             requireMapOwner(c, ownerId, id);

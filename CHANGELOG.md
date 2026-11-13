@@ -2,6 +2,15 @@
 
 Newest first. Versions from 1.x on are the combined app (Root and Rune + Weather generator).
 
+## v1.19.0 (combined app)
+- Weather map: admins can set which regional map lies over which. In the "Kartbild" list on the standard map, each layer
+  has ▲ ▼ buttons (a place further down lies over the ones above); the order is saved for everyone as
+  `settings.layerOrder` of the standard map. Only the server's admins can do this (the server checks it, not just the page),
+  and only on the standard map; maps that borrow its zoom images use the same order.
+- The order is part of the admin export (under `settings` as `layerOrder`, bottom layer first), and
+  `tools/apply-export.py` puts it into `map.json` with `layerOrderRelease`. A new release keeps an order set in the app
+  unless the release carries a newer one (the same rule as for rivers and nations).
+
 ## v1.18.5 (combined app)
 - New map layer "Damarien": the detailed map of Damarien (Jukon to Quilla, the Purpurhavet coast to Khazimbergen). It is
   placed from landmark towns and the coastline against the first Mundana map, and lies above the Jargien layer (which

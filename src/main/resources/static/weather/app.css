@@ -329,6 +329,9 @@ button.danger { border-color: var(--danger); color: var(--danger); }
 .map-layers .ley-panel label:not(:has(input:checked)) span { color: var(--slate-400); }
 .map-layers .ley-panel .ml-base { border-top: 1px solid var(--slate-700); margin-top: 0.3rem; padding-top: 0.4rem; cursor: default; }
 .map-layers .ley-panel .ml-base span { color: var(--bone-dim) !important; }
+.map-layers .ley-panel .ml-moves { margin-left: auto; display: flex; gap: 0.15rem; }
+.map-layers .ley-panel .ml-move { padding: 0 0.35rem; line-height: 1.3; font-size: 0.7rem; border: 1px solid var(--slate-600, var(--slate-500)); background: transparent; color: var(--bone); border-radius: var(--radius-s); cursor: pointer; }
+.map-layers .ley-panel .ml-move:disabled { opacity: 0.3; cursor: default; }
 .map-layers .ley-panel .ml-hint { font-size: 0.72rem; color: var(--slate-400); padding: 0 0.35rem 0.3rem; }
 /* effect toggles that appear next to their layer */
 .layers label.sub { margin-left: -0.2rem; padding: 0.1rem 0.5rem; font-size: 0.76rem; border-style: dashed; color: var(--bone-dim); }

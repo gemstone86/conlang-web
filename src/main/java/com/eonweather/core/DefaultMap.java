@@ -120,6 +120,9 @@ public final class DefaultMap {
             Long id0 = store.defaultMapId();
             if (id0 != null && store.map(id0, null).get("settings") instanceof Map<?, ?> os) os.forEach((k, v) -> before.put(String.valueOf(k), v));
             java.util.function.Predicate<String> newRelease = (key) -> settings.get(key) != null && !Objects.equals(String.valueOf(settings.get(key)), String.valueOf(before.get(key)));
+            // the order of the map layers is edited in the app by the admins (settings.layerOrder): the app's stays over a new
+            // release's unless the release says its order is newer (settings.layerOrderRelease, set by tools/apply-export.py)
+            if (before.get("layerOrder") != null && !newRelease.test("layerOrderRelease")) settings.put("layerOrder", before.get("layerOrder"));
             boolean changed = store.installDefaultMap(new Store.DefaultMapData(name, Json.write(settings), version,
                     info.type(), image, info.width(), info.height(), heightType, height, anchors, symbols, leylines, zones));
             System.out.println(changed

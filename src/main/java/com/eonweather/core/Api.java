@@ -549,6 +549,24 @@ public final class Api {
                     // removing only hides the map; it is deleted for good a day later (see purgeRemovedMaps)
                     if (m.equals("DELETE")) { long uid = requireUser(req); store.removeMap(uid, id); return Http.Response.json(store.map(id, uid)); }
                 }
+                case "layer-order" -> {
+                    // which regional map lies over which, bottom first: set by the server's admins on the standard map
+                    // (settings.layerOrder; it is part of the admin export and of the release, see DefaultMap)
+                    if (m.equals("PUT")) {
+                        long uid = requireUser(req);
+                        if (!store.isAdmin(uid, admins)) throw new ApiException(403, "Only the server's admins may change the order of the map layers");
+                        if (!(body(req).get("order") instanceof List<?> raw)) throw new ApiException(400, "Expected a list of layer ids");
+                        if (raw.size() > 200) throw new ApiException(400, "Too many layers");
+                        List<String> order = new ArrayList<>();
+                        for (Object o : raw) {
+                            if (!(o instanceof String sid) || !sid.matches("[\\w.-]{1,60}")) throw new ApiException(400, "Not a layer id: " + o);
+                            if (order.contains(sid)) throw new ApiException(400, "A layer is listed twice: " + sid);
+                            order.add(sid);
+                        }
+                        store.putDefaultMapSettings(id, Map.of("layerOrder", order));
+                        return Http.Response.json(store.map(id, uid));
+                    }
+                }
                 case "restore" -> {
                     if (m.equals("POST")) { long uid = requireUser(req); store.restoreMap(uid, id); return Http.Response.json(store.map(id, uid)); }
                 }

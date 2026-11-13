@@ -15,7 +15,8 @@ What it does, part by part (only the parts in export.json "changes"):
   nations   -> default-map/nations.json  ("nations" in map.json)
   ranges    -> default-map/ranges.json   ("ranges" in map.json, mountain ranges)
   roads     -> default-map/roads.json    ("roads" in map.json, roads and paths)
-  anchors, leylines, zones, settings -> map.json
+  anchors, leylines, zones, settings -> map.json (settings.layerOrder, the order of the map layers, also gets
+               settings.layerOrderRelease so it is installed once over an order edited in the app since)
   image     -> default-map/map.jpg (only if the export's picture is a JPEG; otherwise just reported)
   regions   -> world/regions/<file>.yaml (a changed built-in region replaces its own file)
 """
@@ -82,6 +83,9 @@ def main():
             else:
                 st[k] = v
         print("  settings:", ", ".join(ch["settings"]))
+        if "layerOrder" in ch["settings"]:
+            # the order of the map layers (bottom first): the release's version is installed once, over the app's
+            st["layerOrderRelease"] = man.get("exportedAt")
     if "image" in ch:
         f = ch["image"]["file"]
         if f.endswith(".jpg"):

@@ -174,6 +174,7 @@
         const sets = (o) => Object.fromEntries(Object.entries(o || {}).map(([k, a]) => [k, new Set(a)]));
         T.baseMap = m.base ? { tiles: sets(m.base.tiles), hide: sets(m.base.hide), map: m.base.map || null } : null;
         T.layers = T.baseMap ? (m.layers || []).map((v) => ({ id: String(v.id), name: v.name || v.id, def: !!v.default, tiles: sets(v.tiles), map: v.map || null })) : [];
+        T.layersManifest = T.layers; T.layers = this._ordered(T.layers);   // the admins' order (settings.layerOrder) over the manifest's
         T.flat = !!m.flat;                                     // flat: no pre-merged zoom images; the base map picture plus see-through layers only
         T.chosen = null;                                       // null: the default layers (the zoom images as they are)
         /** The images that make zoom image level/x_y for the chosen layers, bottom first ([] = none). */
@@ -190,6 +191,27 @@
         this.setTileLayers(this._tileLayers === undefined ? null : this._tileLayers);
         if (this.onTilesLoaded) this.onTilesLoaded(T.layers);
       } catch (e) { /* no tiles: the map image alone is shown */ }
+    }
+    /**
+     * The order the map layers lie in, bottom first (settings.layerOrder of the standard map), or null for the
+     * manifest's. Layers it doesn't list keep their place; the listed ones swap among the places they have.
+     */
+    setLayerOrder(ids) {
+      this._layerOrder = Array.isArray(ids) ? ids.slice() : null;
+      const T = this.tiles;
+      if (!T) return;
+      T.layers = this._ordered(T.layersManifest || T.layers);
+      this.setTileLayers(this._tileLayers === undefined ? null : this._tileLayers);
+    }
+    _ordered(layers) {
+      const ids = this._layerOrder;
+      if (!ids || !ids.length) return layers;
+      const slots = [], want = [];
+      layers.forEach((v, i) => { if (ids.includes(v.id)) slots.push(i); });
+      for (const id of ids) { const v = layers.find((x) => x.id === id); if (v && !want.includes(v)) want.push(v); }
+      const out = layers.slice();
+      want.forEach((v, k) => { out[slots[k]] = v; });
+      return out;
     }
     /** Which map layers to show over the base map: a list of layer ids, or null for the default ones. */
     setTileLayers(ids) {
