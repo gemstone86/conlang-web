@@ -262,14 +262,42 @@
   P._hpWaterMask = function () {
     const E = this.hp, G = this.heightGrid && this.seaLevel != null ? this.heightGrid() : null;
     if (!G) return null;
-    if (E.water && E.waterKey === G.key + ":" + G.sea) return E.water;
+    // forest also stops at the tree line: ground above treeLine metres is blocked too (0: no limit)
+    const limit = E.target === "forest" ? Math.max(0, +this.hpSettings().treeLine || 0) : 0, hi = limit > 0 ? G.sea + limit / G.mps : Infinity;
+    const key = G.key + ":" + G.sea + ":" + hi;
+    if (E.water && E.waterKey === key) return E.water;
     const m = new Uint8Array(E.w * E.h);
     for (let y = 0; y < E.h; y++) {
       const gy = Math.min(G.h - 1, Math.floor((y + 0.5) * G.h / E.h)), r = gy * G.w;
-      for (let x = 0; x < E.w; x++) m[y * E.w + x] = G.d[r + Math.min(G.w - 1, Math.floor((x + 0.5) * G.w / E.w))] <= G.sea ? 1 : 0;
+      for (let x = 0; x < E.w; x++) { const v = G.d[r + Math.min(G.w - 1, Math.floor((x + 0.5) * G.w / E.w))]; m[y * E.w + x] = v <= G.sea || v > hi ? 1 : 0; }
     }
-    E.water = m; E.waterKey = G.key + ":" + G.sea;
+    E.water = m; E.waterKey = key;
     return m;
+  };
+  /** Takes away the forest above the tree line (one undoable step); returns how many pixels. */
+  P.hpClearAboveTreeLine = function () {
+    const E = this.hp;
+    if (!E || E.target !== "forest") return 0;
+    const m = this._hpWaterMask(), G = this.heightGrid();
+    if (!m || !G) return 0;
+    const lim = Math.max(0, +this.hpSettings().treeLine || 0);
+    if (!lim) return 0;
+    const hi = G.sea + lim / G.mps;
+    this._hpBegin();
+    let n = 0;
+    for (let y = 0; y < E.h; y++) {
+      const gy = Math.min(G.h - 1, Math.floor((y + 0.5) * G.h / E.h)), r = gy * G.w;
+      for (let x = 0; x < E.w; x++) {
+        const i = y * E.w + x;
+        if (E.data[i] && G.d[r + Math.min(G.w - 1, Math.floor((x + 0.5) * G.w / E.w))] > hi) { E.data[i] = 0; n++; }
+      }
+    }
+    this._hpNoKeep = true;
+    if (n) this._hpRefresh(0, 0, E.w, E.h);
+    this._hpNoKeep = false;
+    this._hpEnd();
+    this.draw();
+    return n;
   };
   P._hpKeepDry = function (x0, y0, x1, y1) {
     const E = this.hp, m = this._hpWaterMask();
@@ -282,7 +310,7 @@
   P._hpRefresh = function (x0, y0, x1, y1) {
     const E = this.hp;
     x0 = Math.floor(x0); y0 = Math.floor(y0); x1 = Math.ceil(x1); y1 = Math.ceil(y1);
-    if (E.bbox && (E.target === "forest" || E.target === "marsh")) this._hpKeepDry(x0, y0, x1, y1);
+    if (E.bbox && !this._hpNoKeep && (E.target === "forest" || E.target === "marsh")) this._hpKeepDry(x0, y0, x1, y1);
     this._hpPaintRect(E.view, E.lut, x0, y0, x1, y1);
     this._hpPaintRect(E.grey, this._greyLut || (this._greyLut = greyLut()), x0, y0, x1, y1);
     const b = E.bbox;

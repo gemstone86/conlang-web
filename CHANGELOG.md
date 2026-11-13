@@ -2,6 +2,10 @@
 
 Newest first. Versions from 1.x on are the combined app (Root and Rune + Weather generator).
 
+## v1.21.3 (combined app)
+- Weather map: a **tree line** (trädgräns). When painting forest, the painter has *Trädgräns (m)* (default 3000 m, kept per user; 0 = none): forest isn't painted on ground higher than that, with any tool, and *Ta bort över gränsen* removes forest already above it (undoable).
+- Fix: the page scripts (`app.js`, `fieldmap.js`, …) kept their old `?v=` numbers, so a browser with cached copies mixed old scripts with the new `cities.js` and cities / marshland couldn't be placed. All weather scripts now have a new number; **bump it whenever a weather script changes**.
+
 ## v1.21.2 (combined app)
 - Weather map painter: forest and marshland are no longer painted on water. A pixel at or below the sea level of the height map keeps what it had, with every tool (brush, fill, polygon, …). Ice can still be painted on water (sea ice). Forest already painted on water stays until you paint it away.
 

@@ -54,7 +54,7 @@
   function snapshot() {
     return { region: S.region, year: S.year, month: S.month, day: S.day, lang: S.lang, calendar: S.calendar,
       campaignId: S.campaignId, mapId: S.mapId, layers: S.layers, hour: S.hour, opacity: S.opacity,
-      rainFx: S.rainFx, cloudFx: S.cloudFx, religion: S.religion, leyHidden: S.leyHidden, riversKnown: true, nationsKnown: true, rangesKnown: true, roadsKnown: true, marshKnown: true, cityKnown: true, mapLayers: S.mapLayers || null, w3Rivers: S.w3Rivers !== false, heightPick: S.heightPick || "base", rvSuggest: !!S.rvSuggest, rvSuggestAmt: S.rvSuggestAmt || "many", travel: S.travel || null };
+      rainFx: S.rainFx, cloudFx: S.cloudFx, religion: S.religion, leyHidden: S.leyHidden, riversKnown: true, nationsKnown: true, rangesKnown: true, roadsKnown: true, marshKnown: true, cityKnown: true, treeLine: S.treeLine, mapLayers: S.mapLayers || null, w3Rivers: S.w3Rivers !== false, heightPick: S.heightPick || "base", rvSuggest: !!S.rvSuggest, rvSuggestAmt: S.rvSuggestAmt || "many", travel: S.travel || null };
   }
   function applySnapshot(s) {
     if (!s) return;
@@ -73,6 +73,7 @@
     if (Array.isArray(s.layers) && !s.roadsKnown) S.layers = [...new Set([...S.layers, "ice", "road", "trip"])];
     if (Array.isArray(s.layers) && !s.marshKnown && !S.layers.includes("marsh")) S.layers = [...S.layers, "marsh"];   // marshland came later: shown from the start
     if (Array.isArray(s.layers) && !s.cityKnown && !S.layers.includes("city")) S.layers = [...S.layers, "city"];   // cities came later: shown from the start
+    if (Number.isFinite(s.treeLine)) S.treeLine = s.treeLine;
     if (Number.isInteger(s.hour)) S.hour = s.hour;
     if (typeof s.opacity === "number" && s.opacity >= 0.1 && s.opacity <= 1) S.opacity = s.opacity;
     if (typeof s.rainFx === "boolean") S.rainFx = s.rainFx;
@@ -1208,6 +1209,12 @@
         setStatus(n ? T("hpDivLifted", n.toLocaleString(S.lang === "EN" ? "en-GB" : "sv-SE")) : T("hpDivNothing"));
         $("hpUndo").disabled = !fieldMap.hpCanUndo();
       }, 30);
+    };
+    $("hpTreeLine").onchange = (e) => { const v = Math.max(0, Math.min(20000, +String(e.target.value).replace(",", ".") || 0)); e.target.value = v; S.treeLine = v; fieldMap.hpSettings().treeLine = v; if (fieldMap.hp) fieldMap.hp.water = null; saveState(); };
+    $("hpTreeClear").onclick = () => {
+      const n = fieldMap.hpClearAboveTreeLine();
+      setStatus(n ? T("hpTreeCleared", n.toLocaleString(S.lang === "EN" ? "en-GB" : "sv-SE")) : T("hpTreeNone"));
+      $("hpUndo").disabled = !fieldMap.hpCanUndo();
     };
     $("hpRoadSteep").onchange = (e) => {
       fieldMap.hpSettings().roadSteep = e.target.checked;
@@ -2659,6 +2666,9 @@
     $("anchorRegionBox").hidden = !regions; $("unplacedBox").hidden = !regions; $("leyAspectBox").hidden = regions || height;
     $("zoneNew").hidden = mode !== "zone";
     $("heightBar").hidden = !height;
+    $("hpTreeLineBox").hidden = $("hpTreeClear").hidden = mode !== "forest";
+    $("hpTreeLine").value = S.treeLine != null ? S.treeLine : 3000;
+    fieldMap.hpSettings().treeLine = S.treeLine != null ? S.treeLine : 3000;
     $("editBar").classList.toggle("mode-height", height);
     const river = mode === "river", nation = mode === "nation", range = mode === "range", road = mode === "road", city = mode === "city";
     $("cityBar").hidden = !city;
