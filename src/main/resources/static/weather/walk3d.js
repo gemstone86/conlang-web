@@ -488,7 +488,7 @@ float rockN(vec3 x) {
     const Tl = opts.tiles;
     if (!Tl) return Promise.resolve();
     const c = p.ctx, x0 = p.cx - PATCH / 2, y0 = p.cy - PATCH / 2;
-    const L = Tl.levels.reduce((a, b) => (b.w > a.w ? b : a));
+    const L = Tl.levels.filter((l) => !l.extra).reduce((a, b) => (b.w > a.w ? b : a));   // the ordinary levels; extra (finer) ones are sparse
     const f = L.w / imgW, ts = Tl.ts, jobs = [];
     for (const k of (wrapPx ? [-wrapPx, 0, wrapPx] : [0])) {
       const ax = (x0 - k) * f, ay = y0 * f, bx = (x0 - k + PATCH) * f, by = (y0 + PATCH) * f;

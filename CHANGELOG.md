@@ -2,6 +2,14 @@
 
 Newest first. Versions from 1.x on are the combined app (Root and Rune + Weather generator).
 
+## v1.18.5 (combined app)
+- New map layer "Damarien": the detailed map of Damarien (Jukon to Quilla, the Purpurhavet coast to Khazimbergen). It is
+  placed from landmark towns and the coastline against the first Mundana map, and lies above the Jargien layer (which
+  it partly overlaps in the north-west), so above "Asharien & Damarien" too. Off until chosen, like "Asharien & Damarien".
+- The map is sharper than the full-size zoom level, so the zoom images get an extra, finer level (`-1`, marked
+  `"extra": true` in `manifest.json`). The page draws it on top once you zoom in past the ordinary levels, and the 3D view
+  ignores it. `tools/layer-from-image.py` got `--levels`, `--after` and `--default` for this.
+
 ## v1.18.4 (combined app)
 - Mountain ranges updated from the admin export of 2026-11-12 23:52 (Mundana): the Drakkarbergen chain and one other
   range changed.

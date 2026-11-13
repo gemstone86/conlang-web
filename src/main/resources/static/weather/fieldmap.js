@@ -168,7 +168,7 @@
         const r = await fetch(base + "manifest.json");
         if (!r.ok || this._tilePath !== path) return;
         const m = await r.json();
-        const T = { base, ts: m.tileSize, fullW: m.fullWidth || this.imgW, levels: m.levels.map((l) => ({ level: l.level, w: l.width, h: l.height, have: new Set(l.tiles) })) };
+        const T = { base, ts: m.tileSize, fullW: m.fullWidth || this.imgW, levels: m.levels.map((l) => ({ level: l.level, w: l.width, h: l.height, have: new Set(l.tiles), extra: !!l.extra })) };
         // map layers (manifest "base" and "layers"): the zoom images as they are hold all default
         // layers; any other choice is drawn as the base map with the chosen see-through layers on top
         const sets = (o) => Object.fromEntries(Object.entries(o || {}).map(([k, a]) => [k, new Set(a)]));
@@ -232,16 +232,22 @@
       const shownW = this.imgW * s * dpr;              // device pixels across the whole map
       if (shownW <= this.imgW * 1.15) return;           // the map image is sharp enough
       // coarse → fine; use the first level that is at least as sharp as the screen
-      const lv = [...T.levels].sort((a, b) => a.w - b.w);
+      // "extra" levels (finer than the ordinary ones, with pieces only for the few layers sharp enough to need them)
+      // are drawn on top once the screen is sharper than the finest ordinary level, so every layer keeps its ordinary pieces
+      const all = [...T.levels].sort((a, b) => a.w - b.w), lv = all.filter((l) => !l.extra);
       let target = lv.length - 1;
       for (let i = 0; i < lv.length; i++) if (lv[i].w * 1.15 >= shownW) { target = i; break; }
+      const use = lv.slice(0, target + 1).map((L, i) => ({ L, load: i === target }));
+      if (target === lv.length - 1 && shownW > lv[target].w * 1.15) {
+        for (const L of all.filter((l) => l.extra && l.w > lv[target].w)) { use.push({ L, load: true }); if (L.w * 1.15 >= shownW) break; }
+      }
       const [vx0, vy0] = this.toMap(0, 0), [vx1, vy1] = this.toMap(this.cssW, this.cssH);
       const W = this.imgW * s, H = this.imgH * s;
       ctx.save();
       ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = "high";
       const want = new Set();
-      for (let i = 0; i <= target; i++) {
-        const L = lv[i], ts = T.ts;
+      for (const { L, load } of use) {
+        const ts = T.ts;
         const tx0 = Math.max(0, Math.floor(vx0 * L.w / ts)), tx1 = Math.min(Math.ceil(L.w / ts) - 1, Math.floor(vx1 * L.w / ts));
         const ty0 = Math.max(0, Math.floor(vy0 * L.h / ts)), ty1 = Math.min(Math.ceil(L.h / ts) - 1, Math.floor(vy1 * L.h / ts));
         if ((tx1 - tx0 + 1) * (ty1 - ty0 + 1) > 400) continue; // far too many: wait until zoomed in further
@@ -249,7 +255,7 @@
           const id = tx + "_" + ty;
           const key = L.level + "/" + id;
           let t = this.tileCache.get(key);
-          if (!t && i === target) {
+          if (!t && load) {
             const srcs = T.srcs(L.level, id);
             if (!srcs.length) continue;
             // one or more images (base, then see-through layers); shown once all have come
@@ -261,7 +267,7 @@
             });
             this.tileCache.set(key, t);
           }
-          if (i === target) want.add(key);
+          if (load) want.add(key);
           if (!t || !t.ok) continue;
           t.used = performance.now();
           const tw = Math.min(ts, L.w - tx * ts), th = Math.min(ts, L.h - ty * ts);
