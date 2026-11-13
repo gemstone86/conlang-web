@@ -311,8 +311,9 @@
     }
     getLeylines() { return this.leylines.map((l) => ({ aspect: l.aspect, a: { ...l.a }, b: { ...l.b } })); }
     setEditMode(m) {
-      this.editMode = m === "ley" || m === "zone" || m === "height" || m === "river" || m === "nation" || m === "range" || m === "road" ? m : "regions"; this.selectedLey = -1; this.selectedZone = -1;
+      this.editMode = m === "ley" || m === "zone" || m === "height" || m === "river" || m === "nation" || m === "range" || m === "road" || m === "city" ? m : "regions"; this.selectedLey = -1; this.selectedZone = -1;
       if (m !== "road" && this.wyCancelDraft) this.wyCancelDraft();
+      if (m !== "city" && this.ctSel != null) this.ctSel = null;
       if (m !== "range" && this.rgDrawing && this.rgFinish) this.rgFinish();
       if (m !== "river" && this.rvCancel) { this.rvDraft = null; this._rvSnap = null; }
       if (m !== "nation" && this.ntDrawing && this.ntFinish) this.ntFinish();
@@ -432,7 +433,7 @@
     }
     /** The forest map (greyscale, 0 = no trees … 100 = trees everywhere), or a canvas from the painter. */
     setForestImage(img) {
-      this.forestSource = img || null;
+      this.forestSource = img || null; this._lyrRev = (this._lyrRev || 0) + 1;
       this._fview = null;
       this._iceGrid = null; this._forestGrid = null;
       this.draw();
@@ -444,14 +445,21 @@
       this._iceGrid = null;
       this.draw();
     }
+    /** The marshland map (greyscale, 0 = dry … 100 = marsh everywhere), or a canvas from the painter. */
+    setMarshImage(img) {
+      this.marshSource = img || null; this._lyrRev = (this._lyrRev || 0) + 1;
+      this._mview = null;
+      this._marshGrid = null;
+      this.draw();
+    }
     /**
-     * A painted layer's value at a map point, 0–100 ("forest" or "ice"), from a copy at most 2048 wide
+     * A painted layer's value at a map point, 0–100 ("forest", "ice" or "marsh"), from a copy at most 2048 wide
      * kept until the layer changes. 0 without the layer.
      */
     layerAt(kind, nx, ny) {
-      const src = kind === "ice" ? this.iceSource : this.forestSource;
+      const src = kind === "ice" ? this.iceSource : kind === "marsh" ? this.marshSource : this.forestSource;
       if (!src) return 0;
-      const key = kind === "ice" ? "_iceGrid" : "_forestGrid";
+      const key = kind === "ice" ? "_iceGrid" : kind === "marsh" ? "_marshGrid" : "_forestGrid";
       let G = this[key];
       if (!G || G.src !== src) {
         const w = Math.min(src.naturalWidth || src.width, 2048), h = Math.max(1, Math.round(w * this.imgH / this.imgW));
@@ -1164,6 +1172,16 @@
           ctx.restore();
         }
       }
+      // marshland: murky green-brown (while painting marshland the painter shows its own)
+      if (this.layers.has("marsh") && this.marshSource && this.marshColours && !(this.editing && this.editMode === "height" && this.hpTarget === "marsh")) {
+        const cv = this.marshColours();
+        if (cv) {
+          ctx.save();
+          ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = "high";
+          ctx.drawImage(cv, ox, oy, this.imgW * s, this.imgH * s);
+          ctx.restore();
+        }
+      }
       if (this.layers.has("night")) this._drawNight();
       if (this.editing && this.showHeight && this.height) {
         ctx.save();
@@ -1182,10 +1200,12 @@
       if ((this.layers.has("range") || rangeEdit) && this._rgDraw) this._rgDraw();
       if ((this.layers.has("river") || riverEdit) && this._rvDraw) this._rvDraw();
       const roadEdit = this.editing && this.editMode === "road";
-      if ((this.layers.has("road") || roadEdit) && this._wyDraw) this._wyDraw();
+      if ((this.layers.has("road") || roadEdit || this._wySteepShown()) && this._wyDraw) this._wyDraw();
+      const cityEdit = this.editing && this.editMode === "city";
+      if ((this.layers.has("city") || cityEdit) && this._ctDraw) this._ctDraw();
       if (this._lsDraw) this._lsDraw();                   // the other layers' suggestions (the chosen one)
       if (this._trDraw) this._trDraw();                   // journeys (the travel calculator): routes and tokens
-      const regionEdit = this.editing && !leyEdit && !zoneEdit && !heightEdit && !riverEdit && !nationEdit && !rangeEdit && !roadEdit;   // only when placing regions
+      const regionEdit = this.editing && !leyEdit && !zoneEdit && !heightEdit && !riverEdit && !nationEdit && !rangeEdit && !roadEdit && !cityEdit;   // only when placing regions
       if (regionEdit && this.grid && this.grid.hasAnchors) this._drawTerritories();
       if (this.layers.has("zone") || zoneEdit) this._drawZones(zoneEdit);
       if (this.layers.has("ley") || leyEdit) this._drawLeylines(leyEdit);
@@ -1995,6 +2015,9 @@
         if (this.editing && this.editMode === "road" && this.wyPointerDown && this.wyPointerDown(x, y)) {
           this._wyActive = true; st.setPointerCapture(e.pointerId); return;
         }
+        if (this.editing && this.editMode === "city" && this.ctPointerDown && this.ctPointerDown(x, y)) {
+          this._ctActive = true; st.setPointerCapture(e.pointerId); return;
+        }
         if (this.editing && this.editMode === "height" && this.hpPointerDown && this.hpPointerDown(x, y, e.button)) {
           this._hpActive = true; st.setPointerCapture(e.pointerId); return;
         }
@@ -2008,7 +2031,7 @@
           this._rgActive = true; st.setPointerCapture(e.pointerId); return;
         }
         const leyEdit = this.editing && this.editMode === "ley", zoneEdit = this.editing && this.editMode === "zone";
-        const anchor = this.editing && !this.mapTool && !leyEdit && !zoneEdit && this.editMode !== "river" && this.editMode !== "nation" && this.editMode !== "range" && this.editMode !== "road" ? this._hitAnchor(x, y, 10) : -1;
+        const anchor = this.editing && !this.mapTool && !leyEdit && !zoneEdit && this.editMode !== "river" && this.editMode !== "nation" && this.editMode !== "range" && this.editMode !== "road" && this.editMode !== "city" ? this._hitAnchor(x, y, 10) : -1;
         const zp = zoneEdit ? this._hitZonePoint(x, y, 10) : null;
         if (zp && zp.zi !== this.selectedZone) { this.selectedZone = zp.zi; this.opts.onLeySelected && this.opts.onLeySelected(this.zones[zp.zi].aspect); this.draw(); }
         const ley = leyEdit ? this._hitLeyHandle(x, y, 11) : null;
@@ -2019,6 +2042,7 @@
       st.addEventListener("pointermove", (e) => {
         if (this.mapTool && this.mapTool.move) { const [tx, ty] = pos(e); this.mapTool.move(tx, ty); if (this._toolActive) return; }
         if (this.editing && this.editMode === "road" && this.wyPointerMove) { const [wx, wy] = pos(e); this.wyPointerMove(wx, wy); if (this._wyActive) return; }
+        if (this.editing && this.editMode === "city" && this.ctPointerMove) { const [cx, cy] = pos(e); this.ctPointerMove(cx, cy); if (this._ctActive) return; }
         if (this.editing && this.editMode === "height" && this.hpPointerMove) {
           const [hx, hy] = pos(e);
           this.hpPointerMove(hx, hy);
@@ -2062,6 +2086,7 @@
       st.addEventListener("pointerup", (e) => {
         if (this._toolActive) { this._toolActive = false; const [tx, ty] = pos(e); this.mapTool && this.mapTool.up && this.mapTool.up(tx, ty); return; }
         if (this._wyActive) { this._wyActive = false; const [wx, wy] = pos(e); this.wyPointerUp(wx, wy); return; }
+        if (this._ctActive) { this._ctActive = false; this.ctPointerUp(); return; }
         if (this._hpActive) { this._hpActive = false; this.hpPointerUp(); return; }
         if (this._rvActive) { this._rvActive = false; this.rvPointerUp(); return; }
         if (this._ntActive) { this._ntActive = false; const [ux, uy] = pos(e); this.ntPointerUp(ux, uy); return; }
@@ -2076,6 +2101,8 @@
           // a map tool (the travel calculator) took the click
         } else if (!down.moved && inside && this.editing && this.editMode === "road") {
           this.wyClick && this.wyClick(nx, ny, x, y);
+        } else if (!down.moved && inside && this.editing && this.editMode === "city") {
+          this.ctClick && this.ctClick(nx, ny, x, y);
         } else if (!down.moved && inside) {
           if (this.editing && this.editMode === "river") {
             this.rvClick && this.rvClick(nx, ny, x, y);

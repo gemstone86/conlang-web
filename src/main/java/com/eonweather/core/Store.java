@@ -108,6 +108,13 @@ public final class Store {
             "CREATE TABLE IF NOT EXISTS map_ice (map_id BIGINT PRIMARY KEY REFERENCES maps(id) ON DELETE CASCADE, "
                 + "image_type VARCHAR(64) NOT NULL, image " + blob + " NOT NULL, source VARCHAR(16) NOT NULL, updated_by BIGINT, "
                 + "updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)",
+            // a map's marshland: greyscale, 0 = dry … 100 = marsh everywhere; like the forests
+            "CREATE TABLE IF NOT EXISTS map_marsh (map_id BIGINT PRIMARY KEY REFERENCES maps(id) ON DELETE CASCADE, "
+                + "image_type VARCHAR(64) NOT NULL, image " + blob + " NOT NULL, source VARCHAR(16) NOT NULL, updated_by BIGINT, "
+                + "updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)",
+            // a map's cities, as one JSON list, like the roads
+            "CREATE TABLE IF NOT EXISTS map_cities (map_id BIGINT PRIMARY KEY REFERENCES maps(id) ON DELETE CASCADE, "
+                + "cities " + blob + " NOT NULL, source VARCHAR(16) NOT NULL, updated_by BIGINT, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)",
             // a map's roads and paths, as one JSON list, like the rivers
             "CREATE TABLE IF NOT EXISTS map_roads (map_id BIGINT PRIMARY KEY REFERENCES maps(id) ON DELETE CASCADE, "
                 + "roads " + blob + " NOT NULL, source VARCHAR(16) NOT NULL, updated_by BIGINT, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)",
@@ -359,7 +366,7 @@ public final class Store {
         return tx(c -> {
             List<Map<String, Object>> out = new ArrayList<>();
             String sql = "SELECT m.id, m.name, m.is_public, m.width, m.height, m.owner_id, u.username, m.settings_json, "
-                    + "(SELECT COUNT(*) FROM map_heights h WHERE h.map_id = m.id), (SELECT MAX(rev) FROM map_heights h WHERE h.map_id = m.id), m.deleted_at, (SELECT COUNT(*) FROM map_forests f WHERE f.map_id = m.id), (SELECT COUNT(*) FROM map_ice i WHERE i.map_id = m.id) "
+                    + "(SELECT COUNT(*) FROM map_heights h WHERE h.map_id = m.id), (SELECT MAX(rev) FROM map_heights h WHERE h.map_id = m.id), m.deleted_at, (SELECT COUNT(*) FROM map_forests f WHERE f.map_id = m.id), (SELECT COUNT(*) FROM map_ice i WHERE i.map_id = m.id), (SELECT COUNT(*) FROM map_marsh x WHERE x.map_id = m.id) "
                     + "FROM maps m JOIN users u ON u.id = m.owner_id WHERE (m.is_public = TRUE AND m.deleted_at IS NULL)"
                     + (viewerId != null ? " OR m.owner_id = ?" : "")
                     + " ORDER BY CASE WHEN u.username = ? THEN 0 ELSE 1 END, LOWER(m.name)"; // default map first
@@ -387,6 +394,7 @@ public final class Store {
         m.put("heightRev", rs.getInt(10));
         m.put("hasForest", rs.getLong(12) > 0);
         m.put("hasIce", rs.getLong(13) > 0);
+        m.put("hasMarsh", rs.getLong(14) > 0);
         Timestamp del = rs.getTimestamp(11);
         if (del != null) {
             m.put("removedAt", del.getTime());
@@ -399,7 +407,7 @@ public final class Store {
     public Map<String, Object> map(long id, Long viewerId) {
         return tx(c -> {
             try (PreparedStatement ps = prep(c, "SELECT m.id, m.name, m.is_public, m.width, m.height, m.owner_id, u.username, m.settings_json, "
-                    + "(SELECT COUNT(*) FROM map_heights h WHERE h.map_id = m.id), (SELECT MAX(rev) FROM map_heights h WHERE h.map_id = m.id), m.deleted_at, (SELECT COUNT(*) FROM map_forests f WHERE f.map_id = m.id), (SELECT COUNT(*) FROM map_ice i WHERE i.map_id = m.id) "
+                    + "(SELECT COUNT(*) FROM map_heights h WHERE h.map_id = m.id), (SELECT MAX(rev) FROM map_heights h WHERE h.map_id = m.id), m.deleted_at, (SELECT COUNT(*) FROM map_forests f WHERE f.map_id = m.id), (SELECT COUNT(*) FROM map_ice i WHERE i.map_id = m.id), (SELECT COUNT(*) FROM map_marsh x WHERE x.map_id = m.id) "
                     + "FROM maps m JOIN users u ON u.id = m.owner_id WHERE m.id = ?", id);
                  ResultSet rs = ps.executeQuery()) {
                 if (!rs.next()) throw new ApiException(404, "Map not found");
@@ -552,7 +560,9 @@ public final class Store {
         update(c, "DELETE FROM map_ranges WHERE map_id = ?", id);
         update(c, "DELETE FROM map_forests WHERE map_id = ?", id);
         update(c, "DELETE FROM map_ice WHERE map_id = ?", id);
+        update(c, "DELETE FROM map_marsh WHERE map_id = ?", id);
         update(c, "DELETE FROM map_roads WHERE map_id = ?", id);
+        update(c, "DELETE FROM map_cities WHERE map_id = ?", id);
         update(c, "DELETE FROM map_trips WHERE map_id = ?", id);
         update(c, "DELETE FROM height_suggestions WHERE map_id = ?", id);
         update(c, "DELETE FROM layer_votes WHERE suggestion_id IN (SELECT id FROM layer_suggestions WHERE map_id = ?)", id);
@@ -564,7 +574,7 @@ public final class Store {
     public Map<String, Object> mapRaw(long id) {
         return tx(c -> {
             try (PreparedStatement ps = prep(c, "SELECT m.id, m.name, m.is_public, m.width, m.height, m.owner_id, u.username, m.settings_json, "
-                    + "(SELECT COUNT(*) FROM map_heights h WHERE h.map_id = m.id), (SELECT MAX(rev) FROM map_heights h WHERE h.map_id = m.id), m.deleted_at, (SELECT COUNT(*) FROM map_forests f WHERE f.map_id = m.id), (SELECT COUNT(*) FROM map_ice i WHERE i.map_id = m.id) "
+                    + "(SELECT COUNT(*) FROM map_heights h WHERE h.map_id = m.id), (SELECT MAX(rev) FROM map_heights h WHERE h.map_id = m.id), m.deleted_at, (SELECT COUNT(*) FROM map_forests f WHERE f.map_id = m.id), (SELECT COUNT(*) FROM map_ice i WHERE i.map_id = m.id), (SELECT COUNT(*) FROM map_marsh x WHERE x.map_id = m.id) "
                     + "FROM maps m JOIN users u ON u.id = m.owner_id WHERE m.id = ?", id);
                  ResultSet rs = ps.executeQuery()) {
                 if (!rs.next()) throw new ApiException(404, "Map not found");
@@ -1146,7 +1156,12 @@ public final class Store {
     public void setIce(long mapId, String type, byte[] image, String source, Long userId) { setLayer("map_ice", mapId, type, image, source, userId); }
     public void deleteIce(long mapId) { tx(c -> update(c, "DELETE FROM map_ice WHERE map_id = ?", mapId)); }
 
-    /** A painted layer image ("map_forests", "map_ice"), or null. */
+    // ── Marshland (one greyscale image per map, 0 = dry … 100 = marsh), stored like the forests ──
+    public Forest marsh(long mapId) { return layer("map_marsh", mapId); }
+    public void setMarsh(long mapId, String type, byte[] image, String source, Long userId) { setLayer("map_marsh", mapId, type, image, source, userId); }
+    public void deleteMarsh(long mapId) { tx(c -> update(c, "DELETE FROM map_marsh WHERE map_id = ?", mapId)); }
+
+    /** A painted layer image ("map_forests", "map_ice", "map_marsh"), or null. */
     private Forest layer(String table, long mapId) {
         return tx(c -> {
             try (PreparedStatement ps = prep(c, "SELECT image_type, image, source FROM " + table + " WHERE map_id = ?", mapId); ResultSet rs = ps.executeQuery()) {
@@ -1225,6 +1240,24 @@ public final class Store {
             try (PreparedStatement ps = prep(c, "SELECT roads, source FROM map_roads WHERE map_id = ?", mapId); ResultSet rs = ps.executeQuery()) {
                 return rs.next() ? new Rivers(new String(rs.getBytes(1), java.nio.charset.StandardCharsets.UTF_8), rs.getString(2)) : new Rivers("[]", null);
             }
+        });
+    }
+
+    /** The map's cities as JSON text ("[]" without any), and whether they were last changed in the app. */
+    public Rivers cities(long mapId) {
+        return tx(c -> {
+            try (PreparedStatement ps = prep(c, "SELECT cities, source FROM map_cities WHERE map_id = ?", mapId); ResultSet rs = ps.executeQuery()) {
+                return rs.next() ? new Rivers(new String(rs.getBytes(1), java.nio.charset.StandardCharsets.UTF_8), rs.getString(2)) : new Rivers("[]", null);
+            }
+        });
+    }
+
+    public void setCities(long mapId, String json, String source, Long userId) {
+        byte[] b = json.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        tx(c -> {
+            if (update(c, "UPDATE map_cities SET cities = ?, source = ?, updated_by = ?, updated_at = CURRENT_TIMESTAMP WHERE map_id = ?", b, source, userId, mapId) == 0)
+                update(c, "INSERT INTO map_cities (map_id, cities, source, updated_by) VALUES (?, ?, ?, ?)", mapId, b, source, userId);
+            return null;
         });
     }
 

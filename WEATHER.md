@@ -364,6 +364,18 @@ It is part of the admin export (`forest.png`), and a release can ship one as `de
 
 Glaciers and ice sheets are painted like the forest: *Placera områden* → **Is**, greyscale 0 (no ice) to 100 (all ice), with the same tools, **Ladda upp…**, **Töm…** and **Spara is**. The **Is** layer under *Geografi* shows it in white with a blue tint. In 3D, painted ice is shown as glacier ice (and snow) whatever the temperature, on top of the snow and ice the climate gives. On journeys it counts as deep snow. Stored in `map_ice`; endpoints `GET/PUT/DELETE /weather/api/maps/{id}/ice`; part of the admin export (`ice.png`) and shipped as `default-map/ice.png` (`"ice"` and `iceRelease` in `map.json`), with the same rules as the forest.
 
+### Marshland (sumpmark)
+
+Painted like forest and ice: *Redigera* → **Sumpmark**, 0 = dry … 100 = marsh, shown with the **Sumpmark** layer (murky green). In the travel calculator marshland slows the going off the roads (*Sumpmark: avdrag per 25 %*, 0.75 by default, like forest), and at **100 % it can't be crossed on foot at all**: routes go round it. Roads cross a marsh (a causeway), and a river boat (*Använd färjor*) goes through it along a river. Events can ask about it (`marsh:` in `events.yaml`). Stored in `map_marsh`; `GET/PUT/DELETE /weather/api/maps/{id}/marsh` (a grey PNG, like `/forest`); part of the admin export (`marsh.png`), shipped as `default-map/marsh.png` (`"marsh"` and `marshRelease` in `map.json`). Not part of the suggestion workflow for other people's maps: only the owner (for the standard map, the admins) paints it.
+
+### Cities (städer)
+
+Edited in *Redigera* → **Städer**, shown with the **Städer** layer. Each city has a **name**, a **population** (the disc grows with it) and a **harbour** switch (a blue ring).
+- **Placing:** click on the map. Close to a road (10 px) the city is put on the road line, so the road runs through the city. Click a city to choose it, drag it to move it (it snaps to a road line the same way); *Delete* removes it, *Esc* lets go.
+- **Roads and cities:** a road point dropped on a city, or a new road started on one, snaps to the city. In the travel calculator the roads passing through or ending at a city (within 2.5 map pixels) are joined there, so a road network connected by a city can be travelled as one.
+- **Harbours:** **a sea voyage can only set out from a city with a harbour** (boarding a ship, also from a river mouth); going ashore is possible anywhere. On a map with no harbours at all the old rule stays (a ship can set out from any coast), so existing maps keep working until you mark some.
+- **Saving:** like the roads. **Exportera städer** downloads them. Stored in `map_cities`; `GET/PUT /weather/api/maps/{id}/cities`; each city is `{ id, name, population, harbour, x, y }` (0–1). Part of the admin export (`cities.json`), shipped as `default-map/cities.json` (`"cities"` and `citiesRelease` in `map.json`).
+
 ### Roads and paths (vägar)
 
 Edited in *Placera områden* → **Vägar**, shown with the **Vägar** layer. Each road has a kind: **Stig** (path, a thin dashed brown line), **Väg** (road, light) or **Huvudväg** (highway, wide and yellow), and a name.

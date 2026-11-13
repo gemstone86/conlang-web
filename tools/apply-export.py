@@ -11,10 +11,12 @@ What it does, part by part (only the parts in export.json "changes"):
                height changes accepted in the app after the export are put back on top on install
   forest    -> default-map/forest.png    ("forest" in map.json)
   ice       -> default-map/ice.png       ("ice" in map.json)
+  marsh     -> default-map/marsh.png     ("marsh" in map.json)
   rivers    -> default-map/rivers.json   ("rivers" in map.json)
   nations   -> default-map/nations.json  ("nations" in map.json)
   ranges    -> default-map/ranges.json   ("ranges" in map.json, mountain ranges)
   roads     -> default-map/roads.json    ("roads" in map.json, roads and paths)
+  cities    -> default-map/cities.json   ("cities" in map.json)
   anchors, leylines, zones, settings -> map.json (settings.layerOrder, the order of the map layers, also gets
                settings.layerOrderRelease so it is installed once over an order edited in the app since)
   image     -> default-map/map.jpg (only if the export's picture is a JPEG; otherwise just reported)
@@ -59,12 +61,17 @@ def main():
         mj["forest"] = "forest.png"
         mj.setdefault("settings", {})["forestRelease"] = man.get("exportedAt")
         print(f"  forest map: {ch['forest'].get('forestedPixels', '?')} pixels with trees")
+    if "marsh" in ch and "file" in ch["marsh"]:
+        writes[os.path.join(dm, "marsh.png")] = z.read(ch["marsh"]["file"])
+        mj["marsh"] = "marsh.png"
+        mj.setdefault("settings", {})["marshRelease"] = man.get("exportedAt")
+        print(f"  marshland: {ch['marsh'].get('marshyPixels', '?')} marshy pixels")
     if "ice" in ch and "file" in ch["ice"]:
         writes[os.path.join(dm, "ice.png")] = z.read(ch["ice"]["file"])
         mj["ice"] = "ice.png"
         mj.setdefault("settings", {})["iceRelease"] = man.get("exportedAt")
         print(f"  ice map: {ch['ice'].get('coveredPixels', '?')} pixels with ice")
-    for part in ("rivers", "nations", "ranges", "roads"):
+    for part in ("rivers", "nations", "ranges", "roads", "cities"):
         if part in ch:
             writes[os.path.join(dm, part + ".json")] = z.read(ch[part]["file"])
             mj[part] = part + ".json"

@@ -44,7 +44,7 @@
   const DEFAULTS = {
     pace: { slow: 3, normal: 4, fast: 5 },
     road: { path: 0.5, road: 1, highway: 1.5 },
-    offRoad: 0, riverHoursPerSize: 0.25, forestPer25: 0.5, bad: 1, veryBad: 1, snow: 2, slopeUp: 1, slopeDown: 0.5, minSpeed: 1,
+    offRoad: 0, riverHoursPerSize: 0.25, forestPer25: 0.5, marshPer25: 0.75, bad: 1, veryBad: 1, snow: 2, slopeUp: 1, slopeDown: 0.5, minSpeed: 1,
     badRain: 2, badWind: 14, veryBadRain: 6, veryBadWind: 20,
     hoursPerDay: 10, dayStart: 7, keepDays: 3,
     steep: { path: 5, road: 3, highway: 2 },
@@ -92,11 +92,11 @@
 
   // ── speed ──
   /** km/h. kind 0 off road … 3 highway; forest 0–1; grade % (+ up); snow 0–1; wx 0 fine, 1 bad, 2 really bad. */
-  function speedAt(cfg, pace, kind, forest, grade, snow, wx) {
+  function speedAt(cfg, pace, kind, forest, grade, snow, wx, marsh) {
     let v = pace + (kind === 3 ? cfg.road.highway : kind === 2 ? cfg.road.road : kind === 1 ? cfg.road.path : 0);
     const road = kind >= 2;
     if (kind === 0) v -= cfg.offRoad;                       // no road or path at all
-    if (!road) v -= cfg.forestPer25 * 4 * forest;
+    if (!road) v -= cfg.forestPer25 * 4 * forest + cfg.marshPer25 * 4 * (marsh || 0);
     if (wx >= 1 && !road) v -= cfg.bad;
     if (wx >= 2) v -= cfg.veryBad;
     v -= cfg.snow * snow;
@@ -254,7 +254,7 @@
     const W = fm.imgW, H = fm.imgH, gw = Math.ceil(W / CELL), gh = Math.ceil(H / CELL), n = gw * gh;
     const HG = fm.heightGrid();
     if (!HG) return null;
-    const h = new Float32Array(n), water = new Uint8Array(n), forest = new Float32Array(n), snow = new Float32Array(n), steep = new Float32Array(n);
+    const h = new Float32Array(n), water = new Uint8Array(n), forest = new Float32Array(n), marsh = new Float32Array(n), snow = new Float32Array(n), steep = new Float32Array(n);
     // the climate on a coarser grid (every 6 cells)
     const CS = 6, cw = Math.ceil(gw / CS) + 1, ch = Math.ceil(gh / CS) + 1, clim = new Array(cw * ch);
     for (let j = 0; j < ch; j++) for (let i = 0; i < cw; i++) clim[j * cw + i] = climate ? climate(Math.min(1, (i * CS + 0.5) * CELL / W), Math.min(1, (j * CS + 0.5) * CELL / H)) : null;
@@ -264,12 +264,22 @@
       h[k] = m; water[k] = m <= 0 ? 1 : 0;
 
       forest[k] = fm.layerAt("forest", nx, ny) / 100;
+      marsh[k] = fm.layerAt("marsh", nx, ny) / 100;
       snow[k] = deepSnow(clim[Math.round(j / CS) * cw + Math.round(i / CS)], m, fm.layerAt("ice", nx, ny));
     }
     // how steep each cell is, from every pixel of the height map, so a narrow ridge or a cliff between
     // cell centres is never missed
     cellSteepness(fm, HG, gw, gh, steep, water);
-    return { gw, gh, n, h, water, forest, snow, steep, W, H, HG };
+    // harbours: the cells within two of a city with a harbour (a ship sets out from there, if the map has any)
+    const harbour = new Uint8Array(n);
+    let hasHarbours = false;
+    for (const c of fm.cities || []) {
+      if (!c.harbour) continue;
+      hasHarbours = true;
+      const ci = clamp(Math.floor(c.x * W / CELL), 0, gw - 1), cj = clamp(Math.floor(c.y * H / CELL), 0, gh - 1);
+      for (let j = Math.max(0, cj - 2); j <= Math.min(gh - 1, cj + 2); j++) for (let i = Math.max(0, ci - 2); i <= Math.min(gw - 1, ci + 2); i++) harbour[j * gw + i] = 1;
+    }
+    return { gw, gh, n, h, water, forest, marsh, snow, steep, harbour, hasHarbours, W, H, HG };
   }
   function cellSteepness(fm, HG, gw, gh, steep, water) {
     // half the steepest spot and half the average over the cell: a narrow ridge or cliff still shows, but
@@ -341,7 +351,7 @@
 
   /** Road points every map pixel: x, y (0–1), kind (1–3), the grid cell, and who they connect to. */
   function buildRoads(fm, G, climate) {
-    const W = fm.imgW, H = fm.imgH, xs = [], ys = [], kinds = [], hs = [], fo = [], sn = [], nb = [];
+    const W = fm.imgW, H = fm.imgH, xs = [], ys = [], kinds = [], hs = [], fo = [], ma = [], sn = [], nb = [];
     const link = (a, b, k) => { nb[a].push(b, k); nb[b].push(a, k); };
     for (const r of fm.roads || []) {
       if (r.points.length < 2) continue;
@@ -352,7 +362,7 @@
         for (let t = s ? 1 : 0; t <= m; t++) {
           const x = a.x + (b.x - a.x) * t / m, y = a.y + (b.y - a.y) * t / m, id = xs.length;
           const hm = fm.groundM(x, y, G.HG);
-          xs.push(x); ys.push(y); kinds.push(kind); hs.push(hm); fo.push(fm.layerAt("forest", x, y) / 100);
+          xs.push(x); ys.push(y); kinds.push(kind); hs.push(hm); fo.push(fm.layerAt("forest", x, y) / 100); ma.push(fm.layerAt("marsh", x, y) / 100);
           sn.push(deepSnow(climate ? climate(x, y) : null, hm, fm.layerAt("ice", x, y)));
           nb.push([]);
           if (prev >= 0) link(prev, id, kind);
@@ -372,12 +382,24 @@
         if (Math.hypot((xs[q] - xs[p]) * W, (ys[q] - ys[p]) * H) <= 1.2) link(p, q, Math.min(kinds[p], kinds[q]));
       }
     }
+    // cities: the roads passing through (or ending at) a city are joined there
+    for (const c of fm.cities || []) {
+      const near = [], ci = Math.floor(c.x * W / 2), cj = Math.floor(c.y * H / 2);
+      for (let di = -2; di <= 2; di++) for (let dj = -2; dj <= 2; dj++) for (const q of hash.get(key(ci + di, cj + dj)) || [])
+        if (Math.hypot((xs[q] - c.x) * W, (ys[q] - c.y) * H) <= 2.5) near.push(q);
+      near.sort((a, b) => Math.hypot((xs[a] - c.x) * W, (ys[a] - c.y) * H) - Math.hypot((xs[b] - c.x) * W, (ys[b] - c.y) * H));
+      const use = near.slice(0, 8);
+      for (let i = 0; i < use.length; i++) for (let j = i + 1; j < use.length; j++) {
+        const p = use[i], q = use[j];
+        if (!nb[p].includes(q)) link(p, q, Math.min(kinds[p], kinds[q]));
+      }
+    }
     const cell = new Int32Array(R);
     for (let p = 0; p < R; p++) cell[p] = clamp(Math.floor(ys[p] * H / CELL), 0, G.gh - 1) * G.gw + clamp(Math.floor(xs[p] * W / CELL), 0, G.gw - 1);
     // each grid cell's road points (to step onto the road from the land around)
     const onCell = new Map();
     for (let p = 0; p < R; p++) (onCell.get(cell[p]) || onCell.set(cell[p], []).get(cell[p])).push(p);
-    return { R, xs, ys, kinds, hs, fo, sn, nb, cell, onCell };
+    return { R, xs, ys, kinds, hs, fo, ma, sn, nb, cell, onCell };
   }
 
   /**
@@ -515,7 +537,7 @@
     };
     let rc = 0;                                  // the time a stretch really takes, without Säkrast's extra
     const pos = (v) => v < n ? [((v % gw) + 0.5) * CELL / W, (Math.floor(v / gw) + 0.5) * CELL / H] : v < nB ? [RD.xs[v - n], RD.ys[v - n]] : [BT.xs[v - nB], BT.ys[v - nB]];
-    const attr = (v) => v < n ? [G.h[v], G.forest[v], G.snow[v], G.steep[v]] : [RD.hs[v - n], RD.fo[v - n], RD.sn[v - n], G.steep[RD.cell[v - n]]];
+    const attr = (v) => v < n ? [G.h[v], G.forest[v], G.snow[v], G.steep[v], G.marsh[v]] : [RD.hs[v - n], RD.fo[v - n], RD.sn[v - n], G.steep[RD.cell[v - n]], RD.ma[v - n]];
     const vmax = Math.max(pace + cfg.road.highway, BT ? cfg.boat.still + cfg.boat.downShare * BT.maxCur : 0, sea ? Math.max(cfg.sea.normal, cfg.sea.good) / seaF : 0);
     const [tx, ty] = pos(t);
     const heur = (v) => { const [x, y] = pos(v), km = Math.hypot((x - tx) * W, (y - ty) * H) * kmpx; return mode === "short" ? km : km / vmax; };
@@ -523,10 +545,10 @@
     // beside it too: a ridge running from corner to corner can't be slipped through)
     const cost = (u, v, kind, side) => {
       const [ux, uy] = pos(u), [vx, vy] = pos(v), km = Math.hypot((vx - ux) * W, (vy - uy) * H) * kmpx;
-      const [hu, fu, su, tu] = attr(u), [hv, fv, sv, tv] = attr(v);
+      const [hu, fu, su, tu, mu] = attr(u), [hv, fv, sv, tv, mv] = attr(v);
       const grade = km > 0 ? (Math.max(0, hv) - Math.max(0, hu)) / (km * 1000) * 100 : 0;
       const st = Math.max(tu, tv, side || 0);
-      const sp = speedAt(cfg, pace, kind, (fu + fv) / 2, effGrade(kind, grade, st), (su + sv) / 2, 0);
+      const sp = speedAt(cfg, pace, kind, (fu + fv) / 2, effGrade(kind, grade, st), (su + sv) / 2, 0, (mu + mv) / 2);
       // the shortest way that is still passable: ground slower than half a km/h off the roads (mountains,
       // cliffs) counts twenty times its length, so it is only crossed where there is no way round
       if (mode === "short") return kind === 0 && sp < 0.5 ? km * 20 : km;
@@ -534,7 +556,7 @@
       const ford = kind === 0 ? fordsOn(u, v) : 0;
       if (safe) {
         rc = km / sp + ford;
-        return (km / sp) * risk(u, v, kind, (fu + fv) / 2) + ford;
+        return (km / sp) * risk(u, v, kind, (fu + fv + mu + mv) / 2) + ford;
       }
       if (mode === "easy") {
         // the easiest way: roads count as shorter than they are, open ground as longer (a path between),
@@ -550,6 +572,8 @@
     const DX = [-1, 0, 1, -1, 1, -1, 0, 1], DY = [-1, -1, -1, 0, 0, 1, 1, 1];
     const relax = (u, v, kind, side) => {
       if (v < n && G.water[v]) return;
+      // full marshland can't be crossed on foot (roads cross it; a river boat goes through)
+      if (v < n && kind === 0 && G.marsh[v] >= 0.995) return;
       const c = cost(u, v, kind, side);
       relaxC(u, v, kind, c, safe ? rc : c);
     };
@@ -581,7 +605,7 @@
           const v = j * gw + i;
           if (wet || G.water[v]) {
             // at sea (and out to sea from the shore, or ashore): a ship
-            if (sea) relaxC(u, v, 5, boatCost(kmOf(u, v), cfg.sea.normal / seaF, !wet));
+            if (sea && (wet || !G.hasHarbours || G.harbour[u])) relaxC(u, v, 5, boatCost(kmOf(u, v), cfg.sea.normal / seaF, !wet));   // a ship sets out from a harbour only
             continue;
           }
           const side = DX[d] && DY[d] ? Math.max(G.steep[uj * gw + i], G.steep[j * gw + ui]) : 0;
@@ -600,7 +624,7 @@
           relaxC(u, nB + L[q], k, boatCost(kmOf(u, nB + L[q]), boatSpeed(cfg, k, c), false));
         }
         const c = BT.cell[p];                                                // ashore (or onto a ship at the mouth)
-        if (isWater(c)) { if (sea) relaxC(u, c, 5, boatCost(kmOf(u, c), cfg.sea.normal / seaF, true)); }
+        if (isWater(c)) { if (sea && (!G.hasHarbours || G.harbour[c])) relaxC(u, c, 5, boatCost(kmOf(u, c), cfg.sea.normal / seaF, true)); }
         else relaxC(u, c, 0, mode === "short" ? kmOf(u, c) : kmOf(u, c) / pace + fordsOn(u, c));
       } else {
         const p = u - n, L = RD.nb[p];
@@ -735,7 +759,7 @@
         const x = a.x + (b.x - a.x) * t / m, y = a.y + (b.y - a.y) * t / m;
         const nxt = t === m && i + 1 < pts.length - 1;
         S.push({ km: km + L * kmpx * t / m, x, y, k: nxt ? pts[i + 1].k : a.k, c: nxt ? pts[i + 1].c : a.c,
-          h: HG ? fm.groundM(x, y, HG) : 0, f: fm.layerAt("forest", x, y) / 100, ice: fm.layerAt("ice", x, y) });
+          h: HG ? fm.groundM(x, y, HG) : 0, f: fm.layerAt("forest", x, y) / 100, m: fm.layerAt("marsh", x, y) / 100, ice: fm.layerAt("ice", x, y) });
       }
       km += L * kmpx;
     }
@@ -814,7 +838,7 @@
           } else if (RIVER_K(s.k)) v = boatSpeed(cfg, s.k, s.c);
           else {
             const wx = weatherLevel(fm, cfg, s.x, s.y, F, hourG);
-            v = speedAt(cfg, trip.pace, s.k, s.f, s.g, deepSnow(climCache.get(ck), s.h, s.ice), wx);
+            v = speedAt(cfg, trip.pace, s.k, s.f, s.g, deepSnow(climCache.get(ck), s.h, s.ice), wx, s.m);
           }
           let nd = Math.min(total, d + v * dt);
           if (fi < fords.length && fords[fi].km <= nd) { nd = Math.max(d, fords[fi].km); pend += fordHours(cfg, fords[fi].flow, !!trip.ferry); fi++; }
@@ -1379,7 +1403,7 @@
       const rows = [
         ["pace.slow", T("trSetSlow")], ["pace.normal", T("trSetNormal")], ["pace.fast", T("trSetFast")],
         ["road.path", T("trSetPath")], ["road.road", T("trSetRoad")], ["road.highway", T("trSetHighway")],
-        ["offRoad", T("trSetOffRoad")], ["riverHoursPerSize", T("trSetRiver")], ["forestPer25", T("trSetForest")], ["bad", T("trSetBad")], ["veryBad", T("trSetVeryBad")], ["snow", T("trSetSnow")],
+        ["offRoad", T("trSetOffRoad")], ["riverHoursPerSize", T("trSetRiver")], ["forestPer25", T("trSetForest")], ["marshPer25", T("trSetMarsh")], ["bad", T("trSetBad")], ["veryBad", T("trSetVeryBad")], ["snow", T("trSetSnow")],
         ["slopeUp", T("trSetUp")], ["slopeDown", T("trSetDown")], ["minSpeed", T("trSetMin")],
         ["badRain", T("trSetBadRain")], ["badWind", T("trSetBadWind")], ["veryBadRain", T("trSetVeryBadRain")], ["veryBadWind", T("trSetVeryBadWind")],
         ["hoursPerDay", T("trSetHours")], ["dayStart", T("trSetStart")], ["keepDays", T("trSetKeep")],
@@ -1439,7 +1463,7 @@
     _ensureGrid() {
       const fm = this.fm, serial = Math.floor(fm.T || 0);
       const rivSig = (fm.rivers || []).length + ":" + (fm.rivers || []).reduce((a, r) => a + r.points.length + r.size, 0);
-      const key = serial + ":" + (fm.heightGrid() || {}).key + ":" + JSON.stringify(this.cfg().steep);
+      const key = serial + ":" + (fm.heightGrid() || {}).key + ":" + JSON.stringify(this.cfg().steep) + ":" + (fm._lyrRev || 0);
       if (!this._grid || this._gridKey !== key) {
         const climate = this.ctx.climateFor(serial);
         this._grid = buildGrid(fm, climate);
@@ -1474,7 +1498,7 @@
       const c = cv.getContext("2d"), img = c.createImageData(G.gw, G.gh), px = img.data;
       for (let k = 0; k < G.n; k++) {
         if (G.water[k]) continue;
-        const v = speedAt(cfg, pace, 0, G.forest[k], CROSS * G.steep[k], G.snow[k], 0);
+        const v = speedAt(cfg, pace, 0, G.forest[k], CROSS * G.steep[k], G.snow[k], 0, G.marsh[k]);
         const col = v >= pace - cfg.offRoad - 0.3 ? null : v >= 2 ? [240, 220, 80, 110] : v >= 1 ? [245, 150, 50, 170] : v >= 0.5 ? [220, 40, 40, 210] : [110, 20, 120, 230];
         if (!col) continue;
         px.set(col, k * 4);

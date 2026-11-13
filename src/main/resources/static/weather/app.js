@@ -9,7 +9,7 @@
     campaignId: 0, campaigns: [],
     comments: {}, campaignNotes: {},
     maps: [], mapId: null, map: null, anchorsDirty: false, editing: false,
-    layers: ["cloud", "rain", "magic", "night", "ley", "zone", "river", "range", "nation", "ice", "road", "trip"], leyHidden: [], hour: 12, opacity: 1, mySymbols: {}, rainFx: true, cloudFx: true,
+    layers: ["cloud", "rain", "magic", "night", "ley", "zone", "river", "range", "nation", "ice", "marsh", "city", "road", "trip"], leyHidden: [], hour: 12, opacity: 1, mySymbols: {}, rainFx: true, cloudFx: true,
     fieldCache: new Map(), fieldPending: new Map(), hourF: 12,
     dayData: null, monthData: null, field: null,
   };
@@ -54,7 +54,7 @@
   function snapshot() {
     return { region: S.region, year: S.year, month: S.month, day: S.day, lang: S.lang, calendar: S.calendar,
       campaignId: S.campaignId, mapId: S.mapId, layers: S.layers, hour: S.hour, opacity: S.opacity,
-      rainFx: S.rainFx, cloudFx: S.cloudFx, religion: S.religion, leyHidden: S.leyHidden, riversKnown: true, nationsKnown: true, rangesKnown: true, roadsKnown: true, mapLayers: S.mapLayers || null, w3Rivers: S.w3Rivers !== false, heightPick: S.heightPick || "base", rvSuggest: !!S.rvSuggest, rvSuggestAmt: S.rvSuggestAmt || "many", travel: S.travel || null };
+      rainFx: S.rainFx, cloudFx: S.cloudFx, religion: S.religion, leyHidden: S.leyHidden, riversKnown: true, nationsKnown: true, rangesKnown: true, roadsKnown: true, marshKnown: true, cityKnown: true, mapLayers: S.mapLayers || null, w3Rivers: S.w3Rivers !== false, heightPick: S.heightPick || "base", rvSuggest: !!S.rvSuggest, rvSuggestAmt: S.rvSuggestAmt || "many", travel: S.travel || null };
   }
   function applySnapshot(s) {
     if (!s) return;
@@ -71,6 +71,8 @@
     if (Array.isArray(s.layers) && !s.rangesKnown && !S.layers.includes("range")) S.layers = [...S.layers, "range"];
     // ice, roads and journeys came in 2.01: shown from the start
     if (Array.isArray(s.layers) && !s.roadsKnown) S.layers = [...new Set([...S.layers, "ice", "road", "trip"])];
+    if (Array.isArray(s.layers) && !s.marshKnown && !S.layers.includes("marsh")) S.layers = [...S.layers, "marsh"];   // marshland came later: shown from the start
+    if (Array.isArray(s.layers) && !s.cityKnown && !S.layers.includes("city")) S.layers = [...S.layers, "city"];   // cities came later: shown from the start
     if (Number.isInteger(s.hour)) S.hour = s.hour;
     if (typeof s.opacity === "number" && s.opacity >= 0.1 && s.opacity <= 1) S.opacity = s.opacity;
     if (typeof s.rainFx === "boolean") S.rainFx = s.rainFx;
@@ -589,16 +591,17 @@
     onLeylinesChanged: () => { S.anchorsDirty = true; S.leyDirty = true; $("saveAnchors").textContent = T("savePositions") + " •"; renderLegend(); renderLeyFilter(); },
     onLeySelected: (aspect) => { $("leyAspect").value = aspect; },
     onDivides: (r) => { $("hpDivCount").textContent = r.rivers ? T("hpDivCount", r.low, r.ok + r.low, r.up) : T("hpDivNone"); $("hpDivLift").disabled = !r.low; },
+    onRoadSteep: (n, r) => { const el = $("hpRoadSteepCount"); if (el) el.textContent = n ? T("hpRoadSteepCount", n, r) : T("hpRoadSteepNone"); },
     onOutliers: (n) => { $("hpOutCount").textContent = T("hpOutCount", n.toLocaleString(S.lang === "EN" ? "en-GB" : "sv-SE")); },
     onHeightChanged: (t) => {
-      if (t === "forest" || t === "ice") { markForestDirty(true); return; }
+      if (t === "forest" || t === "ice" || t === "marsh") { markForestDirty(true); return; }
       markHeightDirty(true);
       if (fieldMap.heightSource && !fieldMap.heightSource._derived) S.heightBase = fieldMap.heightSource;   // the painted base
       sugDrain = null;                                    // suggested rivers: worked out again from the new heights
     },
     onHeightPicked: (v) => setHpValue(v),
     onHeightHover: (v) => {
-      $("hpHover").textContent = v == null ? "\u00a0" : forestMode() ? T("hpHere", T(layerKind() === "ice" ? "ipCover" : "fpDensity", Math.min(v, 100)))
+      $("hpHover").textContent = v == null ? "\u00a0" : forestMode() ? T("hpHere", T(LK[layerKind()].dens, Math.min(v, 100)))
         : T("hpHere", heightText(v) + (fieldMap.metersPerStep ? ` (${v})` : ""));
     },
     onHeightPoly: () => syncHpToolUi(),
@@ -609,6 +612,8 @@
     onRangeSelected: () => renderRangeBar(),
     onRoadsChanged: () => { S.roadsDirty = true; $("wySave").textContent = T("wySave") + " •"; renderRoadBar(); scheduleRoadSave(); if (window.Travel) Travel.roadsChanged(); },
     onRoadSelected: () => renderRoadBar(),
+    onCitiesChanged: () => { S.citiesDirty = true; $("ctSave").textContent = T("ctSave") + " •"; renderCityBar(); scheduleCitySave(); if (window.Travel) Travel.roadsChanged(); },
+    onCitySelected: () => renderCityBar(),
     onNationsChanged: () => { S.nationsDirty = true; $("ntSave").textContent = T("ntSave") + " •"; renderNationBar(); scheduleNationSave(); },
     onNationSelected: () => renderNationBar(),
     onRiversChanged: () => { scheduleDerived(); if (S.rvSuggest) updateSuggestions(); S.riversDirty = true; $("rvSave").textContent = T("rvSave") + " •"; renderRiverBar(); scheduleRiverSave(); },
@@ -642,7 +647,7 @@
     SG.data = null; SG.selId = null; SG.sel = null; SG.ldata = null; SG.lselId = null; SG.lsel = null;
     setEditing(false);
     if (fieldMap.hpClose) fieldMap.hpClose();
-    S.heightDirty = false; S.forestDirty = false; S.iceDirty = false;
+    S.heightDirty = false; S.forestDirty = false; S.iceDirty = false; S.marshDirty = false;
     closePopup();
     S.map = S.maps.find((m) => m.id === S.mapId) || null;
     $("editMap").hidden = !(S.map && !S.map.removedAt && (S.map.mine || (S.map.isDefault && S.admin)));
@@ -696,7 +701,9 @@
     loadHeight().then(() => loadSuggestions());
     loadForest();
     loadIce();
+    loadMarsh();
     loadRoads();
+    loadCities();
     loadTrips();
     S.anchorsDirty = false; S.leyDirty = false;
     renderLegend();
@@ -1002,12 +1009,18 @@
     if (sea == null || !mps) return String(Math.round(v));
     return v >= sea ? T("masl", fmtInt((v - sea) * mps)) : T("seaDepth", fmtInt((sea - v) * mps));
   }
-  /** Painting a layer (forest or ice, 0–100) rather than heights; layerKind() says which. */
-  const forestMode = () => fieldMap.hpTarget === "forest" || fieldMap.hpTarget === "ice";
-  const layerKind = () => (fieldMap.hpTarget === "ice" ? "ice" : "forest");
+  /** Painting a layer (forest, ice or marshland, 0–100) rather than heights; layerKind() says which. */
+  const forestMode = () => fieldMap.hpTarget === "forest" || fieldMap.hpTarget === "ice" || fieldMap.hpTarget === "marsh";
+  const layerKind = () => (fieldMap.hpTarget === "ice" || fieldMap.hpTarget === "marsh" ? fieldMap.hpTarget : "forest");
+  // what differs between the painted layers: strings, the flag for unsaved changes, the brush default, the file name
+  const LK = {
+    forest: { dens: "fpDensity", label: "fpDensityLabel", save: "fpSave", saved: "fpSaved", clear: "fpClearText", dirty: "forestDirty", def: 60, hint: "forestHint", sv: "-skog.png", en: "-forest.png" },
+    ice: { dens: "ipCover", label: "ipCoverLabel", save: "ipSave", saved: "ipSaved", clear: "ipClearText", dirty: "iceDirty", def: 100, hint: "iceHint", sv: "-is.png", en: "-ice.png" },
+    marsh: { dens: "mpCover", label: "mpCoverLabel", save: "mpSave", saved: "mpSaved", clear: "mpClearText", dirty: "marshDirty", def: 100, hint: "marshHint", sv: "-sumpmark.png", en: "-marshland.png" },
+  };
   function updateHpValueLabel() {
     const v = +$("hpValue").value;
-    $("hpValueM").textContent = forestMode() ? T(layerKind() === "ice" ? "ipCover" : "fpDensity", v) : fieldMap.seaLevel != null && fieldMap.metersPerStep ? heightText(v) : "";
+    $("hpValueM").textContent = forestMode() ? T(LK[layerKind()].dens, v) : fieldMap.seaLevel != null && fieldMap.metersPerStep ? heightText(v) : "";
   }
   function setHpValue(v) {
     v = Math.max(0, Math.min(forestMode() ? 100 : 255, Math.round(+v || 0)));
@@ -1022,9 +1035,9 @@
   }
   /** The layer being painted (forest or ice) has unsaved changes. */
   function markForestDirty(on) {
-    const ice = layerKind() === "ice";
-    if (ice) S.iceDirty = on; else S.forestDirty = on;
-    $("hpSave").textContent = T(ice ? "ipSave" : "fpSave") + (on ? " •" : "");
+    const k = LK[layerKind()];
+    S[k.dirty] = on;
+    $("hpSave").textContent = T(k.save) + (on ? " •" : "");
     $("hpUndo").disabled = !fieldMap.hpCanUndo();
   }
   /** The ice map, for the "Is" layer, the painter and 3D (none: no ice anywhere). */
@@ -1035,6 +1048,16 @@
     img.src = `/weather/api/maps/${map.id}/ice?v=${Date.now()}`;
     try { await img.decode(); } catch (e) { fieldMap.setIceImage(null); return null; }
     if (S.map === map) fieldMap.setIceImage(img);
+    return img;
+  }
+  /** The marshland map, for the "Sumpmark" layer, the painter and the travel calculator (none: dry everywhere). */
+  async function loadMarsh() {
+    const map = S.map;
+    if (!map || !map.hasMarsh) { fieldMap.setMarshImage(null); return null; }
+    const img = new Image();
+    img.src = `/weather/api/maps/${map.id}/marsh?v=${Date.now()}`;
+    try { await img.decode(); } catch (e) { fieldMap.setMarshImage(null); return null; }
+    if (S.map === map) fieldMap.setMarshImage(img);
     return img;
   }
   /** The forest map, for the "Skog" layer and the painter (none: no trees anywhere). */
@@ -1049,12 +1072,12 @@
   }
   async function saveForest() {
     if (!S.map || !fieldMap.hpHas() || !forestMode()) return;
-    const ice = layerKind() === "ice";
+    const kind = layerKind();
     try {
       const blob = await fieldMap.hpPNG();
-      Object.assign(S.map, await api("PUT", `/maps/${S.map.id}/${ice ? "ice" : "forest"}`, blob, "image/png"));
+      Object.assign(S.map, await api("PUT", `/maps/${S.map.id}/${kind}`, blob, "image/png"));
       markForestDirty(false);
-      setStatus(T(ice ? "ipSaved" : "fpSaved"));
+      setStatus(T(LK[kind].saved));
     } catch (e) { setStatus(T("saveFailed") + e.message); }
   }
   function openHeightPainter() {
@@ -1063,17 +1086,17 @@
     const forest = forestMode();
     $("hpValue").max = $("hpValueNum").max = forest ? 100 : 255;
     $("hpTol").max = $("hpTolOut").max = forest ? 100 : 255;
-    document.querySelector('.hp-value [data-i18n="hpHeight"]').textContent = T(forest ? (layerKind() === "ice" ? "ipCoverLabel" : "fpDensityLabel") : "hpHeight");
+    document.querySelector('.hp-value [data-i18n="hpHeight"]').textContent = T(forest ? LK[layerKind()].label : "hpHeight");
     if (forest && ["river", "ridge", "coast", "erode", "rough", "plateau"].includes(fieldMap.hpSettings().tool)) {
       fieldMap.hpSet_("tool", "brush");
       document.querySelector('input[name="hpTool"][value="brush"]').checked = true;
       syncHpToolUi();
     }
-    setHpValue((S.hpVals || {})[forest ? layerKind() : "height"] ?? (forest ? (layerKind() === "ice" ? 100 : 60) : 140));
+    setHpValue((S.hpVals || {})[forest ? layerKind() : "height"] ?? (forest ? LK[layerKind()].def : 140));
     if (!forest && $("hpDiv").checked) setTimeout(() => fieldMap.hpSetDivides(true), 30);   // the rivers may have changed meanwhile
     if (forest) {
       fieldMap.hpOpen();
-      markForestDirty(!!(layerKind() === "ice" ? S.iceDirty : S.forestDirty));
+      markForestDirty(!!S[LK[layerKind()].dirty]);
       return;
     }
     $("hpSave").textContent = T("hpSave") + (S.heightDirty ? " •" : "");
@@ -1186,6 +1209,11 @@
         $("hpUndo").disabled = !fieldMap.hpCanUndo();
       }, 30);
     };
+    $("hpRoadSteep").onchange = (e) => {
+      fieldMap.hpSettings().roadSteep = e.target.checked;
+      $("hpRoadSteepCount").textContent = "";
+      fieldMap.draw();
+    };
     $("hpOutThr").onchange = (e) => fieldMap.hpSetOutliers($("hpOut").checked, Math.max(1, +e.target.value || 5));
     pairSlider("hpAlpha", "hpAlphaNum", (v) => fieldMap.hpSet_("alpha", v), (v) => Math.round(v * 100), (v) => v / 100);
     $("hpPolyFill").onclick = () => { fieldMap.hpFillPolygon(); syncHpToolUi(); };
@@ -1238,7 +1266,7 @@
       if (!blob) { setStatus(T("hpNone")); return; }
       const a = document.createElement("a");
       a.href = URL.createObjectURL(blob);
-      a.download = (S.map ? S.map.name : "karta").replace(/[\\/:*?"<>|]+/g, "_") + (forestMode() ? (layerKind() === "ice" ? (S.lang === "EN" ? "-ice.png" : "-is.png") : S.lang === "EN" ? "-forest.png" : "-skog.png") : S.lang === "EN" ? "-heightmap.png" : "-hojdkarta.png");
+      a.download = (S.map ? S.map.name : "karta").replace(/[\\/:*?"<>|]+/g, "_") + (forestMode() ? LK[layerKind()][S.lang === "EN" ? "en" : "sv"] : S.lang === "EN" ? "-heightmap.png" : "-hojdkarta.png");
       document.body.append(a); a.click(); a.remove();
       setTimeout(() => URL.revokeObjectURL(a.href), 5000);
     };
@@ -1263,12 +1291,12 @@
       markForestDirty(true);
     };
     $("fpClear").onclick = async () => {
-      if (!(await ask({ title: T("fpClear").replace("…", ""), text: T(layerKind() === "ice" ? "ipClearText" : "fpClearText"), buttons: [{ id: "yes", label: T("fpClear").replace("…", ""), primary: true }] }))) return;
+      if (!(await ask({ title: T("fpClear").replace("…", ""), text: T(LK[layerKind()].clear), buttons: [{ id: "yes", label: T("fpClear").replace("…", ""), primary: true }] }))) return;
       fieldMap.hpNew(Math.min(8192, S.map.width), 0);
       markForestDirty(true);
     };
     window.addEventListener("keydown", (e) => {
-      if (!S.editing || !["height", "forest", "ice"].includes($("editMode").value) || /INPUT|TEXTAREA|SELECT/.test(document.activeElement && document.activeElement.tagName)) return;
+      if (!S.editing || !["height", "forest", "ice", "marsh"].includes($("editMode").value) || /INPUT|TEXTAREA|SELECT/.test(document.activeElement && document.activeElement.tagName)) return;
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z") { e.preventDefault(); fieldMap.hpUndo(); $("hpUndo").disabled = !fieldMap.hpCanUndo(); }
       else if (e.key === "Enter" && fieldMap.hpSettings().tool === "polygon") { fieldMap.hpFillPolygon(); syncHpToolUi(); }
       else if (e.key === "Enter" && fieldMap.hpSettings().tool === "river") { fieldMap.hpCarveRiver(); syncHpToolUi(); $("hpUndo").disabled = !fieldMap.hpCanUndo(); }
@@ -1559,7 +1587,7 @@
     setEditing(false);
     if (fieldMap.hpClose) fieldMap.hpClose();
     // back to the layer as it is on the server
-    return L ? L.load() : layer === "forest" ? loadForest() : layer === "ice" ? loadIce() : Promise.resolve();
+    return L ? L.load() : layer === "forest" ? loadForest() : layer === "ice" ? loadIce() : layer === "marsh" ? loadMarsh() : Promise.resolve();
   }
   async function cancelSuggesting() {
     const changed = SGL[SG.layer] ? lsgChanged() : fieldMap.hpCanUndo();
@@ -2383,6 +2411,86 @@
     } else info = T("wyStartHint", (fieldMap.roads || []).length);
     $("wyInfo").textContent = info;
   }
+  // ── Cities ────────────────────────────────────────────────────────────
+  // Placed and saved like the roads (cities.js): a moment after each change, with the same check against
+  // changes saved elsewhere. A city on a road joins the roads through it; a road ended on a city joins it.
+  let citySaveTimer = 0, citySaving = null;
+  async function loadCities() {
+    const map = S.map;
+    clearTimeout(citySaveTimer); citySaveTimer = 0;
+    S.citiesDirty = false; $("ctSave").textContent = T("ctSave");
+    if (!map) { fieldMap.setCities([]); S.citiesRev = null; return; }
+    try {
+      const d = await api("GET", `/maps/${map.id}/cities?v=${Date.now()}`);
+      if (S.map === map) { fieldMap.setCities(d.cities || []); S.citiesRev = d.rev || null; }
+    } catch (e) { fieldMap.setCities([]); S.citiesRev = null; }
+    if (window.Travel) Travel.roadsChanged();
+  }
+  function scheduleCitySave() {
+    clearTimeout(citySaveTimer);
+    citySaveTimer = setTimeout(() => { citySaveTimer = 0; if (S.citiesDirty) saveCities(); }, 1500);
+  }
+  async function saveCities(force) {
+    if (!S.map || SG.suggesting) return;
+    clearTimeout(citySaveTimer); citySaveTimer = 0;
+    if (citySaving) { await citySaving; if (!S.citiesDirty) return; }
+    const map = S.map, list = fieldMap.getCities();
+    $("ctInfo").textContent = T("rvSaving");
+    citySaving = (async () => {
+      try {
+        const rev = !force && S.citiesRev ? `?rev=${encodeURIComponent(S.citiesRev)}` : "";
+        const r = await api("PUT", `/maps/${map.id}/cities${rev}`, list);
+        if (S.map !== map) return;
+        S.citiesRev = r && r.rev || null;
+        if (JSON.stringify(fieldMap.getCities()) === JSON.stringify(list)) { S.citiesDirty = false; $("ctSave").textContent = T("ctSave"); }
+        else scheduleCitySave();
+        $("ctInfo").textContent = T("ctSaved");
+      } catch (e) {
+        if (e.status === 409 && S.map === map) {
+          const pick = await ask({ title: T("ctConflictTitle"), text: T("ctConflictText"),
+            buttons: [{ id: "mine", label: T("rvConflictMine"), primary: true }, { id: "theirs", label: T("rvConflictTheirs") }] });
+          if (pick === "mine") { citySaving = null; return saveCities(true); }
+          if (pick === "theirs") { await loadCities(); renderCityBar(); return; }
+        }
+        $("ctInfo").textContent = T("saveFailed") + e.message;
+      }
+    })();
+    try { await citySaving; } finally { citySaving = null; }
+  }
+  function renderCityBar() {
+    if ($("cityBar").hidden) return;
+    const c = fieldMap.ctChosen ? fieldMap.ctChosen() : null;
+    for (const id of ["ctName", "ctPopulation", "ctHarbour", "ctDelete"]) $(id).disabled = !c;
+    if (document.activeElement !== $("ctName")) $("ctName").value = c ? c.name : "";
+    if (document.activeElement !== $("ctPopulation")) $("ctPopulation").value = c ? c.population : "";
+    $("ctHarbour").checked = !!(c && c.harbour);
+    const list = fieldMap.cities || [], harbours = list.filter((x) => x.harbour).length;
+    $("ctInfo").textContent = c ? T("ctInfoText", c.name || T("ctUnnamed"), (c.population || 0).toLocaleString(S.lang === "EN" ? "en" : "sv")) : T("ctStartHint", list.length, harbours);
+  }
+  function wireCities() {
+    $("ctName").oninput = (e) => fieldMap.ctSetName(e.target.value);
+    $("ctPopulation").oninput = (e) => fieldMap.ctSetPopulation(e.target.value);
+    $("ctHarbour").onchange = (e) => { fieldMap.ctSetHarbour(e.target.checked); fieldMap.ctNewDefaults.harbour = e.target.checked; };
+    $("ctDelete").onclick = async () => {
+      const c = fieldMap.ctChosen();
+      if (!c) return;
+      if (!(await ask({ title: T("ctDelete"), text: T("ctDeleteText", c.name || T("ctUnnamed")), buttons: [{ id: "yes", label: T("ctDelete"), primary: true }] }))) return;
+      fieldMap.ctDelete();
+    };
+    $("ctSave").onclick = () => saveCities();
+    $("ctExport").onclick = async () => {
+      if (S.citiesDirty) await saveCities();
+      const a = document.createElement("a");
+      a.href = `/weather/api/maps/${S.map.id}/cities?download=1&v=${Date.now()}`;
+      document.body.append(a); a.click(); a.remove();
+    };
+    window.addEventListener("keydown", (e) => {
+      if (!S.editing || $("editMode").value !== "city" || /INPUT|TEXTAREA|SELECT/.test(document.activeElement && document.activeElement.tagName)) return;
+      if (e.key === "Escape") { if (fieldMap.ctCancel()) { e.preventDefault(); renderCityBar(); } }
+      else if (e.key === "Delete" && fieldMap.ctSel != null) $("ctDelete").click();
+    });
+    $("stage").addEventListener("pointerup", () => { if (S.editing && $("editMode").value === "city") setTimeout(renderCityBar, 0); });
+  }
   function wireRoads() {
     $("wyNew").onclick = () => { fieldMap.wyNew(); renderRoadBar(); $("stage").focus(); };
     $("wyKind").onchange = (e) => { fieldMap.wySetKind(e.target.value); renderRoadBar(); };
@@ -2542,31 +2650,33 @@
   function applyEditMode() {
     // a suggestion is for one layer only (sending forest values as heights would wreck the ground)
     if (SG.suggesting && $("editMode").value !== SG.layer) $("editMode").value = SG.layer;
-    const mode = $("editMode").value, regions = mode === "regions", forest = mode === "forest" || mode === "ice", height = mode === "height" || forest;
+    const mode = $("editMode").value, regions = mode === "regions", forest = mode === "forest" || mode === "ice" || mode === "marsh", height = mode === "height" || forest;
     $("editBar").classList.toggle("mode-forest", forest);
     // the brush value is kept separately for heights, forest density and ice cover
-    S.hpVals = S.hpVals || { height: 140, forest: 60, ice: 100 };
+    S.hpVals = S.hpVals || { height: 140, forest: 60, ice: 100, marsh: 100 };
     S.hpVals[fieldMap.hpTarget || "height"] = +$("hpValue").value;
     fieldMap.hpSetTarget(forest ? mode : "height");
     $("anchorRegionBox").hidden = !regions; $("unplacedBox").hidden = !regions; $("leyAspectBox").hidden = regions || height;
     $("zoneNew").hidden = mode !== "zone";
     $("heightBar").hidden = !height;
     $("editBar").classList.toggle("mode-height", height);
-    const river = mode === "river", nation = mode === "nation", range = mode === "range", road = mode === "road";
+    const river = mode === "river", nation = mode === "nation", range = mode === "range", road = mode === "road", city = mode === "city";
+    $("cityBar").hidden = !city;
     $("rangeBar").hidden = !range;
     $("riverBar").hidden = !river;
     $("roadBar").hidden = !road;
     $("nationBar").hidden = !nation;
-    $("editBar").classList.toggle("mode-river", river || nation || range || road);
+    $("editBar").classList.toggle("mode-river", river || nation || range || road || city);
     if (road) { $("leyAspectBox").hidden = true; renderRoadBar(); }
+    if (city) { $("leyAspectBox").hidden = true; renderCityBar(); }
     if (range) { $("leyAspectBox").hidden = true; renderRangeBar(); }
     if (river) { $("leyAspectBox").hidden = true; renderRiverBar(); }
     updateSuggestions();
     if (nation) { $("leyAspectBox").hidden = true; renderNationBar(); }
     $("editHint").hidden = height;                       // the painter's help sits in its tooltip instead
     $("heightBar").title = height ? T("heightHint") : "";
-    $("editHint").textContent = T(mode === "ley" ? "leyHint" : mode === "zone" ? "zoneHint" : height ? "heightHint" : river ? "rvHint" : nation ? "ntHint" : range ? "rgHint" : road ? "wyHint" : "editHint");
-    if (height) $("heightBar").title = forest ? T(mode === "ice" ? "iceHint" : "forestHint") : T("heightHint");
+    $("editHint").textContent = T(mode === "ley" ? "leyHint" : mode === "zone" ? "zoneHint" : height ? "heightHint" : river ? "rvHint" : nation ? "ntHint" : range ? "rgHint" : road ? "wyHint" : city ? "ctHint" : "editHint");
+    if (height) $("heightBar").title = forest ? T(LK[mode].hint) : T("heightHint");
     fieldMap.setEditMode(forest ? "height" : mode);   // forest and ice are painted with the height painter
     // painting heights works on the base height map; elsewhere the chosen one (base or calculated) is shown
     if (mode === "height" && fieldMap.heightSource && fieldMap.heightSource._derived && S.heightBase) { fieldMap.setHeightImage(S.heightBase); derivedKey = null; }
@@ -3188,8 +3298,10 @@
       if (S.editing && S.heightDirty) { fieldMap.hpSetTarget("height"); await saveHeight(); }
       if (S.editing && S.forestDirty) { fieldMap.hpSetTarget("forest"); await saveForest(); }
       if (S.editing && S.iceDirty) { fieldMap.hpSetTarget("ice"); await saveForest(); }
+      if (S.editing && S.marshDirty) { fieldMap.hpSetTarget("marsh"); await saveForest(); }
       if (S.editing && fieldMap.wyDraft) fieldMap.wyFinish && fieldMap.wyFinish(null);
       if (S.editing && S.roadsDirty) await saveRoads();
+      if (S.editing && S.citiesDirty) await saveCities();
       setEditing(!S.editing);
     };
     $("anchorRegion").onchange = (e) => fieldMap.setSelectedRegion(e.target.value || null);
@@ -3197,6 +3309,7 @@
     wireSuggestions();
     wireRivers();
     wireRoads();
+    wireCities();
     initTravel();
     wireNations();
     wireRanges();
@@ -3301,7 +3414,7 @@
     window.addEventListener("beforeunload", flushNotes);
     // warn before leaving with changes that aren't saved yet (rivers save themselves after a moment)
     window.addEventListener("beforeunload", (e) => {
-      if (S.riversDirty || S.nationsDirty || S.rangesDirty || S.roadsDirty || (S.editing && (S.anchorsDirty || S.heightDirty || S.forestDirty || S.iceDirty))) {
+      if (S.riversDirty || S.nationsDirty || S.rangesDirty || S.roadsDirty || S.citiesDirty || (S.editing && (S.anchorsDirty || S.heightDirty || S.forestDirty || S.iceDirty || S.marshDirty))) {
         if (S.riversDirty) saveRivers();
         if (S.nationsDirty) saveNations();
         if (S.rangesDirty) saveRanges();

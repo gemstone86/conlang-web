@@ -2,6 +2,11 @@
 
 Newest first. Versions from 1.x on are the combined app (Root and Rune + Weather generator).
 
+## v1.21.0 (combined app)
+- Weather map: **cities.** Redigera → Städer places cities with a name, a population and a harbour switch. A city put close to a road sits on it and joins the roads through it; a road ended or started on a city snaps to it, and the travel calculator joins the roads at a city. **Sea voyages can only start from a harbour** (on maps that have any harbours; a map without keeps the old rule). Saved like the roads, in the admin export (`cities.json`) and releases (`citiesRelease`).
+- Weather map: **marshland.** A painted layer like forest (Redigera → Sumpmark, layer Sumpmark). Marshland slows travel off the roads, and at 100 % nobody can cross it on foot: routes go round it (roads cross it, a river boat goes through it). In the export (`marsh.png`) and releases (`marshRelease`); events can ask for `marsh:`.
+- Weather map: while painting the height map, **Branta vägar** shows the roads that are too steep for their kind on the heights as they are right now (with a count), so you can see what a change does to them.
+
 ## v1.20.0 (combined app)
 - Weather travel: a fourth suggested route, **Säkrast** (safest). It keeps to roads, paths and nations and avoids
   open wilderness: off the roads a stretch counts 2 times its time, plus 0.01 per km from the nearest road or nation

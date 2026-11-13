@@ -650,7 +650,9 @@ public final class Api {
                 case "rivers" -> { return rivers(m, req, id); }
                 case "forest" -> { return paintedLayer(m, req, id, viewer, false); }
                 case "ice" -> { return paintedLayer(m, req, id, viewer, true); }
+                case "marsh" -> { return paintedLayer(m, req, id, viewer, "marsh"); }
                 case "roads" -> { return roads(m, req, id); }
+                case "cities" -> { return cities(m, req, id); }
                 case "trips" -> { return trips(m, p, req, id); }
                 case "nations" -> { return nations(m, req, id); }
                 case "ranges" -> { return ranges(m, req, id); }
@@ -959,16 +961,21 @@ public final class Api {
     // A greyscale image over the map (0–100). Everyone who can see the map sees it; its owner (for the
     // default map: the admins) changes it.
     private Http.Response paintedLayer(String m, Http.Request req, long id, Long viewer, boolean ice) {
-        String what = ice ? "ice" : "forests";
+        return paintedLayer(m, req, id, viewer, ice ? "ice" : "forest");
+    }
+
+    private Http.Response paintedLayer(String m, Http.Request req, long id, Long viewer, String kind) {
+        boolean ice = kind.equals("ice"), marsh = kind.equals("marsh");
+        String what = ice ? "ice" : marsh ? "marshland" : "forests";
         if (m.equals("GET")) {
             Map<String, Object> mp = store.map(id, viewer);
-            Store.Forest f = ice ? store.ice(id) : store.forest(id);
-            if (f == null) throw new ApiException(404, "This map has no " + (ice ? "ice" : "forest") + " map");
+            Store.Forest f = ice ? store.ice(id) : marsh ? store.marsh(id) : store.forest(id);
+            if (f == null) throw new ApiException(404, "This map has no " + kind + " map");
             Http.Response r = new Http.Response(200, f.type(), f.image()).header("Cache-Control", "private, max-age=60");
             if (req.query("download") != null) {
                 String base = String.valueOf(mp.get("name")).replaceAll("[^\\p{L}\\p{N}_.-]+", "-");
-                String enc = java.net.URLEncoder.encode(base + (ice ? "-is.png" : "-skog.png"), StandardCharsets.UTF_8).replace("+", "%20");
-                r = r.header("Content-Disposition", "attachment; filename=\"" + (ice ? "ice" : "forest") + ".png\"; filename*=UTF-8''" + enc);
+                String enc = java.net.URLEncoder.encode(base + (ice ? "-is.png" : marsh ? "-sumpmark.png" : "-skog.png"), StandardCharsets.UTF_8).replace("+", "%20");
+                r = r.header("Content-Disposition", "attachment; filename=\"" + kind + ".png\"; filename*=UTF-8''" + enc);
             }
             return r;
         }
@@ -978,8 +985,10 @@ public final class Api {
             if (store.map(id, uid).containsKey("removedAt")) throw new ApiException(409, "The map is removed. Restore it to change it.");
             if (m.equals("PUT")) {
                 ImageInfo info = image(req);
-                if (ice) store.setIce(id, info.type(), req.body(), "app", uid); else store.setForest(id, info.type(), req.body(), "app", uid);
-            } else if (ice) store.deleteIce(id); else store.deleteForest(id);
+                if (ice) store.setIce(id, info.type(), req.body(), "app", uid);
+                else if (marsh) store.setMarsh(id, info.type(), req.body(), "app", uid);
+                else store.setForest(id, info.type(), req.body(), "app", uid);
+            } else if (ice) store.deleteIce(id); else if (marsh) store.deleteMarsh(id); else store.deleteForest(id);
             return Http.Response.json(store.map(id, uid));
         }
         throw new ApiException(404, "Not found");
@@ -1047,6 +1056,71 @@ public final class Api {
             for (Object po : pts) cp.add(point(po));
             Map<String, Object> c = new LinkedHashMap<>();
             c.put("id", id); c.put("name", name); c.put("kind", kind); c.put("points", cp);
+            out.add(c);
+        }
+        return out;
+    }
+
+    // ── Cities ──────────────────────────────────────────────────────────
+    // { id, name, population, harbour, x, y }. Everyone who can see the map sees them; its owner (for the
+    // default map: the admins) edits them. Same version check as the rivers and roads. A city joins the roads
+    // that pass through it (the travel calculator), and only a city with a harbour lets a sea voyage start.
+    private static final int MAX_CITIES = 20000;
+    private final Object citiesLock = new Object();
+
+    private Http.Response cities(String m, Http.Request req, long mapId) {
+        Long viewer = req.session().userId();
+        if (m.equals("GET")) {
+            Map<String, Object> map = store.map(mapId, viewer);
+            String json = store.cities(mapId).json();
+            if (req.query("download") != null) {
+                String base = String.valueOf(map.get("name")).replaceAll("[^\\p{L}\\p{N}_.-]+", "-");
+                String enc = java.net.URLEncoder.encode(base + "-stader.json", StandardCharsets.UTF_8).replace("+", "%20");
+                return new Http.Response(200, "application/json; charset=utf-8", json.getBytes(StandardCharsets.UTF_8))
+                        .header("Content-Disposition", "attachment; filename=\"cities.json\"; filename*=UTF-8''" + enc);
+            }
+            Map<String, Object> out = new LinkedHashMap<>();
+            out.put("cities", Json.parse(json));
+            out.put("rev", riversRev(json));
+            out.put("canEdit", canReview(mapId, viewer));
+            return Http.Response.json(out);
+        }
+        if (m.equals("PUT")) {
+            long uid = requireUser(req);
+            if (!canReview(mapId, uid)) throw new ApiException(403, "Only the map's owner (for the default map: the admins) can change its cities");
+            if (req.body().length > 20_000_000) throw new ApiException(413, "Too much city data");
+            String json = Json.write(checkCities(Json.parse(new String(req.body(), StandardCharsets.UTF_8))));
+            synchronized (citiesLock) {
+                String base = req.query("rev");
+                if (base != null && !base.isEmpty() && !base.equals(riversRev(store.cities(mapId).json())))
+                    throw new ApiException(409, "The cities were changed elsewhere since this page loaded them");
+                store.setCities(mapId, json, "app", uid);
+            }
+            Map<String, Object> out = new LinkedHashMap<>();
+            out.put("ok", true);
+            out.put("rev", riversRev(json));
+            return Http.Response.json(out);
+        }
+        throw new ApiException(404, "Not found");
+    }
+
+    /** [{ id, name, population (0 or more), harbour, x, y (0–1) }]; ids unique. Returns a cleaned copy. */
+    static List<Map<String, Object>> checkCities(Object parsed) {
+        if (!(parsed instanceof List<?> list)) throw new ApiException(400, "Expected a list of cities");
+        if (list.size() > MAX_CITIES) throw new ApiException(400, "Too many cities");
+        List<Map<String, Object>> out = new ArrayList<>();
+        Set<Long> ids = new HashSet<>();
+        for (Object o : list) {
+            if (!(o instanceof Map<?, ?> r)) throw new ApiException(400, "Bad city");
+            long id = r.get("id") instanceof Number n ? n.longValue() : -1;
+            if (id <= 0 || !ids.add(id)) throw new ApiException(400, "Each city needs its own id");
+            String name = r.get("name") instanceof String s ? limit(s.trim(), 100) : "";
+            long pop = r.get("population") instanceof Number n ? Math.max(0, Math.min(1_000_000_000L, n.longValue())) : 0;
+            boolean harbour = Boolean.TRUE.equals(r.get("harbour"));
+            Map<String, Object> pt = point(r);
+            Map<String, Object> c = new LinkedHashMap<>();
+            c.put("id", id); c.put("name", name); c.put("population", pop); c.put("harbour", harbour);
+            c.put("x", pt.get("x")); c.put("y", pt.get("y"));
             out.add(c);
         }
         return out;

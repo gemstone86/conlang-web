@@ -118,8 +118,12 @@
     road: { w: 2.8, casing: "rgba(70,45,20,0.75)", fill: "#e8d7b0", dash: null },
     path: { w: 1.7, casing: "rgba(60,40,20,0.55)", fill: "#c99a5b", dash: [5, 4] },
   };
+  /** While painting heights with "Branta vägar" ticked: the roads and their steep stretches are shown over the painter. */
+  P._wySteepShown = function () {
+    return !!(this.editing && this.editMode === "height" && this.hp && this.hp.target === "height" && this.hpSettings().roadSteep && (this.roads || []).length);
+  };
   P._wyDraw = function () {
-    const list = this.roads || [], D = this.wyDraft, editing = this.editing && this.editMode === "road";
+    const list = this.roads || [], D = this.wyDraft, editing = this.editing && this.editMode === "road", steepOn = editing || this._wySteepShown();
     if (!list.length && !D) return;
     const ctx = this.ctx, z = clamp(Math.sqrt(this.view.s * this.imgW / 1500), 0.6, 2.6);
     const line = (pts) => { ctx.beginPath(); pts.forEach((p, i) => { const [x, y] = this.toScreen(p.x, p.y); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }); };
@@ -139,16 +143,23 @@
         ctx.setLineDash([]);
       }
     }
-    if (editing) {
+    if (steepOn) {
       // too steep for the road's kind: red (dark red where twice that)
+      let pieces = 0, roads = 0;
       for (const r of list) {
         if (r.points.length < 2) continue;
-        for (const pc of this.roadSteepness(r).pieces) {
+        const P2 = this.roadSteepness(r).pieces;
+        if (P2.length) roads++;
+        pieces += P2.length;
+        for (const pc of P2) {
           line(pc.pts);
           ctx.strokeStyle = pc.level === 2 ? "rgba(140,0,10,0.95)" : "rgba(230,40,40,0.95)";
           ctx.lineWidth = (STYLE[r.kind].w + 1.5) * z; ctx.stroke();
         }
       }
+      if (!editing) this.opts.onRoadSteep && this.opts.onRoadSteep(pieces, roads);
+    }
+    if (editing) {
       const r = this.wyChosen();
       if (r) r.points.forEach((p, i) => {
         const [x, y] = this.toScreen(p.x, p.y);
@@ -181,6 +192,11 @@
     return best;
   };
   /** The road line nearest a screen point (within px): { r, k, t, d, at: [nx, ny] }. */
+  /** What a road point snaps to: a city close by (the road joins the city), else a road line. */
+  P._wySnapTo = function (sx, sy, skip) {
+    const c = this._ctNear ? this._ctNear(sx, sy, SNAP) : null;
+    return c ? { at: [c.x, c.y], city: c } : this._wyHitLine(sx, sy, SNAP, skip);
+  };
   P._wyHitLine = function (sx, sy, px, skip) {
     let best = null;
     for (const r of this.roads || []) {
@@ -279,7 +295,7 @@
       D.moved = true;
       const p = D.r.points[D.i];
       // an end dropped on another road joins it there
-      const h = D.i === 0 || D.i === D.r.points.length - 1 ? this._wyHitLine(sx, sy, SNAP, D.r) : null;
+      const h = D.i === 0 || D.i === D.r.points.length - 1 ? this._wySnapTo(sx, sy, D.r) : null;
       p.x = h ? h.at[0] : clamp(nx, 0, 1); p.y = h ? h.at[1] : clamp(ny, 0, 1);
       this._wySnap = h ? { x: h.at[0], y: h.at[1] } : null;
       this.draw();
@@ -288,7 +304,7 @@
     if (this.wyDraft) {
       this.wyDraft.hover = { x: nx, y: ny };
       const skip = this.wyDraft.extend != null ? this._wyById(this.wyDraft.extend) : null;
-      const h = this._wyHitLine(sx, sy, SNAP, skip);
+      const h = this._wySnapTo(sx, sy, skip);
       this._wySnap = h ? { x: h.at[0], y: h.at[1] } : null;
       this.draw();
     }
@@ -314,7 +330,7 @@
     if (D) {
       if (dbl) { this.wyFinish(); return; }
       const skip = D.extend != null ? this._wyById(D.extend) : null;
-      const h = this._wyHitLine(sx, sy, SNAP, skip);
+      const h = this._wySnapTo(sx, sy, skip);
       const p = h ? { x: h.at[0], y: h.at[1] } : { x: clamp(nx, 0, 1), y: clamp(ny, 0, 1) };
       if (D.extend == null || D.end === "tail") D.points.push(p); else D.points.push(p);
       // on another road (not as the first point of a new one): joins it there and ends
@@ -332,6 +348,8 @@
         return;
       }
     }
+    const cty = this._ctNear ? this._ctNear(sx, sy, SNAP) : null;
+    if (cty) { this.wyDraft = { points: [{ x: cty.x, y: cty.y }], hover: null }; this.opts.onRoadSelected && this.opts.onRoadSelected(null); this.draw(); return; }   // a road starts at a city
     const h = this._wyHitLine(sx, sy, HIT, null);
     if (h) { this.wySelect(h.r.id); return; }
     if (sel) { this.wySelect(null); return; }

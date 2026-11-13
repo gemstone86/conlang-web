@@ -52,6 +52,17 @@
     }
     return lut;
   }
+  /** Marshland cover 0–100 while painting: see-through where dry, then murky olive-teal. */
+  function marshLut() {
+    const lut = new Uint32Array(256);
+    for (let v = 0; v < 256; v++) {
+      const f = Math.min(v, 100) / 100;
+      const r = Math.round(120 - 50 * f), g = Math.round(140 - 20 * f), b = Math.round(70 + 10 * f);
+      const a = v === 0 ? 0 : Math.round(100 + 140 * f);
+      lut[v] = ((a << 24) | (b << 16) | (g << 8) | r) >>> 0;
+    }
+    return lut;
+  }
   function greyLut() {
     const lut = new Uint32Array(256);
     for (let v = 0; v < 256; v++) lut[v] = ((255 << 24) | (v << 16) | (v << 8) | v) >>> 0;
@@ -134,7 +145,7 @@
    * setForestImage). Each keeps its own edits (and undo) while you switch between them.
    */
   P.hpSetTarget = function (t) {
-    t = t === "forest" || t === "ice" ? t : "height";
+    t = t === "forest" || t === "ice" || t === "marsh" ? t : "height";
     if ((this.hpTarget || "height") === t) return;
     this._hpStash = this._hpStash || {};
     this._hpStash[this.hpTarget || "height"] = this.hp;
@@ -144,13 +155,13 @@
     this.draw();
   };
   /** Painting a layer over the map (forest, ice: 0–100) rather than heights. */
-  const isForest = (fm) => fm.hpTarget === "forest" || fm.hpTarget === "ice";
+  const isForest = (fm) => fm.hpTarget === "forest" || fm.hpTarget === "ice" || fm.hpTarget === "marsh";
   /** Sea level for the painter's tools (none while painting forest or ice). */
   P._hpSea = function (dflt) { return !isForest(this) && this.seaLevel != null ? this.seaLevel : dflt; };
   /** Start editing: full-size copy of the current height map (or forest map), or a new flat one. */
   P.hpOpen = function (fallbackW) {
     if (this.hp && this.hp.data) return true;
-    const src = this.hpTarget === "ice" ? this.iceSource : isForest(this) ? this.forestSource : this.heightSource;
+    const src = this.hpTarget === "ice" ? this.iceSource : this.hpTarget === "marsh" ? this.marshSource : isForest(this) ? this.forestSource : this.heightSource;
     if (!src && isForest(this)) {             // no forest (ice) yet: none anywhere
       const w = Math.min(this.imgW || 4096, MAX_W), h = Math.max(1, Math.round(w * this.imgH / this.imgW));
       this._hpInit(new Uint8Array(w * h), w, h);
@@ -229,7 +240,7 @@
     const E = this.hp;
     if (!E) return;
     const S = this.hpSettings();
-    E.lut = S.view === "grey" ? greyLut() : this.hpTarget === "ice" ? iceLut() : isForest(this) ? forestLut() : colourLut(this.seaLevel != null ? this.seaLevel : 0);
+    E.lut = S.view === "grey" ? greyLut() : this.hpTarget === "ice" ? iceLut() : this.hpTarget === "marsh" ? marshLut() : isForest(this) ? forestLut() : colourLut(this.seaLevel != null ? this.seaLevel : 0);
     this._hpPaintRect(E.view, E.lut, 0, 0, E.w, E.h);
   };
   P._hpPaintRect = function (cv, lut, x0, y0, x1, y1) {
@@ -406,6 +417,7 @@
     if (!this.hp) return;
     if (this.hp.target === "forest") this.setForestImage(this.hp.grey);
     else if (this.hp.target === "ice") this.setIceImage(this.hp.grey);
+    else if (this.hp.target === "marsh") this.setMarshImage(this.hp.grey);
     else this.setHeightImage(this.hp.grey);
   };
 
@@ -1207,6 +1219,25 @@
     }
     c.putImageData(img, 0, 0);
     this._iview = { src, canvas: cv, any };
+    return cv;
+  };
+  /** The marshland map in colours for the "Sumpmark" layer: transparent where dry, murky olive where marshy. */
+  P.marshColours = function () {
+    const src = this.marshSource;
+    if (!src) return null;
+    const V = this._mview;
+    if (V && V.src === src && !V.stale) return V.canvas;
+    const w = Math.min(src.naturalWidth || src.width, MAX_W), h = Math.max(1, Math.round(w * this.imgH / this.imgW));
+    const cv = document.createElement("canvas"); cv.width = w; cv.height = h;
+    const c = cv.getContext("2d", { willReadFrequently: true });
+    c.drawImage(src, 0, 0, w, h);
+    const img = c.getImageData(0, 0, w, h), px = img.data;
+    for (let i = 0; i < w * h; i++) {
+      const f = Math.min(px[i * 4], 100) / 100;
+      px[i * 4] = 84; px[i * 4 + 1] = 112; px[i * 4 + 2] = 78; px[i * 4 + 3] = Math.round(225 * Math.sqrt(f));
+    }
+    c.putImageData(img, 0, 0);
+    this._mview = { src, canvas: cv };
     return cv;
   };
   /** The forest map in colours for the "Skog" layer: transparent without trees, dark green where dense. */

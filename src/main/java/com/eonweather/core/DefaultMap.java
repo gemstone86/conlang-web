@@ -205,6 +205,19 @@ public final class DefaultMap {
                     }
                 }
             }
+            // marshland shipped with the release (default-map/marsh.png, "marsh" in map.json): as the forests (marshRelease)
+            if (m.get("marsh") instanceof String mf && !mf.isBlank()) {
+                Long id = store.defaultMapId();
+                byte[] mb = read(cl, mf);
+                if (id != null && mb != null) {
+                    Store.Forest cur = store.marsh(id);
+                    if ((cur == null || !"app".equals(cur.source()) || newRelease.test("marshRelease")) && (cur == null || !Arrays.equals(cur.image(), mb))) {
+                        ImageInfo fi = ImageInfo.detect(mb);
+                        store.setMarsh(id, fi != null ? fi.type() : "image/png", mb, "bundle", null);
+                        System.out.println("Default map: marshland installed from the release");
+                    }
+                }
+            }
             // roads shipped with the release (default-map/roads.json, "roads" in map.json): as the rivers (roadsRelease)
             if (m.get("roads") instanceof String wf && !wf.isBlank()) {
                 Long id = store.defaultMapId();
@@ -218,6 +231,22 @@ public final class DefaultMap {
                         }
                     } catch (RuntimeException e) {
                         System.err.println("Default map: could not install roads: " + e.getMessage());
+                    }
+                }
+            }
+            // cities shipped with the release (default-map/cities.json, "cities" in map.json): as the roads (citiesRelease)
+            if (m.get("cities") instanceof String cf && !cf.isBlank()) {
+                Long id = store.defaultMapId();
+                byte[] cb = read(cl, cf);
+                if (id != null && cb != null) {
+                    try {
+                        Store.Rivers cur = store.cities(id);
+                        if (!"app".equals(cur.source()) || newRelease.test("citiesRelease")) {
+                            String json = Json.write(Api.checkCities(Json.parse(new String(cb, StandardCharsets.UTF_8))));
+                            if (!json.equals(cur.json())) { store.setCities(id, json, "bundle", null); System.out.println("Default map: cities installed from the release"); }
+                        }
+                    } catch (RuntimeException e) {
+                        System.err.println("Default map: could not install cities: " + e.getMessage());
                     }
                 }
             }
