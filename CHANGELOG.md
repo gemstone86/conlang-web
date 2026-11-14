@@ -2,6 +2,15 @@
 
 Newest first. Versions from 1.x on are the combined app (Root and Rune + Weather generator).
 
+## v1.24.0 (combined app)
+Root and Rune:
+- **Regular forms are no longer stored** (compact forms). A form the rules give is worked out when it is shown (dictionary, word window, sentences, the check for unused sound changes) and comes out exactly as a stored one did: built when it comes into use, then through the sound changes as a whole. The word window marks it *by rule*. Editing one stores it as a form made by hand. Stored forms that are just what the rules give are taken away the next time the forms are rebuilt, or with **Store irregular forms** on the Word forms tab. Nothing changes in what the forms are.
+- **Irregular forms from sound changes**: a form is irregular from the year a sound change makes it something else than its word plus its ending, each going through the sound changes on its own: im + tou is *imtou*; "t > b between m and a vowel" makes it *imbou*, while im + tou would still be imtou, so *imbou* is irregular from that year (*akatou* stays regular). The word window shows *irregular since (year)*. Such forms are stored (from their beginning, so the history shows imtou > imbou) by **Store irregular forms**, a rebuild, or when the word is added, and are then left alone when the rule changes. An ending written in the rule itself is followed through the sound changes behind a mark, so its inner edge doesn't count as the edge of a word.
+- **Levelling**: in the word window, **Level…** on a form picks a year from which it is regular again: what its rule gives then (the word as it is then with the ending as it is then), going on from there. *Unlevel* takes it away. Sentences, the dictionary and histories follow it.
+- **Sound change preview** (*Preview effect*) now also lists the groups of words that would come to sound the same though they don't now.
+- **Spelling reforms** (Grammar tab): years of spelling reforms for a language. With them the spelling lags behind the pronunciation: a word is spelled as it sounded at the latest reform (or when coined, if later). The dictionary shows *spelt …* where it differs from how the word sounds now; the word window lists the spelling after each reform. Empty: spelled as it sounds, as before.
+- New columns: `word_forms.irregular_year`, `level_year`, `level_form`; `languages.spelling_years`. `POST /rune/api/languages/{id}/forms/level` `{ word_id, label, year }` (owner).
+
 ## v1.23.0 (combined app)
 Weather map (page v2.24):
 - **Ways of travelling**: *Färdsätt* in the travel panel: on foot, **horse** (1.5 times the speed) or **wagon** (walking speed on roads, 80 % of it on paths and open ground). The routes are found for the way chosen (a wagon keeps to roads more) and the journey remembers it. The three numbers are in the travel settings.

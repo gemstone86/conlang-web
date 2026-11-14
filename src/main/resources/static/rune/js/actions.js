@@ -97,6 +97,10 @@ const A = {
   undo: async () => { const r = await api('POST', base() + '/undo'); say('Undid ' + r.undone); renderPanel(); },
   redo: async () => { const r = await api('POST', base() + '/redo'); say('Redid ' + r.redone); renderPanel(); },
 
+  saveSpelling: async () => {
+    await api('PUT', base(), { spellingYears: val('gr_spell') });
+    say('Spelling reforms saved.'); await loadWorlds(); renderPanel();
+  },
   saveShape: async () => {
     await api('PUT', base(), { syllableShape: val('gr_shape') });
     say('Syllable shape saved.'); await loadWorlds(); renderPanel();
@@ -221,8 +225,26 @@ const A = {
   },
   editForm: async d => {
     const f = prompt('New form:', d.form); if (f == null || !f.trim()) return;
-    const r = await api('POST', wbase() + '/edit', { entity: 'form', action: 'UPDATE', entityId: Number(d.id), payload: { form: f.trim() } });
+    // a form given by the rules is not stored yet: the edit stores it (as one made by hand)
+    const p = { word_id: S.openId, label: d.label, form: f.trim() };
+    if (d.year) p.year = Number(d.year);
+    const r = d.id ? await api('POST', wbase() + '/edit', { entity: 'form', action: 'UPDATE', entityId: Number(d.id), payload: { form: f.trim() } })
+      : await api('POST', wbase() + '/edit', { entity: 'form', action: 'CREATE', payload: p });
     say(r.status === 'pending' ? 'Submitted for the owner to approve.' : 'Saved.'); await afterWordChange();
+  },
+  levelForm: async d => {
+    let year = null;
+    if (!d.off) {
+      const y = prompt('Level out the "' + d.label + '" form from which year?\nFrom then on it is what its rule gives then (the word as it is then, with the ending as it is then).');
+      if (y == null || y.trim() === '' || !Number.isFinite(Number(y))) return;
+      year = Number(y);
+    }
+    await api('POST', wbase() + '/forms/level', { word_id: S.openId, label: d.label, year });
+    say(year == null ? 'Levelling taken away.' : 'Levelled out from ' + year + '.'); await afterWordChange();
+  },
+  storeIrregular: async () => {
+    const r = await api('POST', base() + '/forms/generate', {});
+    say(formsDone(r)); renderPanel();
   },
   delForm: async d => {
     if (!confirm('Delete this form?')) return;
@@ -396,7 +418,9 @@ const A = {
   previewRule: async () => {
     const r = await api('POST', '/rune/api/languages/' + (val('r_lang') || S.lang.id) + '/rules/preview', { year: Number(val('r_year')), ord: Number(val('r_ord') || 0), pattern: val('r_pat'), replacement: val('r_rep') });
     $('#rprev').innerHTML = `<p><strong>${r.wordsAffected}</strong> words would change.</p>` + (r.changes.length ? '<table><tr><th>Word</th><th>Branch</th><th>Before</th><th>After</th></tr>' +
-      r.changes.map(c => `<tr><td>${esc(c.gloss)}</td><td>${esc(c.branch)}</td><td class="form">${esc(c.before)}</td><td class="form">${esc(c.after)}</td></tr>`).join('') + '</table>' : '');
+      r.changes.map(c => `<tr><td>${esc(c.gloss)}</td><td>${esc(c.branch)}</td><td class="form">${esc(c.before)}</td><td class="form">${esc(c.after)}</td></tr>`).join('') + '</table>' : '')
+      + ((r.collisions || []).length ? `<p><strong>${r.collisions.length}</strong> group${r.collisions.length === 1 ? '' : 's'} of words would come to sound the same (they don't now):</p><table><tr><th>Branch</th><th>Would both be</th><th>Words (as they are now)</th></tr>` +
+        r.collisions.map(c => `<tr><td>${esc(c.branch)}</td><td class="form">${esc(c.form)}</td><td>${c.words.map(esc).join(', ')}</td></tr>`).join('') + '</table>' : '<p class="muted small">No words would come to sound the same.</p>');
   },
   openSentence: async d => { S.openSent = Number(d.id); await showSentence(); },
   sentRebuild: async () => {

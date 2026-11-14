@@ -57,7 +57,7 @@ const TAB = {
       <div class="row"><button data-act="suggestRoots">Suggest new roots</button> <input id="sg_n" type="number" value="10" min="1" max="40" size="3" title="how many">
         <select id="sg_syl"><option value="1-1">1 syllable</option><option value="2-2" selected>2 syllables</option><option value="2-3">2-3 syllables</option><option value="3-4">3-4 syllables</option></select>
         <span class="muted small">New forms that sound like this language and are not close to any existing word. Click one to use it.</span></div><div id="sg_out" class="row"></div>
-      <div class="muted small">New words get their forms automatically from the rules on the Word forms tab. Click a word to see and edit all its forms.</div></div>`;
+      <div class="muted small">Words get their forms from the rules on the Word forms tab (only irregular forms are stored). Click a word to see and edit all its forms.</div></div>`;
     const fromWhere = {};
     S.words.filter(w => w.inherited).forEach(w => { fromWhere[w.origin_lang] = (fromWhere[w.origin_lang] || 0) + 1; });
     const anc = tree.lineage.slice(1);
@@ -113,7 +113,10 @@ const TAB = {
     const heads = t => { const s = g.sections.find(x => x.title === t); const a = s && s.headings ? s.headings.split('\t') : []; while (a.length < 6) a.push(''); return a; };
     const cats = g.sections.map(s => s.title);
     for (const e of g.entries) if (!cats.includes(e.category)) cats.push(e.category);
-    let h = `<div class="card"><div class="row"><strong>Syllable shape</strong>
+    let h = `<div class="card"><div class="row"><strong>Spelling reforms</strong>
+      ${isOwner() ? `<input id="gr_spell" value="${esc(S.lang.spelling_years || '')}" placeholder="years, e.g. 0, 500, 1200" size="26"><button data-act="saveSpelling">Save</button>` : `<span>${esc(S.lang.spelling_years || 'none: spelled as it sounds')}</span>`}</div>
+      <p class="muted small">Leave empty and the language is spelled as it sounds. With years here, the spelling lags behind: a word is spelled the way it sounded at the latest reform (or when it was coined, if that was later), until the next reform catches up with the pronunciation. The dictionary then shows the spelling under a word's form when it differs, and the word window lists the spelling after each reform.</p></div>
+      <div class="card"><div class="row"><strong>Syllable shape</strong>
       ${isOwner() ? `<input id="gr_shape" value="${esc(S.lang.syllable_shape || '')}" placeholder="e.g. (V)C(C)V(C)" size="20" class="form"><button data-act="saveShape">Save</button>` : `<span class="form">${esc(S.lang.syllable_shape || 'not set')}</span>`}</div>
       <p class="muted small">C = consonant, V = vowel, brackets = optional. A leading (V) is an optional vowel at the start of a word only. sh, ch, gh, ng and diphthongs (ai, ou) count as one sound. "Suggest new roots" only proposes forms of this shape, and a language without its own shape uses its parent's.</p></div>`;
     if (canSuggest()) h += `<div class="card"><div class="row"><select id="gr_cat" data-grcat="1">${cats.map(c => `<option>${esc(c)}</option>`).join('')}</select>
@@ -137,11 +140,13 @@ const TAB = {
   async forms() {
     const rules = S.formrules = await api('GET', base() + '/formrules');
     S.wordnames = await api('GET', base() + '/wordnames');
-    let h = `<p class="muted small">A form rule says: words of these types get this prefix or suffix, and the result is stored as a form of the word (definite, plural, past ...).
-      Every form then goes through the sound changes by itself. If a label has several rules (for example two plural prefixes), the first one whose condition fits the word is used.
+    let h = `<p class="muted small">A form rule says: words of these types get this prefix or suffix, and the result is a form of the word (definite, plural, past ...).
+      Every form then goes through the sound changes by itself, as a whole. If a label has several rules (for example two plural prefixes), the first one whose condition fits the word is used.
       New words get their forms automatically.<br><strong>Linking the affix to a dictionary word</strong> (for example the word "definite" = tou) makes each form use that word as it was in the year the form begins:
-      if a sound change turns tou into toe in year 300, words from then on get -toe, while older words change through the same sound change. The finished form is stored, so after you
-      edit sound changes or the affix word, use <em>Rebuild all</em> to refresh the forms of existing words.</p>`;
+      if a sound change turns tou into toe in year 300, words from then on get -toe, while older words change through the same sound change. <br><strong>Regular forms are not stored</strong>: they are worked out from the rules when shown (marked <em>by rule</em> in the word window). A form is stored when it is
+      <strong>irregular</strong>: made or changed by hand, or when a sound change has made it something else than its word plus its ending, each going through the sound changes on its own
+      (im + tou: <em>imtou</em> becomes <em>imbou</em> by "t &gt; b between m and a vowel", while <em>akatou</em> stays regular). In the word window an irregular form can be <em>levelled out</em> from a year: it becomes regular again then.
+      ${isOwner() ? '<button data-act="storeIrregular" title="Goes through every word: stores the forms the sound changes have made irregular, and takes away stored forms that are just what the rules give. Forms made by hand are left alone.">Store irregular forms</button>' : ''}</p>`;
     h += await stackOrderCard();
     if (S.prefill) h += `<p class="card pending">From grammar row <strong>${esc(S.prefill.label)}</strong>${S.prefill.hint ? ' — ' + esc(S.prefill.hint) : ''}</p>`;
     if (canSuggest()) h += `<div class="card"><div class="row"><input id="fr_grp" list="fr_groups" placeholder="group (e.g. definers; new name creates it)" size="30"><datalist id="fr_groups">${[...new Set(rules.map(x => x.grp).filter(Boolean))].map(g => `<option value="${esc(g)}">`).join('')}</datalist><input id="fr_label" placeholder="form name (e.g. definite)" size="18"><input id="fr_pos" placeholder="applies to types (e.g. noun; blank = all)" size="26">

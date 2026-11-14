@@ -23,6 +23,36 @@ public final class FormMath {
      * then its ancestors: a branch that had not split off yet at that year shares its parent's form. If the word did not
      * exist yet, its first (entry) form is returned.
      */
+    /**
+     * The years of a language's spelling reforms, from "0, 500, 1200" (sorted; anything else is an error). The
+     * spelling of a word is how it sounded at the latest reform (or when it was coined, if that was later): it lags
+     * behind the pronunciation until the next reform. Empty: the language is spelled as it sounds.
+     */
+    public static List<Integer> years(String text) {
+        List<Integer> out = new java.util.ArrayList<>();
+        if (text == null || text.isBlank()) return out;
+        for (String p : text.split("[,;\\s]+")) {
+            if (p.isBlank()) continue;
+            try { out.add(Integer.parseInt(p.trim())); } catch (NumberFormatException e) { throw new ApiException(400, "Spelling reforms: '" + p + "' is not a year."); }
+        }
+        java.util.Collections.sort(out);
+        return out;
+    }
+
+    public static String yearsText(String text) {
+        List<Integer> ys = years(text);
+        if (ys.size() > 60) throw new ApiException(400, "Too many spelling reforms.");
+        StringBuilder sb = new StringBuilder();
+        for (int y : ys) sb.append(sb.length() == 0 ? "" : ", ").append(y);
+        return sb.length() == 0 ? null : sb.toString();
+    }
+
+    /** A stored form's levelling as an override: from level_year the form is level_form (what its rule gave then). */
+    public static List<Evolver.Override> level(java.util.Map<String, Object> f, long langId) {
+        if (f == null || f.get("level_year") == null || f.get("level_form") == null) return List.of();
+        return List.of(new Evolver.Override(langId, ((Number) f.get("level_year")).intValue(), (String) f.get("level_form")));
+    }
+
     public static String formAt(List<Evolver.Row> rows, List<Long> langPath, int year) {
         for (long lang : langPath) {
             for (int i = rows.size() - 1; i >= 0; i--) {

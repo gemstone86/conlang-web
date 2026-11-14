@@ -106,7 +106,7 @@ function wordRow(w) {
     : (canSuggest() ? `<button data-act="editWord" data-id="${w.id}">Edit</button> <button class="danger" data-act="delWord" data-id="${w.id}">✕</button>` : '');
   const lost = w.lost_year != null ? ` <span class="badge lostbadge" title="No longer used in ${esc(S.lang.name)} from ${w.lost_year}">lost ${w.lost_year}</span>` : '';
   return `<tr class="${w.inherited ? 'inherited' : ''}${w.lost_year != null ? ' lostword' : ''}"><td class="muted small">${w.id}</td><td><a data-act="openWord" data-id="${w.id}" style="cursor:pointer"><strong>${esc(w.gloss)}</strong></a>${inh}${lost}${w.meaning_changed ? `<div class="small muted">means: ${esc(w.meaning)}</div>` : ''}${w.loan_from ? `<div class="small muted">borrowed from <strong>${esc(w.loan_from)}</strong></div>` : ''}${w.ref_to ? `<div class="small muted">→ same as <strong>${esc(w.ref_gloss)}</strong> (#${w.ref_to})</div>` : ''}${(w.problems || []).map(p => `<div class="small gap">⚠ ${esc(p)}</div>`).join('')}</td><td>${esc(w.pos)}</td><td>${esc(w.build)}</td><td>${w.year}</td>
-    <td class="form">${esc(w.form)}</td><td>${d ? lines(d.latest) : '<span class="muted">—</span>'}${more ? ` <span class="badge">+${more}</span>` : ''}</td>
+    <td class="form">${esc(w.form)}${w.spelling ? `<div class="small muted" title="The spelling lags behind: this is how the word sounded at the latest spelling reform (or when it was coined)">spelt <span class="form">${esc(w.spelling)}</span></div>` : ''}</td><td>${d ? lines(d.latest) : '<span class="muted">—</span>'}${more ? ` <span class="badge">+${more}</span>` : ''}</td>
     <td>${w.length}</td><td>${esc(w.pronunciation)}${sayBtn((w.latest || {})[S.lang.name] || w.form, S.lang.id)}</td><td>${esc((w.exists_in || []).join(', '))}</td>
     <td>${lines(w.latest)}${w.has_overrides ? ' <span class="badge">locked</span>' : ''}</td>
     <td>${act}</td></tr>`;
@@ -155,8 +155,19 @@ async function showWord() {
     <h3>Forms</h3><table><tr><th>Type</th><th>Entered</th><th>Latest per branch</th><th></th></tr>
     <tr><td>word</td><td class="form">${r.ref ? `reference to <strong>${esc(r.ref.gloss)}</strong> <span class="muted small">(#${r.ref.id}, ${w.year})</span>` : ''}${r.ref ? '' : ce ? `<a data-act="editWordForm" data-id="${w.id}" data-form="${esc(w.form)}" style="cursor:pointer" title="Click to edit">${esc(w.form)}</a>` : esc(w.form)}${r.ref ? '' : ` <span class="muted small">(${w.year})</span>`}</td><td>${lines(lastPerLang(r.history))}</td>
     <td>${ce ? (r.ref ? `<button data-act="popupEdit" data-id="${w.id}">Edit</button>` : `<button data-act="editWordForm" data-id="${w.id}" data-form="${esc(w.form)}">Edit</button>`) : ''}</td></tr>`;
-  for (const f of r.forms) h += `<tr><td>${esc(f.label)}</td><td class="form">${ce && !r.ref ? `<a data-act="editForm" data-id="${f.id}" data-form="${esc(f.form)}" style="cursor:pointer" title="Click to edit">${esc(f.form)}</a>` : esc(f.form)} <span class="muted small">(${f.year ?? w.year})</span></td><td>${lines(lastPerLang(f.history))}</td>
-    <td>${ce && !r.ref ? `<button data-act="editForm" data-id="${f.id}" data-form="${esc(f.form)}">Edit</button> <button class="danger" data-act="delForm" data-id="${f.id}">✕</button>` : ''}</td></tr>`;
+  if (r.spelling && r.spelling.length > 1) h += `<tr><td>spelling</td><td colspan="3" class="small">${r.spelling.map(x => `<span class="form">${esc(x.form)}</span> <span class="muted">(from ${x.year})</span>`).join(' → ')}</td></tr>`;
+  for (const f of r.forms) {
+    // a form the rules give is not stored (no id): editing it stores it as a form made by hand
+    const ed = `data-act="editForm" data-id="${f.id ?? ''}" data-label="${esc(f.label)}" data-year="${f.year ?? ''}" data-form="${esc(f.form)}"`;
+    const marks = (f.virtual ? ' <span class="badge" title="Worked out from the form rules when shown; not stored. It goes through the sound changes like any form.">by rule</span>' : '')
+      + (f.irregular_year != null ? ` <span class="badge warnb" title="The sound changes made this form something else than its word plus its ending (each going through the sound changes on its own) in ${f.irregular_year}.${f.virtual ? ' Not stored yet: Word forms → Store irregular forms.' : ''}">irregular since ${f.irregular_year}</span>` : '')
+      + (f.manual ? ' <span class="badge" title="Made or changed by hand: it differs from what the form rule gives. Rebuilding leaves it alone unless hand edits are overwritten.">by hand</span>' : '')
+      + (f.level_year != null ? ` <span class="badge" title="Levelled out: from ${f.level_year} it is what the rule gives then (${esc(f.level_form || '')}), and goes on from there.">levelled ${f.level_year}</span>` : '');
+    const lvl = isOwner() && f.has_rule ? (f.level_year != null ? ` <button data-act="levelForm" data-label="${esc(f.label)}" data-off="1" title="Take the levelling away">Unlevel</button>`
+      : ` <button data-act="levelForm" data-label="${esc(f.label)}" title="Level out: pick a year from which the form is regular again (what its rule gives then)">Level…</button>`) : '';
+    h += `<tr><td>${esc(f.label)}${marks}</td><td class="form">${ce && !r.ref ? `<a ${ed} style="cursor:pointer" title="Click to edit">${esc(f.form)}</a>` : esc(f.form)} <span class="muted small">(${f.year ?? w.year})</span></td><td>${lines(lastPerLang(f.history))}</td>
+    <td>${ce && !r.ref ? `<button ${ed}>Edit</button>${lvl}${f.id != null ? ` <button class="danger" data-act="delForm" data-id="${f.id}">✕</button>` : ''}` : ''}</td></tr>`;
+  }
   h += '</table>';
   if (ce && !r.ref) h += `<div class="row"><input id="f_label" list="f_labels" placeholder="form type (e.g. plural)" size="18"><datalist id="f_labels"><option>definite</option><option>plural</option><option>definite plural</option><option>past</option><option>future</option><option>object</option></datalist>
     <input id="f_form" placeholder="form" class="form"><input id="f_year" type="number" placeholder="year" size="8" value="${w.year}" data-yearcheck="form"><span id="f_warn" class="gap small"></span><button class="primary" data-act="addForm">Add form</button></div>
@@ -240,6 +251,10 @@ function syncRefBox() {
   if ($('#w_form')) $('#w_form').hidden = !!on;
   if (on && $('#w_isloan') && $('#w_isloan').checked) { $('#w_isloan').checked = false; syncLoanBox(); $('#w_form').hidden = true; }
 }
+/** What a rebuild did, in words. Regular forms are not stored: they are worked out from the rules when shown. */
+function formsDone(r) {
+  return `Stored ${r.created} new irregular form${r.created === 1 ? '' : 's'}, updated ${r.updated}, removed ${r.removed || 0}; ${r.compacted || 0} regular form${r.compacted === 1 ? '' : 's'} no longer stored (worked out from the rules instead). ${r.irregular || 0} irregular in all.`;
+}
 async function rebuildFlow(what, body) {
   if (!confirm('Recompute ' + what + ' for EVERY word? Hand-edited forms will be overwritten.')) return;
   const dry = await api('POST', base() + '/forms/generate', { ...body, overwrite: true, prune: true, dryRun: true });
@@ -250,7 +265,7 @@ async function rebuildFlow(what, body) {
       '\n\nOK = remove them as part of the rebuild.\nCancel = keep them.');
   }
   const r = await api('POST', base() + '/forms/generate', { ...body, overwrite: true, prune });
-  say('Added ' + r.created + ', updated ' + r.updated + ', removed ' + (r.removed || 0) + ' forms.'); renderPanel();
+  say(formsDone(r)); renderPanel();
 }
 async function afterWordChange() { await refreshDict(); if (S.openId && $('#modal') && !$('#modal').hidden) await showWord(); }
 const TPL = {

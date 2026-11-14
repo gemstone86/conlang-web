@@ -351,6 +351,7 @@ public class ApiController {
         String shapeErr = SyllableShape.check(shapeText);
         if (shapeErr != null) throw new ApiException(400, "Syllable shape: " + shapeErr);
         Long target = b.containsKey("erosionTarget") ? lng(b, "erosionTarget") : null;
+        if (b.containsKey("spellingYears")) db.update("update languages set spelling_years=? where id=?", FormMath.yearsText(str(b, "spellingYears")), id);
         db.update("update languages set name=?, parent_id=?, split_year=?, classes=?, erosion=?, erosion_target=?, ipa_map=?, grammar=?, def_suffix=?, syllable_shape=? where id=?",
                 name.trim(), parent, split,
                 b.containsKey("classes") ? str(b, "classes") : l.get("classes"),
@@ -534,6 +535,21 @@ public class ApiController {
         boolean dry = b != null && Boolean.parseBoolean(String.valueOf(b.get("dryRun")));
         Map<String, Object> res = new LinkedHashMap<>(forms.rebuild(id, label == null || label.isBlank() ? null : label, group, overwrite, prune, dry));
         applog.info("edit", uidG, "Generated forms in language #" + id + (label == null || label.isBlank() ? "" : " (" + label + ")") + (overwrite ? " with overwrite" : "") + (prune ? " with removal" : "") + (dry ? " (dry run)" : "") + ": created=" + res.get("created") + ", updated=" + res.get("updated") + ", removed=" + res.get("removed"));
+        return res;
+    }
+
+    /**
+     * Levels a word's form out from a year (it becomes what its rule gives then), or with no year takes the levelling
+     * away. The owner of the language.
+     */
+    @PostMapping("/languages/{id}/forms/level")
+    public Map<String, Object> levelForm(@PathVariable long id, @RequestBody Map<String, Object> b, HttpSession s) {
+        long uidL = auth.requireUid(s);
+        access.need(uidL, id, Access.OWNER);
+        if (!(b.get("word_id") instanceof Number wid) || str(b, "label") == null || str(b, "label").isBlank()) throw new ApiException(400, "word_id and label are needed.");
+        Integer year = b.get("year") instanceof Number n ? Integer.valueOf(n.intValue()) : null;
+        Map<String, Object> res = forms.level(id, wid.longValue(), str(b, "label").trim(), year);
+        applog.info("edit", uidL, (year == null ? "Removed the levelling of" : "Levelled") + " the '" + str(b, "label") + "' form of word #" + wid + (year == null ? "" : " from " + year));
         return res;
     }
 
