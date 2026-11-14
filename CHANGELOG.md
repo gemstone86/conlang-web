@@ -2,6 +2,10 @@
 
 Newest first. Versions from 1.x on are the combined app (Root and Rune + Weather generator).
 
+## v1.26.0 (combined app)
+Root and Rune:
+- **Expand a word's forms in the dictionary**: a word that has forms by rule gets an arrow (▸) beside its id. Clicking it lists the forms under the word, like words of their own, with sub ids: the word itself is `7.0`, its forms `7.1`, `7.2`, … in the order of their labels (definite, past, plural …). A form row shows its type, year, form and latest per branch, and clicking it opens the word. The *id* filter understands `7.2` (it finds word 7). Words without forms by rule look as before. Nothing is stored for this: the sub ids are worked out from the forms shown, so a form type added or removed later can renumber the ones after it.
+
 ## v1.25.0 (combined app)
 Weather map:
 - A new ford's flood months follow the hemisphere: 3–4 north of the equator (the middle of the map), 9–10 south of it.

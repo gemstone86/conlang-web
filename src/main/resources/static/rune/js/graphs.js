@@ -87,7 +87,7 @@ function yearMatches(spec, y) {
 }
 function fieldFilter(w) {
   const f = S.wf || {}, has = (v, q) => !q.trim() || String(v ?? '').toLowerCase().includes(q.trim().toLowerCase());
-  if (f.id && f.id.trim()) { const ids = f.id.split(/[,\s]+/).filter(Boolean); if (!ids.includes(String(w.id))) return false; }
+  if (f.id && f.id.trim()) { const ids = f.id.split(/[,\s]+/).filter(Boolean); if (!ids.some(i => i.split('.')[0] === String(w.id))) return false; }
   return has(w.gloss, f.gloss || '') && has(w.pos, f.pos || '') && has(w.build, f.build || '') && yearMatches(f.year || '', w.year) &&
     (!(f.form || '').trim() || has(w.form, f.form) || has(w.origin_form, f.form) || has(w.ref_text, f.form));
 }
@@ -99,17 +99,30 @@ function filteredWords() {
   if (!q) return all;
   return all.filter(w => [w.id, w.gloss, w.meaning, w.ref_text, w.ref_gloss, w.ref_to ? 'reference see' : '', w.form, w.pos, w.notes, ...(w.forms || []).map(f => f.form)].join(' ').toLowerCase().includes(q));
 }
+// sub ids: the word itself is .0, its forms follow in the order of their labels (.1, .2, ...)
+const subForms = w => [...(w.forms || [])].sort((a, b) => String(a.label).toLowerCase().localeCompare(String(b.label).toLowerCase())).map((f, i) => ({ f, sub: i + 1 }));
+const hasRuleForms = w => (w.forms || []).some(f => f.virtual);
+function formRow(w, f, sub) {
+  const marks = (f.virtual ? ' <span class="badge" title="Worked out from the form rules when shown; not stored.">by rule</span>' : '')
+    + (f.irregular_year != null ? ` <span class="badge warnb" title="Irregular since ${f.irregular_year}">irregular</span>` : '')
+    + (f.manual ? ' <span class="badge">by hand</span>' : '')
+    + (f.level_year != null ? ` <span class="badge">levelled ${f.level_year}</span>` : '');
+  return `<tr class="subrow${w.lost_year != null ? ' lostword' : ''}"><td class="muted small" title="Word ${w.id}, form ${sub}">${w.id}.${sub}</td><td><a data-act="openWord" data-id="${w.id}" style="cursor:pointer">${esc(w.gloss)} <span class="muted">· ${esc(f.label)}</span></a>${marks}</td><td>${esc(w.pos)}</td><td>form</td><td>${f.year ?? w.year}</td>
+    <td class="form">${esc(f.form)}</td><td></td><td>${[...String(f.form || '')].length}</td><td></td><td></td><td>${lines(f.latest)}</td><td></td></tr>`;
+}
 function wordRow(w) {
   const d = defForm(w), more = (w.forms || []).filter(f => f !== d).length;
   const inh = w.inherited ? ` <span class="badge" title="Coined in ${esc(w.origin_lang)} as ${esc(w.origin_form)}">from ${esc(w.origin_lang)}</span>` : '';
   const act = w.inherited ? `<button data-act="goOrigin" data-id="${w.id}" data-lang="${w.origin_lang_id}">Open in ${esc(w.origin_lang)}</button>`
     : (canSuggest() ? `<button data-act="editWord" data-id="${w.id}">Edit</button> <button class="danger" data-act="delWord" data-id="${w.id}">✕</button>` : '');
   const lost = w.lost_year != null ? ` <span class="badge lostbadge" title="No longer used in ${esc(S.lang.name)} from ${w.lost_year}">lost ${w.lost_year}</span>` : '';
-  return `<tr class="${w.inherited ? 'inherited' : ''}${w.lost_year != null ? ' lostword' : ''}"><td class="muted small">${w.id}</td><td><a data-act="openWord" data-id="${w.id}" style="cursor:pointer"><strong>${esc(w.gloss)}</strong></a>${inh}${lost}${w.meaning_changed ? `<div class="small muted">means: ${esc(w.meaning)}</div>` : ''}${w.loan_from ? `<div class="small muted">borrowed from <strong>${esc(w.loan_from)}</strong></div>` : ''}${w.ref_to ? `<div class="small muted">→ same as <strong>${esc(w.ref_gloss)}</strong> (#${w.ref_to})</div>` : ''}${(w.problems || []).map(p => `<div class="small gap">⚠ ${esc(p)}</div>`).join('')}</td><td>${esc(w.pos)}</td><td>${esc(w.build)}</td><td>${w.year}</td>
+  const subs = hasRuleForms(w), open = subs && S.expanded && S.expanded.has(w.id);
+  const arrow = subs ? `<button class="arrow" data-act="toggleForms" data-id="${w.id}" title="${open ? 'Hide' : 'Show'} the forms the rules give (${w.id}.1, ${w.id}.2 …)" aria-expanded="${open}">${open ? '▾' : '▸'}</button> ` : '';
+  return `<tr class="${w.inherited ? 'inherited' : ''}${w.lost_year != null ? ' lostword' : ''}"><td class="muted small">${arrow}${w.id}${subs ? '.0' : ''}</td><td><a data-act="openWord" data-id="${w.id}" style="cursor:pointer"><strong>${esc(w.gloss)}</strong></a>${inh}${lost}${w.meaning_changed ? `<div class="small muted">means: ${esc(w.meaning)}</div>` : ''}${w.loan_from ? `<div class="small muted">borrowed from <strong>${esc(w.loan_from)}</strong></div>` : ''}${w.ref_to ? `<div class="small muted">→ same as <strong>${esc(w.ref_gloss)}</strong> (#${w.ref_to})</div>` : ''}${(w.problems || []).map(p => `<div class="small gap">⚠ ${esc(p)}</div>`).join('')}</td><td>${esc(w.pos)}</td><td>${esc(w.build)}</td><td>${w.year}</td>
     <td class="form">${esc(w.form)}${w.spelling ? `<div class="small muted" title="The spelling lags behind: this is how the word sounded at the latest spelling reform (or when it was coined)">spelt <span class="form">${esc(w.spelling)}</span></div>` : ''}</td><td>${d ? lines(d.latest) : '<span class="muted">—</span>'}${more ? ` <span class="badge">+${more}</span>` : ''}</td>
     <td>${w.length}</td><td>${esc(w.pronunciation)}${sayBtn((w.latest || {})[S.lang.name] || w.form, S.lang.id)}</td><td>${esc((w.exists_in || []).join(', '))}</td>
     <td>${lines(w.latest)}${w.has_overrides ? ' <span class="badge">locked</span>' : ''}</td>
-    <td>${act}</td></tr>`;
+    <td>${act}</td></tr>${open ? subForms(w).map(x => formRow(w, x.f, x.sub)).join('') : ''}`;
 }
 function drawDict() {
   const body = $('#wbody'); if (!body) return;

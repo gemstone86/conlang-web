@@ -213,6 +213,7 @@ const A = {
   },
   ruleScope: async d => { S.ruleScope = d.v; try { localStorage.setItem('ruleScope', d.v); } catch (x) { /* ignore */ } renderPanel(); },
   clearFilters: async () => { S.wf = {}; S.q = ''; S.page = 0; renderPanel(); },
+  toggleForms: async d => { const id = Number(d.id); S.expanded = S.expanded || new Set(); if (S.expanded.has(id)) S.expanded.delete(id); else S.expanded.add(id); drawDict(); },
   toggleProblems: async () => { S.onlyProblems = !S.onlyProblems; S.page = 0; drawDict(); },
   popupEdit: async d => {
     const m = $('#modal'); if (m) m.hidden = true; S.openId = null;
