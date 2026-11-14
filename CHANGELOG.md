@@ -2,6 +2,14 @@
 
 Newest first. Versions from 1.x on are the combined app (Root and Rune + Weather generator).
 
+## v1.23.0 (combined app)
+Weather map (page v2.24):
+- **Ways of travelling**: *Färdsätt* in the travel panel: on foot, **horse** (1.5 times the speed) or **wagon** (walking speed on roads, 80 % of it on paths and open ground). The routes are found for the way chosen (a wagon keeps to roads more) and the journey remembers it. The three numbers are in the travel settings.
+- **Nights in cities**: a party that reaches a city on its way with at most 2 hours left of the day stays the night there, and it travels up to 1 hour past the day's end to reach one. The journey's line lists the cities it sleeps in. Both numbers are in the settings (−1 and 0 turn it off).
+- **Bridges and fords**: Redigera → *Städer, broar och vadställen* has a *Slag* choice: Stad, Bro or Vadställe. A bridge or ford is put on a river (it snaps to one). A journey crossing the river within 5 map pixels of a bridge doesn't ford; at a ford it doesn't either, except in the ford's flood months (*Översvämmat månad* from–to, 3–4 for a new ford, 0 = never). Roads over rivers are bridges as before.
+- **The tree line follows the temperature** (*Följ temperaturen*, on by default): it lies where the warmest month's mean is 10 °C (6.5° colder per km up), never above *Trädgräns (m)*. Cold regions get a lower line; the coldest none at all. *Visa trädgräns* and *Ta bort över gränsen* follow it.
+- **City weather**: click a city on the map: its name, population and harbour, the weather there now, and the coming three days (lowest to highest temperature, strongest wind, precipitation). Bridges and fords show their name and kind.
+
 ## v1.22.0 (combined app)
 - Weather travel, sea voyages: **Landa var som helst** (a third box next to *Havsresa*): the ship may come ashore anywhere, with 4 hours' landing delay outside a harbour (settings: *Landstigning utanför hamn*). Ships also **keep within sight of a coast** when that isn't much further (open sea counts 1.5 times, sight 40 km, both in the settings), and out of sight of land their course **wiggles**, more in a strong wind. The weather page is v2.23.
 

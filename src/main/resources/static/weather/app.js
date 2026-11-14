@@ -54,7 +54,7 @@
   function snapshot() {
     return { region: S.region, year: S.year, month: S.month, day: S.day, lang: S.lang, calendar: S.calendar,
       campaignId: S.campaignId, mapId: S.mapId, layers: S.layers, hour: S.hour, opacity: S.opacity,
-      rainFx: S.rainFx, cloudFx: S.cloudFx, religion: S.religion, leyHidden: S.leyHidden, riversKnown: true, nationsKnown: true, rangesKnown: true, roadsKnown: true, marshKnown: true, cityKnown: true, treeLine: S.treeLine, showTreeLine: !!S.showTreeLine, mapLayers: S.mapLayers || null, w3Rivers: S.w3Rivers !== false, heightPick: S.heightPick || "base", rvSuggest: !!S.rvSuggest, rvSuggestAmt: S.rvSuggestAmt || "many", travel: S.travel || null };
+      rainFx: S.rainFx, cloudFx: S.cloudFx, religion: S.religion, leyHidden: S.leyHidden, riversKnown: true, nationsKnown: true, rangesKnown: true, roadsKnown: true, marshKnown: true, cityKnown: true, treeLine: S.treeLine, showTreeLine: !!S.showTreeLine, treeTemp: S.treeTemp !== false, mapLayers: S.mapLayers || null, w3Rivers: S.w3Rivers !== false, heightPick: S.heightPick || "base", rvSuggest: !!S.rvSuggest, rvSuggestAmt: S.rvSuggestAmt || "many", travel: S.travel || null };
   }
   function applySnapshot(s) {
     if (!s) return;
@@ -75,6 +75,7 @@
     if (Array.isArray(s.layers) && !s.cityKnown && !S.layers.includes("city")) S.layers = [...S.layers, "city"];   // cities came later: shown from the start
     if (Number.isFinite(s.treeLine)) S.treeLine = s.treeLine;
     if (typeof s.showTreeLine === "boolean") S.showTreeLine = s.showTreeLine;
+    if (typeof s.treeTemp === "boolean") S.treeTemp = s.treeTemp;
     if (Number.isInteger(s.hour)) S.hour = s.hour;
     if (typeof s.opacity === "number" && s.opacity >= 0.1 && s.opacity <= 1) S.opacity = s.opacity;
     if (typeof s.rainFx === "boolean") S.rainFx = s.rainFx;
@@ -584,6 +585,7 @@
   const fieldMap = new FieldMap($("stage"), $("mapCanvas"), {
     fxCanvas: $("fxCanvas"),
     sunRegion: () => S.region,
+    treeClimate: () => (S.world && S.world.regions ? climateOn(1, 15) : null),      // the tree line follows the warmest month
     onPick: (nx, ny, sx, sy) => {
       if (walkPick) { setWalkPick(false); openWalk3d(nx, ny); return; }
       if (SG.open) { const hit = fieldMap.suggestionAt(sx, sy); if (hit) { selectSuggestion(hit.id); return; } }
@@ -1213,6 +1215,7 @@
       }, 30);
     };
     $("hpTreeLine").onchange = (e) => { const v = Math.max(0, Math.min(20000, +String(e.target.value).replace(",", ".") || 0)); e.target.value = v; S.treeLine = v; fieldMap.hpSettings().treeLine = v; if (fieldMap.hp) fieldMap.hp.water = null; saveState(); fieldMap.draw(); };
+    $("hpTreeTemp").onchange = (e) => { S.treeTemp = e.target.checked; fieldMap.hpSettings().treeTemp = e.target.checked; if (fieldMap.hp) fieldMap.hp.water = null; saveState(); fieldMap.draw(); };
     $("hpTreeShow").onchange = (e) => { S.showTreeLine = e.target.checked; fieldMap.hpSettings().showTreeLine = e.target.checked; saveState(); fieldMap.draw(); };
     $("hpTreeClear").onclick = () => {
       const n = fieldMap.hpClearAboveTreeLine();
@@ -2351,6 +2354,7 @@
       pause: () => { const was = playing; if (playing) togglePlay(); return was; }, play: () => { if (!playing) togglePlay(); },
       fmtT: fmtTime, fmtDur: fmtDuration,
       climateFor: (serial) => { const d = dateOfSerial(serial); return climateOn(d.month, d.day); } });
+    fieldMap.monthOf = (serial) => dateOfSerial(serial).month;
     if (S.map) Travel.load();
   }
   function loadTrips() { if (window.Travel && Travel.ctx) Travel.load(); }
@@ -2471,14 +2475,22 @@
     if ($("cityBar").hidden) return;
     const c = fieldMap.ctChosen ? fieldMap.ctChosen() : null;
     for (const id of ["ctName", "ctPopulation", "ctHarbour", "ctDelete"]) $(id).disabled = !c;
+    const kind = c ? c.kind || "city" : fieldMap.ctNewDefaults.kind || "city";
+    $("ctKind").value = kind;
+    $("ctPopBox").hidden = $("ctHarbourBox").hidden = kind !== "city";
+    $("ctFloodBox").hidden = kind !== "ford";
+    if (document.activeElement !== $("ctFloodFrom")) $("ctFloodFrom").value = c && c.kind === "ford" ? c.floodFrom : fieldMap.ctNewDefaults.floodFrom;
+    if (document.activeElement !== $("ctFloodTo")) $("ctFloodTo").value = c && c.kind === "ford" ? c.floodTo : fieldMap.ctNewDefaults.floodTo;
     if (document.activeElement !== $("ctName")) $("ctName").value = c ? c.name : "";
     if (document.activeElement !== $("ctPopulation")) $("ctPopulation").value = c ? c.population : "";
     $("ctHarbour").checked = !!(c && c.harbour);
     const list = fieldMap.cities || [], harbours = list.filter((x) => x.harbour).length;
-    $("ctInfo").textContent = c ? T("ctInfoText", c.name || T("ctUnnamed"), (c.population || 0).toLocaleString(S.lang === "EN" ? "en" : "sv")) : T("ctStartHint", list.length, harbours);
+    $("ctInfo").textContent = c && c.kind === "bridge" ? T("ctInfoBridge", c.name || T("ctKind_bridge")) : c && c.kind === "ford" ? T("ctInfoFord", c.name || T("ctKind_ford")) : c ? T("ctInfoText", c.name || T("ctUnnamed"), (c.population || 0).toLocaleString(S.lang === "EN" ? "en" : "sv")) : T("ctStartHint", list.length, harbours);
   }
   function wireCities() {
     $("ctName").oninput = (e) => fieldMap.ctSetName(e.target.value);
+    $("ctKind").onchange = (e) => { fieldMap.ctSetKind(e.target.value); renderCityBar(); };
+    $("ctFloodFrom").onchange = $("ctFloodTo").onchange = () => fieldMap.ctSetFlood($("ctFloodFrom").value, $("ctFloodTo").value);
     $("ctPopulation").oninput = (e) => fieldMap.ctSetPopulation(e.target.value);
     $("ctHarbour").onchange = (e) => { fieldMap.ctSetHarbour(e.target.checked); fieldMap.ctNewDefaults.harbour = e.target.checked; };
     $("ctDelete").onclick = async () => {
@@ -2669,7 +2681,8 @@
     $("anchorRegionBox").hidden = !regions; $("unplacedBox").hidden = !regions; $("leyAspectBox").hidden = regions || height;
     $("zoneNew").hidden = mode !== "zone";
     $("heightBar").hidden = !height;
-    $("hpTreeLineBox").hidden = $("hpTreeClear").hidden = $("hpTreeShowBox").hidden = mode !== "forest";
+    $("hpTreeLineBox").hidden = $("hpTreeClear").hidden = $("hpTreeShowBox").hidden = $("hpTreeTempBox").hidden = mode !== "forest";
+    $("hpTreeTemp").checked = S.treeTemp !== false; fieldMap.hpSettings().treeTemp = S.treeTemp !== false;
     $("hpTreeShow").checked = !!S.showTreeLine; fieldMap.hpSettings().showTreeLine = !!S.showTreeLine;
     $("hpTreeLine").value = S.treeLine != null ? S.treeLine : 3000;
     fieldMap.hpSettings().treeLine = S.treeLine != null ? S.treeLine : 3000;
@@ -3022,6 +3035,36 @@
     } catch (e) { $("symbolError").textContent = `${symbolTarget}: ${e.message}`; }
   }
 
+  /** The coming three days at a spot, under a city's info: lowest–highest temperature, the strongest wind, the rain. */
+  function cityForecast(box, at) {
+    const w = fieldMap._weightsAt(at.nx, at.ny * fieldMap.imgH / fieldMap.imgW);
+    if (!w) return;
+    const wrap = document.createElement("div"); wrap.className = "city-forecast";
+    const cap = document.createElement("b"); cap.textContent = T("ctForecast"); wrap.append(cap);
+    box.append(wrap);
+    const now = curSerial();
+    Promise.all([1, 2, 3].map((d) => fetchField(now + d).catch(() => null))).then((fields) => {
+      if (popupAt !== at || !wrap.isConnected) return;
+      fields.forEach((F, n) => {
+        if (!F || !F.regions) return;
+        let lo = 99, hi = -99, wind = 0, rain = 0;
+        for (let hr = 0; hr < 24; hr++) {
+          let t = 0, ws = 0, rr = 0, sw = 0;
+          for (let k = 0; k < w.idx.length; k++) {
+            const r = F.regions[w.idx[k]];
+            if (w.idx[k] < 0 || !r || !r.hourly) continue;
+            t += w.wt[k] * r.hourly.temperature[hr]; ws += w.wt[k] * (r.hourly.wind[hr] || 0); rr += w.wt[k] * (r.hourly.rain[hr] || 0); sw += w.wt[k];
+          }
+          if (!sw) continue;
+          t /= sw; lo = Math.min(lo, t); hi = Math.max(hi, t); wind = Math.max(wind, ws / sw); rain += rr / sw / 24;
+        }
+        if (hi < lo) return;
+        const d = dateOfSerial(now + n + 1), p = document.createElement("div");
+        p.textContent = T("ctForecastDay", d.day, d.month, fmtT(lo), fmtT(hi), wind.toFixed(0), rain.toFixed(1));
+        wrap.append(p);
+      });
+    });
+  }
   function closePopup() { popupAt = null; $("popup").hidden = true; fieldMap.setHighlight(null); }
   function refreshPopup() {
     if (!popupAt) return;
@@ -3036,6 +3079,15 @@
     const h = document.createElement("h4"); h.textContent = s.region.name;
     const dl = document.createElement("dl");
     const row = (k, v) => { const dt = document.createElement("dt"); dt.textContent = k; const dd = document.createElement("dd"); dd.textContent = v; dl.append(dt, dd); };
+    // a city (or a bridge, a ford) under the click: its name on top, and for a city the weather of the coming days below
+    const place = S.layers.includes("city") && fieldMap.cityAt ? fieldMap.cityAt(popupAt.nx, popupAt.ny, 12) : null;
+    if (place) {
+      const kind = place.kind || "city";
+      h.textContent = place.name || T(kind === "city" ? "ctUnnamed" : "ctKind_" + kind);
+      if (kind === "city") row(T("ctPopulation"), (place.population || 0).toLocaleString(S.lang === "EN" ? "en" : "sv") + (place.harbour ? " · " + T("ctHarbour") : ""));
+      else row(T("ctKind"), T("ctKind_" + kind) + (kind === "ford" && place.floodFrom && place.floodTo ? ` (${T("ctFlood").toLowerCase()} ${place.floodFrom}–${place.floodTo})` : ""));
+      row(T("ctRegion"), s.region.name);
+    }
     row(T("temperature"), fmtT(s.temperature));
     row(T("wind"), `${s.wind.toFixed(1)} (${T("windFrom")} ${dir})`);
     if (s.shelter >= 0.05) row("", T("sheltered", Math.round(s.shelter * 100)));
@@ -3062,6 +3114,7 @@
     }
     if (s.fog >= 0.15) row("", T(s.fog >= 0.75 ? "fogThick" : "fogLight"));
     box.append(close, h, dl);
+    if (place && (place.kind || "city") === "city") cityForecast(box, popupAt);
     const events = s.region.events.filter((e) => e && e.trim() && !isMagic(e));
     if (events.length) { const p = document.createElement("p"); p.textContent = events.join(", "); p.style.margin = "0 0 .4rem"; box.append(p); }
     s.storms.forEach((st) => {
@@ -3518,7 +3571,7 @@
   }
 
   // ── Version in the corner: the server's, and this page's if they differ (old files cached) ──
-  const CLIENT_VERSION = "2.23";
+  const CLIENT_VERSION = "2.24";
   function showVersion(server) {
     const el = $("appVersion");
     if (!el) return;

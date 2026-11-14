@@ -194,7 +194,8 @@
   /** The road line nearest a screen point (within px): { r, k, t, d, at: [nx, ny] }. */
   /** What a road point snaps to: a city close by (the road joins the city), else a road line. */
   P._wySnapTo = function (sx, sy, skip) {
-    const c = this._ctNear ? this._ctNear(sx, sy, SNAP) : null;
+    let c = this._ctNear ? this._ctNear(sx, sy, SNAP) : null;
+    if (c && c.kind && c.kind !== "city") c = null;
     return c ? { at: [c.x, c.y], city: c } : this._wyHitLine(sx, sy, SNAP, skip);
   };
   P._wyHitLine = function (sx, sy, px, skip) {
@@ -349,7 +350,7 @@
       }
     }
     const cty = this._ctNear ? this._ctNear(sx, sy, SNAP) : null;
-    if (cty) { this.wyDraft = { points: [{ x: cty.x, y: cty.y }], hover: null }; this.opts.onRoadSelected && this.opts.onRoadSelected(null); this.draw(); return; }   // a road starts at a city
+    if (cty && (!cty.kind || cty.kind === "city")) { this.wyDraft = { points: [{ x: cty.x, y: cty.y }], hover: null }; this.opts.onRoadSelected && this.opts.onRoadSelected(null); this.draw(); return; }   // a road starts at a city
     const h = this._wyHitLine(sx, sy, HIT, null);
     if (h) { this.wySelect(h.r.id); return; }
     if (sel) { this.wySelect(null); return; }

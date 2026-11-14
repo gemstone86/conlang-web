@@ -311,14 +311,22 @@
       </div>
       <div id="cityBar" class="river-bar city-bar" hidden>
         <label class="field slim">
+          <span data-i18n="ctKind">Slag</span>
+          <select id="ctKind"><option value="city" data-i18n="ctKind_city">Stad</option><option value="bridge" data-i18n="ctKind_bridge">Bro</option><option value="ford" data-i18n="ctKind_ford">Vadställe</option></select>
+        </label>
+        <label class="field slim">
           <span data-i18n="rvName">Namn</span>
           <input type="text" id="ctName" maxlength="100" class="rv-name">
         </label>
-        <label class="field slim">
+        <label class="field slim" id="ctPopBox">
           <span data-i18n="ctPopulation">Folkmängd</span>
           <input type="number" id="ctPopulation" min="0" max="1000000000" step="100" class="num-small" style="width:7rem">
         </label>
-        <label class="check" data-i18n-title="ctHarbourTip" title="Med hamn kan ett skepp lägga ut härifrån. Finns det hamnar på kartan får havsresor bara börja och sluta i dem."><input type="checkbox" id="ctHarbour"><span data-i18n="ctHarbour">Hamn</span></label>
+        <label class="check" id="ctHarbourBox" data-i18n-title="ctHarbourTip" title="Med hamn kan ett skepp lägga ut härifrån. Finns det hamnar på kartan får havsresor bara börja och sluta i dem."><input type="checkbox" id="ctHarbour"><span data-i18n="ctHarbour">Hamn</span></label>
+        <label class="field slim" id="ctFloodBox" hidden data-i18n-title="ctFloodTip" title="Månaderna (från–till) då vadstället är översvämmat och inte går att använda. 0 = aldrig.">
+          <span data-i18n="ctFlood">Översvämmat månad</span>
+          <input type="number" id="ctFloodFrom" min="0" max="12" step="1" class="num-small" style="width:3.6rem"><span>–</span><input type="number" id="ctFloodTo" min="0" max="12" step="1" class="num-small" style="width:3.6rem">
+        </label>
         <output id="ctInfo" class="rv-info"></output>
         <button type="button" id="ctDelete" data-i18n="ctDelete">Ta bort staden</button>
         <div class="spacer"></div>
@@ -396,18 +404,21 @@
           <input type="range" id="hpTol" min="0" max="255" step="1" value="0">
           <input type="number" id="hpTolOut" min="0" max="255" step="1" value="0" class="num-small" aria-label="Tolerans">
         </label>
-        <label class="field slim" id="hpTreeLineBox" hidden data-i18n-title="hpTreeLineTip" title="Trädgränsen: över den här höjden (meter över havet) växer inga träd, och skog målas inte där. 0 = ingen gräns.">
-          <span data-i18n="hpTreeLine">Trädgräns (m)</span>
-          <input type="number" id="hpTreeLine" min="0" max="20000" step="50" value="3000" class="num-small" style="width:5.5rem">
-        </label>
-        <label class="check" id="hpTreeShowBox" style="white-space:nowrap" hidden data-i18n-title="hpTreeShowTip" title="Visar trädgränsen i rött: marken över gränsen är rödtonad och gränsen själv en stark röd linje."><input type="checkbox" id="hpTreeShow"><span data-i18n="hpTreeShow">Visa trädgräns</span></label>
-        <button type="button" id="hpTreeClear" style="white-space:nowrap" hidden data-i18n="hpTreeClear" data-i18n-title="hpTreeClearTip" title="Tar bort all skog som ligger över trädgränsen (kan ångras).">Ta bort över gränsen</button>
         <label class="check" id="hpCoastBox" hidden><input type="checkbox" id="hpCoast" checked><span data-i18n="hpCoast">Stanna vid kusten</span></label>
         <button type="button" id="hpPolyFill" hidden data-i18n="hpPolyFill">Fyll polygonen</button>
         <button type="button" id="hpRiverCarve" hidden data-i18n="hpRiverCarve">Gräv floden</button>
         <button type="button" id="hpRidgeMake" hidden data-i18n="hpRidgeMake">Skapa ås</button>
         <button type="button" id="hpCoastMake" hidden data-i18n="hpCoastMake">Skapa kust</button>
         <button type="button" id="hpPlateauMake" hidden data-i18n="hpPlateauMake">Skapa platå</button>
+        </div>
+        <div class="hp-tree">
+        <label class="field slim" id="hpTreeLineBox" hidden data-i18n-title="hpTreeLineTip" title="Trädgränsen: över den här höjden (meter över havet) växer inga träd, och skog målas inte där. 0 = ingen gräns.">
+          <span data-i18n="hpTreeLine">Trädgräns (m)</span>
+          <input type="number" id="hpTreeLine" min="0" max="20000" step="50" value="3000" class="num-small" style="width:5.5rem">
+        </label>
+        <label class="check" id="hpTreeTempBox" style="white-space:nowrap" hidden data-i18n-title="hpTreeTempTip" title="Trädgränsen följer klimatet: den ligger där årets varmaste månad har 10 °C i medeltal (6,5° kallare per km uppåt), men aldrig högre än Trädgräns (m). I kalla områden ligger den alltså lägre, och längst i norr och söder växer inga träd alls."><input type="checkbox" id="hpTreeTemp" checked><span data-i18n="hpTreeTemp">Följ temperaturen</span></label>
+        <label class="check" id="hpTreeShowBox" style="white-space:nowrap" hidden data-i18n-title="hpTreeShowTip" title="Visar trädgränsen i rött: marken över gränsen är rödtonad och gränsen själv en stark röd linje."><input type="checkbox" id="hpTreeShow"><span data-i18n="hpTreeShow">Visa trädgräns</span></label>
+        <button type="button" id="hpTreeClear" style="white-space:nowrap" hidden data-i18n="hpTreeClear" data-i18n-title="hpTreeClearTip" title="Tar bort all skog som ligger över trädgränsen (kan ångras).">Ta bort över gränsen</button>
         </div>
         <label class="field slim">
           <span data-i18n="hpView">Visning</span>
@@ -636,20 +647,20 @@
   </form>
 </dialog>
 
-<script src="i18n.js?v=134"></script>
-<script src="fieldmap.js?v=134"></script>
-<script src="terrain.js?v=134"></script>
-<script src="heightpaint.js?v=134"></script>
-<script src="rivers.js?v=134"></script>
+<script src="i18n.js?v=136"></script>
+<script src="fieldmap.js?v=136"></script>
+<script src="terrain.js?v=136"></script>
+<script src="heightpaint.js?v=136"></script>
+<script src="rivers.js?v=136"></script>
 <script src="vendor/polygon-clipping-0.15.7.umd.min.js"></script>
-<script src="nations.js?v=134"></script>
-<script src="ranges.js?v=134"></script>
-<script src="roads.js?v=134"></script>
-<script src="cities.js?v=134"></script>
-<script src="layersugg.js?v=134"></script>
-<script src="travel.js?v=134"></script>
-<script src="events.js?v=134"></script>
-<script src="app.js?v=134"></script>
+<script src="nations.js?v=136"></script>
+<script src="ranges.js?v=136"></script>
+<script src="roads.js?v=136"></script>
+<script src="cities.js?v=136"></script>
+<script src="layersugg.js?v=136"></script>
+<script src="travel.js?v=136"></script>
+<script src="events.js?v=136"></script>
+<script src="app.js?v=136"></script>
 <a id="tilesWarn" class="tiles-warn" hidden target="_blank" rel="noopener"></a>
 <div id="appVersion" class="app-version" aria-label="Version"></div>
 </body>

@@ -259,17 +259,44 @@
    * Forest and marshland are never painted on water: a pixel of the painter's map at or below the sea level
    * of the height map (the one shown; none: no limit) keeps what it had when the stroke began.
    */
+  /**
+   * The tree line over the painter's map: (x, y) in its pixels → the grey value above which no trees grow, and a
+   * key that changes when it does. At most treeLine metres; with treeTemp on, lower where it is colder: where the
+   * warmest month's mean temperature falls below 10 °C (6.5° colder per km up), from the regions' climate.
+   */
+  const TREE_T = 10, TREE_STEP = 32;
+  P._hpTreeLine = function (G) {
+    const E = this.hp, S = this.hpSettings(), limit = Math.max(0, +S.treeLine || 0);
+    if (!limit) return { key: "none", at: () => Infinity };
+    const flat = G.sea + limit / G.mps, clim = S.treeTemp !== false && this.opts.treeClimate ? this.opts.treeClimate() : null;
+    if (!clim) return { key: "m" + limit, at: () => flat };
+    const key = "t" + limit + ":" + (this._climRev || 0) + ":" + E.w;
+    if (!E.tgrid || E.tgrid.key !== key) {
+      const gw = Math.ceil(E.w / TREE_STEP) + 1, gh = Math.ceil(E.h / TREE_STEP) + 1, d = new Float32Array(gw * gh);
+      for (let j = 0; j < gh; j++) for (let i = 0; i < gw; i++) {
+        const c = clim(Math.min(1, i * TREE_STEP / E.w), Math.min(1, j * TREE_STEP / E.h));
+        d[j * gw + i] = c ? Math.min(limit, (c.warm - TREE_T) / 6.5 * 1000) : limit;      // metres above the sea
+      }
+      E.tgrid = { key, gw, gh, d };
+    }
+    const T = E.tgrid;
+    return { key, at: (x, y) => {
+      const fx = x / TREE_STEP, fy = y / TREE_STEP, i = Math.min(T.gw - 2, Math.floor(fx)), j = Math.min(T.gh - 2, Math.floor(fy)), tx = fx - i, ty = fy - j, k = j * T.gw + i;
+      const m = (T.d[k] * (1 - tx) + T.d[k + 1] * tx) * (1 - ty) + (T.d[k + T.gw] * (1 - tx) + T.d[k + T.gw + 1] * tx) * ty;
+      return G.sea + m / G.mps;
+    } };
+  };
   P._hpWaterMask = function () {
     const E = this.hp, G = this.heightGrid && this.seaLevel != null ? this.heightGrid() : null;
     if (!G) return null;
     // forest also stops at the tree line: ground above treeLine metres is blocked too (0: no limit)
-    const limit = E.target === "forest" ? Math.max(0, +this.hpSettings().treeLine || 0) : 0, hi = limit > 0 ? G.sea + limit / G.mps : Infinity;
-    const key = G.key + ":" + G.sea + ":" + hi;
+    const TL = E.target === "forest" ? this._hpTreeLine(G) : { key: "none", at: () => Infinity };
+    const key = G.key + ":" + G.sea + ":" + TL.key;
     if (E.water && E.waterKey === key) return E.water;
     const m = new Uint8Array(E.w * E.h);
     for (let y = 0; y < E.h; y++) {
       const gy = Math.min(G.h - 1, Math.floor((y + 0.5) * G.h / E.h)), r = gy * G.w;
-      for (let x = 0; x < E.w; x++) { const v = G.d[r + Math.min(G.w - 1, Math.floor((x + 0.5) * G.w / E.w))]; m[y * E.w + x] = v <= G.sea || v > hi ? 1 : 0; }
+      for (let x = 0; x < E.w; x++) { const v = G.d[r + Math.min(G.w - 1, Math.floor((x + 0.5) * G.w / E.w))]; m[y * E.w + x] = v <= G.sea || v > TL.at(x, y) ? 1 : 0; }
     }
     E.water = m; E.waterKey = key;
     return m;
@@ -282,14 +309,14 @@
     if (!m || !G) return 0;
     const lim = Math.max(0, +this.hpSettings().treeLine || 0);
     if (!lim) return 0;
-    const hi = G.sea + lim / G.mps;
+    const TL = this._hpTreeLine(G);
     this._hpBegin();
     let n = 0;
     for (let y = 0; y < E.h; y++) {
       const gy = Math.min(G.h - 1, Math.floor((y + 0.5) * G.h / E.h)), r = gy * G.w;
       for (let x = 0; x < E.w; x++) {
         const i = y * E.w + x;
-        if (E.data[i] && G.d[r + Math.min(G.w - 1, Math.floor((x + 0.5) * G.w / E.w))] > hi) { E.data[i] = 0; n++; }
+        if (E.data[i] && G.d[r + Math.min(G.w - 1, Math.floor((x + 0.5) * G.w / E.w))] > TL.at(x, y)) { E.data[i] = 0; n++; }
       }
     }
     this._hpNoKeep = true;
@@ -1023,12 +1050,12 @@
     const E = this.hp, S = this.hpSettings(), G = this.heightGrid && this.seaLevel != null ? this.heightGrid() : null;
     const limit = Math.max(0, +S.treeLine || 0);
     if (!E || !G || !limit) return null;
-    const key = G.key + ":" + G.sea + ":" + limit;
+    const TL = this._hpTreeLine(G), key = G.key + ":" + G.sea + ":" + TL.key;
     if (E.tl && E.tl.key === key) return E.tl.canvas;
-    const w = E.w, h = E.h, hi = G.sea + limit / G.mps, up = new Uint8Array(w * h);
+    const w = E.w, h = E.h, up = new Uint8Array(w * h);
     for (let y = 0; y < h; y++) {
       const r = Math.min(G.h - 1, Math.floor((y + 0.5) * G.h / h)) * G.w;
-      for (let x = 0; x < w; x++) if (G.d[r + Math.min(G.w - 1, Math.floor((x + 0.5) * G.w / w))] > hi) up[y * w + x] = 1;
+      for (let x = 0; x < w; x++) { const v = G.d[r + Math.min(G.w - 1, Math.floor((x + 0.5) * G.w / w))]; if (v > G.sea && v > TL.at(x, y)) up[y * w + x] = 1; }
     }
     const cv = document.createElement("canvas"); cv.width = w; cv.height = h;
     const c = cv.getContext("2d"), img = c.createImageData(w, h), out = new Uint32Array(img.data.buffer);

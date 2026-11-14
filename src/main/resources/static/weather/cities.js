@@ -1,3 +1,5 @@
+// Also bridges and fords (kind "bridge" / "ford"): placed on a river, they let a journey cross it there without
+// fording; a ford only outside its flood months (floodFrom–floodTo, 0 = never flooded).
 // Eon Weather – cities: a place with a name, a population and (or not) a harbour. A city joins the roads that
 // pass through it, and a road ended on a city joins the city (roads.js snaps to the cities here). Only a city
 // with a harbour lets a sea voyage start (travel.js). Edited under Redigera → Städer; saved like the roads.
@@ -9,15 +11,18 @@
   const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
   const HIT = 11;           // px: how close counts as clicking a city
   const SNAP = 10;          // px: how close to a road a city is placed on it
+  const KINDS = ["city", "bridge", "ford"];
 
   // ── data ──
   P.setCities = function (list) {
-    this.cities = (list || []).map((c) => ({ id: c.id, name: c.name || "", population: Math.max(0, +c.population || 0), harbour: !!c.harbour, x: c.x, y: c.y }));
+    this.cities = (list || []).map((c) => ({ id: c.id, kind: KINDS.includes(c.kind) ? c.kind : "city", name: c.name || "", population: Math.max(0, +c.population || 0), harbour: !!c.harbour,
+      floodFrom: clamp(Math.round(+c.floodFrom || 0), 0, 12), floodTo: clamp(Math.round(+c.floodTo || 0), 0, 12), x: c.x, y: c.y }));
     this.ctSel = null; this._ctDrag = null;
     this.draw();
   };
   P.getCities = function () {
-    return (this.cities || []).map((c) => ({ id: c.id, name: c.name, population: c.population, harbour: !!c.harbour, x: +c.x.toFixed(7), y: +c.y.toFixed(7) }));
+    return (this.cities || []).map((c) => ({ id: c.id, kind: c.kind || "city", name: c.name, population: c.kind === "city" ? c.population : 0, harbour: c.kind === "city" && !!c.harbour,
+      floodFrom: c.kind === "ford" ? c.floodFrom || 0 : 0, floodTo: c.kind === "ford" ? c.floodTo || 0 : 0, x: +c.x.toFixed(7), y: +c.y.toFixed(7) }));
   };
   P._ctChanged = function () { this.opts.onCitiesChanged && this.opts.onCitiesChanged(); this.draw(); };
   P._ctById = function (id) { return (this.cities || []).find((c) => c.id === id) || null; };
@@ -37,8 +42,9 @@
   /** The city under a map point (normalized) for the info box, or null. */
   P.cityAt = function (nx, ny, px = 9) { const [sx, sy] = this.toScreen(nx, ny); return this._ctNear(sx, sy, px); };
   /** A city is placed on a road line close by (so the road passes through it). */
-  P._ctSnapToRoad = function (sx, sy, nx, ny) {
-    const h = this._wyHitLine ? this._wyHitLine(sx, sy, SNAP, null) : null;
+  P._ctSnapToRoad = function (sx, sy, nx, ny, kind) {
+    // a bridge or a ford sits on a river; a city on a road
+    const h = kind && kind !== "city" ? (this._rvHitLine ? this._rvHitLine(sx, sy, SNAP + 6, null) : null) : this._wyHitLine ? this._wyHitLine(sx, sy, SNAP, null) : null;
     return h ? { x: h.at[0], y: h.at[1], road: true } : { x: clamp(nx, 0, 1), y: clamp(ny, 0, 1), road: false };
   };
 
@@ -53,7 +59,18 @@
     this.ctSelect(null);
     this._ctChanged();
   };
-  P.ctNewDefaults = { population: 1000, harbour: false };
+  P.ctNewDefaults = { kind: "city", population: 1000, harbour: false, floodFrom: 3, floodTo: 4 };
+  P.ctSetKind = function (k) {
+    k = KINDS.includes(k) ? k : "city";
+    this.ctNewDefaults.kind = k;
+    const c = this.ctChosen();
+    if (c && c.kind !== k) { c.kind = k; if (k === "ford" && !c.floodFrom) { c.floodFrom = this.ctNewDefaults.floodFrom; c.floodTo = this.ctNewDefaults.floodTo; } this._ctChanged(); }
+  };
+  P.ctSetFlood = function (from, to) {
+    const c = this.ctChosen(), f = clamp(Math.round(+from || 0), 0, 12), t = clamp(Math.round(+to || 0), 0, 12);
+    this.ctNewDefaults.floodFrom = f; this.ctNewDefaults.floodTo = t;
+    if (c && c.kind === "ford") { c.floodFrom = f; c.floodTo = t; this._ctChanged(); }
+  };
   P.ctPointerDown = function (sx, sy) {
     const c = this._ctNear(sx, sy);
     if (!c) return false;
@@ -66,7 +83,7 @@
     if (!D) return;
     if (!D.moved && Math.hypot(sx - D.sx, sy - D.sy) < 4) return;
     D.moved = true;
-    const [nx, ny] = this.toMap(sx, sy), p = this._ctSnapToRoad(sx, sy, nx, ny);
+    const [nx, ny] = this.toMap(sx, sy), p = this._ctSnapToRoad(sx, sy, nx, ny, D.c.kind);
     D.c.x = p.x; D.c.y = p.y;
     this.draw();
   };
@@ -79,8 +96,9 @@
   P.ctClick = function (nx, ny, sx, sy) {
     const c = this._ctNear(sx, sy);
     if (c) { this.ctSelect(c.id); return; }
-    const p = this._ctSnapToRoad(sx, sy, nx, ny);
-    const n = { id: this._ctNewId(), name: "", population: this.ctNewDefaults.population, harbour: this.ctNewDefaults.harbour, x: p.x, y: p.y };
+    const kind = this.ctNewDefaults.kind || "city", p = this._ctSnapToRoad(sx, sy, nx, ny, kind);
+    const n = { id: this._ctNewId(), kind, name: "", population: kind === "city" ? this.ctNewDefaults.population : 0, harbour: kind === "city" && this.ctNewDefaults.harbour,
+      floodFrom: kind === "ford" ? this.ctNewDefaults.floodFrom : 0, floodTo: kind === "ford" ? this.ctNewDefaults.floodTo : 0, x: p.x, y: p.y };
     this.cities = this.cities || [];
     this.cities.push(n);
     this.ctSelect(n.id);
@@ -103,6 +121,17 @@
     for (const c of big) {
       const [x, y] = this.toScreen(c.x, c.y), r = radius(c.population, z), sel = editing && c.id === this.ctSel;
       if (x < -30 || y < -30 || x > this.cssW + 30 || y > this.cssH + 30) continue;
+      if (c.kind === "bridge" || c.kind === "ford") {
+        // a bridge: a brown plank across; a ford: a pale dashed bar; both in a ring when chosen
+        const L = 6.5 * z;
+        ctx.lineCap = "butt";
+        ctx.strokeStyle = "#1a1410"; ctx.lineWidth = 5.5 * z; ctx.setLineDash([]); ctx.beginPath(); ctx.moveTo(x - L, y); ctx.lineTo(x + L, y); ctx.stroke();
+        ctx.strokeStyle = c.kind === "bridge" ? "#c58b4a" : "#cfe9ff"; ctx.lineWidth = 3 * z; ctx.setLineDash(c.kind === "ford" ? [2.5 * z, 2 * z] : []);
+        ctx.beginPath(); ctx.moveTo(x - L + 1, y); ctx.lineTo(x + L - 1, y); ctx.stroke(); ctx.setLineDash([]);
+        if (sel) { ctx.strokeStyle = "#ffe08a"; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(x, y, L + 4, 0, Math.PI * 2); ctx.stroke(); }
+        if (c.name && (labels || sel)) { ctx.lineWidth = 3; ctx.strokeStyle = "rgba(20,14,8,0.85)"; ctx.strokeText(c.name, x + L + 4, y); ctx.fillStyle = "#fff3d6"; ctx.fillText(c.name, x + L + 4, y); }
+        continue;
+      }
       if (c.harbour) {                                                    // a harbour: a blue ring round the disc
         ctx.beginPath(); ctx.arc(x, y, r + 3 * z, 0, Math.PI * 2); ctx.strokeStyle = "#3b9cff"; ctx.lineWidth = 2 * z; ctx.stroke();
       }

@@ -19,7 +19,7 @@ import java.util.regex.Pattern;
  */
 public final class Api {
     /** Shown in the page's corner. Keep in step with CLIENT_VERSION in app.js and ?v= in index.html. */
-    public static final String VERSION = "2.23";
+    public static final String VERSION = "2.24";
     public static final int MAX_IMAGE_BYTES = 30 * 1024 * 1024;
 
     // The world is rebuilt when regions are made or changed in the app; these three are swapped together.
@@ -1062,10 +1062,11 @@ public final class Api {
     }
 
     // ── Cities ──────────────────────────────────────────────────────────
-    // { id, name, population, harbour, x, y }. Everyone who can see the map sees them; its owner (for the
+    // { id, kind: "city" | "bridge" | "ford", name, population, harbour, floodFrom, floodTo (a ford's flood months), x, y }. Everyone who can see the map sees them; its owner (for the
     // default map: the admins) edits them. Same version check as the rivers and roads. A city joins the roads
     // that pass through it (the travel calculator), and only a city with a harbour lets a sea voyage start.
     private static final int MAX_CITIES = 20000;
+    private static final Set<String> CITY_KINDS = Set.of("city", "bridge", "ford");
     private final Object citiesLock = new Object();
 
     private Http.Response cities(String m, Http.Request req, long mapId) {
@@ -1119,7 +1120,11 @@ public final class Api {
             boolean harbour = Boolean.TRUE.equals(r.get("harbour"));
             Map<String, Object> pt = point(r);
             Map<String, Object> c = new LinkedHashMap<>();
-            c.put("id", id); c.put("name", name); c.put("population", pop); c.put("harbour", harbour);
+            String ckind = r.get("kind") instanceof String k && CITY_KINDS.contains(k) ? k : "city";
+            int ff = r.get("floodFrom") instanceof Number n ? Math.max(0, Math.min(12, n.intValue())) : 0;
+            int ft = r.get("floodTo") instanceof Number n ? Math.max(0, Math.min(12, n.intValue())) : 0;
+            c.put("id", id); c.put("kind", ckind); c.put("name", name); c.put("population", pop); c.put("harbour", harbour);
+            if (ckind.equals("ford")) { c.put("floodFrom", ff); c.put("floodTo", ft); }
             c.put("x", pt.get("x")); c.put("y", pt.get("y"));
             out.add(c);
         }
