@@ -17,6 +17,8 @@ jobs:
           java-version: "21"
           cache: maven
       # compiles both apps, runs EvolverTest and CombinedAppTest (the whole app on a fresh database), builds the jar
+      # the weather page's own tests (the travel rules, the painter's limits, the texts): plain Node, nothing to install
+      - run: node --test src/test/js/*.test.js
       - run: mvn -B package
       # only when tests fail: their reports, kept briefly (the jar isn't kept: the deploy builds its own, and the
       # speech engine makes it large enough to fill GitHub's artifact storage)

@@ -13,7 +13,7 @@
 
   <groupId>com.conlangs</groupId>
   <artifactId>conlang-web</artifactId>
-  <version>1.24.0</version>
+  <version>1.25.0</version>
   <name>Root and Rune + Weather generator</name>
   <description>One app with a shared login: Root and Rune (conlang builder) and the Eon weather generator</description>
 
@@ -71,12 +71,12 @@
       <resource>
         <directory>src/main/resources</directory>
         <filtering>true</filtering>
-        <includes><include>application*.properties</include></includes>
+        <includes><include>application*.properties</include><include>static/version.js</include></includes>
       </resource>
       <resource>
         <directory>src/main/resources</directory>
         <filtering>false</filtering>
-        <excludes><exclude>application*.properties</exclude></excludes>
+        <excludes><exclude>application*.properties</exclude><exclude>static/version.js</exclude></excludes>
       </resource>
       <!-- the weather generator's world folder, packed into the jar so the jar alone can be deployed -->
       <resource>

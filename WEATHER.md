@@ -520,7 +520,7 @@ Admins see two small buttons next to the region menu: **＋** makes a new region
 
 ## Version number
 
-The bottom-right corner of the page shows the version, e.g. `v1.28`. If the server runs a newer version than the files your browser has cached, it shows both in gold (`v1.29 · sidan v1.28 — ladda om`), and a reload (Ctrl+F5) fixes it. The number lives in three places, which are changed together for each release: `Api.VERSION`, `CLIENT_VERSION` in `app.js`, and the `?v=` numbers in `index.html`.
+The bottom-right corner of the page shows the app's version (the one in `pom.xml`; the page gets it from `/version.js`, which the build fills in). If the server runs another version than the page's files, it shows both in gold: reload the page.
 
 ## Putting it on the internet (Azure App Service)
 

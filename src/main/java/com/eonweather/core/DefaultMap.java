@@ -128,132 +128,38 @@ public final class DefaultMap {
             System.out.println(changed
                     ? "Default map \"" + name + "\" installed (" + anchors.size() + " regions, " + symbols.size() + " symbols, " + leylines.size() + " leylines, " + zones.size() + " high-magic areas)"
                     : "Default map \"" + name + "\" is up to date");
-            // rivers shipped with the release (default-map/rivers.json): installed unless rivers have been
-            // edited in the app since (then the app's stay; a release made from their export has the same ones)
-            if (m.get("rivers") instanceof String rf && !rf.isBlank()) {
-                Long id = store.defaultMapId();
-                byte[] rb = read(cl, rf);
-                if (id != null && rb != null) {
-                    try {
-                        Store.Rivers cur = store.rivers(id);
-                        if (!"app".equals(cur.source()) || newRelease.test("riversRelease")) {
-                            String json = Json.write(Api.checkRivers(Json.parse(new String(rb, StandardCharsets.UTF_8))));
-                            if (!json.equals(cur.json())) { store.setRivers(id, json, "bundle", null); System.out.println("Default map: rivers installed from the release"); }
-                        }
-                    } catch (RuntimeException e) {
-                        System.err.println("Default map: could not install rivers: " + e.getMessage());
+            // the layers shipped with the release (default-map/rivers.json … cities.json, forest.png, ice.png, marsh.png, each
+            // named in map.json): installed unless the layer has been edited in the app since (then the app's stays; a
+            // release made from its export has the same), or the release says its own is newer (settings.<layer>Release)
+            Long id = store.defaultMapId();
+            for (Api.ListLayer layer : Api.ListLayer.values()) {
+                if (!(m.get(layer.name) instanceof String file) || file.isBlank() || id == null) continue;
+                byte[] bytes = read(cl, file);
+                if (bytes == null) continue;
+                try {
+                    Store.Rivers cur = store.list(layer.name, id);
+                    if (!"app".equals(cur.source()) || newRelease.test(layer.name + "Release")) {
+                        String json = Json.write(layer.check.apply(Json.parse(new String(bytes, StandardCharsets.UTF_8))));
+                        if (!json.equals(cur.json())) { store.setList(layer.name, id, json, "bundle", null); System.out.println("Default map: " + layer.name + " installed from the release"); }
                     }
+                } catch (RuntimeException e) {
+                    System.err.println("Default map: could not install " + layer.name + ": " + e.getMessage());
                 }
             }
-            // nations shipped with the release (default-map/nations.json, "nations" in map.json): the same rule
-            if (m.get("nations") instanceof String nf && !nf.isBlank()) {
-                Long id = store.defaultMapId();
-                byte[] nb = read(cl, nf);
-                if (id != null && nb != null) {
-                    try {
-                        Store.Rivers cur = store.nations(id);
-                        if (!"app".equals(cur.source()) || newRelease.test("nationsRelease")) {
-                            String json = Json.write(Api.checkNations(Json.parse(new String(nb, StandardCharsets.UTF_8))));
-                            if (!json.equals(cur.json())) { store.setNations(id, json, "bundle", null); System.out.println("Default map: nations installed from the release"); }
-                        }
-                    } catch (RuntimeException e) {
-                        System.err.println("Default map: could not install nations: " + e.getMessage());
-                    }
-                }
-            }
-            // mountain ranges shipped with the release (default-map/ranges.json, "ranges" in map.json): as the nations
-            if (m.get("ranges") instanceof String gf && !gf.isBlank()) {
-                Long id = store.defaultMapId();
-                byte[] gb = read(cl, gf);
-                if (id != null && gb != null) {
-                    try {
-                        Store.Rivers cur = store.ranges(id);
-                        if (!"app".equals(cur.source()) || newRelease.test("rangesRelease")) {
-                            String json = Json.write(Api.checkRanges(Json.parse(new String(gb, StandardCharsets.UTF_8))));
-                            if (!json.equals(cur.json())) { store.setRanges(id, json, "bundle", null); System.out.println("Default map: mountain ranges installed from the release"); }
-                        }
-                    } catch (RuntimeException e) {
-                        System.err.println("Default map: could not install mountain ranges: " + e.getMessage());
-                    }
-                }
-            }
-            // forests shipped with the release (default-map/forest.png, "forest" in map.json): the same rule as the rivers
-            if (m.get("forest") instanceof String ff && !ff.isBlank()) {
-                Long id = store.defaultMapId();
-                byte[] fb = read(cl, ff);
-                if (id != null && fb != null) {
-                    Store.Forest cur = store.forest(id);
-                    if (cur == null || !"app".equals(cur.source()) || newRelease.test("forestRelease")) {
-                        if (cur == null || !Arrays.equals(cur.image(), fb)) {
-                            ImageInfo fi = ImageInfo.detect(fb);
-                            store.setForest(id, fi != null ? fi.type() : "image/png", fb, "bundle", null);
-                            System.out.println("Default map: forests installed from the release");
-                        }
-                    }
-                }
-            }
-            // ice shipped with the release (default-map/ice.png, "ice" in map.json): as the forests (iceRelease)
-            if (m.get("ice") instanceof String icf && !icf.isBlank()) {
-                Long id = store.defaultMapId();
-                byte[] ib = read(cl, icf);
-                if (id != null && ib != null) {
-                    Store.Forest cur = store.ice(id);
-                    if ((cur == null || !"app".equals(cur.source()) || newRelease.test("iceRelease")) && (cur == null || !Arrays.equals(cur.image(), ib))) {
-                        ImageInfo fi = ImageInfo.detect(ib);
-                        store.setIce(id, fi != null ? fi.type() : "image/png", ib, "bundle", null);
-                        System.out.println("Default map: ice installed from the release");
-                    }
-                }
-            }
-            // marshland shipped with the release (default-map/marsh.png, "marsh" in map.json): as the forests (marshRelease)
-            if (m.get("marsh") instanceof String mf && !mf.isBlank()) {
-                Long id = store.defaultMapId();
-                byte[] mb = read(cl, mf);
-                if (id != null && mb != null) {
-                    Store.Forest cur = store.marsh(id);
-                    if ((cur == null || !"app".equals(cur.source()) || newRelease.test("marshRelease")) && (cur == null || !Arrays.equals(cur.image(), mb))) {
-                        ImageInfo fi = ImageInfo.detect(mb);
-                        store.setMarsh(id, fi != null ? fi.type() : "image/png", mb, "bundle", null);
-                        System.out.println("Default map: marshland installed from the release");
-                    }
-                }
-            }
-            // roads shipped with the release (default-map/roads.json, "roads" in map.json): as the rivers (roadsRelease)
-            if (m.get("roads") instanceof String wf && !wf.isBlank()) {
-                Long id = store.defaultMapId();
-                byte[] wb = read(cl, wf);
-                if (id != null && wb != null) {
-                    try {
-                        Store.Rivers cur = store.roads(id);
-                        if (!"app".equals(cur.source()) || newRelease.test("roadsRelease")) {
-                            String json = Json.write(Api.checkRoads(Json.parse(new String(wb, StandardCharsets.UTF_8))));
-                            if (!json.equals(cur.json())) { store.setRoads(id, json, "bundle", null); System.out.println("Default map: roads installed from the release"); }
-                        }
-                    } catch (RuntimeException e) {
-                        System.err.println("Default map: could not install roads: " + e.getMessage());
-                    }
-                }
-            }
-            // cities shipped with the release (default-map/cities.json, "cities" in map.json): as the roads (citiesRelease)
-            if (m.get("cities") instanceof String cf && !cf.isBlank()) {
-                Long id = store.defaultMapId();
-                byte[] cb = read(cl, cf);
-                if (id != null && cb != null) {
-                    try {
-                        Store.Rivers cur = store.cities(id);
-                        if (!"app".equals(cur.source()) || newRelease.test("citiesRelease")) {
-                            String json = Json.write(Api.checkCities(Json.parse(new String(cb, StandardCharsets.UTF_8))));
-                            if (!json.equals(cur.json())) { store.setCities(id, json, "bundle", null); System.out.println("Default map: cities installed from the release"); }
-                        }
-                    } catch (RuntimeException e) {
-                        System.err.println("Default map: could not install cities: " + e.getMessage());
-                    }
+            for (String kind : List.of("forest", "ice", "marsh")) {
+                if (!(m.get(kind) instanceof String file) || file.isBlank() || id == null) continue;
+                byte[] bytes = read(cl, file);
+                if (bytes == null) continue;
+                Store.Forest cur = store.painted(kind, id);
+                if ((cur == null || !"app".equals(cur.source()) || newRelease.test(kind + "Release")) && (cur == null || !Arrays.equals(cur.image(), bytes))) {
+                    ImageInfo fi = ImageInfo.detect(bytes);
+                    store.setPainted(kind, id, fi != null ? fi.type() : "image/png", bytes, "bundle", null);
+                    System.out.println("Default map: " + kind + " installed from the release");
                 }
             }
             // height map changes accepted in the app after this release's height map was made go back on top of it
             if (changed && height != null) {
                 int since = settings.get("heightRev") instanceof Number n ? n.intValue() : 0;
-                Long id = store.defaultMapId();
                 if (id != null) {
                     try {
                         HeightPatches.replay(store, id, since);

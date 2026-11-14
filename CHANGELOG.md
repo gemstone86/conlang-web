@@ -2,6 +2,21 @@
 
 Newest first. Versions from 1.x on are the combined app (Root and Rune + Weather generator).
 
+## v1.25.0 (combined app)
+Weather map:
+- A new ford's flood months follow the hemisphere: 3–4 north of the equator (the middle of the map), 9–10 south of it.
+- A wagon's speed off the roads can be chosen for a journey: *Vagn utanför väg (%)* next to *Färdsätt* (the settings' value, 80 %, unless you type another).
+- A route's small bends no longer dip into full marshland.
+
+From the code review:
+- **Passwords** are stored with 600 000 rounds of PBKDF2 (was 120 000), as `pbkdf2$rounds$salt$hash`. Existing accounts are stored again at that strength the next time they log in; nothing to do. (Failed logins were already limited: 10 per username and address in 15 minutes.)
+- **Requests from other sites are refused** for every changing request to `/api`, `/rune/api` and `/weather/api` (`SameOriginFilter`: the browser's `Sec-Fetch-Site` and `Origin`). Root and Rune had only the cookie's SameSite setting before.
+- **One version number**: `pom.xml`. The pages get it from `/version.js` (filled in by the build), the weather server from the same property. The weather page now shows the app's version (v1.25.0), not its own series (it was at 2.24). No more numbers to bump in `main.js`, `app.js`, `Api.java` or `index.html`.
+- The `?v=` numbers on the weather page's scripts are gone: the server already tells browsers to check for a newer copy every time.
+- **Tests for the weather page's JavaScript** (`src/test/js`, run with `node --test src/test/js/*.test.js`, and in both GitHub workflows): the travel rules (horse and wagon, nights in cities, bridges and fords, marshland, harbours, Säkrast), the painter's limits (water, tree line), and that every text exists in both languages.
+- **Smaller files**: `app.js` (3 600 lines) is now seven files, `app-core.js` … `app-start.js`, loaded in order and sharing one scope (the code is unchanged); `i18n.js` has one text per line (it was a few lines of tens of thousands of characters each).
+- **One of each instead of five and three**: the server's handlers and storage for rivers, roads, cities, mountain ranges and nations are one (`Api.ListLayer`, `Store.list` / `setList`), and so are forest, ice and marshland (`Store.painted`); installing them from a release is two loops. `Api.java` −140 lines, `Store.java` −55, `DefaultMap.java` −90. Nothing changes in the API.
+
 ## v1.24.0 (combined app)
 Root and Rune:
 - **Regular forms are no longer stored** (compact forms). A form the rules give is worked out when it is shown (dictionary, word window, sentences, the check for unused sound changes) and comes out exactly as a stored one did: built when it comes into use, then through the sound changes as a whole. The word window marks it *by rule*. Editing one stores it as a form made by hand. Stored forms that are just what the rules give are taken away the next time the forms are rebuilt, or with **Store irregular forms** on the Word forms tab. Nothing changes in what the forms are.

@@ -59,16 +59,17 @@
     this.ctSelect(null);
     this._ctChanged();
   };
-  P.ctNewDefaults = { kind: "city", population: 1000, harbour: false, floodFrom: 3, floodTo: 4 };
+  P.ctNewDefaults = { kind: "city", population: 1000, harbour: false };
+  /** A new ford's flood months: the spring thaw, months 3–4 north of the equator (the middle of the map) and 9–10 south of it. */
+  P.ctFloodDefault = function (y) { return y > 0.5 ? [9, 10] : [3, 4]; };
   P.ctSetKind = function (k) {
     k = KINDS.includes(k) ? k : "city";
     this.ctNewDefaults.kind = k;
     const c = this.ctChosen();
-    if (c && c.kind !== k) { c.kind = k; if (k === "ford" && !c.floodFrom) { c.floodFrom = this.ctNewDefaults.floodFrom; c.floodTo = this.ctNewDefaults.floodTo; } this._ctChanged(); }
+    if (c && c.kind !== k) { c.kind = k; if (k === "ford" && !c.floodFrom) [c.floodFrom, c.floodTo] = this.ctFloodDefault(c.y); this._ctChanged(); }
   };
   P.ctSetFlood = function (from, to) {
     const c = this.ctChosen(), f = clamp(Math.round(+from || 0), 0, 12), t = clamp(Math.round(+to || 0), 0, 12);
-    this.ctNewDefaults.floodFrom = f; this.ctNewDefaults.floodTo = t;
     if (c && c.kind === "ford") { c.floodFrom = f; c.floodTo = t; this._ctChanged(); }
   };
   P.ctPointerDown = function (sx, sy) {
@@ -98,7 +99,7 @@
     if (c) { this.ctSelect(c.id); return; }
     const kind = this.ctNewDefaults.kind || "city", p = this._ctSnapToRoad(sx, sy, nx, ny, kind);
     const n = { id: this._ctNewId(), kind, name: "", population: kind === "city" ? this.ctNewDefaults.population : 0, harbour: kind === "city" && this.ctNewDefaults.harbour,
-      floodFrom: kind === "ford" ? this.ctNewDefaults.floodFrom : 0, floodTo: kind === "ford" ? this.ctNewDefaults.floodTo : 0, x: p.x, y: p.y };
+      floodFrom: kind === "ford" ? this.ctFloodDefault(p.y)[0] : 0, floodTo: kind === "ford" ? this.ctFloodDefault(p.y)[1] : 0, x: p.x, y: p.y };
     this.cities = this.cities || [];
     this.cities.push(n);
     this.ctSelect(n.id);

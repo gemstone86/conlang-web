@@ -60,7 +60,7 @@ class CombinedAppTest {
 
         HttpResponse<String> weather = get(c, "/weather/");
         assertEquals(200, weather.statusCode());
-        assertTrue(weather.body().contains("app.js"));
+        assertTrue(weather.body().contains("app-core.js"));
 
         assertEquals(302, get(c, "/rune").statusCode(), "/rune redirects to /rune/");
         // every script the Root and Rune page asks for is there
@@ -72,7 +72,7 @@ class CombinedAppTest {
             found++;
         }
         assertTrue(found >= 9, "the page lists its scripts");
-        assertEquals(200, get(c, "/weather/app.js").statusCode());
+        assertEquals(200, get(c, "/weather/app-start.js").statusCode());
         assertEquals(200, get(c, "/weather/tiles/mundana-1/manifest.json").statusCode());
     }
 

@@ -103,8 +103,10 @@
   // ── speed ──
   /** km/h. kind 0 off road … 3 highway; forest 0–1; grade % (+ up); snow 0–1; wx 0 fine, 1 bad, 2 really bad. */
   /** A way of travelling as { mul, off }: the speed times mul, and times off as well off the roads. */
-  function mountOf(cfg, name) {
-    return name === "horse" ? { mul: cfg.mount.horse, off: 1 } : name === "wagon" ? { mul: cfg.mount.wagon, off: cfg.mount.wagonOff } : null;
+  function mountOf(cfg, name, wagonOff) {
+    // wagonOff: the journey's own share of the speed off the roads (chosen in the panel), else the settings'
+    const off = Number.isFinite(+wagonOff) && wagonOff != null && wagonOff !== "" ? clamp(+wagonOff, 0.05, 1) : cfg.mount.wagonOff;
+    return name === "horse" ? { mul: cfg.mount.horse, off: 1 } : name === "wagon" ? { mul: cfg.mount.wagon, off } : null;
   }
   // the month the routes are planned for (fords are closed in their flood months); null: fords count as open
   let planMonth = null;
@@ -805,7 +807,7 @@
         let qx = px / W, qy = py / H;
         for (const f of [1, 0.6, 0.35, 0.15]) {
           const tx = clamp((px + nx * off * f) / W, 0, 1), ty = clamp((py + ny * off * f) / H, 0, 1);
-          if ((fm.groundM(tx, ty, HG) <= 0) === (k0 === 5)) { qx = tx; qy = ty; break; }
+          if ((fm.groundM(tx, ty, HG) <= 0) === (k0 === 5) && (k0 === 5 || fm.layerAt("marsh", tx, ty) < 99.5)) { qx = tx; qy = ty; break; }   // nor into full marshland
         }
         out.push({ x: clamp(qx, 0, 1), y: clamp(qy, 0, 1), k: k0 });
       }
@@ -895,7 +897,7 @@
     const delays = (trip.delays || []).slice().sort((a, b) => a.at - b.at);
     // fording rivers off the roads: the hours are spent when the party gets there
     const fords = trip._fords || (trip._fords = routeCrossings(fm, trip.route.map((p) => ({ x: p[0], y: p[1], k: p[2] || 0 })), riverIndex(fm), true));
-    const km = [0], mt = mountOf(cfg, trip.mount), monthOf = fm.monthOf || (() => null);
+    const km = [0], mt = mountOf(cfg, trip.mount, trip.wagonOff), monthOf = fm.monthOf || (() => null);
     // the cities along the way (where the route passes within 1.5 map pixels of one), by distance
     const towns = trip._towns || (trip._towns = (() => {
       const out = [];
@@ -1226,7 +1228,7 @@
       if (!this._grid) { this.msg(this.T("trNoHeight")); this._stopPicking(true); return; }
       const pace = cfg.pace.normal;
       planMonth = fm.monthOf ? fm.monthOf(Math.floor(fm.T || 0)) : null;
-      const out = [], opt = { mount: mountOf(cfg, this.mount), ferry: !!this.ferry, sea: !!this.sea, landAnywhere: !!this.sea && !!this.landAny, boats: this.ferry ? this._ensureBoats() : null,
+      const out = [], opt = { mount: mountOf(cfg, this.mount, this.wagonOff), ferry: !!this.ferry, sea: !!this.sea, landAnywhere: !!this.sea && !!this.landAny, boats: this.ferry ? this._ensureBoats() : null,
         hours: clamp(+String(this._lastHours || cfg.hoursPerDay).replace(",", ".") || cfg.hoursPerDay, 0.5, 24) };
       if (opt.sea) {
         // the wind at planning time bends a ship's course out at sea
@@ -1258,7 +1260,7 @@
         if (same) { (same.also = same.also || []).unshift(out[i].mode); out.splice(i, 1); }
       }
       tv.candidates = out; tv.chosen = out[0].mode;
-      this._planned = { ferry: opt.ferry, sea: opt.sea, landAny: opt.landAnywhere, mount: this.mount && this.mount !== "foot" ? this.mount : null };
+      this._planned = { ferry: opt.ferry, sea: opt.sea, landAny: opt.landAnywhere, mount: this.mount && this.mount !== "foot" ? this.mount : null, wagonOff: this.mount === "wagon" && this.wagonOff != null ? this.wagonOff : null };
       this.msg("");
       this.render(); fm.draw();
       await this._etas();
@@ -1281,7 +1283,7 @@
     _tripFrom(c, o) {
       return { route: c.pts.map((p) => (p.c != null ? [+p.x.toFixed(6), +p.y.toFixed(6), p.k, +p.c.toFixed(2)] : [+p.x.toFixed(6), +p.y.toFixed(6), p.k])), startT: o.startT, pace: o.pace,
         dayStart: o.dayStart != null ? o.dayStart : this.cfg().dayStart, offset: this.fm.spotOffset ? this.fm.spotOffset(c.pts[0].x) : 0, delays: o.delays || [],
-        ...(this._planned && this._planned.ferry ? { ferry: true } : {}), ...(this._planned && this._planned.sea ? { sea: true } : {}), ...(this._planned && this._planned.landAny ? { landAny: true } : {}), ...(this._planned && this._planned.mount ? { mount: this._planned.mount } : {}) };
+        ...(this._planned && this._planned.ferry ? { ferry: true } : {}), ...(this._planned && this._planned.sea ? { sea: true } : {}), ...(this._planned && this._planned.landAny ? { landAny: true } : {}), ...(this._planned && this._planned.mount ? { mount: this._planned.mount } : {}), ...(this._planned && this._planned.wagonOff != null ? { wagonOff: this._planned.wagonOff } : {}) };
     },
     /** The journey's hour-by-hour progress, fetching the days' weather it needs. */
     async _timeline(trip) {
@@ -1719,8 +1721,15 @@
         const sel = document.createElement("select"); sel.id = "trMount";
         for (const v of ["foot", "horse", "wagon"]) sel.add(new Option(T("trMount_" + v), v));
         sel.value = this.mount || "foot";
-        sel.onchange = () => { this.mount = sel.value; if (tv.candidates && tv.start && tv.end) this._plan(); };
-        ml.append(ms, sel); modes.append(ml);
+        // a wagon's speed off the roads, in per cent of its speed on them: the settings' value unless another is typed here
+        const wl = document.createElement("label"); wl.className = "field slim"; wl.title = T("trWagonOffTip", Math.round(cfg.mount.wagonOff * 100));
+        const ws = document.createElement("span"); ws.textContent = T("trWagonOff");
+        const wi = document.createElement("input"); wi.type = "number"; wi.id = "trWagonOff"; wi.className = "num-small"; wi.min = 5; wi.max = 100; wi.step = 5;
+        wi.value = Math.round((this.wagonOff != null ? this.wagonOff : cfg.mount.wagonOff) * 100);
+        wl.append(ws, wi); wl.hidden = (this.mount || "foot") !== "wagon";
+        wi.onchange = () => { const v = clamp(+wi.value || cfg.mount.wagonOff * 100, 5, 100); wi.value = v; this.wagonOff = v / 100; if (tv.candidates && tv.start && tv.end) this._plan(); };
+        sel.onchange = () => { this.mount = sel.value; wl.hidden = sel.value !== "wagon"; if (tv.candidates && tv.start && tv.end) this._plan(); };
+        ml.append(ms, sel); modes.append(ml, wl);
         plan.append(modes);
       }
       const tl = document.createElement("label"); tl.className = "check"; tl.title = T("trTerrainTip");
@@ -1774,7 +1783,7 @@
         const st = document.createElement("div"); st.className = "tr-status"; st.textContent = status;
         const det = document.createElement("div"); det.className = "tr-status";
         det.textContent = T("trDetails", trip.pace, Math.round(tl.total), T(MODE_TXT[trip.mode] || "trFast")) + " · " + T("trHoursShort", fmtH(+trip.hoursPerDay || cfg.hoursPerDay))
-          + (trip.mount ? " · " + T("trMount_" + trip.mount) : "") + (trip.ferry ? " · " + T("trFerryShort") : "") + (trip.sea ? " · " + T("trSeaShort") : "")
+          + (trip.mount ? " · " + T("trMount_" + trip.mount) + (trip.mount === "wagon" && trip.wagonOff != null ? ` (${Math.round(trip.wagonOff * 100)} %)` : "") : "") + (trip.ferry ? " · " + T("trFerryShort") : "") + (trip.sea ? " · " + T("trSeaShort") : "")
           + (trip.timeline && trip.timeline.nights && trip.timeline.nights.length ? " · " + T("trNights", trip.timeline.nights.map((n) => n || "?").join(", ")) : "");
         li.append(head, st, det);
         if (trip.delays && trip.delays.length) {

@@ -44,6 +44,8 @@ jobs:
           cache: maven
 
       # with the tests: a version that fails them is never published
+      # the weather page's own tests (the travel rules, the painter's limits, the texts): plain Node, nothing to install
+      - run: node --test src/test/js/*.test.js
       - name: Build and test
         run: mvn -B package
 

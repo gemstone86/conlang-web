@@ -1,6 +1,6 @@
 'use strict';
 // Root and Rune: version check and start. The files in js/ are loaded in order by index.html and share one scope.
-const UI_VERSION = '1.24.0';   // keep equal to the version in pom.xml
+const UI_VERSION = window.APP_VERSION || 'dev';   // from /version.js, which the build fills in from pom.xml
 api('GET', '/rune/api/version').then(v => {
   $('#ver').textContent = 'v' + v.version + (v.built ? ' · built ' + v.built.replace('T', ' ').replace('Z', ' UTC') : '');
   if (v.version !== UI_VERSION) {

@@ -1146,20 +1146,17 @@ public final class Store {
     // ── Forests (one greyscale image per map) ────────────────────────────
     public record Forest(String type, byte[] image, String source) {}
 
-    /** The map's forest image, or null without one (no access check). */
-    public Forest forest(long mapId) { return layer("map_forests", mapId); }
-    public void setForest(long mapId, String type, byte[] image, String source, Long userId) { setLayer("map_forests", mapId, type, image, source, userId); }
-    public void deleteForest(long mapId) { tx(c -> update(c, "DELETE FROM map_forests WHERE map_id = ?", mapId)); }
-
-    // ── Ice (one greyscale image per map, 0 = none … 100 = all ice), stored like the forests ──
-    public Forest ice(long mapId) { return layer("map_ice", mapId); }
-    public void setIce(long mapId, String type, byte[] image, String source, Long userId) { setLayer("map_ice", mapId, type, image, source, userId); }
-    public void deleteIce(long mapId) { tx(c -> update(c, "DELETE FROM map_ice WHERE map_id = ?", mapId)); }
-
-    // ── Marshland (one greyscale image per map, 0 = dry … 100 = marsh), stored like the forests ──
-    public Forest marsh(long mapId) { return layer("map_marsh", mapId); }
-    public void setMarsh(long mapId, String type, byte[] image, String source, Long userId) { setLayer("map_marsh", mapId, type, image, source, userId); }
-    public void deleteMarsh(long mapId) { tx(c -> update(c, "DELETE FROM map_marsh WHERE map_id = ?", mapId)); }
+    // ── Painted layers: one greyscale image per map, 0–100 (forest: trees; ice; marsh), source 'bundle' or 'app' ──
+    private static String paintedTable(String kind) {
+        return switch (kind) { case "forest" -> "map_forests"; case "ice" -> "map_ice"; case "marsh" -> "map_marsh"; default -> throw new IllegalArgumentException("No such layer: " + kind); };
+    }
+    /** A painted layer's image ("forest", "ice", "marsh"), or null without one (no access check). */
+    public Forest painted(String kind, long mapId) { return layer(paintedTable(kind), mapId); }
+    public void setPainted(String kind, long mapId, String type, byte[] image, String source, Long userId) { setLayer(paintedTable(kind), mapId, type, image, source, userId); }
+    public void deletePainted(String kind, long mapId) { String t = paintedTable(kind); tx(c -> update(c, "DELETE FROM " + t + " WHERE map_id = ?", mapId)); }
+    public Forest forest(long mapId) { return painted("forest", mapId); }
+    public Forest ice(long mapId) { return painted("ice", mapId); }
+    public Forest marsh(long mapId) { return painted("marsh", mapId); }
 
     /** A painted layer image ("map_forests", "map_ice", "map_marsh"), or null. */
     private Forest layer(String table, long mapId) {
@@ -1181,94 +1178,42 @@ public final class Store {
 
     public record Rivers(String json, String source) {}
 
-    public Rivers rivers(long mapId) {
+    /** A list layer of a map ("rivers", "roads", "cities", "ranges", "nations") as JSON text ("[]" without any), and whether it was last changed in the app. */
+    public Rivers list(String layer, long mapId) {
+        String table = listTable(layer);
         return tx(c -> {
-            try (PreparedStatement ps = prep(c, "SELECT rivers, source FROM map_rivers WHERE map_id = ?", mapId); ResultSet rs = ps.executeQuery()) {
+            try (PreparedStatement ps = prep(c, "SELECT " + layer + ", source FROM " + table + " WHERE map_id = ?", mapId); ResultSet rs = ps.executeQuery()) {
                 return rs.next() ? new Rivers(new String(rs.getBytes(1), java.nio.charset.StandardCharsets.UTF_8), rs.getString(2)) : new Rivers("[]", null);
             }
         });
     }
 
-    public void setRivers(long mapId, String json, String source, Long userId) {
+    public void setList(String layer, long mapId, String json, String source, Long userId) {
+        String table = listTable(layer);
         byte[] b = json.getBytes(java.nio.charset.StandardCharsets.UTF_8);
         tx(c -> {
-            if (update(c, "UPDATE map_rivers SET rivers = ?, source = ?, updated_by = ?, updated_at = CURRENT_TIMESTAMP WHERE map_id = ?", b, source, userId, mapId) == 0)
-                update(c, "INSERT INTO map_rivers (map_id, rivers, source, updated_by) VALUES (?, ?, ?, ?)", mapId, b, source, userId);
+            if (update(c, "UPDATE " + table + " SET " + layer + " = ?, source = ?, updated_by = ?, updated_at = CURRENT_TIMESTAMP WHERE map_id = ?", b, source, userId, mapId) == 0)
+                update(c, "INSERT INTO " + table + " (map_id, " + layer + ", source, updated_by) VALUES (?, ?, ?, ?)", mapId, b, source, userId);
             return null;
         });
     }
 
-    /** The map's nations as JSON text ("[]" without any), and whether they were last changed in the app. */
-    public Rivers nations(long mapId) {
-        return tx(c -> {
-            try (PreparedStatement ps = prep(c, "SELECT nations, source FROM map_nations WHERE map_id = ?", mapId); ResultSet rs = ps.executeQuery()) {
-                return rs.next() ? new Rivers(new String(rs.getBytes(1), java.nio.charset.StandardCharsets.UTF_8), rs.getString(2)) : new Rivers("[]", null);
-            }
-        });
+    /** The table of a list layer (the layer's name is also its column); only the known ones. */
+    private static String listTable(String layer) {
+        if (!java.util.Set.of("rivers", "roads", "cities", "ranges", "nations").contains(layer)) throw new IllegalArgumentException("No such layer: " + layer);
+        return "map_" + layer;
     }
 
-    public void setNations(long mapId, String json, String source, Long userId) {
-        byte[] b = json.getBytes(java.nio.charset.StandardCharsets.UTF_8);
-        tx(c -> {
-            if (update(c, "UPDATE map_nations SET nations = ?, source = ?, updated_by = ?, updated_at = CURRENT_TIMESTAMP WHERE map_id = ?", b, source, userId, mapId) == 0)
-                update(c, "INSERT INTO map_nations (map_id, nations, source, updated_by) VALUES (?, ?, ?, ?)", mapId, b, source, userId);
-            return null;
-        });
-    }
-
-    /** The map's mountain ranges as JSON text ("[]" without any), and whether they were last changed in the app. */
-    public Rivers ranges(long mapId) {
-        return tx(c -> {
-            try (PreparedStatement ps = prep(c, "SELECT ranges, source FROM map_ranges WHERE map_id = ?", mapId); ResultSet rs = ps.executeQuery()) {
-                return rs.next() ? new Rivers(new String(rs.getBytes(1), java.nio.charset.StandardCharsets.UTF_8), rs.getString(2)) : new Rivers("[]", null);
-            }
-        });
-    }
-
-    public void setRanges(long mapId, String json, String source, Long userId) {
-        byte[] b = json.getBytes(java.nio.charset.StandardCharsets.UTF_8);
-        tx(c -> {
-            if (update(c, "UPDATE map_ranges SET ranges = ?, source = ?, updated_by = ?, updated_at = CURRENT_TIMESTAMP WHERE map_id = ?", b, source, userId, mapId) == 0)
-                update(c, "INSERT INTO map_ranges (map_id, ranges, source, updated_by) VALUES (?, ?, ?, ?)", mapId, b, source, userId);
-            return null;
-        });
-    }
-
-    /** The map's roads and paths as JSON text ("[]" without any), and whether they were last changed in the app. */
-    public Rivers roads(long mapId) {
-        return tx(c -> {
-            try (PreparedStatement ps = prep(c, "SELECT roads, source FROM map_roads WHERE map_id = ?", mapId); ResultSet rs = ps.executeQuery()) {
-                return rs.next() ? new Rivers(new String(rs.getBytes(1), java.nio.charset.StandardCharsets.UTF_8), rs.getString(2)) : new Rivers("[]", null);
-            }
-        });
-    }
-
-    /** The map's cities as JSON text ("[]" without any), and whether they were last changed in the app. */
-    public Rivers cities(long mapId) {
-        return tx(c -> {
-            try (PreparedStatement ps = prep(c, "SELECT cities, source FROM map_cities WHERE map_id = ?", mapId); ResultSet rs = ps.executeQuery()) {
-                return rs.next() ? new Rivers(new String(rs.getBytes(1), java.nio.charset.StandardCharsets.UTF_8), rs.getString(2)) : new Rivers("[]", null);
-            }
-        });
-    }
-
-    public void setCities(long mapId, String json, String source, Long userId) {
-        byte[] b = json.getBytes(java.nio.charset.StandardCharsets.UTF_8);
-        tx(c -> {
-            if (update(c, "UPDATE map_cities SET cities = ?, source = ?, updated_by = ?, updated_at = CURRENT_TIMESTAMP WHERE map_id = ?", b, source, userId, mapId) == 0)
-                update(c, "INSERT INTO map_cities (map_id, cities, source, updated_by) VALUES (?, ?, ?, ?)", mapId, b, source, userId);
-            return null;
-        });
-    }
-
-    public void setRoads(long mapId, String json, String source, Long userId) {
-        byte[] b = json.getBytes(java.nio.charset.StandardCharsets.UTF_8);
-        tx(c -> {
-            if (update(c, "UPDATE map_roads SET roads = ?, source = ?, updated_by = ?, updated_at = CURRENT_TIMESTAMP WHERE map_id = ?", b, source, userId, mapId) == 0)
-                update(c, "INSERT INTO map_roads (map_id, roads, source, updated_by) VALUES (?, ?, ?, ?)", mapId, b, source, userId);
-            return null;
-        });
-    }
+    public Rivers rivers(long mapId) { return list("rivers", mapId); }
+    public void setRivers(long mapId, String json, String source, Long userId) { setList("rivers", mapId, json, source, userId); }
+    public Rivers nations(long mapId) { return list("nations", mapId); }
+    public void setNations(long mapId, String json, String source, Long userId) { setList("nations", mapId, json, source, userId); }
+    public Rivers ranges(long mapId) { return list("ranges", mapId); }
+    public void setRanges(long mapId, String json, String source, Long userId) { setList("ranges", mapId, json, source, userId); }
+    public Rivers roads(long mapId) { return list("roads", mapId); }
+    public void setRoads(long mapId, String json, String source, Long userId) { setList("roads", mapId, json, source, userId); }
+    public Rivers cities(long mapId) { return list("cities", mapId); }
+    public void setCities(long mapId, String json, String source, Long userId) { setList("cities", mapId, json, source, userId); }
 
     // ── Settings for the whole app (admins) ──────────────────────────────
     /** An app setting's JSON, or null. */
