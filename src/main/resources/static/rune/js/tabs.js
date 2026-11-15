@@ -52,7 +52,7 @@ const TAB = {
       <input id="w_form" placeholder="form" size="14" class="form"><input id="w_ref" list="w_refs" placeholder="refers to which word?" size="22" hidden><datalist id="w_refs">${S.words.filter(x => !x.ref_to).map(x => `<option value="${esc(x.gloss)} #${x.id}">${esc(x.form)}</option>`).join('')}</datalist><label style="display:inline;margin:0" title="The word has no form of its own: it shows the forms of another word"><input type="checkbox" id="w_isref" data-isref="1"> reference to another word</label>
       <label style="display:inline;margin:0" title="Take the word from another language, as it sounded there in the year you give"><input type="checkbox" id="w_isloan" data-isloan="1"> borrow</label>
       <select id="w_loanlang" data-loanlang="1" hidden><option value="">from which language?</option>${loanLangs().map(l => `<option value="${l.id}">${esc(l.name)}</option>`).join('')}</select><input id="w_loanword" list="w_loanwords" placeholder="search by meaning or form" size="28" hidden><datalist id="w_loanwords"></datalist><input id="w_year" placeholder="year" size="6" type="number">
-      <input id="w_notes" placeholder="notes" size="20"><input id="w_id" type="hidden">
+      <input id="w_notes" placeholder="notes" size="20"><input id="w_tags" list="tag_list" placeholder="tags" size="14" title="Comma-separated tags"><input id="w_id" type="hidden">
       <button class="primary" data-act="saveWord" id="w_btn">Add word</button></div>
       <div class="row"><button data-act="suggestRoots">Suggest new roots</button> <input id="sg_n" type="number" value="10" min="1" max="40" size="3" title="how many">
         <select id="sg_syl"><option value="1-1">1 syllable</option><option value="2-2" selected>2 syllables</option><option value="2-3">2-3 syllables</option><option value="3-4">3-4 syllables</option></select>
@@ -69,7 +69,7 @@ const TAB = {
       <label style="display:inline;margin:0 0 0 10px">Per page</label> <select data-psize="1">${[25, 50, 100, 250].map(n => `<option ${n === S.pageSize ? 'selected' : ''}>${n}</option>`).join('')}</select>
       <span class="pager"></span></div>
     <table id="wt"><thead><tr><th>ID</th><th>Gloss</th><th>Type</th><th>Build</th><th>Year</th><th>Form</th><th>Definite</th><th>Len</th><th>IPA</th><th>Also in</th><th>Latest per branch</th><th></th></tr>
-      <tr class="filters">${['id', 'gloss', 'pos', 'build', 'year', 'form'].map(k => `<th><input data-wf="${k}" value="${esc((S.wf || {})[k] || '')}" placeholder="${k === 'year' ? 'year, a..b, <a, >a' : k === 'id' ? 'id' : 'filter'}" style="width:100%;min-width:${k === 'id' ? 3 : 6}rem"></th>`).join('')}<th colspan="6"><button data-act="clearFilters" class="small">Clear filters</button></th></tr></thead><tbody id="wbody"></tbody></table>
+      <tr class="filters">${['id', 'gloss', 'pos', 'build', 'year', 'form'].map(k => `<th><input data-wf="${k}" value="${esc((S.wf || {})[k] || '')}" placeholder="${k === 'year' ? 'year, a..b, <a, >a' : k === 'id' ? 'id' : 'filter'}" style="width:100%;min-width:${k === 'id' ? 3 : 6}rem"></th>`).join('')}<th colspan="6"><input data-wf="tag" list="tag_list" value="${esc((S.wf || {}).tag || '')}" placeholder="tag filter" size="12" title="Only words with these tags (comma-separated)"> <button data-act="clearFilters" class="small">Clear filters</button><datalist id="tag_list">${wordTagList().map(t => `<option value="${esc(t)}">`).join('')}</datalist></th></tr></thead><tbody id="wbody"></tbody></table>
     <div class="row"><span class="pager"></span></div>`;
     return h;
   },
@@ -143,7 +143,7 @@ const TAB = {
     let h = `<p class="muted small">A form rule says: words of these types get this prefix or suffix, and the result is a form of the word (definite, plural, past ...).
       Every form then goes through the sound changes by itself, as a whole. If a label has several rules (for example two plural prefixes), the first one whose condition fits the word is used.
       New words get their forms automatically.<br><strong>Linking the affix to a dictionary word</strong> (for example the word "definite" = tou) makes each form use that word as it was in the year the form begins:
-      if a sound change turns tou into toe in year 300, words from then on get -toe, while older words change through the same sound change. <br><strong>Regular forms are not stored</strong>: they are worked out from the rules when shown (marked <em>by rule</em> in the word window). A form is stored when it is
+      if a sound change turns tou into toe in year 300, words from then on get -toe, while older words change through the same sound change. <br><strong>First remove from the end of the word</strong> (optional, a pattern like a sound change's) takes the old ending off the word before the ending is added: a form built on <em>ēþmijaną</em> + <em>-ida</em> becomes <em>ēþmijida</em> with <code>(aną|ą)$</code>, not <em>ēþmijanąida</em> whose old ending the sound changes could no longer reach. <br><strong>Regular forms are not stored</strong>: they are worked out from the rules when shown (marked <em>by rule</em> in the word window). A form is stored when it is
       <strong>irregular</strong>: made or changed by hand, or when a sound change has made it something else than its word plus its ending, each going through the sound changes on its own
       (im + tou: <em>imtou</em> becomes <em>imbou</em> by "t &gt; b between m and a vowel", while <em>akatou</em> stays regular). In the word window an irregular form can be <em>levelled out</em> from a year: it becomes regular again then.
       ${isOwner() ? '<button data-act="storeIrregular" title="Goes through every word: stores the forms the sound changes have made irregular, and takes away stored forms that are just what the rules give. Forms made by hand are left alone.">Store irregular forms</button>' : ''}</p>`;
@@ -156,16 +156,17 @@ const TAB = {
       <div class="row"><label style="display:inline;margin:0" title="A derivation: the result is a different word (seal → to seal) with its own type and endings. It isn't stored on every word; sentences build it, and you can save it as a word"><input type="checkbox" id="fr_derive" data-frderive="1"> Makes a new word of another type</label>
         <span id="fr_derivebox" hidden><input id="fr_newpos" list="fr_poslist" placeholder="new type, e.g. verb" size="16"><datalist id="fr_poslist">${[...new Set(S.wordnames.map(w => w.pos).concat(rules.map(r => r.pos), rules.map(r => r.new_pos)).filter(Boolean).flatMap(p => String(p).split(',')).map(p => p.trim()).filter(Boolean))].map(p => `<option value="${esc(p)}">`).join('')}</datalist>
         <input id="fr_newgloss" placeholder="meaning, e.g. to {gloss}" size="22" title="{gloss} is the old word's meaning"></span></div>
+      <div class="row"><input id="fr_strip" placeholder="first remove from the end of the word (regex, optional; e.g. (aną|ą|az)$)" size="52" class="form" title="The old ending of the word that its sound changes would take off, but cannot once the ending stands behind it: take it off the word before the ending is added (from the start of the word for a prefix). Written as a sound change's pattern; only a match at the edge counts."></div>
       <div class="row"><input id="fr_cond" placeholder="only if the word matches (regex, optional; e.g. ^a  or  {V}$)" size="44" class="form">
       <label style="display:inline;margin:0"><input type="checkbox" id="fr_hiatus"> drop the first vowel when two vowels meet</label>
       <input id="fr_year" type="number" placeholder="from year" size="8" data-yearcheck="rule"><span id="fr_warn" class="gap small"></span><input id="fr_ord" type="number" placeholder="order" size="5" value="0"><input id="fr_id" type="hidden"></div>
       <div class="row"><button class="primary" data-act="saveFormRule" id="fr_btn">Add form rule</button><button data-act="cancelFormRule" id="fr_cancel" hidden>Cancel edit</button></div></div>`;
     if (isOwner()) h += '<div class="row"><button data-act="genForms">Add missing forms to all existing words</button></div>';
-    h += '<table><tr><th>Form</th><th>Applies to</th><th>Affix</th><th>Condition</th><th>Vowel clash</th><th>From</th><th>Order</th><th></th></tr>';
+    h += '<table><tr><th>Form</th><th>Applies to</th><th>Affix</th><th>Condition / removes</th><th>Vowel clash</th><th>From</th><th>Order</th><th></th></tr>';
     const order = []; for (const r of rules) { const g = r.grp || ''; if (!order.includes(g)) order.push(g); }
     order.sort((x, y) => (x === '') - (y === ''));
     const rowOf = r => `<tr><td><strong>${esc(r.label)}</strong>${r.new_pos ? `<div class="small"><span class="badge" title="Derivation: makes a new word">→ ${esc(r.new_pos)}</span> ${esc((r.new_gloss || '{gloss}'))}</div>` : ''}</td><td>${esc(r.pos) || 'all types'}</td><td class="form">${r.affix_word_id ? `⛓ <span class="small">${esc(r.affix_gloss ?? '(deleted word)')}</span> ${r.affix_form ? esc(r.placement === 'prefix' ? r.affix_form + '-' : '-' + r.affix_form) : ''}` : (r.placement === 'prefix' ? esc(r.affix) + '-' : '-' + esc(r.affix))}</td>
-      <td class="form">${esc(r.cond_re)}</td><td>${r.hiatus ? 'drop first vowel' : ''}</td><td>${r.year ?? ''}</td><td>${r.ord}</td>
+      <td class="form">${esc(r.cond_re)}${r.strip_re ? `<div class="small" title="Taken off the end of the word before the ending is added"><span class="badge">remove</span> <span class="form">${esc(r.strip_re)}</span></div>` : ''}</td><td>${r.hiatus ? 'drop first vowel' : ''}</td><td>${r.year ?? ''}</td><td>${r.ord}</td>
       <td>${canSuggest() ? `<button data-act="editFormRule" data-id="${r.id}">Edit</button> <button class="danger" data-act="delFormRule" data-id="${r.id}">✕</button>` : ''}
       ${isOwner() && !r.new_pos ? `<button data-act="rebuildForm" data-l="${esc(r.label)}" title="Recompute this form for every word (overwrites hand edits)">Rebuild all</button>` : ''}</td></tr>`;
     for (const g of order) {
@@ -278,7 +279,8 @@ const TAB = {
   },
   async bulk() {
     if (!canEdit()) return '<p class="muted">Editors only.</p>';
-    return excelImportCard() + `<p class="muted small">One word per line: <code>gloss;type;form;year;notes</code> (tab-separated also works). Nothing is added if any line has an error.</p>
+    return excelImportCard() + `<p class="muted small">One word per line: <code>gloss;type;form;year;notes;tags</code> (tab-separated also works; tags are optional, comma-separated). Nothing is added if any line has an error.</p>
+    <div class="row"><input id="b_tags" list="tag_list" placeholder="tag for all these words (optional)" size="34" title="Every word added gets this tag, besides any tags on its own line. Several tags: separate with commas."><datalist id="tag_list">${wordTagList().map(t => `<option value="${esc(t)}">`).join('')}</datalist></div>
     <textarea id="b_text" rows="12"></textarea><div class="row"><label style="display:inline;margin:0"><input type="checkbox" id="b_skip"> skip words that already exist here (same gloss)</label></div><div class="row"><button data-act="bulkCheck">Check only</button><button class="primary" data-act="bulkGo">Add all</button></div><div id="b_out"></div>`;
   },
   async changes() {

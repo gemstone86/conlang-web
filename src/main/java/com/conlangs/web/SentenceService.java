@@ -189,6 +189,18 @@ public class SentenceService {
             });
         }
 
+        final Map<Long, Pattern> strips = new HashMap<>();
+
+        /** What a rule takes off the end of the word before its ending is added (null: nothing, or a pattern that does not compile). */
+        Pattern strip(Map<String, Object> r) {
+            String s = (String) r.get("strip_re");
+            if (s == null || s.isBlank()) return null;
+            Pattern got = strips.computeIfAbsent(Db.num(r.get("id")), k -> {
+                try { return Patterns.compile(s, stackClasses); } catch (IllegalArgumentException e) { return BAD; }
+            });
+            return got == BAD ? null : got;
+        }
+
         /** The ending of a rule at a year: its linked dictionary word as it sounded then, or the fixed affix. */
         String affixAt(Map<String, Object> r, int y) {
             String affix = r.get("affix") == null ? "" : (String) r.get("affix");
@@ -727,6 +739,7 @@ public class SentenceService {
             if (rule == null) return new Res(null, "no '" + sl.label() + "' rule fits '" + cur + "' in " + y0, note, gloss);
             String affix = c.affixAt(rule, y0);
             if (affix == null || affix.isEmpty()) return new Res(null, "the '" + sl.label() + "' ending has no form in " + y0, note, gloss);
+            cur = FormMath.strip(cur, c.strip(rule), "prefix".equals(rule.get("placement")));
             cur = FormMath.attach(cur, (String) rule.get("placement"), affix, ((Number) rule.get("hiatus")).intValue() != 0, c.stackVowels);
         }
         List<Evolver.Row> rows = c.ev.evolve(langAt(c, y0), cur, y0, List.of());

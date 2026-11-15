@@ -795,7 +795,7 @@ public class DictService {
         return Map.of("joined", joined.toString(), "parts", used, "steps", out);
     }
 
-    /** Bulk entry: lines of gloss;pos;form;year;notes (tab or semicolon separated). All-or-nothing. */
+    /** Bulk entry: lines of gloss;pos;form;year;notes;tags (tab or semicolon separated). All-or-nothing. */
     /**
      * A borrowed word takes the form the source word had in the source language in the year of borrowing. The result is
      * stored as an ordinary form (the borrowing language's own sound changes then apply from that year), with loan_word_id
@@ -923,11 +923,20 @@ public class DictService {
     }
 
     public Map<String, Object> bulk(long uid, long langId, String text, boolean dryRun) {
-        return bulk(uid, langId, text, dryRun, false);
+        return bulk(uid, langId, text, dryRun, false, null);
     }
 
     public Map<String, Object> bulk(long uid, long langId, String text, boolean dryRun, boolean skipExisting) {
+        return bulk(uid, langId, text, dryRun, skipExisting, null);
+    }
+
+    /**
+     * As above; tags (comma separated) go on every word added. A line can have its own tags as a sixth column
+     * (gloss;type;form;year;notes;tags): the words of that line get both.
+     */
+    public Map<String, Object> bulk(long uid, long langId, String text, boolean dryRun, boolean skipExisting, String tags) {
         access.need(uid, langId, Access.EDITOR);
+        final String allTags = RuleTags.normalize(tags);
         List<Map<String, Object>> parsed = new ArrayList<>();
         List<String> errors = new ArrayList<>();
         List<String> skipped = new ArrayList<>();
@@ -951,6 +960,9 @@ public class DictService {
             if (f.length > 2) p.put("form", f[2].trim());
             if (f.length > 3 && !f[3].isBlank()) p.put("year", f[3].trim());
             if (f.length > 4) p.put("notes", f[4].trim());
+            String own = f.length > 5 ? f[5].trim() : "";
+            String joined = (allTags == null ? "" : allTags) + (!own.isEmpty() && allTags != null ? "," : "") + own;
+            if (!joined.isBlank()) p.put("tags", joined);
             try {
                 parsed.add(store.validate(langId, "word", "CREATE", null, p));
             } catch (ApiException e) {
@@ -961,6 +973,11 @@ public class DictService {
         if (!dryRun) {
             for (Map<String, Object> p : parsed) store.submit(uid, langId, "word", "CREATE", null, p);
         }
-        return Map.of("count", parsed.size(), "dryRun", dryRun, "skipped", skipped);
+        Map<String, Object> res = new LinkedHashMap<>();
+        res.put("count", parsed.size());
+        res.put("dryRun", dryRun);
+        res.put("skipped", skipped);
+        res.put("tags", allTags);
+        return res;
     }
 }

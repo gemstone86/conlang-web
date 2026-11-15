@@ -54,6 +54,12 @@ public class ImportService {
     }
 
     public Map<String, Object> importDictionary(InputStream in, long langId, long uid) throws Exception {
+        return importDictionary(in, langId, uid, null);
+    }
+
+    /** As above; tags (comma separated) go on every word imported. */
+    public Map<String, Object> importDictionary(InputStream in, long langId, long uid, String tags) throws Exception {
+        final String allTags = RuleTags.normalize(tags);
         List<String> skipped = new ArrayList<>();
         int imported = 0, already = 0;
         // Route each row to the language whose name equals its 'group' (case-insensitive); anything else goes to langId.
@@ -103,6 +109,7 @@ public class ImportService {
                 p.put("build", b);
                 if (col.containsKey("type")) p.put("pos", text(r.getCell(col.get("type"))));
                 if (col.containsKey("notes")) p.put("notes", text(r.getCell(col.get("notes"))));
+                if (allTags != null) p.put("tags", allTags);
                 try {
                     Map<String, Object> clean = store.validate(target, "word", "CREATE", null, p);
                     store.apply(target, uid, "word", "CREATE", null, clean);

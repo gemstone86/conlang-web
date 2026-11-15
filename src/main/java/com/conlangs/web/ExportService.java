@@ -41,12 +41,12 @@ public class ExportService {
         long worldId = Db.num(lang.get("world_id"));
         try (XSSFWorkbook wb = new XSSFWorkbook(); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
             Sheet d = wb.createSheet("Dictionary");
-            row(d, 0, "id", "gloss", "pos", "build", "year", "form", "length", "pronunciation", "notes", "inherited from");
+            row(d, 0, "id", "gloss", "pos", "build", "year", "form", "length", "pronunciation", "notes", "inherited from", "tags");
             int r = 1;
             List<Map<String, Object>> words = dict.words(uid, langId);
             for (Map<String, Object> w : words) {
                 row(d, r++, w.get("id"), w.get("gloss"), w.get("pos"), w.get("build"), w.get("year"), w.get("form"),
-                        w.get("length"), w.get("pronunciation"), w.get("notes"), w.get("origin_lang"));
+                        w.get("length"), w.get("pronunciation"), w.get("notes"), w.get("origin_lang"), w.get("tags"));
             }
             Sheet h = wb.createSheet("History");
             row(h, 0, "word id", "gloss", "language", "year", "form", "source", "rule");
@@ -129,10 +129,10 @@ public class ExportService {
                 row(ck, r++, cells.toArray());
             }
             Sheet fr2 = wb.createSheet("Form rules");
-            row(fr2, 0, "group", "form", "applies to", "placement", "affix", "affix word", "condition", "drop first vowel", "from year", "order");
+            row(fr2, 0, "group", "form", "applies to", "placement", "affix", "affix word", "condition", "drop first vowel", "from year", "order", "remove from the end first");
             r = 1;
             for (Map<String, Object> x : db.rows("select f.*, w.gloss as aw from form_rules f left join words w on w.id=f.affix_word_id where f.language_id=? order by f.ord, f.id", langId)) {
-                row(fr2, r++, x.get("grp"), x.get("label"), x.get("pos"), x.get("placement"), x.get("affix"), x.get("aw"), x.get("cond_re"), x.get("hiatus"), x.get("year"), x.get("ord"));
+                row(fr2, r++, x.get("grp"), x.get("label"), x.get("pos"), x.get("placement"), x.get("affix"), x.get("aw"), x.get("cond_re"), x.get("hiatus"), x.get("year"), x.get("ord"), x.get("strip_re"));
             }
             Sheet me = wb.createSheet("Meanings");
             row(me, 0, "word id", "gloss", "language", "from year", "mode", "meaning");

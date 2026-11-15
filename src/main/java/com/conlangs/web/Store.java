@@ -19,14 +19,14 @@ public class Store {
     private static final Map<String, String> TABLE = Map.of("word", "words", "rule", "rules", "override", "word_overrides", "form", "word_forms",
             "gsection", "grammar_sections", "grammar", "grammar_entries", "phoneme", "phonemes", "formrule", "form_rules", "meaning", "word_meanings", "loss", "word_losses");
     private static final Map<String, List<String>> FIELDS = Map.of(
-            "word", List.of("gloss", "pos", "build", "form", "year", "notes", "ref_word_id", "loan_word_id", "derived_from", "derived_label"),
+            "word", List.of("gloss", "pos", "build", "form", "year", "notes", "tags", "ref_word_id", "loan_word_id", "derived_from", "derived_label"),
             "rule", List.of("year", "ord", "name", "pattern", "replacement", "note", "tags"),
             "override", List.of("word_id", "lang_id", "year", "form"),
             "form", List.of("word_id", "label", "form", "year"),
             "gsection", List.of("title", "headings", "ord"),
             "grammar", List.of("category", "name", "c1", "c2", "c3", "c4", "c5", "c6", "year", "ord"),
             "phoneme", List.of("symbol", "kind", "row_label", "col_label", "notes", "year", "year_to"),
-            "formrule", List.of("grp", "label", "pos", "placement", "affix", "affix_word_id", "cond_re", "hiatus", "year", "ord", "new_pos", "new_gloss"),
+            "formrule", List.of("grp", "label", "pos", "placement", "affix", "affix_word_id", "cond_re", "strip_re", "hiatus", "year", "ord", "new_pos", "new_gloss"),
             "meaning", List.of("word_id", "lang_id", "year", "mode", "meaning", "pos"),
             "loss", List.of("word_id", "lang_id", "year", "note"));
     private static final Set<String> LANG_OWNED = Set.of("word", "rule", "gsection", "grammar", "phoneme", "formrule");
@@ -198,6 +198,13 @@ public class Store {
                             throw new ApiException(400, e.getMessage());
                         }
                     }
+                    if (!blank(clean.get("strip_re"))) {
+                        try {
+                            Patterns.compile((String) clean.get("strip_re"), classesOf(langId));
+                        } catch (IllegalArgumentException e) {
+                            throw new ApiException(400, "Remove from the end first: " + e.getMessage());
+                        }
+                    }
                 }
                 case "gsection" -> {
                     if (blank(clean.get("title"))) throw new ApiException(400, "A section needs a title.");
@@ -216,7 +223,7 @@ public class Store {
             }
         }
         if (clean.containsKey("ord") && clean.get("ord") == null) clean.remove("ord");
-        if (entity.equals("rule") && clean.containsKey("tags")) clean.put("tags", RuleTags.normalize(clean.get("tags")));
+        if ((entity.equals("rule") || entity.equals("word")) && clean.containsKey("tags")) clean.put("tags", RuleTags.normalize(clean.get("tags")));
         if ((entity.equals("word") || entity.equals("form")) && clean.containsKey("form") && blank(clean.get("form")) && !action.equals("DELETE"))
             throw new ApiException(400, "Form can't be empty.");
         if (entity.equals("rule") && clean.containsKey("pattern")) {

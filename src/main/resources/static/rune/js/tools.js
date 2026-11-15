@@ -5,6 +5,7 @@ function excelImportCard() {
   if (!(S.me && S.me.is_admin && isOwner())) return '';
   return `<details class="card"><summary><strong>Import from Excel</strong> <span class="small muted">a language's dictionary, grammar and sounds from an .xlsx workbook (admins)</span></summary>
     <div class="row"><input type="file" id="gx_file" accept=".xlsx"></div>
+    <div class="row"><input id="gx_tags" placeholder="tag for all imported words (optional)" size="34"></div>
     <div class="row"><button class="primary" data-act="excelDict">Import dictionary</button>
       <span class="small muted">Reads the sheet <strong>"Ygg Elven dict"</strong>: columns <em>dictionary</em> (meaning), <em>elven</em> (form), <em>build</em>, <em>year</em>,
       and optionally <em>type</em>, <em>notes</em> and <em>group</em> (a row whose group is the name of another language in this world goes to that language).
