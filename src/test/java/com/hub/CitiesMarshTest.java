@@ -60,7 +60,7 @@ class CitiesMarshTest {
         assertTrue(mapId > 0);
         String url = "/weather/api/maps/" + mapId + "/cities";
 
-        assertEquals(0, json.readTree(get(anon, url).body()).path("cities").size(), "none to begin with");
+        assertTrue(json.readTree(get(anon, url).body()).path("cities").size() > 0, "the standard map ships with its cities");
         String list = "[{\"id\":1,\"name\":\"Port\",\"population\":12000,\"harbour\":true,\"x\":0.4,\"y\":0.5},"
                 + "{\"id\":2,\"name\":\"Inland\",\"population\":-5,\"x\":0.5,\"y\":0.5}]";
         assertEquals(401, send(anon, "PUT", url, list, true).statusCode(), "not logged in");
@@ -80,7 +80,7 @@ class CitiesMarshTest {
 
         // marshland: a painted layer like the forests; only the owner paints it
         String murl = "/weather/api/maps/" + mapId + "/marsh";
-        assertEquals(404, get(anon, murl).statusCode(), "none yet");
+        assertEquals(200, get(anon, murl).statusCode(), "the standard map ships with its marshland");
         HttpRequest put = HttpRequest.newBuilder(URI.create("http://localhost:" + port + murl)).header("Content-Type", "image/png")
                 .header("X-Eon-Request", "1").PUT(HttpRequest.BodyPublishers.ofByteArray(PNG)).build();
         assertEquals(403, member.send(put, HttpResponse.BodyHandlers.ofString()).statusCode());

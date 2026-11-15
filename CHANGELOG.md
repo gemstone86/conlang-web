@@ -2,6 +2,10 @@
 
 Newest first. Versions from 1.x on are the combined app (Root and Rune + Weather generator).
 
+## v1.26.1 (combined app)
+Weather map:
+- The standard map is updated from an admin export (Mundana, 15 November): the height map (909 changed pixels, revision 10), the forests, the roads (66) and, new in the standard map, the **cities** (16) and the **marshland**. A server that already has the standard map gets them installed once (the *Release* marks in `map.json`); what was changed in the app since is not touched by the older parts.
+
 ## v1.26.0 (combined app)
 Root and Rune:
 - **Expand a word's forms in the dictionary**: a word that has forms by rule gets an arrow (▸) beside its id. Clicking it lists the forms under the word: the form's name (definite, plural …) stands where the id is, then the word, its type and *by rule* (or *irregular*, *by hand*, *levelled*), the form, its year and its latest per branch. Clicking a row opens the word. There are no ids of their own for forms: every row belongs to the word's id. Words without forms by rule look as before.
