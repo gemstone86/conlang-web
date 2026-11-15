@@ -134,7 +134,7 @@ class DerivationTest {
         assertEquals(seal, w.path("derived_from").asLong());
         Long pastForm = null;
         for (JsonNode f : om.readTree(get(owner, "/rune/api/words/" + toSeal + "/history").body()).path("forms"))
-            if (f.path("label").asText().equals("past")) pastForm = f.path("id").asLong();
+            if (f.path("label").asText().equals("past") && !f.path("id").isNull()) pastForm = f.path("id").asLong();   // a form the rules give is not stored: it has no id
         HttpResponse<String> irr = pastForm == null
                 ? edit(owner, elven, "form", "CREATE", null, "{\"word_id\":" + toSeal + ",\"label\":\"past\",\"form\":\"mahalvo\"}")
                 : edit(owner, elven, "form", "UPDATE", pastForm, "{\"form\":\"mahalvo\"}");

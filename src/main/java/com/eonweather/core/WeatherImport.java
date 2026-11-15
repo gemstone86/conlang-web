@@ -35,7 +35,7 @@ public final class WeatherImport {
     static final List<String> TABLES = List.of(
             "user_state", "campaigns", "notes", "custom_regions", "symbols", "app_settings",
             "maps", "map_anchors", "map_leylines", "map_zones", "map_heights", "map_rivers", "map_nations",
-            "map_ranges", "map_forests", "map_ice", "map_roads", "map_trips",
+            "map_ranges", "map_forests", "map_ice", "map_marsh", "map_roads", "map_cities", "map_trips",
             "height_suggestions", "height_votes", "layer_suggestions", "layer_votes");
     /** Columns that hold an account id. */
     static final Set<String> USER_COLUMNS = Set.of("OWNER_ID", "AUTHOR_ID", "REVIEWER_ID", "UPDATED_BY", "USER_ID");

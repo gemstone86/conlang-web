@@ -1,0 +1,146 @@
+[
+  {
+    "id": 1,
+    "kind": "city",
+    "name": "Camard",
+    "population": 5000,
+    "harbour": true,
+    "x": 0.5724534,
+    "y": 0.3218674
+  },
+  {
+    "id": 2,
+    "kind": "city",
+    "name": "Talea",
+    "population": 1000,
+    "harbour": false,
+    "x": 0.5605945,
+    "y": 0.2737698
+  },
+  {
+    "id": 3,
+    "kind": "city",
+    "name": "Arlon",
+    "population": 1000,
+    "harbour": false,
+    "x": 0.555363,
+    "y": 0.2727009
+  },
+  {
+    "id": 4,
+    "kind": "city",
+    "name": "Valdus",
+    "population": 1000,
+    "harbour": false,
+    "x": 0.5555827,
+    "y": 0.2766208
+  },
+  {
+    "id": 5,
+    "kind": "city",
+    "name": "Durum",
+    "population": 1000,
+    "harbour": false,
+    "x": 0.5618081,
+    "y": 0.2801952
+  },
+  {
+    "id": 6,
+    "kind": "city",
+    "name": "Marek Pomian",
+    "population": 1000,
+    "harbour": true,
+    "x": 0.5761068,
+    "y": 0.2976363
+  },
+  {
+    "id": 7,
+    "kind": "city",
+    "name": "Jhamalo Gedonia",
+    "population": 1000,
+    "harbour": true,
+    "x": 0.5846444,
+    "y": 0.2795836
+  },
+  {
+    "id": 8,
+    "kind": "city",
+    "name": "Tuzan Rim",
+    "population": 1000,
+    "harbour": true,
+    "x": 0.5716241,
+    "y": 0.3118708
+  },
+  {
+    "id": 9,
+    "kind": "city",
+    "name": "Calnia",
+    "population": 1000,
+    "harbour": true,
+    "x": 0.6286525,
+    "y": 0.2912888
+  },
+  {
+    "id": 10,
+    "kind": "city",
+    "name": "Jarla",
+    "population": 1000,
+    "harbour": false,
+    "x": 0.5697706,
+    "y": 0.2827521
+  },
+  {
+    "id": 11,
+    "kind": "city",
+    "name": "Remzian Krack",
+    "population": 1000,
+    "harbour": false,
+    "x": 0.5762232,
+    "y": 0.2902192
+  },
+  {
+    "id": 12,
+    "kind": "city",
+    "name": "Szaracpm Tamatz",
+    "population": 1000,
+    "harbour": true,
+    "x": 0.5827214,
+    "y": 0.2851623
+  },
+  {
+    "id": 13,
+    "kind": "city",
+    "name": "Zamm Foran",
+    "population": 1000,
+    "harbour": true,
+    "x": 0.5832819,
+    "y": 0.2782838
+  },
+  {
+    "id": 14,
+    "kind": "city",
+    "name": "Tzir",
+    "population": 1000,
+    "harbour": true,
+    "x": 0.5816511,
+    "y": 0.2771466
+  },
+  {
+    "id": 15,
+    "kind": "city",
+    "name": "Rametzio Turak",
+    "population": 1000,
+    "harbour": true,
+    "x": 0.5810575,
+    "y": 0.2753994
+  },
+  {
+    "id": 16,
+    "kind": "city",
+    "name": "Haraziz Krack",
+    "population": 1000,
+    "harbour": true,
+    "x": 0.584786,
+    "y": 0.2698989
+  }
+]

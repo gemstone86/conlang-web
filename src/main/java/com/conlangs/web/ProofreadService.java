@@ -22,7 +22,10 @@ public class ProofreadService {
     private final SentenceService sentences;
     private final MissingService missing;
 
-    public ProofreadService(Db db, Access access, DictService dict, SentenceService sentences, MissingService missing) {
+    private final FormGenerator formGen;
+
+    public ProofreadService(Db db, Access access, DictService dict, SentenceService sentences, MissingService missing, FormGenerator formGen) {
+        this.formGen = formGen;
         this.db = db;
         this.access = access;
         this.dict = dict;
@@ -90,10 +93,19 @@ public class ProofreadService {
         Set<String> used = new HashSet<>();
         for (long src : path) {
             if (src != langId && access.level(uid, src) < Access.VIEWER) continue;
-            for (Map<String, Object> w : db.rows("select form, year from words where language_id=?", src))
-                collect(ev.evolve(src, (String) w.get("form"), ((Number) w.get("year")).intValue(), List.of(), only), langId, used);
-            for (Map<String, Object> f : db.rows("select f.form, coalesce(f.year, w.year) as year from word_forms f join words w on w.id=f.word_id where w.language_id=?", src))
-                collect(ev.evolve(src, (String) f.get("form"), ((Number) f.get("year")).intValue(), List.of(), only), langId, used);
+            // the stored forms, and the ones the rules give without being stored
+            Map<Long, Set<String>> have = new HashMap<>();
+            for (Map<String, Object> f : db.rows("select f.word_id, f.label, f.form, f.level_year, f.level_form, coalesce(f.year, w.year) as year from word_forms f join words w on w.id=f.word_id where w.language_id=?", src)) {
+                have.computeIfAbsent(Db.num(f.get("word_id")), k -> new HashSet<>()).add(String.valueOf(f.get("label")).toLowerCase());
+                collect(ev.evolve(src, (String) f.get("form"), ((Number) f.get("year")).intValue(), FormMath.level(f, src), only), langId, used);
+            }
+            FormGenerator.Ctx fc = formGen.prepare(src, ev);
+            for (Map<String, Object> w : db.rows("select id, pos, form, year from words where language_id=?", src)) {
+                List<Evolver.Row> rows = ev.evolve(src, (String) w.get("form"), ((Number) w.get("year")).intValue(), List.of(), only);
+                collect(rows, langId, used);
+                if (fc.hasRules()) for (Map<String, Object> f : formGen.virtualFor(fc, w, rows, have.getOrDefault(Db.num(w.get("id")), Set.of())))
+                    collect(ev.evolve(src, (String) f.get("form"), f.get("year") == null ? ((Number) w.get("year")).intValue() : ((Number) f.get("year")).intValue(), List.of(), only), langId, used);
+            }
         }
         Map<Long, Map<String, String>> off = RuleTags.effectiveOff(db, Db.num(lang.get("world_id")));
         List<Map<String, Object>> unused = new ArrayList<>();

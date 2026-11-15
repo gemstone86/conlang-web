@@ -11,11 +11,13 @@
   "metersPerStep": 100,
   "blockHeight": 30,
   "clockX": 0.6287,
-  "heightRev": 6,
+  "heightRev": 10,
   "riversRelease": "2026-11-04T06:44:34.638173700Z",
-  "rangesRelease": "2026-11-04T06:44:34.638173700Z",
-  "roadsRelease": "2026-10-31T13:38:48.143566300Z",
-  "forestRelease": "2026-10-31T13:38:48.143566300Z"
+  "rangesRelease": "2026-11-12T23:52:18.045782400Z",
+  "roadsRelease": "2026-11-15T19:23:16.885114100Z",
+  "forestRelease": "2026-11-15T19:23:16.885114100Z",
+  "marshRelease": "2026-11-15T19:23:16.885114100Z",
+  "citiesRelease": "2026-11-15T19:23:16.885114100Z"
  },
  "symbols": {
   "Astrotropi": "symbols/Astrotropi.png",
@@ -1451,5 +1453,7 @@
  "rivers": "rivers.json",
  "ranges": "ranges.json",
  "roads": "roads.json",
- "forest": "forest.png"
+ "forest": "forest.png",
+ "marsh": "marsh.png",
+ "cities": "cities.json"
 }

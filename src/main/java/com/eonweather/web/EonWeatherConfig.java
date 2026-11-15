@@ -41,7 +41,9 @@ public class EonWeatherConfig {
                       @Value("${app.registration:true}") boolean registration,
                       @Value("${spring.datasource.url:}") String dbUrl,
                       @Value("${eon.import:auto}") String importMode,
-                      @Value("${eon.import-from:}") String importFrom) {
+                      @Value("${eon.import-from:}") String importFrom,
+                      @Value("${app.version:dev}") String appVersion) {
+        Api.VERSION = appVersion;
         Api api = new Api(eonWorld, eonStore, registration);
         importOldDatabase(dataSource, dbUrl, importMode, importFrom);
         DefaultMap.install(eonStore, eonWorld); // the map shipped in src/main/resources/default-map

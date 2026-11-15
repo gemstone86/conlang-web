@@ -34,6 +34,7 @@ limits:
 #   travel: foot | river | sea      on foot, by river boat, or by ship (a list for several)
 #   road: none | path | road | highway   on foot: the road it is on (none: no road or path)
 #   forest: 50          at least 50 % trees (or { min: 20, max: 50 })
+#   marsh: 50           at least 50 % marshland (painted like forest; 100 = impassable on foot)
 #   ice: 50             at least 50 % ice
 #   height: 1500        at least 1500 m above the sea (or { min, max })
 #   steep: 8            the ground at least 8 % steep (or { min, max }); about 8 % and up is mountains

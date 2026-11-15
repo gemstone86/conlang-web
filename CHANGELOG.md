@@ -2,6 +2,131 @@
 
 Newest first. Versions from 1.x on are the combined app (Root and Rune + Weather generator).
 
+## v1.26.1 (combined app)
+Weather map:
+- The standard map is updated from an admin export (Mundana, 15 November): the height map (909 changed pixels, revision 10), the forests, the roads (66) and, new in the standard map, the **cities** (16) and the **marshland**. A server that already has the standard map gets them installed once (the *Release* marks in `map.json`); what was changed in the app since is not touched by the older parts.
+
+## v1.26.0 (combined app)
+Root and Rune:
+- **Expand a word's forms in the dictionary**: a word that has forms by rule gets an arrow (▸) beside its id. Clicking it lists the forms under the word: the form's name (definite, plural …) stands where the id is, then the word, its type and *by rule* (or *irregular*, *by hand*, *levelled*), the form, its year and its latest per branch. Clicking a row opens the word. There are no ids of their own for forms: every row belongs to the word's id. Words without forms by rule look as before.
+
+## v1.25.0 (combined app)
+Weather map:
+- A new ford's flood months follow the hemisphere: 3–4 north of the equator (the middle of the map), 9–10 south of it.
+- A wagon's speed off the roads can be chosen for a journey: *Vagn utanför väg (%)* next to *Färdsätt* (the settings' value, 80 %, unless you type another).
+- A route's small bends no longer dip into full marshland.
+
+From the code review:
+- **Passwords** are stored with 600 000 rounds of PBKDF2 (was 120 000), as `pbkdf2$rounds$salt$hash`. Existing accounts are stored again at that strength the next time they log in; nothing to do. (Failed logins were already limited: 10 per username and address in 15 minutes.)
+- **Requests from other sites are refused** for every changing request to `/api`, `/rune/api` and `/weather/api` (`SameOriginFilter`: the browser's `Sec-Fetch-Site` and `Origin`). Root and Rune had only the cookie's SameSite setting before.
+- **One version number**: `pom.xml`. The pages get it from `/version.js` (filled in by the build), the weather server from the same property. The weather page now shows the app's version (v1.25.0), not its own series (it was at 2.24). No more numbers to bump in `main.js`, `app.js`, `Api.java` or `index.html`.
+- The `?v=` numbers on the weather page's scripts are gone: the server already tells browsers to check for a newer copy every time.
+- **Tests for the weather page's JavaScript** (`src/test/js`, run with `node --test src/test/js/*.test.js`, and in both GitHub workflows): the travel rules (horse and wagon, nights in cities, bridges and fords, marshland, harbours, Säkrast), the painter's limits (water, tree line), and that every text exists in both languages.
+- **Smaller files**: `app.js` (3 600 lines) is now seven files, `app-core.js` … `app-start.js`, loaded in order and sharing one scope (the code is unchanged); `i18n.js` has one text per line (it was a few lines of tens of thousands of characters each).
+- **One of each instead of five and three**: the server's handlers and storage for rivers, roads, cities, mountain ranges and nations are one (`Api.ListLayer`, `Store.list` / `setList`), and so are forest, ice and marshland (`Store.painted`); installing them from a release is two loops. `Api.java` −140 lines, `Store.java` −55, `DefaultMap.java` −90. Nothing changes in the API.
+
+## v1.24.0 (combined app)
+Root and Rune:
+- **Regular forms are no longer stored** (compact forms). A form the rules give is worked out when it is shown (dictionary, word window, sentences, the check for unused sound changes) and comes out exactly as a stored one did: built when it comes into use, then through the sound changes as a whole. The word window marks it *by rule*. Editing one stores it as a form made by hand. Stored forms that are just what the rules give are taken away the next time the forms are rebuilt, or with **Store irregular forms** on the Word forms tab. Nothing changes in what the forms are.
+- **Irregular forms from sound changes**: a form is irregular from the year a sound change makes it something else than its word plus its ending, each going through the sound changes on its own: im + tou is *imtou*; "t > b between m and a vowel" makes it *imbou*, while im + tou would still be imtou, so *imbou* is irregular from that year (*akatou* stays regular). The word window shows *irregular since (year)*. Such forms are stored (from their beginning, so the history shows imtou > imbou) by **Store irregular forms**, a rebuild, or when the word is added, and are then left alone when the rule changes. An ending written in the rule itself is followed through the sound changes behind a mark, so its inner edge doesn't count as the edge of a word.
+- **Levelling**: in the word window, **Level…** on a form picks a year from which it is regular again: what its rule gives then (the word as it is then with the ending as it is then), going on from there. *Unlevel* takes it away. Sentences, the dictionary and histories follow it.
+- **Sound change preview** (*Preview effect*) now also lists the groups of words that would come to sound the same though they don't now.
+- **Spelling reforms** (Grammar tab): years of spelling reforms for a language. With them the spelling lags behind the pronunciation: a word is spelled as it sounded at the latest reform (or when coined, if later). The dictionary shows *spelt …* where it differs from how the word sounds now; the word window lists the spelling after each reform. Empty: spelled as it sounds, as before.
+- New columns: `word_forms.irregular_year`, `level_year`, `level_form`; `languages.spelling_years`. `POST /rune/api/languages/{id}/forms/level` `{ word_id, label, year }` (owner).
+
+## v1.23.0 (combined app)
+Weather map (page v2.24):
+- **Ways of travelling**: *Färdsätt* in the travel panel: on foot, **horse** (1.5 times the speed) or **wagon** (walking speed on roads, 80 % of it on paths and open ground). The routes are found for the way chosen (a wagon keeps to roads more) and the journey remembers it. The three numbers are in the travel settings.
+- **Nights in cities**: a party that reaches a city on its way with at most 2 hours left of the day stays the night there, and it travels up to 1 hour past the day's end to reach one. The journey's line lists the cities it sleeps in. Both numbers are in the settings (−1 and 0 turn it off).
+- **Bridges and fords**: Redigera → *Städer, broar och vadställen* has a *Slag* choice: Stad, Bro or Vadställe. A bridge or ford is put on a river (it snaps to one). A journey crossing the river within 5 map pixels of a bridge doesn't ford; at a ford it doesn't either, except in the ford's flood months (*Översvämmat månad* from–to, 3–4 for a new ford, 0 = never). Roads over rivers are bridges as before.
+- **The tree line follows the temperature** (*Följ temperaturen*, on by default): it lies where the warmest month's mean is 10 °C (6.5° colder per km up), never above *Trädgräns (m)*. Cold regions get a lower line; the coldest none at all. *Visa trädgräns* and *Ta bort över gränsen* follow it.
+- **City weather**: click a city on the map: its name, population and harbour, the weather there now, and the coming three days (lowest to highest temperature, strongest wind, precipitation). Bridges and fords show their name and kind.
+
+## v1.22.0 (combined app)
+- Weather travel, sea voyages: **Landa var som helst** (a third box next to *Havsresa*): the ship may come ashore anywhere, with 4 hours' landing delay outside a harbour (settings: *Landstigning utanför hamn*). Ships also **keep within sight of a coast** when that isn't much further (open sea counts 1.5 times, sight 40 km, both in the settings), and out of sight of land their course **wiggles**, more in a strong wind. The weather page is v2.23.
+
+## v1.21.5 (combined app)
+- Weather travel: a sea voyage now also has to **end** in a harbour (it came ashore anywhere before). Where the map has harbours, ships set out from one and come ashore at one; a map with no harbours keeps the old rule. The weather page is v2.22.
+
+## v1.21.4 (combined app)
+- Fix: on the standard map, admins couldn't pick *Städer* or *Sumpmark* in the edit list (the options were greyed out: the list of modes open to people who don't own the map didn't include them). The owner and the admins now can; other people still can't (they can't save them). The weather page is now **v2.21** (shown bottom right; the page and the server must match).
+- Forest painter: **Visa trädgräns** switch. On, the ground above the tree line is tinted red and the tree line itself is a strong red edge (follows the *Trädgräns (m)* value, default 3000 m).
+
+## v1.21.3 (combined app)
+- Weather map: a **tree line** (trädgräns). When painting forest, the painter has *Trädgräns (m)* (default 3000 m, kept per user; 0 = none): forest isn't painted on ground higher than that, with any tool, and *Ta bort över gränsen* removes forest already above it (undoable).
+- Fix: the page scripts (`app.js`, `fieldmap.js`, …) kept their old `?v=` numbers, so a browser with cached copies mixed old scripts with the new `cities.js` and cities / marshland couldn't be placed. All weather scripts now have a new number; **bump it whenever a weather script changes**.
+
+## v1.21.2 (combined app)
+- Weather map painter: forest and marshland are no longer painted on water. A pixel at or below the sea level of the height map keeps what it had, with every tool (brush, fill, polygon, …). Ice can still be painted on water (sea ice). Forest already painted on water stays until you paint it away.
+
+## v1.21.1 (combined app)
+- Standard map updated from an admin export: height map (1 217 changed pixels), forest and roads (53).
+
+## v1.21.0 (combined app)
+- Weather map: **cities.** Redigera → Städer places cities with a name, a population and a harbour switch. A city put close to a road sits on it and joins the roads through it; a road ended or started on a city snaps to it, and the travel calculator joins the roads at a city. **Sea voyages can only start from a harbour** (on maps that have any harbours; a map without keeps the old rule). Saved like the roads, in the admin export (`cities.json`) and releases (`citiesRelease`).
+- Weather map: **marshland.** A painted layer like forest (Redigera → Sumpmark, layer Sumpmark). Marshland slows travel off the roads, and at 100 % nobody can cross it on foot: routes go round it (roads cross it, a river boat goes through it). In the export (`marsh.png`) and releases (`marshRelease`); events can ask for `marsh:`.
+- Weather map: while painting the height map, **Branta vägar** shows the roads that are too steep for their kind on the heights as they are right now (with a count), so you can see what a change does to them.
+
+## v1.20.0 (combined app)
+- Weather travel: a fourth suggested route, **Säkrast** (safest). It keeps to roads, paths and nations and avoids
+  open wilderness: off the roads a stretch counts 2 times its time, plus 0.01 per km from the nearest road or nation
+  (at most 6 times), and more for forest; inside a nation's borders only 1.4 times. So from the open plains it goes
+  south to the settled land, west along the roads and nations and north again rather than straight across.
+  It is never allowed to take more than 3 times the time of Snabbast (otherwise the caution is eased off until it
+  fits). All the numbers are in the travel settings (⚙, "Säkrast: …", `safe` in `travel.yaml`).
+
+## v1.19.0 (combined app)
+- Weather map: admins can set which regional map lies over which. In the "Kartbild" list on the standard map, each layer
+  has ▲ ▼ buttons (a place further down lies over the ones above); the order is saved for everyone as
+  `settings.layerOrder` of the standard map. Only the server's admins can do this (the server checks it, not just the page),
+  and only on the standard map; maps that borrow its zoom images use the same order.
+- The order is part of the admin export (under `settings` as `layerOrder`, bottom layer first), and
+  `tools/apply-export.py` puts it into `map.json` with `layerOrderRelease`. A new release keeps an order set in the app
+  unless the release carries a newer one (the same rule as for rivers and nations).
+
+## v1.18.5 (combined app)
+- New map layer "Damarien": the detailed map of Damarien (Jukon to Quilla, the Purpurhavet coast to Khazimbergen). It is
+  placed from landmark towns and the coastline against the first Mundana map, and lies above the Jargien layer (which
+  it partly overlaps in the north-west), so above "Asharien & Damarien" too. Off until chosen, like "Asharien & Damarien".
+- The map is sharper than the full-size zoom level, so the zoom images get an extra, finer level (`-1`, marked
+  `"extra": true` in `manifest.json`). The page draws it on top once you zoom in past the ordinary levels, and the 3D view
+  ignores it. `tools/layer-from-image.py` got `--levels`, `--after` and `--default` for this.
+
+## v1.18.4 (combined app)
+- Mountain ranges updated from the admin export of 2026-11-12 23:52 (Mundana): the Drakkarbergen chain and one other
+  range changed.
+
+## v1.18.3 (combined app)
+- The Colostro inset in the Jargien map layer is moved to where Colostro really is (12 map pixels east and 49.5 north:
+  the town square, the mountains and the coast now line up with the first Mundana map). New
+  `tools/move-layer-piece.py` moves one piece of a layer and rewrites only the zoom pieces it touches.
+
+## v1.18.2 (combined app)
+- The map layer "Egor–Nermada (Ivani, Ara)" is now called "Thalamur–Nermada". Its id is unchanged, so saved layer choices still work.
+
+## v1.18.1 (combined app)
+- The layer "Första Mundanakartan" is now the whole first Mundana map, made from the original picture (it was
+  only the fragments left between the other regional maps, and was called "where it was blurry"). It lies under
+  the other layers, so they still cover it where they overlap. New `tools/layer-from-image.py` makes or replaces a
+  layer from one whole image.
+
+## v1.18.0 (combined app)
+- Weather map: the base map is now the plain world map (the whole known world, `default-map/map.jpg`, the
+  3192 px picture with the added labels, stretched to the app's 5476 px size, which keeps every position, scale and
+  the wrap width as they were). "Bara grundkartan" shows only that.
+- The regional maps are drawn over it as layers only. The pre-merged zoom images and the old base's own zoom images
+  are gone (`manifest.json` now has `"flat": true`); the default layers are the ones marked default, as before.
+- Regional maps that were pasted straight into the old base and never were layers (e.g. Menon Aun, Mio–Enara) are
+  not in the picture any more; they come back as layers later.
+
+## v1.17.2 (combined app)
+- Fixed: after removing the last sound change with a tag you had selected as a filter, the sound changes list stayed
+  empty and the filter could not be cleared. The filter now clears itself.
+
+## v1.17.1 (combined app)
+- The word popup has a Type section: the word's type and where it comes from (set on the word, made by a derivation
+  from another word, a cross-reference keeping its own type, or a different type in a particular meaning).
+
 ## v1.17.0 (combined app)
 No visible changes.
 - Spring Boot 3.5.16 → 4.1.2 (Spring Framework 7, Jackson 3), the line that gets free security fixes. The JSON the app

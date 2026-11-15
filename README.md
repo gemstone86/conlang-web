@@ -34,6 +34,8 @@ notes, campaigns and maps). Weather admins are the site admins plus any username
 Forgotten password: an admin issues a reset code in Root and Rune (**Issue reset code**), and the user enters it on
 the start page.
 
+**Version and tests.** The version is written in one place, `pom.xml`; the pages read it from `/version.js` (filled in when the app is built). `mvn package` runs the Java tests (the whole app on a fresh database); `node --test src/test/js/*.test.js` runs the weather page's own (travel rules, the painter, the texts). Both run in the GitHub workflows.
+
 **Database.** One H2 file, `./data/hub.mv.db`, holding both apps' tables. It is guarded like the weather generator's
 was: a copy of the app starting up waits for the old one to hand the file over, a damaged file is repaired (or
 restored from the newest backup), and backups are written to `./data/backups/` (see WEATHER.md, *Backups*).

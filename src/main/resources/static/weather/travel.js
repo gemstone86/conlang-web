@@ -38,13 +38,13 @@
   const DIRS = { N: 0, NE: 45, E: 90, SE: 135, S: 180, SW: 225, W: 270, NW: 315 };
   const CELL = 4;                       // map px per routing grid cell
   const LAPSE = 6.5 / 1000;
-  const MODE_COL = { fast: "#ff5fa2", easy: "#5fd38a", short: "#ffb347" }, MODE_TXT = { fast: "trFast", easy: "trEasy", short: "trShort" };
+  const MODE_COL = { fast: "#ff5fa2", easy: "#5fd38a", short: "#ffb347", safe: "#5fb6ff" }, MODE_TXT = { fast: "trFast", easy: "trEasy", short: "trShort", safe: "trSafe" };
   const COLOURS = ["#e8833a", "#ff5fa2", "#c678dd", "#7bd88f", "#ef6f6c", "#ffd166", "#56c2b6", "#d4a373"];
 
   const DEFAULTS = {
     pace: { slow: 3, normal: 4, fast: 5 },
     road: { path: 0.5, road: 1, highway: 1.5 },
-    offRoad: 0, riverHoursPerSize: 0.25, forestPer25: 0.5, bad: 1, veryBad: 1, snow: 2, slopeUp: 1, slopeDown: 0.5, minSpeed: 1,
+    offRoad: 0, riverHoursPerSize: 0.25, forestPer25: 0.5, marshPer25: 0.75, bad: 1, veryBad: 1, snow: 2, slopeUp: 1, slopeDown: 0.5, minSpeed: 1,
     badRain: 2, badWind: 14, veryBadRain: 6, veryBadWind: 20,
     hoursPerDay: 10, dayStart: 7, keepDays: 3,
     steep: { path: 5, road: 3, highway: 2 },
@@ -55,9 +55,23 @@
     // river boats: still-water speed; downstream they get downShare of the current, upstream it is taken off
     // all of it, and below minUp km/h there is no way up (the current: the river's, see rivers.js)
     boat: { still: 7.75, downShare: 0.5, minUp: 1 },
-    sea: { normal: 9.9, good: 14.8, bad: 4.9 },
+    sea: { normal: 9.9, good: 14.8, bad: 4.9, sight: 40, far: 1.5 },
+    // the way of travelling: a horse goes this many times the pace; a wagon this many times on roads and
+    // wagonOff times that off the roads (on a path or open ground)
+    mount: { horse: 1.5, wagon: 1, wagonOff: 0.8 },
+    // nights in cities: a party reaching a city with at most cityStop hours left of the day stays the night,
+    // and it travels up to cityPush hours past the day's end to reach one
+    cityStop: 2, cityPush: 1,
+    // a bridge or an open ford within this many map pixels of where a river is crossed: no fording
+    crossingReach: 5,
+    // coming ashore anywhere (the "Landa var som helst" choice) instead of in a harbour costs these hours
+    landHours: 4,
     // how much routes off the roads and rivers wander (1 = normal, 0 = straight, 2 = twice as much)
     wiggle: 1,
+    // Säkrast: off the roads the time counts (off + perKm × km from anything civilised, at most max) times as
+    // much (nation: inside a nation's borders instead; path: on a path), plus forest × the share of trees;
+    // the route is never allowed to take more than maxTimes the time of Snabbast
+    safe: { off: 2, perKm: 0.01, max: 6, nation: 1.4, path: 1.2, forest: 0.5, maxTimes: 3 },
     boatMinFlow: 4, boardHours: 1, seaAllDay: 1, windGood: 5, windCalm: 2,
   };
   const copy = (o) => JSON.parse(JSON.stringify(o));
@@ -88,11 +102,39 @@
 
   // ── speed ──
   /** km/h. kind 0 off road … 3 highway; forest 0–1; grade % (+ up); snow 0–1; wx 0 fine, 1 bad, 2 really bad. */
-  function speedAt(cfg, pace, kind, forest, grade, snow, wx) {
+  /** A way of travelling as { mul, off }: the speed times mul, and times off as well off the roads. */
+  function mountOf(cfg, name, wagonOff) {
+    // wagonOff: the journey's own share of the speed off the roads (chosen in the panel), else the settings'
+    const off = Number.isFinite(+wagonOff) && wagonOff != null && wagonOff !== "" ? clamp(+wagonOff, 0.05, 1) : cfg.mount.wagonOff;
+    return name === "horse" ? { mul: cfg.mount.horse, off: 1 } : name === "wagon" ? { mul: cfg.mount.wagon, off } : null;
+  }
+  // the month the routes are planned for (fords are closed in their flood months); null: fords count as open
+  let planMonth = null;
+  /** Whether a ford { floodFrom, floodTo } (months, 0 = never floods) can be crossed in a month. */
+  function fordOpen(c, month) {
+    const a = +c.floodFrom || 0, b = +c.floodTo || 0;
+    if (!a || !b || month == null) return true;
+    return a <= b ? !(month >= a && month <= b) : !(month >= a || month <= b);
+  }
+  /** The bridge or ford at a river crossing (map px), or null: within cfg's reach of it. */
+  function crossingAt(fm, px, py, reach) {
+    let best = null, bd = reach;
+    for (const c of fm.cities || []) {
+      if (c.kind !== "bridge" && c.kind !== "ford") continue;
+      const d = Math.hypot(c.x * fm.imgW - px, c.y * fm.imgH - py);
+      if (d <= bd) { bd = d; best = c; }
+    }
+    return best;
+  }
+  function speedAt(cfg, pace, kind, forest, grade, snow, wx, marsh, mt) {
+    const v0 = speedOnFoot(cfg, pace, kind, forest, grade, snow, wx, marsh);
+    return mt ? v0 * mt.mul * (kind < 2 ? mt.off : 1) : v0;
+  }
+  function speedOnFoot(cfg, pace, kind, forest, grade, snow, wx, marsh) {
     let v = pace + (kind === 3 ? cfg.road.highway : kind === 2 ? cfg.road.road : kind === 1 ? cfg.road.path : 0);
     const road = kind >= 2;
     if (kind === 0) v -= cfg.offRoad;                       // no road or path at all
-    if (!road) v -= cfg.forestPer25 * 4 * forest;
+    if (!road) v -= cfg.forestPer25 * 4 * forest + cfg.marshPer25 * 4 * (marsh || 0);
     if (wx >= 1 && !road) v -= cfg.bad;
     if (wx >= 2) v -= cfg.veryBad;
     v -= cfg.snow * snow;
@@ -234,12 +276,18 @@
     return res;
   }
   /** A route's river crossings off the roads: [{ km, flow }] (on a road or path the bridge or ford is there). */
-  function routeCrossings(fm, pts, RI) {
-    const W = fm.imgW, H = fm.imgH, kmpx = fm.kmPerMapPx(), out = [];
+  function routeCrossings(fm, pts, RI, keepFords) {
+    const W = fm.imgW, H = fm.imgH, kmpx = fm.kmPerMapPx(), out = [], reach = fm._xReach || 5;
     let km = 0;
     for (let i = 0; i + 1 < pts.length; i++) {
       const a = pts[i], b = pts[i + 1], L = Math.hypot((b.x - a.x) * W, (b.y - a.y) * H) * kmpx;
-      if (!a.k) for (const c of crossings(RI, a.x * W, a.y * H, b.x * W, b.y * H)) out.push({ km: km + c.t * L, flow: c.flow });
+      if (!a.k) for (const c of crossings(RI, a.x * W, a.y * H, b.x * W, b.y * H)) {
+        // at a bridge: no fording; at a ford: none while it is open (keepFords: kept, marked, for the journey to decide by its date)
+        const x = crossingAt(fm, (a.x + (b.x - a.x) * c.t) * W, (a.y + (b.y - a.y) * c.t) * H, reach);
+        if (x && x.kind === "bridge") continue;
+        if (x && !keepFords && fordOpen(x, planMonth)) continue;
+        out.push(x ? { km: km + c.t * L, flow: c.flow, ford: { floodFrom: x.floodFrom, floodTo: x.floodTo } } : { km: km + c.t * L, flow: c.flow });
+      }
       km += L;
     }
     return out;
@@ -250,7 +298,7 @@
     const W = fm.imgW, H = fm.imgH, gw = Math.ceil(W / CELL), gh = Math.ceil(H / CELL), n = gw * gh;
     const HG = fm.heightGrid();
     if (!HG) return null;
-    const h = new Float32Array(n), water = new Uint8Array(n), forest = new Float32Array(n), snow = new Float32Array(n), steep = new Float32Array(n);
+    const h = new Float32Array(n), water = new Uint8Array(n), forest = new Float32Array(n), marsh = new Float32Array(n), snow = new Float32Array(n), steep = new Float32Array(n);
     // the climate on a coarser grid (every 6 cells)
     const CS = 6, cw = Math.ceil(gw / CS) + 1, ch = Math.ceil(gh / CS) + 1, clim = new Array(cw * ch);
     for (let j = 0; j < ch; j++) for (let i = 0; i < cw; i++) clim[j * cw + i] = climate ? climate(Math.min(1, (i * CS + 0.5) * CELL / W), Math.min(1, (j * CS + 0.5) * CELL / H)) : null;
@@ -260,12 +308,22 @@
       h[k] = m; water[k] = m <= 0 ? 1 : 0;
 
       forest[k] = fm.layerAt("forest", nx, ny) / 100;
+      marsh[k] = fm.layerAt("marsh", nx, ny) / 100;
       snow[k] = deepSnow(clim[Math.round(j / CS) * cw + Math.round(i / CS)], m, fm.layerAt("ice", nx, ny));
     }
     // how steep each cell is, from every pixel of the height map, so a narrow ridge or a cliff between
     // cell centres is never missed
     cellSteepness(fm, HG, gw, gh, steep, water);
-    return { gw, gh, n, h, water, forest, snow, steep, W, H, HG };
+    // harbours: the cells within two of a city with a harbour (a ship sets out from there, if the map has any)
+    const harbour = new Uint8Array(n);
+    let hasHarbours = false;
+    for (const c of fm.cities || []) {
+      if (!c.harbour || (c.kind && c.kind !== "city")) continue;
+      hasHarbours = true;
+      const ci = clamp(Math.floor(c.x * W / CELL), 0, gw - 1), cj = clamp(Math.floor(c.y * H / CELL), 0, gh - 1);
+      for (let j = Math.max(0, cj - 2); j <= Math.min(gh - 1, cj + 2); j++) for (let i = Math.max(0, ci - 2); i <= Math.min(gw - 1, ci + 2); i++) harbour[j * gw + i] = 1;
+    }
+    return { gw, gh, n, h, water, forest, marsh, snow, steep, harbour, hasHarbours, W, H, HG };
   }
   function cellSteepness(fm, HG, gw, gh, steep, water) {
     // half the steepest spot and half the average over the cell: a narrow ridge or cliff still shows, but
@@ -289,9 +347,80 @@
     for (let c = 0; c < steep.length; c++) steep[c] = water[c] || !cnt[c] ? 0 : (steep[c] + sum[c] / cnt[c]) / 2;
   }
 
+  function inPoly(x, y, pts) {
+    let inside = false;
+    for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+      const a = pts[i], b = pts[j];
+      if ((a.y > y) !== (b.y > y) && x < (b.x - a.x) * (y - a.y) / (b.y - a.y) + a.x) inside = !inside;
+    }
+    return inside;
+  }
+  /**
+   * How civilised each grid cell is, for Säkrast: nat[cell] 1 inside a nation's borders, and civ[cell] the
+   * distance (km, 8-way) to the nearest road point or nation cell. Made once for the roads and nations as they are.
+   */
+  function buildCivil(fm, G, RD) {
+    const sig = (fm.cities || []).length + ":" + (fm.nations || []).length + ":" + (fm.nations || []).reduce((a, n) => a + (n.parts || []).reduce((b, q) => b + q.length, 0) + (n.subs || []).length, 0);
+    if (G.civ && G.civRD === RD && G.civSig === sig) return;
+    const { gw, gh, n, W, H } = G, nat = new Uint8Array(n), civ = new Float32Array(n).fill(1e9), cellKm = CELL * fm.kmPerMapPx();
+    for (const nt of fm.nations || []) {
+      const parts = (nt.parts || []).filter((q) => q.length >= 3);
+      for (const q of parts) {
+        let x0 = 1, y0 = 1, x1 = 0, y1 = 0;
+        for (const c of q) { x0 = Math.min(x0, c.x); y0 = Math.min(y0, c.y); x1 = Math.max(x1, c.x); y1 = Math.max(y1, c.y); }
+        const i0 = Math.max(0, Math.floor(x0 * W / CELL)), i1 = Math.min(gw - 1, Math.ceil(x1 * W / CELL));
+        const j0 = Math.max(0, Math.floor(y0 * H / CELL)), j1 = Math.min(gh - 1, Math.ceil(y1 * H / CELL));
+        for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
+          const k = j * gw + i;
+          if (!nat[k] && inPoly(Math.min(1, (i + 0.5) * CELL / W), Math.min(1, (j + 0.5) * CELL / H), q)) nat[k] = 1;
+        }
+      }
+    }
+    for (let k = 0; k < n; k++) if (nat[k]) civ[k] = 0;
+    for (let p = 0; p < RD.R; p++) civ[RD.cell[p]] = 0;
+    for (const c of fm.cities || []) civ[clamp(Math.floor(c.y * H / CELL), 0, gh - 1) * gw + clamp(Math.floor(c.x * W / CELL), 0, gw - 1)] = 0;
+    // two chamfer passes over the grid
+    const D = 1.4142, relax = (k, o, w) => { const v = civ[o] + w * cellKm; if (v < civ[k]) civ[k] = v; };
+    for (let j = 0; j < gh; j++) for (let i = 0; i < gw; i++) {
+      const k = j * gw + i;
+      if (i > 0) relax(k, k - 1, 1);
+      if (j > 0) { relax(k, k - gw, 1); if (i > 0) relax(k, k - gw - 1, D); if (i + 1 < gw) relax(k, k - gw + 1, D); }
+    }
+    for (let j = gh - 1; j >= 0; j--) for (let i = gw - 1; i >= 0; i--) {
+      const k = j * gw + i;
+      if (i + 1 < gw) relax(k, k + 1, 1);
+      if (j + 1 < gh) { relax(k, k + gw, 1); if (i + 1 < gw) relax(k, k + gw + 1, D); if (i > 0) relax(k, k + gw - 1, D); }
+    }
+    G.nat = nat; G.civ = civ; G.civRD = RD; G.civSig = sig;
+  }
+
+  /** Distance (km, 8-way) from each water cell to the nearest land cell: a ship keeps within sight of the coast (nothing on land). */
+  function buildCoast(fm, G) {
+    if (G.coast) return;
+    const { gw, gh, n } = G, cellKm = CELL * fm.kmPerMapPx(), D = 1.4142, d = new Float32Array(n);
+    for (let k = 0; k < n; k++) d[k] = G.water[k] ? 1e9 : 0;
+    const relax = (k, o, w) => { const v = d[o] + w * cellKm; if (v < d[k]) d[k] = v; };
+    for (let j = 0; j < gh; j++) for (let i = 0; i < gw; i++) {
+      const k = j * gw + i;
+      if (i > 0) relax(k, k - 1, 1);
+      if (j > 0) { relax(k, k - gw, 1); if (i > 0) relax(k, k - gw - 1, D); if (i + 1 < gw) relax(k, k - gw + 1, D); }
+    }
+    for (let j = gh - 1; j >= 0; j--) for (let i = gw - 1; i >= 0; i--) {
+      const k = j * gw + i;
+      if (i + 1 < gw) relax(k, k + 1, 1);
+      if (j + 1 < gh) { relax(k, k + gw, 1); if (i + 1 < gw) relax(k, k + gw + 1, D); if (i > 0) relax(k, k + gw - 1, D); }
+    }
+    G.coast = d;
+  }
+  /** Whether a harbour city lies close to a map point (0–1): where a ship may come ashore without the landing delay. */
+  function harbourNear(fm, x, y) {
+    for (const c of fm.cities || []) if (c.harbour && Math.hypot((c.x - x) * fm.imgW, (c.y - y) * fm.imgH) <= 10) return true;
+    return false;
+  }
+  const hasHarbours = (fm) => (fm.cities || []).some((c) => c.harbour);
   /** Road points every map pixel: x, y (0–1), kind (1–3), the grid cell, and who they connect to. */
   function buildRoads(fm, G, climate) {
-    const W = fm.imgW, H = fm.imgH, xs = [], ys = [], kinds = [], hs = [], fo = [], sn = [], nb = [];
+    const W = fm.imgW, H = fm.imgH, xs = [], ys = [], kinds = [], hs = [], fo = [], ma = [], sn = [], nb = [];
     const link = (a, b, k) => { nb[a].push(b, k); nb[b].push(a, k); };
     for (const r of fm.roads || []) {
       if (r.points.length < 2) continue;
@@ -302,7 +431,7 @@
         for (let t = s ? 1 : 0; t <= m; t++) {
           const x = a.x + (b.x - a.x) * t / m, y = a.y + (b.y - a.y) * t / m, id = xs.length;
           const hm = fm.groundM(x, y, G.HG);
-          xs.push(x); ys.push(y); kinds.push(kind); hs.push(hm); fo.push(fm.layerAt("forest", x, y) / 100);
+          xs.push(x); ys.push(y); kinds.push(kind); hs.push(hm); fo.push(fm.layerAt("forest", x, y) / 100); ma.push(fm.layerAt("marsh", x, y) / 100);
           sn.push(deepSnow(climate ? climate(x, y) : null, hm, fm.layerAt("ice", x, y)));
           nb.push([]);
           if (prev >= 0) link(prev, id, kind);
@@ -322,12 +451,24 @@
         if (Math.hypot((xs[q] - xs[p]) * W, (ys[q] - ys[p]) * H) <= 1.2) link(p, q, Math.min(kinds[p], kinds[q]));
       }
     }
+    // cities: the roads passing through (or ending at) a city are joined there
+    for (const c of fm.cities || []) {
+      const near = [], ci = Math.floor(c.x * W / 2), cj = Math.floor(c.y * H / 2);
+      for (let di = -2; di <= 2; di++) for (let dj = -2; dj <= 2; dj++) for (const q of hash.get(key(ci + di, cj + dj)) || [])
+        if (Math.hypot((xs[q] - c.x) * W, (ys[q] - c.y) * H) <= 2.5) near.push(q);
+      near.sort((a, b) => Math.hypot((xs[a] - c.x) * W, (ys[a] - c.y) * H) - Math.hypot((xs[b] - c.x) * W, (ys[b] - c.y) * H));
+      const use = near.slice(0, 8);
+      for (let i = 0; i < use.length; i++) for (let j = i + 1; j < use.length; j++) {
+        const p = use[i], q = use[j];
+        if (!nb[p].includes(q)) link(p, q, Math.min(kinds[p], kinds[q]));
+      }
+    }
     const cell = new Int32Array(R);
     for (let p = 0; p < R; p++) cell[p] = clamp(Math.floor(ys[p] * H / CELL), 0, G.gh - 1) * G.gw + clamp(Math.floor(xs[p] * W / CELL), 0, G.gw - 1);
     // each grid cell's road points (to step onto the road from the land around)
     const onCell = new Map();
     for (let p = 0; p < R; p++) (onCell.get(cell[p]) || onCell.set(cell[p], []).get(cell[p])).push(p);
-    return { R, xs, ys, kinds, hs, fo, sn, nb, cell, onCell };
+    return { R, xs, ys, kinds, hs, fo, ma, sn, nb, cell, onCell };
   }
 
   /**
@@ -450,24 +591,45 @@
     };
     const s = landNear(a), t = landNear(b);
     if (s < 0 || t < 0) return null;
+    const mt = opt.mount || null;
+    fm._xReach = cfg.crossingReach;
+    if (sea) { buildCoast(fm, G); G.seaSight = cfg.sea.sight; G.windAt = opt.windAt || null; }
+    const safe = mode === "safe", sc = clamp(opt.safeScale == null ? 1 : opt.safeScale, 0, 1);
+    if (safe) buildCivil(fm, G, RD);
+    // how many times as much a stretch counts for Säkrast (1 on roads; more the farther from anything civilised)
+    const risk = (u, v, kind, fo) => {
+      let m;
+      if (kind >= 2) m = 1;
+      else if (kind === 1) m = cfg.safe.path;
+      else {
+        const cu = u < n ? u : RD.cell[u - n], cv = v < n ? v : RD.cell[v - n];
+        m = (G.nat[cu] && G.nat[cv]) ? cfg.safe.nation : clamp(cfg.safe.off + (G.civ[cu] + G.civ[cv]) / 2 * cfg.safe.perKm, 1, Math.max(1, cfg.safe.max));
+      }
+      return 1 + sc * (Math.max(1, m * (1 + cfg.safe.forest * fo * (kind >= 2 ? 0 : 1))) - 1);
+    };
+    let rc = 0;                                  // the time a stretch really takes, without Säkrast's extra
     const pos = (v) => v < n ? [((v % gw) + 0.5) * CELL / W, (Math.floor(v / gw) + 0.5) * CELL / H] : v < nB ? [RD.xs[v - n], RD.ys[v - n]] : [BT.xs[v - nB], BT.ys[v - nB]];
-    const attr = (v) => v < n ? [G.h[v], G.forest[v], G.snow[v], G.steep[v]] : [RD.hs[v - n], RD.fo[v - n], RD.sn[v - n], G.steep[RD.cell[v - n]]];
-    const vmax = Math.max(pace + cfg.road.highway, BT ? cfg.boat.still + cfg.boat.downShare * BT.maxCur : 0, sea ? Math.max(cfg.sea.normal, cfg.sea.good) / seaF : 0);
+    const attr = (v) => v < n ? [G.h[v], G.forest[v], G.snow[v], G.steep[v], G.marsh[v]] : [RD.hs[v - n], RD.fo[v - n], RD.sn[v - n], G.steep[RD.cell[v - n]], RD.ma[v - n]];
+    const vmax = Math.max((pace + cfg.road.highway) * (mt ? Math.max(mt.mul, mt.mul * mt.off) : 1), BT ? cfg.boat.still + cfg.boat.downShare * BT.maxCur : 0, sea ? Math.max(cfg.sea.normal, cfg.sea.good) / seaF : 0);
     const [tx, ty] = pos(t);
     const heur = (v) => { const [x, y] = pos(v), km = Math.hypot((x - tx) * W, (y - ty) * H) * kmpx; return mode === "short" ? km : km / vmax; };
     // off the roads a step counts the steeper of its two cells (and, going diagonally, of the two cells
     // beside it too: a ridge running from corner to corner can't be slipped through)
     const cost = (u, v, kind, side) => {
       const [ux, uy] = pos(u), [vx, vy] = pos(v), km = Math.hypot((vx - ux) * W, (vy - uy) * H) * kmpx;
-      const [hu, fu, su, tu] = attr(u), [hv, fv, sv, tv] = attr(v);
+      const [hu, fu, su, tu, mu] = attr(u), [hv, fv, sv, tv, mv] = attr(v);
       const grade = km > 0 ? (Math.max(0, hv) - Math.max(0, hu)) / (km * 1000) * 100 : 0;
       const st = Math.max(tu, tv, side || 0);
-      const sp = speedAt(cfg, pace, kind, (fu + fv) / 2, effGrade(kind, grade, st), (su + sv) / 2, 0);
+      const sp = speedAt(cfg, pace, kind, (fu + fv) / 2, effGrade(kind, grade, st), (su + sv) / 2, 0, (mu + mv) / 2, mt);
       // the shortest way that is still passable: ground slower than half a km/h off the roads (mountains,
       // cliffs) counts twenty times its length, so it is only crossed where there is no way round
       if (mode === "short") return kind === 0 && sp < 0.5 ? km * 20 : km;
       // fording a river off the roads: hours per size of the river there (a road or path has its bridge)
       const ford = kind === 0 ? fordsOn(u, v) : 0;
+      if (safe) {
+        rc = km / sp + ford;
+        return (km / sp) * risk(u, v, kind, (fu + fv + mu + mv) / 2) + ford;
+      }
       if (mode === "easy") {
         // the easiest way: roads count as shorter than they are, open ground as longer (a path between),
         // and every 250 m up costs an hour more, so it keeps to roads and low ground even if that is slower
@@ -476,27 +638,43 @@
       }
       return km / sp + ford;
     };
-    const g = new Float64Array(N).fill(Infinity), from = new Int32Array(N).fill(-1), via = new Int8Array(N), done = new Uint8Array(N);
+    const g = new Float64Array(N).fill(Infinity), tm = new Float64Array(N), from = new Int32Array(N).fill(-1), via = new Int8Array(N), done = new Uint8Array(N);
     const heap = Heap();
     g[s] = 0; heap.push(heur(s), s);
     const DX = [-1, 0, 1, -1, 1, -1, 0, 1], DY = [-1, -1, -1, 0, 0, 1, 1, 1];
     const relax = (u, v, kind, side) => {
       if (v < n && G.water[v]) return;
-      relaxC(u, v, kind, cost(u, v, kind, side));
+      // full marshland can't be crossed on foot (roads cross it; a river boat goes through)
+      if (v < n && kind === 0 && G.marsh[v] >= 0.995) return;
+      const c = cost(u, v, kind, side);
+      relaxC(u, v, kind, c, safe ? rc : c);
     };
-    const relaxC = (u, v, kind, c) => {
+    const relaxC = (u, v, kind, c, real) => {
       c += g[u];
-      if (c < g[v]) { g[v] = c; from[v] = u; via[v] = kind; heap.push(c + heur(v), v); }
+      if (c < g[v]) { g[v] = c; tm[v] = tm[u] + (real == null ? c - g[u] : real); from[v] = u; via[v] = kind; heap.push(c + heur(v), v); }
     };
     const fordsOn = (u, v) => {
       let h = 0;
       if (!G.rivers || !(cfg.riverHoursPerSize > 0)) return 0;
       const [ux, uy] = pos(u), [vx, vy] = pos(v);
-      for (const c of crossings(G.rivers, ux * W, uy * H, vx * W, vy * H)) h += fordHours(cfg, c.flow, BT != null);
+      for (const c of crossings(G.rivers, ux * W, uy * H, vx * W, vy * H)) {
+        const x = crossingAt(fm, (ux + (vx - ux) * c.t) * W, (uy + (vy - uy) * c.t) * H, cfg.crossingReach);
+        if (x && (x.kind === "bridge" || fordOpen(x, planMonth))) continue;
+        h += fordHours(cfg, c.flow, BT != null);
+      }
       return h;
     };
     const kmOf = (u, v) => { const [ux, uy] = pos(u), [vx, vy] = pos(v); return Math.hypot((vx - ux) * W, (vy - uy) * H) * kmpx; };
     // by boat: hours (or km for Kortast), plus the boarding when getting on
+    // a ship's step: open sea (farther from any coast than it can see) counts more, so it keeps in sight of land
+    // if that isn't too much further; coming ashore anywhere but in a harbour costs the landing hours
+    const far = (c) => (c < n && cfg.sea.far > 1 && G.coast && G.coast[c] > cfg.sea.sight ? cfg.sea.far : 1);
+    const seaStep = (u, v, board, landing) => {
+      const km = kmOf(u, v), f = mode === "short" ? 1 : Math.max(far(u), far(v));
+      let c = mode === "short" ? km + (board ? BOARD_KM : 0) : km / (cfg.sea.normal / seaF) * f + (board ? cfg.boardHours : 0);
+      if (landing && G.hasHarbours && !G.harbour[v]) c += mode === "short" ? cfg.landHours * cfg.sea.normal : cfg.landHours;
+      return c;
+    };
     const boatCost = (km, speed, board) => (mode === "short" ? km + (board ? BOARD_KM : 0) : km / speed + (board ? cfg.boardHours : 0));
     const isWater = (v) => v < n && G.water[v];
     while (heap.size) {
@@ -512,7 +690,9 @@
           const v = j * gw + i;
           if (wet || G.water[v]) {
             // at sea (and out to sea from the shore, or ashore): a ship
-            if (sea) relaxC(u, v, 5, boatCost(kmOf(u, v), cfg.sea.normal / seaF, !wet));
+            // a ship sets out from a harbour and comes ashore at one (where the map has harbours)
+            const landing = wet && !G.water[v];
+            if (sea && (landing ? !G.hasHarbours || G.harbour[v] || opt.landAnywhere : wet || !G.hasHarbours || G.harbour[u])) relaxC(u, v, 5, seaStep(u, v, !wet, landing));
             continue;
           }
           const side = DX[d] && DY[d] ? Math.max(G.steep[uj * gw + i], G.steep[j * gw + ui]) : 0;
@@ -531,7 +711,7 @@
           relaxC(u, nB + L[q], k, boatCost(kmOf(u, nB + L[q]), boatSpeed(cfg, k, c), false));
         }
         const c = BT.cell[p];                                                // ashore (or onto a ship at the mouth)
-        if (isWater(c)) { if (sea) relaxC(u, c, 5, boatCost(kmOf(u, c), cfg.sea.normal / seaF, true)); }
+        if (isWater(c)) { if (sea && (!G.hasHarbours || G.harbour[c])) relaxC(u, c, 5, boatCost(kmOf(u, c), cfg.sea.normal / seaF, true)); }
         else relaxC(u, c, 0, mode === "short" ? kmOf(u, c) : kmOf(u, c) / pace + fordsOn(u, c));
       } else {
         const p = u - n, L = RD.nb[p];
@@ -559,7 +739,7 @@
     pts = wiggle(fm, G, pts, cfg.wiggle, (q) => (G.rivers && G.rivers.seg.length ? routeCrossings(fm, q, G.rivers).reduce((t, c) => t + fordHours(cfg, c.flow, BT != null), 0) : 0));
     let km = 0;
     for (let i = 1; i < pts.length; i++) km += Math.hypot((pts[i].x - pts[i - 1].x) * W, (pts[i].y - pts[i - 1].y) * H) * kmpx;
-    return { pts, km };
+    return { pts, km, hours: tm[t] };
   }
   /**
    * The meander: stretches off the roads and rivers (on foot, or at sea) are bent sideways by a few gentle
@@ -616,11 +796,18 @@
         let off = 0;
         for (const [a, len, ph, sg] of waves) off += sg * a * Math.sin(2 * Math.PI * d / len + ph);
         off *= taper;
+        if (k0 === 5) {
+          // at sea: little bending within sight of a coast; farther out the ship drifts more, and more in a strong wind
+          const ci = clamp(Math.floor(px / CELL), 0, G.gw - 1), cj = clamp(Math.floor(py / CELL), 0, G.gh - 1);
+          const open = G.coast && G.coast[cj * G.gw + ci] > (G.seaSight || 40);
+          const wnd = G.windAt ? G.windAt(px / W, py / H) : null;
+          off *= (open ? clamp(0.45 + 0.12 * (wnd == null ? 5 : wnd), 0.3, 1.6) : 0.25) / 0.6;
+        }
         // not into the water on land, nor onto land at sea: the bend gets smaller there
         let qx = px / W, qy = py / H;
         for (const f of [1, 0.6, 0.35, 0.15]) {
           const tx = clamp((px + nx * off * f) / W, 0, 1), ty = clamp((py + ny * off * f) / H, 0, 1);
-          if ((fm.groundM(tx, ty, HG) <= 0) === (k0 === 5)) { qx = tx; qy = ty; break; }
+          if ((fm.groundM(tx, ty, HG) <= 0) === (k0 === 5) && (k0 === 5 || fm.layerAt("marsh", tx, ty) < 99.5)) { qx = tx; qy = ty; break; }   // nor into full marshland
         }
         out.push({ x: clamp(qx, 0, 1), y: clamp(qy, 0, 1), k: k0 });
       }
@@ -666,7 +853,7 @@
         const x = a.x + (b.x - a.x) * t / m, y = a.y + (b.y - a.y) * t / m;
         const nxt = t === m && i + 1 < pts.length - 1;
         S.push({ km: km + L * kmpx * t / m, x, y, k: nxt ? pts[i + 1].k : a.k, c: nxt ? pts[i + 1].c : a.c,
-          h: HG ? fm.groundM(x, y, HG) : 0, f: fm.layerAt("forest", x, y) / 100, ice: fm.layerAt("ice", x, y) });
+          h: HG ? fm.groundM(x, y, HG) : 0, f: fm.layerAt("forest", x, y) / 100, m: fm.layerAt("marsh", x, y) / 100, ice: fm.layerAt("ice", x, y) });
       }
       km += L * kmpx;
     }
@@ -709,8 +896,21 @@
     const total = S.length ? S[S.length - 1].km : 0, dt = 0.25;           // hours per step
     const delays = (trip.delays || []).slice().sort((a, b) => a.at - b.at);
     // fording rivers off the roads: the hours are spent when the party gets there
-    const fords = trip._fords || (trip._fords = routeCrossings(fm, trip.route.map((p) => ({ x: p[0], y: p[1], k: p[2] || 0 })), riverIndex(fm)));
-    const km = [0];
+    const fords = trip._fords || (trip._fords = routeCrossings(fm, trip.route.map((p) => ({ x: p[0], y: p[1], k: p[2] || 0 })), riverIndex(fm), true));
+    const km = [0], mt = mountOf(cfg, trip.mount, trip.wagonOff), monthOf = fm.monthOf || (() => null);
+    // the cities along the way (where the route passes within 1.5 map pixels of one), by distance
+    const towns = trip._towns || (trip._towns = (() => {
+      const out = [];
+      for (const c of fm.cities || []) {
+        if (c.kind && c.kind !== "city") continue;
+        let best = -1, bd = 1.5;
+        for (let q = 0; q < S.length; q++) { const dd = Math.hypot((S[q].x - c.x) * fm.imgW, (S[q].y - c.y) * fm.imgH); if (dd <= bd) { bd = dd; best = q; } }
+        if (best >= 0 && S[best].km > 1 && S[best].km < total - 1) out.push({ km: S[best].km, name: c.name || "" });
+      }
+      return out.sort((a, b) => a.km - b.km);
+    })());
+    const nights = [];
+    let restUntil = -1, ti = 0, lastV = trip.pace;
     // pend: travel hours to spend (fords, boarding, and delays made before 2.16); hold: clock hours the
     // party stands still whatever the hour (a delay: 24 is a whole day)
     let t = trip.startT, d = 0, i = 0, pend = 0, hold = 0, di = 0, h = 0, fi = 0;
@@ -727,7 +927,16 @@
       while (i + 1 < S.length && S[i + 1].km <= d) i++;
       // at sea a ship sails day and night (when the rules say so)
       const atSea = S[i] && S[i].k === 5 && cfg.seaAllDay;
-      const travelling = atSea || (end <= 24 ? local >= trip.dayStart - 1e-6 && local < end - 1e-6 : local >= trip.dayStart - 1e-6 || local < end - 24 - 1e-6);
+      let travelling = atSea || (end <= 24 ? local >= trip.dayStart - 1e-6 && local < end - 1e-6 : local >= trip.dayStart - 1e-6 || local < end - 24 - 1e-6);
+      // nights in cities: resting in one until the next morning; and a city close ahead at the day's end is worth pushing on for
+      const onFoot = S[i] && !MODE_OF(S[i].k);
+      while (ti < towns.length && towns[ti].km <= d + 1e-6) ti++;
+      let pushing = false;
+      if (!atSea && t < restUntil - 1e-9) travelling = false;
+      else if (!travelling && onFoot && cfg.cityPush > 0 && ti < towns.length && end - trip.dayStart < 24 - cfg.cityPush) {
+        const past = (((local - end) % 24) + 24) % 24;
+        if (past < cfg.cityPush && towns[ti].km - d <= Math.max(1, lastV) * (cfg.cityPush - past)) { travelling = true; pushing = true; }
+      }
       if (hold > 0) hold = Math.max(0, hold - dt);
       else if (travelling) {
         if (pend > 0) pend = Math.max(0, pend - dt);
@@ -745,14 +954,32 @@
           } else if (RIVER_K(s.k)) v = boatSpeed(cfg, s.k, s.c);
           else {
             const wx = weatherLevel(fm, cfg, s.x, s.y, F, hourG);
-            v = speedAt(cfg, trip.pace, s.k, s.f, s.g, deepSnow(climCache.get(ck), s.h, s.ice), wx);
+            v = speedAt(cfg, trip.pace, s.k, s.f, s.g, deepSnow(climCache.get(ck), s.h, s.ice), wx, s.m, mt);
+            lastV = v;
           }
           let nd = Math.min(total, d + v * dt);
-          if (fi < fords.length && fords[fi].km <= nd) { nd = Math.max(d, fords[fi].km); pend += fordHours(cfg, fords[fi].flow, !!trip.ferry); fi++; }
+          if (fi < fords.length && fords[fi].km <= nd) {
+            nd = Math.max(d, fords[fi].km);
+            // a ford is crossed freely outside its flood months (by the date the party gets there)
+            if (!(fords[fi].ford && fordOpen(fords[fi].ford, monthOf(serial)))) pend += fordHours(cfg, fords[fi].flow, !!trip.ferry);
+            fi++;
+          }
+          // a city reached late in the day (or pushed on for): the night is spent there
+          if (onFoot && ti < towns.length && towns[ti].km <= nd && cfg.cityStop >= 0) {
+            const left = pushing ? 0 : (((end - local) % 24) + 24) % 24;
+            if (pushing || left <= cfg.cityStop) {
+              nd = Math.max(d, towns[ti].km);
+              restUntil = t + ((((trip.dayStart - local) % 24) + 24) % 24 || 24) / 24;
+              nights.push(towns[ti].name);
+              ti++;
+            }
+          }
           // getting on board (a river boat, a ship, or from one to the other) takes the boarding hours
           for (let j = i + 1; j < S.length && S[j].km <= nd; j++) {
             const mj = MODE_OF(S[j].k);
             if (mj && mj !== MODE_OF(S[j - 1].k) && S[j].km > d + 1e-9) { nd = S[j].km; pend += cfg.boardHours; break; }
+            // coming ashore from a ship anywhere but in a harbour (where the map has harbours): the landing hours
+            if (trip.landAny && MODE_OF(S[j - 1].k) === 2 && mj === 0 && S[j].km > d + 1e-9 && hasHarbours(fm) && !harbourNear(fm, S[j].x, S[j].y)) { nd = S[j].km; pend += cfg.landHours; break; }
           }
           d = nd;
         }
@@ -762,7 +989,7 @@
       if (h >= 1 - 1e-9) { km.push(d); h = 0; }
     }
     if (h > 0) km.push(d);
-    return { km, total, arriveT: t };
+    return { km, total, arriveT: t, nights };
   }
 
   // ── journeys on the map ──
@@ -1000,10 +1227,29 @@
       if (this.terrainOn && !tv.terrain) this.showTerrain(true);
       if (!this._grid) { this.msg(this.T("trNoHeight")); this._stopPicking(true); return; }
       const pace = cfg.pace.normal;
-      const out = [], opt = { ferry: !!this.ferry, sea: !!this.sea, boats: this.ferry ? this._ensureBoats() : null,
+      planMonth = fm.monthOf ? fm.monthOf(Math.floor(fm.T || 0)) : null;
+      const out = [], opt = { mount: mountOf(cfg, this.mount, this.wagonOff), ferry: !!this.ferry, sea: !!this.sea, landAnywhere: !!this.sea && !!this.landAny, boats: this.ferry ? this._ensureBoats() : null,
         hours: clamp(+String(this._lastHours || cfg.hoursPerDay).replace(",", ".") || cfg.hoursPerDay, 0.5, 24) };
-      for (const mode of ["fast", "easy", "short"]) {
-        const r = findRoute(fm, this._grid, this._roads, tv.start, tv.end, mode, cfg, pace, opt);
+      if (opt.sea) {
+        // the wind at planning time bends a ship's course out at sea
+        const serial = Math.floor(fm.T || 0), hg = ((fm.T || 0) - serial) * 24;
+        let F = this.fieldCache.get(serial);
+        if (F === undefined) { try { F = await this.ctx.fetchField(serial); } catch (e) { F = null; } this.fieldCache.set(serial, F); }
+        opt.windAt = (x, y) => { const w = weatherAt(fm, x, y, F, hg); return w ? w.wind : null; };
+      }
+      for (const mode of ["fast", "easy", "short", "safe"]) {
+        let r = findRoute(fm, this._grid, this._roads, tv.start, tv.end, mode, cfg, pace, opt);
+        // Säkrast may not take more than maxTimes the time of Snabbast: otherwise ease the extra caution
+        // off (halving the gap each time) until it fits; at nothing it is Snabbast itself
+        const fast = out.find((o) => o.mode === "fast");
+        if (r && mode === "safe" && fast && fast.hours > 0 && r.hours > cfg.safe.maxTimes * fast.hours) {
+          let lo = 0, hi = 1, best = null;
+          for (let i = 0; i < 5; i++) {
+            const mid = (lo + hi) / 2, q = findRoute(fm, this._grid, this._roads, tv.start, tv.end, "safe", cfg, pace, { ...opt, safeScale: mid });
+            if (q && q.hours <= cfg.safe.maxTimes * fast.hours) { lo = mid; best = q; } else hi = mid;
+          }
+          r = best || fast;
+        }
         if (r) out.push({ mode, ...r, sum: routeSummary(fm, r.pts, this._grid.rivers, cfg, opt.ferry) });
       }
       if (!out.length) { this.msg(this.T(opt.sea ? "trNoWayAtAll" : "trNoWay")); tv.end = null; this.picking = "end"; this.render(); fm.draw(); return; }
@@ -1014,7 +1260,7 @@
         if (same) { (same.also = same.also || []).unshift(out[i].mode); out.splice(i, 1); }
       }
       tv.candidates = out; tv.chosen = out[0].mode;
-      this._planned = { ferry: opt.ferry, sea: opt.sea };
+      this._planned = { ferry: opt.ferry, sea: opt.sea, landAny: opt.landAnywhere, mount: this.mount && this.mount !== "foot" ? this.mount : null, wagonOff: this.mount === "wagon" && this.wagonOff != null ? this.wagonOff : null };
       this.msg("");
       this.render(); fm.draw();
       await this._etas();
@@ -1037,7 +1283,7 @@
     _tripFrom(c, o) {
       return { route: c.pts.map((p) => (p.c != null ? [+p.x.toFixed(6), +p.y.toFixed(6), p.k, +p.c.toFixed(2)] : [+p.x.toFixed(6), +p.y.toFixed(6), p.k])), startT: o.startT, pace: o.pace,
         dayStart: o.dayStart != null ? o.dayStart : this.cfg().dayStart, offset: this.fm.spotOffset ? this.fm.spotOffset(c.pts[0].x) : 0, delays: o.delays || [],
-        ...(this._planned && this._planned.ferry ? { ferry: true } : {}), ...(this._planned && this._planned.sea ? { sea: true } : {}) };
+        ...(this._planned && this._planned.ferry ? { ferry: true } : {}), ...(this._planned && this._planned.sea ? { sea: true } : {}), ...(this._planned && this._planned.landAny ? { landAny: true } : {}), ...(this._planned && this._planned.mount ? { mount: this._planned.mount } : {}), ...(this._planned && this._planned.wagonOff != null ? { wagonOff: this._planned.wagonOff } : {}) };
     },
     /** The journey's hour-by-hour progress, fetching the days' weather it needs. */
     async _timeline(trip) {
@@ -1068,7 +1314,7 @@
       trip.color = COLOURS[(tv.trips.length) % COLOURS.length];
       this.msg(this.T("trWorking"));
       const tl = await this._timeline(trip);
-      trip.timeline = { km: tl.km.map((v) => +v.toFixed(3)), total: +tl.total.toFixed(3), arriveT: tl.arriveT };
+      trip.timeline = { km: tl.km.map((v) => +v.toFixed(3)), total: +tl.total.toFixed(3), arriveT: tl.arriveT, nights: tl.nights || [] };
       trip.plan = trip.timeline;                 // the journey as planned, without delays (the events belong to it)
       const body = { ...trip }; delete body._samples; delete body._cum; delete body._fords; delete body._ev; delete body._evKey;
       try {
@@ -1104,14 +1350,14 @@
       if (trip.plan) return;
       if (!(trip.delays && trip.delays.length)) { trip.plan = trip.timeline; return; }
       const tl = await this._timeline({ ...trip, delays: [] });
-      trip.plan = { km: tl.km.map((v) => +v.toFixed(3)), total: +tl.total.toFixed(3), arriveT: tl.arriveT };
+      trip.plan = { km: tl.km.map((v) => +v.toFixed(3)), total: +tl.total.toFixed(3), arriveT: tl.arriveT, nights: tl.nights || [] };
     },
     async _recompute(trip) {
       this.msg(this.T("trWorking"));
       trip._samples = null; trip._fords = null;
       await this._ensurePlan(trip);
       const tl = await this._timeline(trip);
-      trip.timeline = { km: tl.km.map((v) => +v.toFixed(3)), total: +tl.total.toFixed(3), arriveT: tl.arriveT };
+      trip.timeline = { km: tl.km.map((v) => +v.toFixed(3)), total: +tl.total.toFixed(3), arriveT: tl.arriveT, nights: tl.nights || [] };
       try { await this._save(trip); this.msg(this.T("trArrives", trip.name, this.ctx.fmtT(trip.timeline.arriveT))); }
       catch (e) { this.msg(this.T("saveFailed") + e.message); }
       this.render(); this.fm.draw();
@@ -1299,14 +1545,14 @@
       const rows = [
         ["pace.slow", T("trSetSlow")], ["pace.normal", T("trSetNormal")], ["pace.fast", T("trSetFast")],
         ["road.path", T("trSetPath")], ["road.road", T("trSetRoad")], ["road.highway", T("trSetHighway")],
-        ["offRoad", T("trSetOffRoad")], ["riverHoursPerSize", T("trSetRiver")], ["forestPer25", T("trSetForest")], ["bad", T("trSetBad")], ["veryBad", T("trSetVeryBad")], ["snow", T("trSetSnow")],
+        ["offRoad", T("trSetOffRoad")], ["riverHoursPerSize", T("trSetRiver")], ["forestPer25", T("trSetForest")], ["marshPer25", T("trSetMarsh")], ["bad", T("trSetBad")], ["veryBad", T("trSetVeryBad")], ["snow", T("trSetSnow")],
         ["slopeUp", T("trSetUp")], ["slopeDown", T("trSetDown")], ["minSpeed", T("trSetMin")],
         ["badRain", T("trSetBadRain")], ["badWind", T("trSetBadWind")], ["veryBadRain", T("trSetVeryBadRain")], ["veryBadWind", T("trSetVeryBadWind")],
         ["hoursPerDay", T("trSetHours")], ["dayStart", T("trSetStart")], ["keepDays", T("trSetKeep")],
         ["steep.path", T("trSetSteepPath")], ["steep.road", T("trSetSteepRoad")], ["steep.highway", T("trSetSteepHighway")],
         ["boat.still", T("trSetBoatStill")], ["boat.downShare", T("trSetBoatShare")], ["boat.minUp", T("trSetBoatMinUp")], ["boatMinFlow", T("trSetBoatMin")],
-        ["sea.normal", T("trSetSeaNormal")], ["sea.good", T("trSetSeaGood")], ["sea.bad", T("trSetSeaBad")],
-        ["wiggle", T("trSetWiggle")], ["windGood", T("trSetWindGood")], ["windCalm", T("trSetWindCalm")], ["seaAllDay", T("trSetSeaAllDay")], ["boardHours", T("trSetBoard")],
+        ["sea.normal", T("trSetSeaNormal")], ["sea.sight", T("trSetSeaSight")], ["sea.far", T("trSetSeaFar")], ["landHours", T("trSetLandHours")], ["sea.good", T("trSetSeaGood")], ["sea.bad", T("trSetSeaBad")],
+        ["mount.horse", T("trSetHorse")], ["mount.wagon", T("trSetWagon")], ["mount.wagonOff", T("trSetWagonOff")], ["cityStop", T("trSetCityStop")], ["cityPush", T("trSetCityPush")], ["crossingReach", T("trSetCrossingReach")], ["wiggle", T("trSetWiggle")], ["safe.off", T("trSetSafeOff")], ["safe.perKm", T("trSetSafePerKm")], ["safe.max", T("trSetSafeMax")], ["safe.nation", T("trSetSafeNation")], ["safe.path", T("trSetSafePath")], ["safe.forest", T("trSetSafeForest")], ["safe.maxTimes", T("trSetSafeMaxTimes")], ["windGood", T("trSetWindGood")], ["windCalm", T("trSetWindCalm")], ["seaAllDay", T("trSetSeaAllDay")], ["boardHours", T("trSetBoard")],
       ];
       const get = (k) => k.split(".").reduce((o, p) => o[p], cfg);
       const dlg = this.$("trSettings"), body = this.$("trSettingsBody");
@@ -1359,7 +1605,7 @@
     _ensureGrid() {
       const fm = this.fm, serial = Math.floor(fm.T || 0);
       const rivSig = (fm.rivers || []).length + ":" + (fm.rivers || []).reduce((a, r) => a + r.points.length + r.size, 0);
-      const key = serial + ":" + (fm.heightGrid() || {}).key + ":" + JSON.stringify(this.cfg().steep);
+      const key = serial + ":" + (fm.heightGrid() || {}).key + ":" + JSON.stringify(this.cfg().steep) + ":" + (fm._lyrRev || 0);
       if (!this._grid || this._gridKey !== key) {
         const climate = this.ctx.climateFor(serial);
         this._grid = buildGrid(fm, climate);
@@ -1394,7 +1640,7 @@
       const c = cv.getContext("2d"), img = c.createImageData(G.gw, G.gh), px = img.data;
       for (let k = 0; k < G.n; k++) {
         if (G.water[k]) continue;
-        const v = speedAt(cfg, pace, 0, G.forest[k], CROSS * G.steep[k], G.snow[k], 0);
+        const v = speedAt(cfg, pace, 0, G.forest[k], CROSS * G.steep[k], G.snow[k], 0, G.marsh[k]);
         const col = v >= pace - cfg.offRoad - 0.3 ? null : v >= 2 ? [240, 220, 80, 110] : v >= 1 ? [245, 150, 50, 170] : v >= 0.5 ? [220, 40, 40, 210] : [110, 20, 120, 230];
         if (!col) continue;
         px.set(col, k * 4);
@@ -1463,13 +1709,27 @@
       // by boat: allowed before the routes are found (changing it finds them again)
       if (S.user) {
         const modes = document.createElement("div"); modes.className = "tr-modes";
-        for (const [k, label, tip] of [["ferry", "trFerry", "trFerryTip"], ["sea", "trSea", "trSeaTip"]]) {
+        for (const [k, label, tip] of [["ferry", "trFerry", "trFerryTip"], ["sea", "trSea", "trSeaTip"], ["landAny", "trLandAny", "trLandAnyTip"]]) {
           const l = document.createElement("label"); l.className = "check";
-          l.title = k === "ferry" ? T(tip, cfg.boat.still, cfg.boat.downShare, cfg.boatMinFlow, cfg.boardHours, cfg.boat.minUp) : T(tip, cfg.sea.normal, cfg.sea.good, cfg.sea.bad, cfg.boardHours);
+          l.title = k === "ferry" ? T(tip, cfg.boat.still, cfg.boat.downShare, cfg.boatMinFlow, cfg.boardHours, cfg.boat.minUp) : k === "landAny" ? T(tip, cfg.landHours) : T(tip, cfg.sea.normal, cfg.sea.good, cfg.sea.bad, cfg.boardHours);
           l.innerHTML = `<input type="checkbox" id="tr_${k}"><span></span>`; l.lastChild.textContent = T(label); l.firstChild.checked = !!this[k];
           l.firstChild.onchange = (e) => { this[k] = e.target.checked; if (tv.candidates && tv.start && tv.end) this._plan(); };
           modes.append(l);
         }
+        const ml = document.createElement("label"); ml.className = "field slim"; ml.title = T("trMountTip", cfg.mount.horse, cfg.mount.wagon, Math.round(cfg.mount.wagonOff * 100));
+        const ms = document.createElement("span"); ms.textContent = T("trMount");
+        const sel = document.createElement("select"); sel.id = "trMount";
+        for (const v of ["foot", "horse", "wagon"]) sel.add(new Option(T("trMount_" + v), v));
+        sel.value = this.mount || "foot";
+        // a wagon's speed off the roads, in per cent of its speed on them: the settings' value unless another is typed here
+        const wl = document.createElement("label"); wl.className = "field slim"; wl.title = T("trWagonOffTip", Math.round(cfg.mount.wagonOff * 100));
+        const ws = document.createElement("span"); ws.textContent = T("trWagonOff");
+        const wi = document.createElement("input"); wi.type = "number"; wi.id = "trWagonOff"; wi.className = "num-small"; wi.min = 5; wi.max = 100; wi.step = 5;
+        wi.value = Math.round((this.wagonOff != null ? this.wagonOff : cfg.mount.wagonOff) * 100);
+        wl.append(ws, wi); wl.hidden = (this.mount || "foot") !== "wagon";
+        wi.onchange = () => { const v = clamp(+wi.value || cfg.mount.wagonOff * 100, 5, 100); wi.value = v; this.wagonOff = v / 100; if (tv.candidates && tv.start && tv.end) this._plan(); };
+        sel.onchange = () => { this.mount = sel.value; wl.hidden = sel.value !== "wagon"; if (tv.candidates && tv.start && tv.end) this._plan(); };
+        ml.append(ms, sel); modes.append(ml, wl);
         plan.append(modes);
       }
       const tl = document.createElement("label"); tl.className = "check"; tl.title = T("trTerrainTip");
@@ -1523,7 +1783,8 @@
         const st = document.createElement("div"); st.className = "tr-status"; st.textContent = status;
         const det = document.createElement("div"); det.className = "tr-status";
         det.textContent = T("trDetails", trip.pace, Math.round(tl.total), T(MODE_TXT[trip.mode] || "trFast")) + " · " + T("trHoursShort", fmtH(+trip.hoursPerDay || cfg.hoursPerDay))
-          + (trip.ferry ? " · " + T("trFerryShort") : "") + (trip.sea ? " · " + T("trSeaShort") : "");
+          + (trip.mount ? " · " + T("trMount_" + trip.mount) + (trip.mount === "wagon" && trip.wagonOff != null ? ` (${Math.round(trip.wagonOff * 100)} %)` : "") : "") + (trip.ferry ? " · " + T("trFerryShort") : "") + (trip.sea ? " · " + T("trSeaShort") : "")
+          + (trip.timeline && trip.timeline.nights && trip.timeline.nights.length ? " · " + T("trNights", trip.timeline.nights.map((n) => n || "?").join(", ")) : "");
         li.append(head, st, det);
         if (trip.delays && trip.delays.length) {
           const dl = document.createElement("div"); dl.className = "tr-delays";
@@ -1567,6 +1828,6 @@
   // for tests
   Travel._steepAt = steepAt;
   Travel._seaSpeed = seaSpeed; Travel._buildBoats = buildBoats;
-  Travel._speedAt = speedAt; Travel._simulate = simulate; Travel._findRoute = findRoute; Travel._buildGrid = buildGrid; Travel._buildRoads = buildRoads; Travel._tripAt = tripAt;
+  Travel._speedAt = speedAt; Travel._simulate = simulate; Travel._findRoute = findRoute; Travel._buildGrid = buildGrid; Travel._buildRoads = buildRoads; Travel._tripAt = tripAt; Travel._defaults = DEFAULTS; Travel._riverIndex = riverIndex; Travel._setPlanMonth = (m) => { planMonth = m; };
   window.Travel = Travel;
 })();
