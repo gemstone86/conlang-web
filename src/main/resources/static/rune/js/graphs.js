@@ -85,10 +85,14 @@ function yearMatches(spec, y) {
   if (/^-?\d+$/.test(t)) return y === +t;
   return String(y).includes(t);
 }
+// the tags of a word, and whether it has all the tags in a filter ("a, b")
+const wordTags = w => (w && w.tags ? String(w.tags).split(',').map(t => t.trim()).filter(Boolean) : []);
+const tagMatches = (q, tags) => { const want = String(q || '').split(',').map(t => t.trim().toLowerCase()).filter(Boolean); if (!want.length) return true; const have = wordTags({ tags }).map(t => t.toLowerCase()); return want.every(t => have.includes(t)); };
+const wordTagList = () => [...new Set((S.words || []).flatMap(wordTags))].sort((a, b) => a.localeCompare(b));
 function fieldFilter(w) {
   const f = S.wf || {}, has = (v, q) => !q.trim() || String(v ?? '').toLowerCase().includes(q.trim().toLowerCase());
   if (f.id && f.id.trim()) { const ids = f.id.split(/[,\s]+/).filter(Boolean); if (!ids.includes(String(w.id))) return false; }
-  return has(w.gloss, f.gloss || '') && has(w.pos, f.pos || '') && has(w.build, f.build || '') && yearMatches(f.year || '', w.year) &&
+  return has(w.gloss, f.gloss || '') && has(w.pos, f.pos || '') && has(w.build, f.build || '') && yearMatches(f.year || '', w.year) && tagMatches(f.tag || '', w.tags) &&
     (!(f.form || '').trim() || has(w.form, f.form) || has(w.origin_form, f.form) || has(w.ref_text, f.form));
 }
 function filteredWords() {
@@ -97,7 +101,7 @@ function filteredWords() {
   if (S.onlyProblems) all = all.filter(w => (w.problems || []).length);
   if (S.wf && Object.values(S.wf).some(v => (v || '').trim())) all = all.filter(fieldFilter);
   if (!q) return all;
-  return all.filter(w => [w.id, w.gloss, w.meaning, w.ref_text, w.ref_gloss, w.ref_to ? 'reference see' : '', w.form, w.pos, w.notes, ...(w.forms || []).map(f => f.form)].join(' ').toLowerCase().includes(q));
+  return all.filter(w => [w.id, w.gloss, w.meaning, w.ref_text, w.ref_gloss, w.ref_to ? 'reference see' : '', w.form, w.pos, w.notes, w.tags, ...(w.forms || []).map(f => f.form)].join(' ').toLowerCase().includes(q));
 }
 // a word's forms, listed under it when it is expanded: the form's label stands where the id is
 const subForms = w => [...(w.forms || [])].sort((a, b) => String(a.label).toLowerCase().localeCompare(String(b.label).toLowerCase()));
@@ -116,9 +120,10 @@ function wordRow(w) {
   const act = w.inherited ? `<button data-act="goOrigin" data-id="${w.id}" data-lang="${w.origin_lang_id}">Open in ${esc(w.origin_lang)}</button>`
     : (canSuggest() ? `<button data-act="editWord" data-id="${w.id}">Edit</button> <button class="danger" data-act="delWord" data-id="${w.id}">✕</button>` : '');
   const lost = w.lost_year != null ? ` <span class="badge lostbadge" title="No longer used in ${esc(S.lang.name)} from ${w.lost_year}">lost ${w.lost_year}</span>` : '';
+  const tagChips = (w.tags ? String(w.tags).split(',').map(t => t.trim()).filter(Boolean) : []).map(t => ` <span class="badge tagb" title="Tag: click to show only words with it" data-act="tagFilter" data-tag="${esc(t)}" style="cursor:pointer">${esc(t)}</span>`).join('');
   const subs = hasRuleForms(w), open = subs && S.expanded && S.expanded.has(w.id);
   const arrow = subs ? `<button class="arrow" data-act="toggleForms" data-id="${w.id}" title="${open ? 'Hide' : 'Show'} the forms the rules give " aria-expanded="${open}">${open ? '▾' : '▸'}</button> ` : '';
-  return `<tr class="${w.inherited ? 'inherited' : ''}${w.lost_year != null ? ' lostword' : ''}"><td class="muted small">${arrow}${w.id}</td><td><a data-act="openWord" data-id="${w.id}" style="cursor:pointer"><strong>${esc(w.gloss)}</strong></a>${inh}${lost}${w.meaning_changed ? `<div class="small muted">means: ${esc(w.meaning)}</div>` : ''}${w.loan_from ? `<div class="small muted">borrowed from <strong>${esc(w.loan_from)}</strong></div>` : ''}${w.ref_to ? `<div class="small muted">→ same as <strong>${esc(w.ref_gloss)}</strong> (#${w.ref_to})</div>` : ''}${(w.problems || []).map(p => `<div class="small gap">⚠ ${esc(p)}</div>`).join('')}</td><td>${esc(w.pos)}</td><td>${esc(w.build)}</td><td>${w.year}</td>
+  return `<tr class="${w.inherited ? 'inherited' : ''}${w.lost_year != null ? ' lostword' : ''}"><td class="muted small">${arrow}${w.id}</td><td><a data-act="openWord" data-id="${w.id}" style="cursor:pointer"><strong>${esc(w.gloss)}</strong></a>${inh}${lost}${tagChips}${w.meaning_changed ? `<div class="small muted">means: ${esc(w.meaning)}</div>` : ''}${w.loan_from ? `<div class="small muted">borrowed from <strong>${esc(w.loan_from)}</strong></div>` : ''}${w.ref_to ? `<div class="small muted">→ same as <strong>${esc(w.ref_gloss)}</strong> (#${w.ref_to})</div>` : ''}${(w.problems || []).map(p => `<div class="small gap">⚠ ${esc(p)}</div>`).join('')}</td><td>${esc(w.pos)}</td><td>${esc(w.build)}</td><td>${w.year}</td>
     <td class="form">${esc(w.form)}${w.spelling ? `<div class="small muted" title="The spelling lags behind: this is how the word sounded at the latest spelling reform (or when it was coined)">spelt <span class="form">${esc(w.spelling)}</span></div>` : ''}</td><td>${d ? lines(d.latest) : '<span class="muted">—</span>'}${more ? ` <span class="badge">+${more}</span>` : ''}</td>
     <td>${w.length}</td><td>${esc(w.pronunciation)}${sayBtn((w.latest || {})[S.lang.name] || w.form, S.lang.id)}</td><td>${esc((w.exists_in || []).join(', '))}</td>
     <td>${lines(w.latest)}${w.has_overrides ? ' <span class="badge">locked</span>' : ''}</td>

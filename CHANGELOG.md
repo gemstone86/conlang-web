@@ -2,6 +2,12 @@
 
 Newest first. Versions from 1.x on are the combined app (Root and Rune + Weather generator).
 
+## v1.27.0 (combined app)
+Root and Rune:
+- **Tags on words.** A word can have tags (comma-separated, like the sound changes'): a *tags* box when adding or editing a word, shown as small labels after the word in the dictionary (click one to show only the words with it), and a *tag filter* in the dictionary's filter row (several tags: the word must have all of them; the free-text search finds tags too). Tags are kept in the full export and in the Excel export (a *tags* column at the end).
+- **Bulk entry can tag every word.** The Bulk tab has *tag for all these words*: every word added gets it. A line can also have its own tags as a sixth column (`gloss;type;form;year;notes;tags`); that word gets both. *Check only* says what would be tagged; a tag longer than 40 characters is refused and nothing is added. The admins' Excel dictionary import has the same box.
+- New column `words.tags`; `POST /rune/api/languages/{id}/bulk` takes `tags`, `POST /rune/api/admin/import-elven` takes `tags`.
+
 ## v1.26.1 (combined app)
 Weather map:
 - The standard map is updated from an admin export (Mundana, 15 November): the height map (909 changed pixels, revision 10), the forests, the roads (66) and, new in the standard map, the **cities** (16) and the **marshland**. A server that already has the standard map gets them installed once (the *Release* marks in `map.json`); what was changed in the app since is not touched by the older parts.

@@ -7,6 +7,7 @@ const ctx = { S: { lang: { id: 1, name: "Old" }, expanded: new Set() }, esc: s =
 vm.createContext(ctx);
 // only the word list part: from "// a word's forms" to the end of drawDict's predecessor
 const from = src.indexOf("// a word's forms, listed"), to = src.indexOf("function drawDict");
+vm.runInContext(src.slice(src.indexOf("// the tags of a word"), src.indexOf("function fieldFilter")), ctx);   // the tag helpers
 vm.runInContext(src.slice(from, to), ctx);
 const word = { id: 7, gloss: "tree", pos: "noun", build: "x", year: 0, form: "im", length: 2, pronunciation: "", forms: [
   { label: "plural", form: "imka", virtual: true, latest: {} }, { label: "definite", form: "imtou", virtual: true, latest: {} }, { label: "past", form: "imi", latest: {} }] };
@@ -28,4 +29,16 @@ test("expanded: the forms follow in label order, the label where the id is", () 
 test("a word without forms by rule has no arrow", () => {
   const h = ctx.wordRow({ ...word, forms: [{ label: "past", form: "imi", latest: {} }] });
   assert.doesNotMatch(h, /toggleForms/);
+});
+
+const tagMatches = vm.runInContext("tagMatches", ctx);   // a const, so not a property of the context
+test("tags: shown as chips, and the filter wants all the tags given", () => {
+  const h = ctx.wordRow({ ...word, forms: [], tags: "bird, old" });
+  assert.match(h, /data-tag="bird"/);
+  assert.match(h, /data-tag="old"/);
+  assert.ok(tagMatches("bird", "bird, old"));
+  assert.ok(tagMatches("OLD, bird", "bird, old"), "any letter case, any order");
+  assert.ok(!tagMatches("bird, new", "bird, old"));
+  assert.ok(tagMatches("", null), "no filter lets every word through");
+  assert.ok(!tagMatches("bird", null));
 });

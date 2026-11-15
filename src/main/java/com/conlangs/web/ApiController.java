@@ -98,10 +98,10 @@ public class ApiController {
     }
 
     @PostMapping("/admin/import-elven")
-    public Map<String, Object> importElven(@RequestParam("file") MultipartFile file, @RequestParam("languageId") long languageId, HttpSession s) throws Exception {
+    public Map<String, Object> importElven(@RequestParam("file") MultipartFile file, @RequestParam("languageId") long languageId, @RequestParam(value = "tags", required = false) String tags, HttpSession s) throws Exception {
         long uid = auth.requireAdmin(s);
         access.need(uid, languageId, Access.OWNER);
-        Map<String, Object> res = imports.importDictionary(file.getInputStream(), languageId, uid);
+        Map<String, Object> res = imports.importDictionary(file.getInputStream(), languageId, uid, tags);
         applog.info("import", uid, "Dictionary import into language " + languageId + ": " + res.get("imported") + " words, " + res.get("skippedCount") + " skipped",
                 "per group: " + res.get("perGroup") + "\nskipped (first 50): " + res.get("skipped"));
         return res;
@@ -558,8 +558,8 @@ public class ApiController {
         long uidB = auth.requireUid(s);
         boolean dry = Boolean.parseBoolean(String.valueOf(b.get("dryRun")));
         boolean skip = Boolean.parseBoolean(String.valueOf(b.get("skipExisting")));
-        Map<String, Object> res = dict.bulk(uidB, id, str(b, "text"), dry, skip);
-        applog.info("edit", uidB, "Bulk entry in language #" + id + ": " + res.get("count") + " words" + (dry ? " (check only)" : ""));
+        Map<String, Object> res = dict.bulk(uidB, id, str(b, "text"), dry, skip, str(b, "tags"));
+        applog.info("edit", uidB, "Bulk entry in language #" + id + ": " + res.get("count") + " words" + (res.get("tags") != null ? " tagged " + res.get("tags") : "") + (dry ? " (check only)" : ""));
         return res;
     }
 

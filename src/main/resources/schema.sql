@@ -291,3 +291,5 @@ ALTER TABLE word_forms ADD COLUMN IF NOT EXISTS irregular_year INT NULL;
 ALTER TABLE word_forms ADD COLUMN IF NOT EXISTS level_year INT NULL;
 ALTER TABLE word_forms ADD COLUMN IF NOT EXISTS level_form VARCHAR(400) NULL;
 ALTER TABLE languages ADD COLUMN IF NOT EXISTS spelling_years VARCHAR(400);
+-- Tags on words (comma separated, like the sound changes' tags): bulk entry can give every new word one
+ALTER TABLE words ADD COLUMN IF NOT EXISTS tags VARCHAR(400) NULL;

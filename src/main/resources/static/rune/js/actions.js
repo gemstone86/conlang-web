@@ -119,7 +119,7 @@ const A = {
     $('#w_form').hidden = false; $('#w_form').value = d.form; $('#w_gloss').focus();
   },
   saveWord: async () => {
-    const p = { gloss: val('w_gloss'), pos: val('w_pos'), build: val('w_build'), form: val('w_form'), notes: val('w_notes') };
+    const p = { gloss: val('w_gloss'), pos: val('w_pos'), build: val('w_build'), form: val('w_form'), notes: val('w_notes'), tags: val('w_tags') };
     if (val('w_year') !== '') p.year = Number(val('w_year'));
     if ($('#w_isref') && $('#w_isref').checked) {
       const t = val('w_ref').trim(), m = t.match(/#(\d+)\s*$/);
@@ -140,7 +140,7 @@ const A = {
   },
   editWord: async d => {
     const w = S.words.find(x => x.id === Number(d.id));
-    for (const [k, v] of [['gloss', w.gloss], ['pos', w.pos], ['build', w.build], ['form', w.ref_to ? '' : w.form], ['year', w.year], ['notes', w.notes]]) $('#w_' + k).value = v ?? '';
+    for (const [k, v] of [['gloss', w.gloss], ['pos', w.pos], ['build', w.build], ['form', w.ref_to ? '' : w.form], ['year', w.year], ['notes', w.notes], ['tags', w.tags]]) $('#w_' + k).value = v ?? '';
     $('#w_isref').checked = !!w.ref_to; $('#w_ref').value = w.ref_to ? w.ref_gloss + ' #' + w.ref_to : ''; syncRefBox();
     $('#w_id').value = w.id; $('#w_btn').textContent = 'Save changes'; window.scrollTo(0, 0);
   },
@@ -212,6 +212,7 @@ const A = {
     renderPanel();
   },
   ruleScope: async d => { S.ruleScope = d.v; try { localStorage.setItem('ruleScope', d.v); } catch (x) { /* ignore */ } renderPanel(); },
+  tagFilter: async d => { S.wf = S.wf || {}; S.wf.tag = d.tag; S.page = 0; renderPanel(); },
   clearFilters: async () => { S.wf = {}; S.q = ''; S.page = 0; renderPanel(); },
   toggleForms: async d => { const id = Number(d.id); S.expanded = S.expanded || new Set(); if (S.expanded.has(id)) S.expanded.delete(id); else S.expanded.add(id); drawDict(); },
   toggleProblems: async () => { S.onlyProblems = !S.onlyProblems; S.page = 0; drawDict(); },
@@ -371,7 +372,7 @@ const A = {
   },
   cancelRule: async () => renderPanel(),
   excelDict: async () => {
-    const d = await excelUpload('/rune/api/admin/import-elven');
+    const d = await excelUpload('/rune/api/admin/import-elven', { tags: val('gx_tags') });
     const per = Object.entries(d.perGroup || {}).map(([g, n]) => (g === '(none)' ? S.lang.name : g) + ': ' + n);
     const groups = per.length > 1 ? per.join(', ') : '';
     say('Imported ' + d.imported + ' words' + (groups ? ' (' + groups + ')' : '') + '.' + (d.alreadyThere ? ' ' + d.alreadyThere + ' were there already.' : '')
@@ -513,12 +514,12 @@ const A = {
     try { S.missing = await api('GET', base() + '/missing'); $('#c_misslist').innerHTML = compMissList(S.missing); filterMissList(); } catch (e) { /* list refresh is optional */ }
   },
   bulkCheck: async () => {
-    const r = await api('POST', base() + '/bulk', { text: val('b_text'), dryRun: true, skipExisting: $('#b_skip').checked });
-    say(r.count + ' words would be added.' + (r.skipped.length ? ' Already there, skipped: ' + r.skipped.join(', ') + '.' : ''));
+    const r = await api('POST', base() + '/bulk', { text: val('b_text'), dryRun: true, skipExisting: $('#b_skip').checked, tags: val('b_tags') });
+    say(r.count + ' words would be added' + (r.tags ? ', tagged ' + r.tags : '') + '.' + (r.skipped.length ? ' Already there, skipped: ' + r.skipped.join(', ') + '.' : ''));
   },
   bulkGo: async () => {
-    const r = await api('POST', base() + '/bulk', { text: val('b_text'), skipExisting: $('#b_skip').checked });
-    say('Added ' + r.count + ' words.' + (r.skipped.length ? ' Skipped (already there): ' + r.skipped.join(', ') + '.' : '')); S.tab = 'dict'; renderPanel();
+    const r = await api('POST', base() + '/bulk', { text: val('b_text'), skipExisting: $('#b_skip').checked, tags: val('b_tags') });
+    say('Added ' + r.count + ' words' + (r.tags ? ', tagged ' + r.tags : '') + '.' + (r.skipped.length ? ' Skipped (already there): ' + r.skipped.join(', ') + '.' : '')); S.tab = 'dict'; renderPanel();
   },
   soundImportCheck: async () => {
     const f = $('#si_file') && $('#si_file').files[0];
