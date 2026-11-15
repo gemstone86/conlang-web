@@ -74,7 +74,7 @@
   function terrainAt(fm, x, y, kind, coastKm) {
     const HG = fm.heightGrid ? fm.heightGrid() : null;
     const t = { travel: MODE(kind), road: MODE(kind) === "foot" ? ROAD[kind] || "none" : "none",
-      forest: fm.layerAt ? fm.layerAt("forest", x, y) : 0, ice: fm.layerAt ? fm.layerAt("ice", x, y) : 0,
+      forest: fm.layerAt ? fm.layerAt("forest", x, y) : 0, marsh: fm.layerAt ? fm.layerAt("marsh", x, y) : 0, ice: fm.layerAt ? fm.layerAt("ice", x, y) : 0,
       height: HG ? Math.max(0, fm.groundM(x, y, HG)) : 0, steep: 0, zones: [], nations: [] };
     if (HG && window.Travel && Travel._steepAt) t.steep = Travel._steepAt(fm, HG, x, y);
     // how far to the shore (km, up to the farthest any rule asks about): from land to the sea, or from the sea to land
@@ -107,7 +107,7 @@
       switch (k) {
         case "travel": if (!list(c).map(lower).includes(t.travel)) return false; break;
         case "road": if (!list(c).map(lower).includes(t.road)) return false; break;
-        case "forest": case "ice": case "height": case "steep": if (!inRange(t[k], c)) return false; break;
+        case "forest": case "marsh": case "ice": case "height": case "steep": if (!inRange(t[k], c)) return false; break;
         case "zone":
           if (c === true) { if (!t.zones.length) return false; }
           else if (c === false) { if (t.zones.length) return false; }

@@ -417,7 +417,7 @@ public class SentenceService {
                 ? "'" + w.get("gloss") + "' has no '" + label.trim() + "' form; used '" + fr.get("label") + "'" : null;
         int fy = fr.get("year") == null ? wyear : ((Number) fr.get("year")).intValue();
         if (fy > year) return new Res(null, "the '" + fr.get("label") + "' form of '" + w.get("gloss") + "' is not in use until " + fy, note, null);
-        String form = formAtYear(c, wid, (String) fr.get("form"), fy, year);
+        String form = formAtYear(c, wid, (String) fr.get("form"), fy, year, fr);
         if (form == null) return new Res(null, "'" + w.get("gloss") + "' is not in " + access.language(c.langId).get("name") + " (coined after the split)", note, null);
         return new Res(form, null, note, "." + fr.get("label"));
     }
@@ -710,7 +710,7 @@ public class SentenceService {
             if (!open && earliest != null) y0 = Math.max(y0, earliest);
         }
         if (y0 > year) return new Res(null, "'" + w.get("gloss") + gloss + "' is not in use until " + y0, null, gloss);
-        String cur = formAtYear(c, wid, start, startYear, y0);
+        String cur = formAtYear(c, wid, start, startYear, y0, stored);
         if (cur == null) return new Res(null, "'" + w.get("gloss") + "' is not in " + access.language(c.langId).get("name") + " (coined after the split)", null, gloss);
         for (int i = from; i < ordered.size(); i++) {
             Slot sl = ordered.get(i);
@@ -827,10 +827,20 @@ public class SentenceService {
     }
 
     private String formAtYear(Ctx c, long wordId, String form, int startYear, int year) {
+        return formAtYear(c, wordId, form, startYear, year, null);
+    }
+
+    /** stored: the stored form this is (or null): its levelling counts. */
+    private String formAtYear(Ctx c, long wordId, String form, int startYear, int year, Map<String, Object> stored) {
         Map<String, Object> w = c.words.get(wordId);
         long src = Db.num(w.get("language_id"));
-        List<Evolver.Row> rows = c.evolved.computeIfAbsent(wordId + "|" + startYear + "|" + form,
-                k -> c.ev.evolve(src, form, startYear, c.overrides.getOrDefault(wordId, List.of())));
+        List<Evolver.Override> level = FormMath.level(stored, src);
+        List<Evolver.Row> rows = c.evolved.computeIfAbsent(wordId + "|" + startYear + "|" + form + (level.isEmpty() ? "" : "|L" + level.get(0).year()),
+                k -> {
+                    List<Evolver.Override> ovr = c.overrides.getOrDefault(wordId, List.of());
+                    if (!level.isEmpty()) { ovr = new ArrayList<>(ovr); ovr.addAll(level); }
+                    return c.ev.evolve(src, form, startYear, ovr);
+                });
         if (src != c.langId && rows.stream().noneMatch(r -> r.langId() == c.langId)) return null;
         return FormMath.formAt(rows, c.pathNearestFirst, year);
     }

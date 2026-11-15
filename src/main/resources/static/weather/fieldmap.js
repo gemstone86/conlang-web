@@ -168,12 +168,14 @@
         const r = await fetch(base + "manifest.json");
         if (!r.ok || this._tilePath !== path) return;
         const m = await r.json();
-        const T = { base, ts: m.tileSize, fullW: m.fullWidth || this.imgW, levels: m.levels.map((l) => ({ level: l.level, w: l.width, h: l.height, have: new Set(l.tiles) })) };
+        const T = { base, ts: m.tileSize, fullW: m.fullWidth || this.imgW, levels: m.levels.map((l) => ({ level: l.level, w: l.width, h: l.height, have: new Set(l.tiles), extra: !!l.extra })) };
         // map layers (manifest "base" and "layers"): the zoom images as they are hold all default
         // layers; any other choice is drawn as the base map with the chosen see-through layers on top
         const sets = (o) => Object.fromEntries(Object.entries(o || {}).map(([k, a]) => [k, new Set(a)]));
         T.baseMap = m.base ? { tiles: sets(m.base.tiles), hide: sets(m.base.hide), map: m.base.map || null } : null;
         T.layers = T.baseMap ? (m.layers || []).map((v) => ({ id: String(v.id), name: v.name || v.id, def: !!v.default, tiles: sets(v.tiles), map: v.map || null })) : [];
+        T.layersManifest = T.layers; T.layers = this._ordered(T.layers);   // the admins' order (settings.layerOrder) over the manifest's
+        T.flat = !!m.flat;                                     // flat: no pre-merged zoom images; the base map picture plus see-through layers only
         T.chosen = null;                                       // null: the default layers (the zoom images as they are)
         /** The images that make zoom image level/x_y for the chosen layers, bottom first ([] = none). */
         T.srcs = (level, id) => {
@@ -190,13 +192,38 @@
         if (this.onTilesLoaded) this.onTilesLoaded(T.layers);
       } catch (e) { /* no tiles: the map image alone is shown */ }
     }
+    /**
+     * The order the map layers lie in, bottom first (settings.layerOrder of the standard map), or null for the
+     * manifest's. Layers it doesn't list keep their place; the listed ones swap among the places they have.
+     */
+    setLayerOrder(ids) {
+      this._layerOrder = Array.isArray(ids) ? ids.slice() : null;
+      const T = this.tiles;
+      if (!T) return;
+      T.layers = this._ordered(T.layersManifest || T.layers);
+      this.setTileLayers(this._tileLayers === undefined ? null : this._tileLayers);
+    }
+    _ordered(layers) {
+      const ids = this._layerOrder;
+      if (!ids || !ids.length) return layers;
+      const slots = [], want = [];
+      layers.forEach((v, i) => { if (ids.includes(v.id)) slots.push(i); });
+      for (const id of ids) { const v = layers.find((x) => x.id === id); if (v && !want.includes(v)) want.push(v); }
+      const out = layers.slice();
+      want.forEach((v, k) => { out[slots[k]] = v; });
+      return out;
+    }
     /** Which map layers to show over the base map: a list of layer ids, or null for the default ones. */
     setTileLayers(ids) {
       this._tileLayers = Array.isArray(ids) ? ids.slice() : null;
       const T = this.tiles;
       if (!T) return;
       let chosen = null;
-      if (this._tileLayers && T.layers.length) {
+      if (T.flat && T.layers.length) {
+        // the base map picture is the plain world map; the chosen layers (the default ones when nothing is chosen) lie on top
+        const want = this._tileLayers ? new Set(this._tileLayers) : null;
+        chosen = T.layers.filter((v) => (want ? want.has(v.id) : v.def));   // in drawing order
+      } else if (this._tileLayers && T.layers.length) {
         const want = new Set(this._tileLayers);
         const same = T.layers.every((v) => v.def === want.has(v.id));
         if (!same) chosen = T.layers.filter((v) => want.has(v.id));      // in drawing order
@@ -227,16 +254,22 @@
       const shownW = this.imgW * s * dpr;              // device pixels across the whole map
       if (shownW <= this.imgW * 1.15) return;           // the map image is sharp enough
       // coarse → fine; use the first level that is at least as sharp as the screen
-      const lv = [...T.levels].sort((a, b) => a.w - b.w);
+      // "extra" levels (finer than the ordinary ones, with pieces only for the few layers sharp enough to need them)
+      // are drawn on top once the screen is sharper than the finest ordinary level, so every layer keeps its ordinary pieces
+      const all = [...T.levels].sort((a, b) => a.w - b.w), lv = all.filter((l) => !l.extra);
       let target = lv.length - 1;
       for (let i = 0; i < lv.length; i++) if (lv[i].w * 1.15 >= shownW) { target = i; break; }
+      const use = lv.slice(0, target + 1).map((L, i) => ({ L, load: i === target }));
+      if (target === lv.length - 1 && shownW > lv[target].w * 1.15) {
+        for (const L of all.filter((l) => l.extra && l.w > lv[target].w)) { use.push({ L, load: true }); if (L.w * 1.15 >= shownW) break; }
+      }
       const [vx0, vy0] = this.toMap(0, 0), [vx1, vy1] = this.toMap(this.cssW, this.cssH);
       const W = this.imgW * s, H = this.imgH * s;
       ctx.save();
       ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = "high";
       const want = new Set();
-      for (let i = 0; i <= target; i++) {
-        const L = lv[i], ts = T.ts;
+      for (const { L, load } of use) {
+        const ts = T.ts;
         const tx0 = Math.max(0, Math.floor(vx0 * L.w / ts)), tx1 = Math.min(Math.ceil(L.w / ts) - 1, Math.floor(vx1 * L.w / ts));
         const ty0 = Math.max(0, Math.floor(vy0 * L.h / ts)), ty1 = Math.min(Math.ceil(L.h / ts) - 1, Math.floor(vy1 * L.h / ts));
         if ((tx1 - tx0 + 1) * (ty1 - ty0 + 1) > 400) continue; // far too many: wait until zoomed in further
@@ -244,7 +277,7 @@
           const id = tx + "_" + ty;
           const key = L.level + "/" + id;
           let t = this.tileCache.get(key);
-          if (!t && i === target) {
+          if (!t && load) {
             const srcs = T.srcs(L.level, id);
             if (!srcs.length) continue;
             // one or more images (base, then see-through layers); shown once all have come
@@ -256,7 +289,7 @@
             });
             this.tileCache.set(key, t);
           }
-          if (i === target) want.add(key);
+          if (load) want.add(key);
           if (!t || !t.ok) continue;
           t.used = performance.now();
           const tw = Math.min(ts, L.w - tx * ts), th = Math.min(ts, L.h - ty * ts);
@@ -278,8 +311,9 @@
     }
     getLeylines() { return this.leylines.map((l) => ({ aspect: l.aspect, a: { ...l.a }, b: { ...l.b } })); }
     setEditMode(m) {
-      this.editMode = m === "ley" || m === "zone" || m === "height" || m === "river" || m === "nation" || m === "range" || m === "road" ? m : "regions"; this.selectedLey = -1; this.selectedZone = -1;
+      this.editMode = m === "ley" || m === "zone" || m === "height" || m === "river" || m === "nation" || m === "range" || m === "road" || m === "city" ? m : "regions"; this.selectedLey = -1; this.selectedZone = -1;
       if (m !== "road" && this.wyCancelDraft) this.wyCancelDraft();
+      if (m !== "city" && this.ctSel != null) this.ctSel = null;
       if (m !== "range" && this.rgDrawing && this.rgFinish) this.rgFinish();
       if (m !== "river" && this.rvCancel) { this.rvDraft = null; this._rvSnap = null; }
       if (m !== "nation" && this.ntDrawing && this.ntFinish) this.ntFinish();
@@ -399,7 +433,7 @@
     }
     /** The forest map (greyscale, 0 = no trees … 100 = trees everywhere), or a canvas from the painter. */
     setForestImage(img) {
-      this.forestSource = img || null;
+      this.forestSource = img || null; this._lyrRev = (this._lyrRev || 0) + 1;
       this._fview = null;
       this._iceGrid = null; this._forestGrid = null;
       this.draw();
@@ -411,14 +445,21 @@
       this._iceGrid = null;
       this.draw();
     }
+    /** The marshland map (greyscale, 0 = dry … 100 = marsh everywhere), or a canvas from the painter. */
+    setMarshImage(img) {
+      this.marshSource = img || null; this._lyrRev = (this._lyrRev || 0) + 1;
+      this._mview = null;
+      this._marshGrid = null;
+      this.draw();
+    }
     /**
-     * A painted layer's value at a map point, 0–100 ("forest" or "ice"), from a copy at most 2048 wide
+     * A painted layer's value at a map point, 0–100 ("forest", "ice" or "marsh"), from a copy at most 2048 wide
      * kept until the layer changes. 0 without the layer.
      */
     layerAt(kind, nx, ny) {
-      const src = kind === "ice" ? this.iceSource : this.forestSource;
+      const src = kind === "ice" ? this.iceSource : kind === "marsh" ? this.marshSource : this.forestSource;
       if (!src) return 0;
-      const key = kind === "ice" ? "_iceGrid" : "_forestGrid";
+      const key = kind === "ice" ? "_iceGrid" : kind === "marsh" ? "_marshGrid" : "_forestGrid";
       let G = this[key];
       if (!G || G.src !== src) {
         const w = Math.min(src.naturalWidth || src.width, 2048), h = Math.max(1, Math.round(w * this.imgH / this.imgW));
@@ -1131,6 +1172,16 @@
           ctx.restore();
         }
       }
+      // marshland: murky green-brown (while painting marshland the painter shows its own)
+      if (this.layers.has("marsh") && this.marshSource && this.marshColours && !(this.editing && this.editMode === "height" && this.hpTarget === "marsh")) {
+        const cv = this.marshColours();
+        if (cv) {
+          ctx.save();
+          ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = "high";
+          ctx.drawImage(cv, ox, oy, this.imgW * s, this.imgH * s);
+          ctx.restore();
+        }
+      }
       if (this.layers.has("night")) this._drawNight();
       if (this.editing && this.showHeight && this.height) {
         ctx.save();
@@ -1149,10 +1200,12 @@
       if ((this.layers.has("range") || rangeEdit) && this._rgDraw) this._rgDraw();
       if ((this.layers.has("river") || riverEdit) && this._rvDraw) this._rvDraw();
       const roadEdit = this.editing && this.editMode === "road";
-      if ((this.layers.has("road") || roadEdit) && this._wyDraw) this._wyDraw();
+      if ((this.layers.has("road") || roadEdit || this._wySteepShown()) && this._wyDraw) this._wyDraw();
+      const cityEdit = this.editing && this.editMode === "city";
+      if ((this.layers.has("city") || cityEdit) && this._ctDraw) this._ctDraw();
       if (this._lsDraw) this._lsDraw();                   // the other layers' suggestions (the chosen one)
       if (this._trDraw) this._trDraw();                   // journeys (the travel calculator): routes and tokens
-      const regionEdit = this.editing && !leyEdit && !zoneEdit && !heightEdit && !riverEdit && !nationEdit && !rangeEdit && !roadEdit;   // only when placing regions
+      const regionEdit = this.editing && !leyEdit && !zoneEdit && !heightEdit && !riverEdit && !nationEdit && !rangeEdit && !roadEdit && !cityEdit;   // only when placing regions
       if (regionEdit && this.grid && this.grid.hasAnchors) this._drawTerritories();
       if (this.layers.has("zone") || zoneEdit) this._drawZones(zoneEdit);
       if (this.layers.has("ley") || leyEdit) this._drawLeylines(leyEdit);
@@ -1962,6 +2015,9 @@
         if (this.editing && this.editMode === "road" && this.wyPointerDown && this.wyPointerDown(x, y)) {
           this._wyActive = true; st.setPointerCapture(e.pointerId); return;
         }
+        if (this.editing && this.editMode === "city" && this.ctPointerDown && this.ctPointerDown(x, y)) {
+          this._ctActive = true; st.setPointerCapture(e.pointerId); return;
+        }
         if (this.editing && this.editMode === "height" && this.hpPointerDown && this.hpPointerDown(x, y, e.button)) {
           this._hpActive = true; st.setPointerCapture(e.pointerId); return;
         }
@@ -1975,7 +2031,7 @@
           this._rgActive = true; st.setPointerCapture(e.pointerId); return;
         }
         const leyEdit = this.editing && this.editMode === "ley", zoneEdit = this.editing && this.editMode === "zone";
-        const anchor = this.editing && !this.mapTool && !leyEdit && !zoneEdit && this.editMode !== "river" && this.editMode !== "nation" && this.editMode !== "range" && this.editMode !== "road" ? this._hitAnchor(x, y, 10) : -1;
+        const anchor = this.editing && !this.mapTool && !leyEdit && !zoneEdit && this.editMode !== "river" && this.editMode !== "nation" && this.editMode !== "range" && this.editMode !== "road" && this.editMode !== "city" ? this._hitAnchor(x, y, 10) : -1;
         const zp = zoneEdit ? this._hitZonePoint(x, y, 10) : null;
         if (zp && zp.zi !== this.selectedZone) { this.selectedZone = zp.zi; this.opts.onLeySelected && this.opts.onLeySelected(this.zones[zp.zi].aspect); this.draw(); }
         const ley = leyEdit ? this._hitLeyHandle(x, y, 11) : null;
@@ -1986,6 +2042,7 @@
       st.addEventListener("pointermove", (e) => {
         if (this.mapTool && this.mapTool.move) { const [tx, ty] = pos(e); this.mapTool.move(tx, ty); if (this._toolActive) return; }
         if (this.editing && this.editMode === "road" && this.wyPointerMove) { const [wx, wy] = pos(e); this.wyPointerMove(wx, wy); if (this._wyActive) return; }
+        if (this.editing && this.editMode === "city" && this.ctPointerMove) { const [cx, cy] = pos(e); this.ctPointerMove(cx, cy); if (this._ctActive) return; }
         if (this.editing && this.editMode === "height" && this.hpPointerMove) {
           const [hx, hy] = pos(e);
           this.hpPointerMove(hx, hy);
@@ -2029,6 +2086,7 @@
       st.addEventListener("pointerup", (e) => {
         if (this._toolActive) { this._toolActive = false; const [tx, ty] = pos(e); this.mapTool && this.mapTool.up && this.mapTool.up(tx, ty); return; }
         if (this._wyActive) { this._wyActive = false; const [wx, wy] = pos(e); this.wyPointerUp(wx, wy); return; }
+        if (this._ctActive) { this._ctActive = false; this.ctPointerUp(); return; }
         if (this._hpActive) { this._hpActive = false; this.hpPointerUp(); return; }
         if (this._rvActive) { this._rvActive = false; this.rvPointerUp(); return; }
         if (this._ntActive) { this._ntActive = false; const [ux, uy] = pos(e); this.ntPointerUp(ux, uy); return; }
@@ -2043,6 +2101,8 @@
           // a map tool (the travel calculator) took the click
         } else if (!down.moved && inside && this.editing && this.editMode === "road") {
           this.wyClick && this.wyClick(nx, ny, x, y);
+        } else if (!down.moved && inside && this.editing && this.editMode === "city") {
+          this.ctClick && this.ctClick(nx, ny, x, y);
         } else if (!down.moved && inside) {
           if (this.editing && this.editMode === "river") {
             this.rvClick && this.rvClick(nx, ny, x, y);

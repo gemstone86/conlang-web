@@ -50,6 +50,24 @@ public class Auth {
         return registration || db.count("select count(*) from users where " + REAL_USER) == 0;
     }
 
+    /** Rounds of PBKDF2 for passwords set from now on (older ones are stored again at this strength at the next login). */
+    static final int ROUNDS = 600_000;
+    /** The salt column of a password stored as "pbkdf2$rounds$salt$hash" (the rounds are part of it). */
+    private static final String SELF = "pbkdf2";
+
+    /** A password as it is stored now: "pbkdf2$rounds$salt$hash". */
+    private static String stored(String password) {
+        try {
+            byte[] salt = new byte[16];
+            new java.security.SecureRandom().nextBytes(salt);
+            byte[] h = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256").generateSecret(new PBEKeySpec(password.toCharArray(), salt, ROUNDS, 256)).getEncoded();
+            return "pbkdf2$" + ROUNDS + "$" + Base64.getEncoder().encodeToString(salt) + "$" + Base64.getEncoder().encodeToString(h);
+        } catch (Exception e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
+    /** The first format (120 000 rounds, the salt in its own column): only read, for accounts that haven't logged in since. */
     private static String hash(String password, String salt) {
         try {
             PBEKeySpec spec = new PBEKeySpec(password.toCharArray(), Base64.getDecoder().decode(salt), 120_000, 256);
@@ -61,9 +79,8 @@ public class Auth {
     }
 
     /**
-     * Does the password match the account? Accounts moved over from the separate weather generator
-     * (com.eonweather.core.WeatherImport) keep their old password in its format, "pbkdf2$iterations$salt$hash"
-     * (salt column "pbkdf2"); the others use this app's (base64 hash, salt in its own column).
+     * Does the password match the account? Passwords are stored as "pbkdf2$rounds$salt$hash" (salt column "pbkdf2");
+     * accounts that haven't logged in since that came in still have the first format (base64 hash, salt in its own column).
      */
     static boolean matches(String password, Map<String, Object> u) {
         String stored = (String) u.get("pw_hash"), salt = (String) u.get("salt");
@@ -86,11 +103,14 @@ public class Auth {
         }
     }
 
-    /** After a login with an old-format password: stored again in this app's format. */
+    /** After a login with a password stored in the first format or with fewer rounds: stored again at today's strength. */
     private void upgradeHash(Map<String, Object> u, String password) {
-        if (!String.valueOf(u.get("pw_hash")).startsWith("pbkdf2$")) return;
-        String salt = newSalt();
-        db.update("update users set pw_hash=?, salt=? where id=?", hash(password, salt), salt, u.get("id"));
+        String cur = String.valueOf(u.get("pw_hash"));
+        if (cur.startsWith("pbkdf2$")) {
+            String[] p = cur.split("\\$");
+            try { if (p.length == 4 && Integer.parseInt(p[1]) >= ROUNDS) return; } catch (NumberFormatException e) { /* stored again below */ }
+        }
+        db.update("update users set pw_hash=?, salt=? where id=?", stored(password), SELF, u.get("id"));
     }
 
     private static String newSalt() {
@@ -123,9 +143,8 @@ public class Auth {
         if (eonAdmins.stream().anyMatch(a -> a.equalsIgnoreCase(username))
                 && eonAdmins.stream().anyMatch(a -> db.count("select count(*) from users where lower(username)=lower(?)", a) > 0))
             throw new ApiException(409, "That username is taken.");
-        String salt = newSalt();
         long id = db.insert("insert into users(username, pw_hash, salt, is_admin) values (?,?,?,?)",
-                username, hash(password, salt), salt, first);
+                username, stored(password), SELF, first);
         applog.info("auth", id, "Registered account '" + username + "'" + (first ? " (first account, made admin)" : ""));
         return id;
     }
@@ -135,7 +154,7 @@ public class Auth {
         if (tooManyFailures(key)) throw new ApiException(429, "Too many failed logins. Wait a few minutes and try again.");
         Map<String, Object> u = username == null ? null : db.one("select * from users where lower(username)=lower(?) and " + REAL_USER, username);
         // Always hash, so timing doesn't reveal whether the user exists.
-        if (u == null) hash(password == null ? "" : password, newSalt());
+        if (u == null) stored(password == null ? "" : password);
         if (u == null || !matches(password == null ? "" : password, u)) {
             applog.warn("auth", null, "POST /api/auth/login", 401, "Failed login for '" + username + "'" + (u == null ? " (no such user)" : " (wrong password)"));
             recordFailure(key);
@@ -218,8 +237,7 @@ public class Auth {
         if (!matches(current == null ? "" : current, u))
             throw new ApiException(403, "Current password is wrong.");
         checkPassword(newPassword);
-        String salt = newSalt();
-        db.update("update users set pw_hash=?, salt=? where id=?", hash(newPassword, salt), salt, uid);
+        db.update("update users set pw_hash=?, salt=? where id=?", stored(newPassword), SELF, uid);
         applog.info("auth", uid, "Changed password");
     }
 
@@ -230,8 +248,7 @@ public class Auth {
                 : db.one("select id, expires from reset_codes where user_id=? and code_hash=?", u.get("id"), sha256(code.trim().toUpperCase()));
         if (rc == null || ((Timestamp) rc.get("expires")).toInstant().isBefore(Instant.now()))
             throw new ApiException(400, "Invalid or expired reset code.");
-        String salt = newSalt();
-        db.update("update users set pw_hash=?, salt=? where id=?", hash(newPassword, salt), salt, u.get("id"));
+        db.update("update users set pw_hash=?, salt=? where id=?", stored(newPassword), SELF, u.get("id"));
         db.update("delete from reset_codes where user_id=?", u.get("id"));
         applog.info("auth", Db.num(u.get("id")), "Password reset with a reset code");
     }
