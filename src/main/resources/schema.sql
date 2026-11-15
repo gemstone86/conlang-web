@@ -293,3 +293,5 @@ ALTER TABLE word_forms ADD COLUMN IF NOT EXISTS level_form VARCHAR(400) NULL;
 ALTER TABLE languages ADD COLUMN IF NOT EXISTS spelling_years VARCHAR(400);
 -- Tags on words (comma separated, like the sound changes' tags): bulk entry can give every new word one
 ALTER TABLE words ADD COLUMN IF NOT EXISTS tags VARCHAR(400) NULL;
+-- A form rule can first take this (a pattern, as a sound change's) off the end of the word it is added to (the start for a prefix)
+ALTER TABLE form_rules ADD COLUMN IF NOT EXISTS strip_re VARCHAR(1000) NULL;

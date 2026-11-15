@@ -2,6 +2,13 @@
 
 Newest first. Versions from 1.x on are the combined app (Root and Rune + Weather generator).
 
+## v1.28.0 (combined app)
+Root and Rune:
+- **Form rules can take the word's old ending off first.** A new optional field on a form rule, *first remove from the end of the word* (a pattern written like a sound change's, e.g. `(aną|ōną|ą|az)$`), is applied to the word before the ending is added (from the start of the word for a prefix). Before, the ending was glued on the whole dictionary form, so the word's old ending sat in the middle of the new form (*ēþmijanąida*), where the sound changes that remove it from the end of a word (`ną$`, `ą$`, `z$` …) could no longer match; the plain dictionary form went through them, the built forms did not. With the pattern: *ēþmijaną* + *-ida* → *ēþmijida*, *atganganą* + *-ida* → *atgangida*, *þeudą* + *-az* → *þeudaz*, at any start year (no need to set the rule's year after the ending-loss rules).
+  - Only a match that touches the edge counts (the last one for a suffix, the first for a prefix); no match, or a match of the whole word, leaves the word as it is. A pattern that does not compile is refused when the rule is saved.
+  - Used for the forms the rules give (dictionary, word window), for forms built in sentences and tables of endings (also when endings are stacked: the pattern is applied to what stands before each ending is added) and for the check for irregular forms. Forms already stored (irregular, made by hand, or stored by *Store irregular forms*) keep what they have: *Rebuild all* on the rule recomputes them.
+  - New column `form_rules.strip_re`; shown on the rule's row as *remove …*; in the Excel export as *remove from the end first*.
+
 ## v1.27.0 (combined app)
 Root and Rune:
 - **Tags on words.** A word can have tags (comma-separated, like the sound changes'): a *tags* box when adding or editing a word, shown as small labels after the word in the dictionary (click one to show only the words with it), and a *tag filter* in the dictionary's filter row (several tags: the word must have all of them; the free-text search finds tags too). Tags are kept in the full export and in the Excel export (a *tags* column at the end).

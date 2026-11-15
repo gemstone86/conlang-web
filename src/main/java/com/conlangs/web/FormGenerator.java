@@ -104,6 +104,7 @@ public class FormGenerator {
         final Map<String, String> classes;
         final String vowels;
         final Map<Long, Pattern> conds = new HashMap<>();
+        final Map<Long, Pattern> strips = new HashMap<>();     // the patterns taken off a base first (a rule with none, or a bad one, has no entry)
         final List<Long> path = new ArrayList<>();
         final Set<Long> own;
         final Map<Long, List<Evolver.Row>> affixRows = new HashMap<>();
@@ -124,6 +125,12 @@ public class FormGenerator {
             classes = rules.isEmpty() ? Map.of() : classesOf(langId);
             vowels = classes.getOrDefault("V", "aeiouy");
             for (Map<String, Object> r : rules) {
+                String sr = (String) r.get("strip_re");
+                if (sr != null && !sr.isBlank()) {
+                    try {
+                        strips.put(Db.num(r.get("id")), Patterns.compile(sr, classes));
+                    } catch (IllegalArgumentException e) { /* a bad pattern strips nothing */ }
+                }
                 String c = (String) r.get("cond_re");
                 if (c != null && !c.isBlank()) {
                     try {
@@ -179,6 +186,7 @@ public class FormGenerator {
                 String at = FormMath.formAt(baseRows.get(), List.of(c.langId), start);
                 if (at != null) baseAt = at;
             }
+            baseAt = FormMath.strip(baseAt, c.strips.get(rid), "prefix".equals(r.get("placement")));
             Long aw = r.get("affix_word_id") == null ? null : Db.num(r.get("affix_word_id"));
             if (aw != null) {
                 List<Evolver.Row> rows = affixRowsOf(c, aw);
@@ -221,6 +229,7 @@ public class FormGenerator {
     String regularAt(Ctx c, Built b, List<Evolver.Row> baseRows, int year) {
         String base = FormMath.formAt(baseRows, List.of(c.langId), year), affix = affixAt(c, b, year);
         if (base == null || affix == null || affix.isEmpty()) return null;
+        base = FormMath.strip(base, c.strips.get(Db.num(b.rule().get("id"))), "prefix".equals(b.rule().get("placement")));
         return FormMath.attach(base, (String) b.rule().get("placement"), affix, ((Number) b.rule().get("hiatus")).intValue() != 0, c.vowels);
     }
 

@@ -19,6 +19,25 @@ public final class FormMath {
     }
 
     /**
+     * Takes what a pattern matches off the end of a base (off its start, for a prefix) before an affix is added: the
+     * old ending of the word (a Proto-Germanic -ną or -ą) that sound changes would take off a word on its own, but
+     * not once the affix stands behind it. Only a match that touches that edge counts (the last one for a suffix, the
+     * first for a prefix); a pattern that matches nothing there, or the whole base, leaves the base as it is.
+     */
+    public static String strip(String base, java.util.regex.Pattern p, boolean prefix) {
+        if (p == null || base == null || base.isEmpty()) return base;
+        java.util.regex.Matcher m = p.matcher(base);
+        int from = -1, to = -1;
+        while (m.find()) {
+            if (m.end() == m.start()) continue;
+            if (prefix) { if (m.start() == 0) { from = 0; to = m.end(); break; } }
+            else if (m.end() == base.length()) { from = m.start(); to = m.end(); }
+        }
+        if (from < 0 || (from == 0 && to == base.length())) return base;
+        return base.substring(0, from) + base.substring(to);
+    }
+
+    /**
      * The form a word had in a language at a given year, taken from Evolver rows. langPath lists the language itself first,
      * then its ancestors: a branch that had not split off yet at that year shares its parent's form. If the word did not
      * exist yet, its first (entry) form is returned.

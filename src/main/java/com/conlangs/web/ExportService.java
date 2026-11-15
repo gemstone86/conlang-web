@@ -129,10 +129,10 @@ public class ExportService {
                 row(ck, r++, cells.toArray());
             }
             Sheet fr2 = wb.createSheet("Form rules");
-            row(fr2, 0, "group", "form", "applies to", "placement", "affix", "affix word", "condition", "drop first vowel", "from year", "order");
+            row(fr2, 0, "group", "form", "applies to", "placement", "affix", "affix word", "condition", "drop first vowel", "from year", "order", "remove from the end first");
             r = 1;
             for (Map<String, Object> x : db.rows("select f.*, w.gloss as aw from form_rules f left join words w on w.id=f.affix_word_id where f.language_id=? order by f.ord, f.id", langId)) {
-                row(fr2, r++, x.get("grp"), x.get("label"), x.get("pos"), x.get("placement"), x.get("affix"), x.get("aw"), x.get("cond_re"), x.get("hiatus"), x.get("year"), x.get("ord"));
+                row(fr2, r++, x.get("grp"), x.get("label"), x.get("pos"), x.get("placement"), x.get("affix"), x.get("aw"), x.get("cond_re"), x.get("hiatus"), x.get("year"), x.get("ord"), x.get("strip_re"));
             }
             Sheet me = wb.createSheet("Meanings");
             row(me, 0, "word id", "gloss", "language", "from year", "mode", "meaning");

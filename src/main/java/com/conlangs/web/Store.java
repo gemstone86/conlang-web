@@ -26,7 +26,7 @@ public class Store {
             "gsection", List.of("title", "headings", "ord"),
             "grammar", List.of("category", "name", "c1", "c2", "c3", "c4", "c5", "c6", "year", "ord"),
             "phoneme", List.of("symbol", "kind", "row_label", "col_label", "notes", "year", "year_to"),
-            "formrule", List.of("grp", "label", "pos", "placement", "affix", "affix_word_id", "cond_re", "hiatus", "year", "ord", "new_pos", "new_gloss"),
+            "formrule", List.of("grp", "label", "pos", "placement", "affix", "affix_word_id", "cond_re", "strip_re", "hiatus", "year", "ord", "new_pos", "new_gloss"),
             "meaning", List.of("word_id", "lang_id", "year", "mode", "meaning", "pos"),
             "loss", List.of("word_id", "lang_id", "year", "note"));
     private static final Set<String> LANG_OWNED = Set.of("word", "rule", "gsection", "grammar", "phoneme", "formrule");
@@ -196,6 +196,13 @@ public class Store {
                             Patterns.compile((String) clean.get("cond_re"), classesOf(langId));
                         } catch (IllegalArgumentException e) {
                             throw new ApiException(400, e.getMessage());
+                        }
+                    }
+                    if (!blank(clean.get("strip_re"))) {
+                        try {
+                            Patterns.compile((String) clean.get("strip_re"), classesOf(langId));
+                        } catch (IllegalArgumentException e) {
+                            throw new ApiException(400, "Remove from the end first: " + e.getMessage());
                         }
                     }
                 }

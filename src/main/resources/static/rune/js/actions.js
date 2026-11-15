@@ -273,7 +273,7 @@ const A = {
       const aw = S.wordnames.find(w => w.id === awid), y = val('fr_year');
       if (aw && y !== '' && Number(y) < aw.year && !confirm('The year ' + y + ' is older than the word "' + aw.gloss + '" (' + aw.year + '). Continue anyway?')) return;
     }
-    const p = { grp: val('fr_grp').trim(), label: val('fr_label'), pos: val('fr_pos'), placement: val('fr_place'), affix: val('fr_affix'), affix_word_id: awid, cond_re: val('fr_cond'),
+    const p = { grp: val('fr_grp').trim(), label: val('fr_label'), pos: val('fr_pos'), placement: val('fr_place'), affix: val('fr_affix'), affix_word_id: awid, cond_re: val('fr_cond'), strip_re: val('fr_strip'),
       hiatus: $('#fr_hiatus').checked ? 1 : 0, year: val('fr_year'), ord: Number(val('fr_ord') || 0), new_pos: $('#fr_derive').checked ? val('fr_newpos').trim() || null : null, new_gloss: $('#fr_derive').checked ? val('fr_newgloss').trim() || null : null };
     if ($('#fr_derive').checked && !p.new_pos) { say('Give the type of the new word (e.g. verb), or untick "Makes a new word".', true); return; }
     const r = await api('POST', base() + '/edit', { entity: 'formrule', action: id ? 'UPDATE' : 'CREATE', entityId: id ? Number(id) : null, payload: p });
@@ -282,7 +282,7 @@ const A = {
   },
   editFormRule: async d => {
     const r = S.formrules.find(x => x.id === Number(d.id));
-    for (const [k, v] of [['grp', r.grp], ['label', r.label], ['pos', r.pos], ['place', r.placement], ['affix', r.affix], ['link', r.affix_gloss], ['cond', r.cond_re], ['year', r.year], ['ord', r.ord], ['newpos', r.new_pos], ['newgloss', r.new_gloss]]) $('#fr_' + k).value = v ?? '';
+    for (const [k, v] of [['grp', r.grp], ['label', r.label], ['pos', r.pos], ['place', r.placement], ['affix', r.affix], ['link', r.affix_gloss], ['cond', r.cond_re], ['strip', r.strip_re], ['year', r.year], ['ord', r.ord], ['newpos', r.new_pos], ['newgloss', r.new_gloss]]) $('#fr_' + k).value = v ?? '';
     $('#fr_hiatus').checked = !!r.hiatus; $('#fr_derive').checked = !!r.new_pos; $('#fr_derivebox').hidden = !r.new_pos; $('#fr_id').value = r.id; $('#fr_btn').textContent = 'Save changes'; $('#fr_cancel').hidden = false; window.scrollTo(0, 0);
   },
   cancelFormRule: async () => { S.prefill = null; renderPanel(); },
