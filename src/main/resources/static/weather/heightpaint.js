@@ -52,6 +52,17 @@
     }
     return lut;
   }
+  /** Marshland cover 0–100 while painting: see-through where dry, then murky olive-teal. */
+  function marshLut() {
+    const lut = new Uint32Array(256);
+    for (let v = 0; v < 256; v++) {
+      const f = Math.min(v, 100) / 100;
+      const r = Math.round(120 - 50 * f), g = Math.round(140 - 20 * f), b = Math.round(70 + 10 * f);
+      const a = v === 0 ? 0 : Math.round(100 + 140 * f);
+      lut[v] = ((a << 24) | (b << 16) | (g << 8) | r) >>> 0;
+    }
+    return lut;
+  }
   function greyLut() {
     const lut = new Uint32Array(256);
     for (let v = 0; v < 256; v++) lut[v] = ((255 << 24) | (v << 16) | (v << 8) | v) >>> 0;
@@ -134,7 +145,7 @@
    * setForestImage). Each keeps its own edits (and undo) while you switch between them.
    */
   P.hpSetTarget = function (t) {
-    t = t === "forest" || t === "ice" ? t : "height";
+    t = t === "forest" || t === "ice" || t === "marsh" ? t : "height";
     if ((this.hpTarget || "height") === t) return;
     this._hpStash = this._hpStash || {};
     this._hpStash[this.hpTarget || "height"] = this.hp;
@@ -144,13 +155,13 @@
     this.draw();
   };
   /** Painting a layer over the map (forest, ice: 0–100) rather than heights. */
-  const isForest = (fm) => fm.hpTarget === "forest" || fm.hpTarget === "ice";
+  const isForest = (fm) => fm.hpTarget === "forest" || fm.hpTarget === "ice" || fm.hpTarget === "marsh";
   /** Sea level for the painter's tools (none while painting forest or ice). */
   P._hpSea = function (dflt) { return !isForest(this) && this.seaLevel != null ? this.seaLevel : dflt; };
   /** Start editing: full-size copy of the current height map (or forest map), or a new flat one. */
   P.hpOpen = function (fallbackW) {
     if (this.hp && this.hp.data) return true;
-    const src = this.hpTarget === "ice" ? this.iceSource : isForest(this) ? this.forestSource : this.heightSource;
+    const src = this.hpTarget === "ice" ? this.iceSource : this.hpTarget === "marsh" ? this.marshSource : isForest(this) ? this.forestSource : this.heightSource;
     if (!src && isForest(this)) {             // no forest (ice) yet: none anywhere
       const w = Math.min(this.imgW || 4096, MAX_W), h = Math.max(1, Math.round(w * this.imgH / this.imgW));
       this._hpInit(new Uint8Array(w * h), w, h);
@@ -229,7 +240,7 @@
     const E = this.hp;
     if (!E) return;
     const S = this.hpSettings();
-    E.lut = S.view === "grey" ? greyLut() : this.hpTarget === "ice" ? iceLut() : isForest(this) ? forestLut() : colourLut(this.seaLevel != null ? this.seaLevel : 0);
+    E.lut = S.view === "grey" ? greyLut() : this.hpTarget === "ice" ? iceLut() : this.hpTarget === "marsh" ? marshLut() : isForest(this) ? forestLut() : colourLut(this.seaLevel != null ? this.seaLevel : 0);
     this._hpPaintRect(E.view, E.lut, 0, 0, E.w, E.h);
   };
   P._hpPaintRect = function (cv, lut, x0, y0, x1, y1) {
@@ -244,9 +255,89 @@
     }
     c.putImageData(img, x0, y0);
   };
+  /**
+   * Forest and marshland are never painted on water: a pixel of the painter's map at or below the sea level
+   * of the height map (the one shown; none: no limit) keeps what it had when the stroke began.
+   */
+  /**
+   * The tree line over the painter's map: (x, y) in its pixels → the grey value above which no trees grow, and a
+   * key that changes when it does. At most treeLine metres; with treeTemp on, lower where it is colder: where the
+   * warmest month's mean temperature falls below 10 °C (6.5° colder per km up), from the regions' climate.
+   */
+  const TREE_T = 10, TREE_STEP = 32;
+  P._hpTreeLine = function (G) {
+    const E = this.hp, S = this.hpSettings(), limit = Math.max(0, +S.treeLine || 0);
+    if (!limit) return { key: "none", at: () => Infinity };
+    const flat = G.sea + limit / G.mps, clim = S.treeTemp !== false && this.opts.treeClimate ? this.opts.treeClimate() : null;
+    if (!clim) return { key: "m" + limit, at: () => flat };
+    const key = "t" + limit + ":" + (this._climRev || 0) + ":" + E.w;
+    if (!E.tgrid || E.tgrid.key !== key) {
+      const gw = Math.ceil(E.w / TREE_STEP) + 1, gh = Math.ceil(E.h / TREE_STEP) + 1, d = new Float32Array(gw * gh);
+      for (let j = 0; j < gh; j++) for (let i = 0; i < gw; i++) {
+        const c = clim(Math.min(1, i * TREE_STEP / E.w), Math.min(1, j * TREE_STEP / E.h));
+        d[j * gw + i] = c ? Math.min(limit, (c.warm - TREE_T) / 6.5 * 1000) : limit;      // metres above the sea
+      }
+      E.tgrid = { key, gw, gh, d };
+    }
+    const T = E.tgrid;
+    return { key, at: (x, y) => {
+      const fx = x / TREE_STEP, fy = y / TREE_STEP, i = Math.min(T.gw - 2, Math.floor(fx)), j = Math.min(T.gh - 2, Math.floor(fy)), tx = fx - i, ty = fy - j, k = j * T.gw + i;
+      const m = (T.d[k] * (1 - tx) + T.d[k + 1] * tx) * (1 - ty) + (T.d[k + T.gw] * (1 - tx) + T.d[k + T.gw + 1] * tx) * ty;
+      return G.sea + m / G.mps;
+    } };
+  };
+  P._hpWaterMask = function () {
+    const E = this.hp, G = this.heightGrid && this.seaLevel != null ? this.heightGrid() : null;
+    if (!G) return null;
+    // forest also stops at the tree line: ground above treeLine metres is blocked too (0: no limit)
+    const TL = E.target === "forest" ? this._hpTreeLine(G) : { key: "none", at: () => Infinity };
+    const key = G.key + ":" + G.sea + ":" + TL.key;
+    if (E.water && E.waterKey === key) return E.water;
+    const m = new Uint8Array(E.w * E.h);
+    for (let y = 0; y < E.h; y++) {
+      const gy = Math.min(G.h - 1, Math.floor((y + 0.5) * G.h / E.h)), r = gy * G.w;
+      for (let x = 0; x < E.w; x++) { const v = G.d[r + Math.min(G.w - 1, Math.floor((x + 0.5) * G.w / E.w))]; m[y * E.w + x] = v <= G.sea || v > TL.at(x, y) ? 1 : 0; }
+    }
+    E.water = m; E.waterKey = key;
+    return m;
+  };
+  /** Takes away the forest above the tree line (one undoable step); returns how many pixels. */
+  P.hpClearAboveTreeLine = function () {
+    const E = this.hp;
+    if (!E || E.target !== "forest") return 0;
+    const m = this._hpWaterMask(), G = this.heightGrid();
+    if (!m || !G) return 0;
+    const lim = Math.max(0, +this.hpSettings().treeLine || 0);
+    if (!lim) return 0;
+    const TL = this._hpTreeLine(G);
+    this._hpBegin();
+    let n = 0;
+    for (let y = 0; y < E.h; y++) {
+      const gy = Math.min(G.h - 1, Math.floor((y + 0.5) * G.h / E.h)), r = gy * G.w;
+      for (let x = 0; x < E.w; x++) {
+        const i = y * E.w + x;
+        if (E.data[i] && G.d[r + Math.min(G.w - 1, Math.floor((x + 0.5) * G.w / E.w))] > TL.at(x, y)) { E.data[i] = 0; n++; }
+      }
+    }
+    this._hpNoKeep = true;
+    if (n) this._hpRefresh(0, 0, E.w, E.h);
+    this._hpNoKeep = false;
+    this._hpEnd();
+    this.draw();
+    return n;
+  };
+  P._hpKeepDry = function (x0, y0, x1, y1) {
+    const E = this.hp, m = this._hpWaterMask();
+    if (!m || !E.before) return;
+    for (let y = Math.max(0, y0); y < Math.min(E.h, y1); y++) for (let x = Math.max(0, x0); x < Math.min(E.w, x1); x++) {
+      const i = y * E.w + x;
+      if (m[i]) E.data[i] = E.before[i];
+    }
+  };
   P._hpRefresh = function (x0, y0, x1, y1) {
     const E = this.hp;
     x0 = Math.floor(x0); y0 = Math.floor(y0); x1 = Math.ceil(x1); y1 = Math.ceil(y1);
+    if (E.bbox && !this._hpNoKeep && (E.target === "forest" || E.target === "marsh")) this._hpKeepDry(x0, y0, x1, y1);
     this._hpPaintRect(E.view, E.lut, x0, y0, x1, y1);
     this._hpPaintRect(E.grey, this._greyLut || (this._greyLut = greyLut()), x0, y0, x1, y1);
     const b = E.bbox;
@@ -406,6 +497,7 @@
     if (!this.hp) return;
     if (this.hp.target === "forest") this.setForestImage(this.hp.grey);
     else if (this.hp.target === "ice") this.setIceImage(this.hp.grey);
+    else if (this.hp.target === "marsh") this.setMarshImage(this.hp.grey);
     else this.setHeightImage(this.hp.grey);
   };
 
@@ -953,6 +1045,31 @@
   };
 
   // ── drawing: the height map over the map, the polygon being drawn, the brush outline ──
+  /** The tree line as a see-through picture: the ground above it tinted red, its edge (the tree line itself) strong red. */
+  P._hpTreeLineCanvas = function () {
+    const E = this.hp, S = this.hpSettings(), G = this.heightGrid && this.seaLevel != null ? this.heightGrid() : null;
+    const limit = Math.max(0, +S.treeLine || 0);
+    if (!E || !G || !limit) return null;
+    const TL = this._hpTreeLine(G), key = G.key + ":" + G.sea + ":" + TL.key;
+    if (E.tl && E.tl.key === key) return E.tl.canvas;
+    const w = E.w, h = E.h, up = new Uint8Array(w * h);
+    for (let y = 0; y < h; y++) {
+      const r = Math.min(G.h - 1, Math.floor((y + 0.5) * G.h / h)) * G.w;
+      for (let x = 0; x < w; x++) { const v = G.d[r + Math.min(G.w - 1, Math.floor((x + 0.5) * G.w / w))]; if (v > G.sea && v > TL.at(x, y)) up[y * w + x] = 1; }
+    }
+    const cv = document.createElement("canvas"); cv.width = w; cv.height = h;
+    const c = cv.getContext("2d"), img = c.createImageData(w, h), out = new Uint32Array(img.data.buffer);
+    const FILL = ((90 << 24) | (50 << 16) | (50 << 8) | 235) >>> 0, EDGE = ((255 << 24) | (20 << 16) | (20 << 8) | 255) >>> 0;
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+      const i = y * w + x;
+      if (!up[i]) continue;
+      const edge = x === 0 || y === 0 || x === w - 1 || y === h - 1 || !up[i - 1] || !up[i + 1] || !up[i - w] || !up[i + w];
+      out[i] = edge ? EDGE : FILL;
+    }
+    c.putImageData(img, 0, 0);
+    E.tl = { key, canvas: cv };
+    return cv;
+  };
   P._hpDraw = function () {
     const E = this.hp;
     if (!E) return;
@@ -962,6 +1079,10 @@
     ctx.imageSmoothingEnabled = s * this.imgW / E.w < 8;   // smooth; single pixels show only when zoomed far in
     ctx.drawImage(E.view, ox, oy, this.imgW * s, this.imgH * s);
     ctx.restore();
+    if (S.showTreeLine && E.target === "forest") {
+      const tl = this._hpTreeLineCanvas();
+      if (tl) { ctx.save(); ctx.imageSmoothingEnabled = false; ctx.drawImage(tl, ox, oy, this.imgW * s, this.imgH * s); ctx.restore(); }
+    }
     if (E.poly.length && S.tool === "coast") {
       // coast: each pair as an arrow from inland (green) to the coast (blue); joined pairs outlined
       ctx.save();
@@ -1207,6 +1328,25 @@
     }
     c.putImageData(img, 0, 0);
     this._iview = { src, canvas: cv, any };
+    return cv;
+  };
+  /** The marshland map in colours for the "Sumpmark" layer: transparent where dry, murky olive where marshy. */
+  P.marshColours = function () {
+    const src = this.marshSource;
+    if (!src) return null;
+    const V = this._mview;
+    if (V && V.src === src && !V.stale) return V.canvas;
+    const w = Math.min(src.naturalWidth || src.width, MAX_W), h = Math.max(1, Math.round(w * this.imgH / this.imgW));
+    const cv = document.createElement("canvas"); cv.width = w; cv.height = h;
+    const c = cv.getContext("2d", { willReadFrequently: true });
+    c.drawImage(src, 0, 0, w, h);
+    const img = c.getImageData(0, 0, w, h), px = img.data;
+    for (let i = 0; i < w * h; i++) {
+      const f = Math.min(px[i * 4], 100) / 100;
+      px[i * 4] = 84; px[i * 4 + 1] = 112; px[i * 4 + 2] = 78; px[i * 4 + 3] = Math.round(225 * Math.sqrt(f));
+    }
+    c.putImageData(img, 0, 0);
+    this._mview = { src, canvas: cv };
     return cv;
   };
   /** The forest map in colours for the "Skog" layer: transparent without trees, dark green where dense. */

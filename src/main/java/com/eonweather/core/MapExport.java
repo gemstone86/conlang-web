@@ -23,6 +23,7 @@ import java.util.zip.ZipOutputStream;
  * forest.png             the forest map (0 = no trees … 100 = trees everywhere), if it differs
  * ice.png                the ice map (0 = no ice … 100 = all ice), if it differs
  * roads.json             the roads and paths, if they differ
+ * cities.json            the cities (name, population, harbour, place), if they differ
  * map.jpg / map.png …    the map picture, if it differs
  * regions/&lt;name&gt;.yaml   each region made or changed in the app
  * </pre>
@@ -62,7 +63,7 @@ final class MapExport {
         o.put("height", g.h());
         long n = 0;
         for (byte v : g.data()) if (v != 0) n++;
-        o.put(name.equals("forest") ? "forestedPixels" : "coveredPixels", n);
+        o.put(name.equals("forest") ? "forestedPixels" : name.equals("marsh") ? "marshyPixels" : "coveredPixels", n);
         changes.put(name, o);
     }
 
@@ -153,6 +154,7 @@ final class MapExport {
         // ── forests and ice (greyscale 0–100), the whole image if any pixel differs ──
         paintedPart(files, changes, same, empty, all, summaryOnly, isDefault, "forest", store.forest(mapId), bundle);
         paintedPart(files, changes, same, empty, all, summaryOnly, isDefault, "ice", store.ice(mapId), bundle);
+        paintedPart(files, changes, same, empty, all, summaryOnly, isDefault, "marsh", store.marsh(mapId), bundle);
 
         // ── rivers and nations ──
         String rj = store.rivers(mapId).json(), nj = store.nations(mapId).json();
@@ -166,6 +168,9 @@ final class MapExport {
         String wj = store.roads(mapId).json();
         if (!isDefault && !all && Json.parse(wj) instanceof List<?> l && l.isEmpty()) empty.add("roads");
         else listPart(files, changes, same, all, "roads", wj, bundle, Api::checkRoads);
+        String cj = store.cities(mapId).json();
+        if (!isDefault && !all && Json.parse(cj) instanceof List<?> l && l.isEmpty()) empty.add("cities");
+        else listPart(files, changes, same, all, "cities", cj, bundle, Api::checkCities);
 
         // ── region positions, leylines, high-magic areas: in export.json, as in map.json ──
         List<Map<String, Object>> anchors = new ArrayList<>();

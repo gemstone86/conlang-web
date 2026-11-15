@@ -114,3 +114,7 @@ button.say.busy { opacity:.5; cursor:progress; }
 table.paradigm td, table.paradigm th { padding:.15rem .5rem; }
 #sg_list li { margin:.2rem 0; }
 #sg_list button { padding:0 .4rem; margin-left:.2rem; }
+
+button.arrow { border:0; background:none; padding:0 .2rem; cursor:pointer; font-size:.9rem; line-height:1; color:#555; }
+tr.subrow td { background:#fafafa; font-size:.92em; }
+tr.subrow td:first-child { padding-left:1.4rem; }

@@ -19,8 +19,10 @@ public class DictService {
     private final Access access;
     private final Store store;
     private final EvolverFactory evolvers;
+    private final FormGenerator formGen;
 
-    public DictService(Db db, Access access, Store store, EvolverFactory evolvers) {
+    public DictService(Db db, Access access, Store store, EvolverFactory evolvers, FormGenerator formGen) {
+        this.formGen = formGen;
         this.db = db;
         this.access = access;
         this.store = store;
@@ -247,6 +249,10 @@ public class DictService {
         // only these languages are shown: the way down from the ancestors, this one and its branches
         Set<Long> needed = new HashSet<>(fullPath);
         needed.addAll(branchSet);
+        List<Integer> reforms = FormMath.years((String) lang.get("spelling_years"));
+        Integer lastReform = reforms.isEmpty() ? null : reforms.get(reforms.size() - 1);
+        List<Long> nearestFirst = new ArrayList<>(fullPath);
+        java.util.Collections.reverse(nearestFirst);
         List<Map<String, Object>> out = new ArrayList<>();
         Map<Long, Map<String, Object>> late = new HashMap<>();   // ancestor words coined after this language split off
         for (long src : sources) {
@@ -271,6 +277,7 @@ public class DictService {
             for (Map<String, Object> f : db.rows("select f.* from word_forms f join words w on w.id=f.word_id where w.language_id=? order by f.id", src)) {
                 formsByWord.computeIfAbsent(Db.num(f.get("word_id")), k -> new ArrayList<>()).add(f);
             }
+            FormGenerator.Ctx formCtx = formGen.prepare(src, ev);
             for (Map<String, Object> w : db.rows("select * from words where language_id=? order by lower(gloss), year, id", src)) {
                 long id = Db.num(w.get("id"));
                 String form = (String) w.get("form");
@@ -300,6 +307,12 @@ public class DictService {
                 }
                 Map<String, Object> m = new LinkedHashMap<>(w);
                 m.put("form", shown);
+                if (lastReform != null && !Evolver.isLiteral(form)) {
+                    // the spelling lags: as the word sounded at the latest spelling reform (or when coined, if later)
+                    String sp = FormMath.formAt(rows, nearestFirst, lastReform);
+                    Object nowF = latest.get(langName);
+                    if (sp != null && !sp.equals(nowF == null ? shown : nowF.toString())) m.put("spelling", sp);
+                }
                 m.put("inherited", inherited);
                 if (lost != null) m.put("lost_year", lost.year());
                 if (inherited) {
@@ -325,10 +338,17 @@ public class DictService {
                 m.put("meaning", String.join("; ", senses));
                 m.put("meaning_changed", !senses.equals(List.of((String) w.get("gloss"))));
                 List<Map<String, Object>> fs = new ArrayList<>();
-                for (Map<String, Object> f : formsByWord.getOrDefault(id, List.of())) {
+                // the stored forms (irregular or made by hand), then the ones the rules give, worked out here
+                List<Map<String, Object>> all = new ArrayList<>(formsByWord.getOrDefault(id, List.of()));
+                if (formCtx.hasRules()) {
+                    Set<String> have = new HashSet<>();
+                    for (Map<String, Object> f : all) have.add(String.valueOf(f.get("label")).toLowerCase());
+                    all.addAll(formGen.virtualFor(formCtx, w, rows, have));
+                }
+                for (Map<String, Object> f : all) {
                     Map<String, Object> fm = new LinkedHashMap<>(f);
                     int fy = f.get("year") == null ? wyear : ((Number) f.get("year")).intValue();
-                    fm.put("latest", latestPerBranch(ev.evolve(src, (String) f.get("form"), fy, List.of(), needed), branchSet));
+                    fm.put("latest", latestPerBranch(ev.evolve(src, (String) f.get("form"), fy, FormMath.level(f, src), needed), branchSet));
                     fs.add(fm);
                 }
                 m.put("forms", fs);
@@ -368,14 +388,42 @@ public class DictService {
         List<Map<String, Object>> forms = new ArrayList<>();
         Map<String, Object> formOwner = target != null ? target : w;   // a cross-reference shows the forms of the word it points to
         long formLang = Db.num(formOwner.get("language_id"));
+        // what the rules give this word, by form type: to mark the stored ones and to add the ones not stored
+        Map<String, Map<String, Object>> byRule = new LinkedHashMap<>();
+        for (Map<String, Object> d : formGen.describe(formLang, formOwner, ev)) byRule.put(String.valueOf(d.get("label")).toLowerCase(), d);
         for (Map<String, Object> f : db.rows("select * from word_forms where word_id=? order by id", Db.num(formOwner.get("id")))) {
             Map<String, Object> fm = new LinkedHashMap<>(f);
             int fy = f.get("year") == null ? ((Number) formOwner.get("year")).intValue() : ((Number) f.get("year")).intValue();
-            fm.put("history", historyMaps(ev.evolve(formLang, (String) f.get("form"), fy, List.of())));
+            Map<String, Object> d = byRule.remove(String.valueOf(f.get("label")).toLowerCase());
+            fm.put("has_rule", d != null);
+            if (d != null) {
+                boolean same = String.valueOf(d.get("form")).equals(f.get("form")) && java.util.Objects.equals(d.get("year"), f.get("year") == null ? null : ((Number) f.get("year")).intValue());
+                fm.put("manual", !same);
+                if (same) fm.put("irregular_year", d.get("irregular_year"));
+            }
+            fm.put("history", historyMaps(ev.evolve(formLang, (String) f.get("form"), fy, FormMath.level(f, formLang))));
+            forms.add(fm);
+        }
+        for (Map<String, Object> d : byRule.values()) {
+            Map<String, Object> fm = new LinkedHashMap<>(d);
+            int fy = d.get("year") == null ? ((Number) formOwner.get("year")).intValue() : ((Number) d.get("year")).intValue();
+            fm.put("has_rule", true);
+            fm.put("history", historyMaps(ev.evolve(formLang, (String) d.get("form"), fy, List.of())));
             forms.add(fm);
         }
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("word", w);
+        // the spelling after each spelling reform of the word's language (how the word sounded then)
+        List<Integer> reforms = FormMath.years((String) lang.get("spelling_years"));
+        if (!reforms.isEmpty() && !Evolver.isLiteral((String) w.get("form"))) {
+            List<Long> pathNear = new ArrayList<>(pathRootFirst(langId, langsOf(Db.num(lang.get("world_id")))));
+            java.util.Collections.reverse(pathNear);
+            List<Map<String, Object>> sp = new ArrayList<>();
+            int wy = ((Number) w.get("year")).intValue();
+            sp.add(Map.of("year", wy, "form", FormMath.formAt(rows, pathNear, wy)));
+            for (int y : reforms) if (y > wy) { String f = FormMath.formAt(rows, pathNear, y); if (f != null && !f.equals(sp.get(sp.size() - 1).get("form"))) sp.add(Map.of("year", y, "form", f)); }
+            out.put("spelling", sp);
+        }
         if (w.get("loan_word_id") != null) {
             Map<String, Object> lw = db.one("select w.gloss, l.name as lname from words w join languages l on l.id=w.language_id where w.id=?", Db.num(w.get("loan_word_id")));
             out.put("loan_from", lw == null ? "a word that no longer exists" : lw.get("lname") + ": " + lw.get("gloss"));
@@ -430,6 +478,7 @@ public class DictService {
         long worldId = Db.num(lang.get("world_id"));
         Evolver base = evolverFor(worldId, null), with = evolverFor(worldId, extra);
         List<Map<String, Object>> changes = new ArrayList<>();
+        Map<String, Map<String, List<String[]>>> afterBy = new LinkedHashMap<>();   // branch → form with the rule → [gloss, form without it]
         int affected = 0;
         List<Long> sources = new ArrayList<>();
         sources.add(langId);
@@ -443,6 +492,9 @@ public class DictService {
             Map<String, Object> a = latestPerBranch(base.evolve(srcLang, (String) w.get("form"), yr, overridesOf(id)));
             Map<String, Object> b = latestPerBranch(with.evolve(srcLang, (String) w.get("form"), yr, overridesOf(id)));
             boolean any = false;
+            if (!Evolver.isLiteral((String) w.get("form"))) for (String k : b.keySet())
+                afterBy.computeIfAbsent(k, x -> new HashMap<>()).computeIfAbsent(String.valueOf(b.get(k)), x -> new ArrayList<>())
+                        .add(new String[] { String.valueOf(w.get("gloss")), String.valueOf(a.get(k)) });
             for (String k : b.keySet()) {
                 if (!b.get(k).equals(a.get(k))) {
                     any = true;
@@ -458,7 +510,24 @@ public class DictService {
             }
             if (any) affected++;
         }
-        return Map.of("wordsAffected", affected, "changes", changes);
+        // words that would come to sound the same (in a branch) though they don't now
+        List<Map<String, Object>> collisions = new ArrayList<>();
+        for (Map.Entry<String, Map<String, List<String[]>>> br : afterBy.entrySet()) {
+            for (Map.Entry<String, List<String[]>> g : br.getValue().entrySet()) {
+                if (g.getValue().size() < 2 || collisions.size() >= 100) continue;
+                Set<String> before = new HashSet<>();
+                for (String[] x : g.getValue()) before.add(x[1]);
+                if (before.size() < 2) continue;                          // they already sounded the same
+                Map<String, Object> m = new LinkedHashMap<>();
+                m.put("branch", br.getKey());
+                m.put("form", g.getKey());
+                List<String> ws = new ArrayList<>();
+                for (String[] x : g.getValue()) ws.add(x[0] + " (" + x[1] + ")");
+                m.put("words", ws);
+                collisions.add(m);
+            }
+        }
+        return Map.of("wordsAffected", affected, "changes", changes, "collisions", collisions);
     }
 
     /** Which languages this one inherits from, and whatever stops their words from reaching it. */
