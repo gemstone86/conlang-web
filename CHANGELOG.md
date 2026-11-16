@@ -2,6 +2,10 @@
 
 Newest first. Versions from 1.x on are the combined app (Root and Rune + Weather generator).
 
+## v1.29.1 (combined app)
+Root and Rune:
+- **Slower speech by default.** The speech engine's default speed goes from 140 to 105 words a minute. A language that has its own speed set (*Settings → Speech → Speed*, 60–400) keeps it; an empty field uses the default, or the parent language's speed.
+
 ## v1.29.0 (combined app)
 Root and Rune:
 - **Edit a word in the word window.** Clicking a word now has an edit row just above the forms table (gloss, type, build, form, year, notes, tags and *Save word*), so a word can be changed and checked in the same place. Only what was changed is saved, through the same edit as the dictionary's, so it is in the edit log and can be undone.

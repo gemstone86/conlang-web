@@ -13,7 +13,7 @@
     ['fi', 'Finnish: clear, even vowels (good default)'], ['qya', 'Quenya'], ['sjn', 'Sindarin'], ['la', 'Latin'],
     ['en', 'English'], ['de', 'German'], ['fr', 'French'], ['es', 'Spanish'], ['it', 'Italian'], ['sv', 'Swedish'],
     ['pl', 'Polish'], ['ru', 'Russian'], ['eo', 'Esperanto'], ['cy', 'Welsh']];
-  const DEFAULT = { voice: 'fi', stress: 'first', speed: 140 };
+  const DEFAULT = { voice: 'fi', stress: 'first', speed: 105 };
   // When a voice has no sound for a symbol, try these (nearest first).
   const FALLBACK = {
     'ɢ': ['g'], 'ɴ': ['ŋ', 'n'], 'ɱ': ['m'], 'ɳ': ['n'], 'ɲ': ['nj', 'n'], 'ɽ': ['ɾ', 'r'], 'ɸ': ['f'], 'ħ': ['h', 'x'], 'ʕ': ['ɣ', 'h'],
