@@ -2,6 +2,10 @@
 
 Newest first. Versions from 1.x on are the combined app (Root and Rune + Weather generator).
 
+## v1.29.3 (combined app)
+Weather generator:
+- **The Asharien & Damarien layer moved a little to the left.** Fitted against the first Mundana map it sat about 1.3 map pixels (10 full-size pixels) too far to the right; the scale was right. It is moved 10 full-size pixels left with `tools/move-layer-piece.py`. The fit also suggests it could go about one map pixel north; that is left as it is.
+
 ## v1.29.2 (combined app)
 Weather generator:
 - **Caserion fits the map better.** The Caserion part of the layer *Gordrion, Vambolien & Caserion* was drawn about 4 % smaller than the first Mundana map and sat a few pixels too far south, which is why the south fitted and the north drifted. It is now scaled up 4 % (the north and south halves gave the same scale when fitted) and moved so that its north edge is about 5 map pixels further north; the place names now fall on the first map's. New tool `tools/scale-layer-piece.py` (like `move-layer-piece.py`, with a scale).
