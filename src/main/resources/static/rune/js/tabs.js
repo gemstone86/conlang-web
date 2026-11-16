@@ -17,6 +17,7 @@ async function renderPanel() {
   let h = `<h2>${esc(l.name)} <span class="badge">${LEVELS[l.level]}</span>${l.is_public ? ' <span class="badge public">public</span>' : ''}${l.owner_name && l.level < 3 ? ` <span class="small muted">by ${esc(l.owner_name)}</span>` : ''}</h2>
   ${publishRow(l)}
   <div class="row">${canEdit() ? '<button data-act="undo">↶ Undo</button><button data-act="redo">↷ Redo</button>' : ''}
+  <button data-act="copyLink" title="Copy a link that opens this language (people need access to it: it is public, or shared with them)">🔗 Copy link</button>
   <a href="/rune/api/languages/${l.id}/export.xlsx"><button>Export Excel</button></a></div><div class="tabs">` +
     TABS.filter(t => (isOwner() || !['share', 'settings'].includes(t[0])) && (S.me || !['changes', 'log'].includes(t[0])) && (canEdit() || !['bulk', 'compound'].includes(t[0]))).map(t => `<button data-act="tab" data-t="${t[0]}" class="${S.tab === t[0] ? 'on' : ''}">${t[1]}</button>`).join('') +
     '</div><div id="tabbody">Loading…</div>';

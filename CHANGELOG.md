@@ -2,6 +2,10 @@
 
 Newest first. Versions from 1.x on are the combined app (Root and Rune + Weather generator).
 
+## v1.30.0 (combined app)
+Root and Rune:
+- **Link to a language.** A *Copy link* button next to *Export Excel* copies a link (`/rune/?lang=…`) that opens that language. A public language opens for anyone; a private one opens for the people it is shared with. Someone who is not logged in and follows a link to a language they cannot see is sent to log in and then brought back to the same link.
+
 ## v1.29.3 (combined app)
 Weather generator:
 - **The Asharien & Damarien layer moved a little to the left.** Fitted against the first Mundana map it sat about 1.3 map pixels (10 full-size pixels) too far to the right; the scale was right. It is moved 10 full-size pixels left with `tools/move-layer-piece.py`. The fit also suggests it could go about one map pixel north; that is left as it is.

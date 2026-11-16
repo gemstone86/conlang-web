@@ -95,6 +95,8 @@ async function boot() {
   if (lid) {
     const l = S.worlds.flatMap(w => w.languages).find(x => x.id === lid);
     if (l) { S.lang = l; const t = q.get('tab'); if (t && TAB[t]) S.tab = t; }
+    // not logged in and the language is not public: log in first, and come back to the same link
+    if (!l && !S.me) { location.href = '/?next=' + encodeURIComponent(location.pathname + location.search); return; }
     history.replaceState(null, '', location.pathname);
     render();
     if (!l) say('That language was not found, or you can no longer see it.', true);

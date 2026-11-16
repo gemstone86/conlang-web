@@ -154,6 +154,11 @@ const A = {
     S.connectorNew = await api('POST', '/rune/api/admin/connector-keys', { username: val('cn_user'), label: val('cn_label') });
     await connectorPage();
   },
+  copyLink: async () => {
+    const url = location.origin + '/rune/?lang=' + S.lang.id;
+    try { await navigator.clipboard.writeText(url); say('Link copied. ' + (S.lang.is_public ? 'The language is public, so anyone can open it.' : 'Only people it is shared with can open it.')); }
+    catch (e) { window.prompt('Copy this link:', url); }
+  },
   connectorCopy: async () => { const i = $('#cn_url'); i.select(); try { await navigator.clipboard.writeText(i.value); say('Copied.'); } catch (e) { document.execCommand('copy'); say('Copied.'); } },
   connectorRevoke: async d => {
     if (!confirm('Revoke connector address #' + d.id + '? Claude can no longer use it.')) return;
