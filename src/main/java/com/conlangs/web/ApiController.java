@@ -510,6 +510,40 @@ public class ApiController {
                 + "where f.language_id=? order by f.ord, f.id", id);
     }
 
+    /**
+     * Moves a form rule one place up or down among the rules of its group, as the Word forms tab shows them. This is only
+     * how they are displayed (form_rules.show_ord): which rule is used for a word goes by the rules' own order, which is
+     * not touched. Editors and owners.
+     */
+    @PostMapping("/languages/{id}/formrules/move")
+    public Map<String, Object> moveFormRule(@PathVariable long id, @RequestBody Map<String, Object> b, HttpSession s) {
+        long uidM = auth.requireUid(s);
+        access.need(uidM, id, Access.EDITOR);
+        if (!(b.get("id") instanceof Number rid)) throw new ApiException(400, "id is needed.");
+        String dir = str(b, "dir");
+        if (!"up".equals(dir) && !"down".equals(dir)) throw new ApiException(400, "dir must be up or down.");
+        List<Map<String, Object>> all = db.rows("select id, grp, ord, show_ord from form_rules where language_id=? order by ord, id", id);
+        Map<String, Object> me = null;
+        for (Map<String, Object> r : all) if (Db.num(r.get("id")) == rid.longValue()) me = r;
+        if (me == null) throw new ApiException(404, "No such form rule in this language.");
+        String grp = me.get("grp") == null ? "" : me.get("grp").toString().trim();
+        List<Map<String, Object>> group = new ArrayList<>();
+        for (Map<String, Object> r : all) if ((r.get("grp") == null ? "" : r.get("grp").toString().trim()).equals(grp)) group.add(r);
+        // the order as shown: the ones moved before (show_ord) first, the others after them in their own order
+        group.sort((x, y) -> {
+            long a = x.get("show_ord") == null ? Long.MAX_VALUE : Db.num(x.get("show_ord")), c = y.get("show_ord") == null ? Long.MAX_VALUE : Db.num(y.get("show_ord"));
+            return a != c ? Long.compare(a, c) : 0;   // equal keys: the stable sort keeps the rules' own order
+        });
+        int at = group.indexOf(me), to = "up".equals(dir) ? at - 1 : at + 1;
+        if (to >= 0 && to < group.size()) {
+            group.remove(at);
+            group.add(to, me);
+        }
+        for (int i = 0; i < group.size(); i++) db.update("update form_rules set show_ord=? where id=?", i, Db.num(group.get(i).get("id")));
+        applog.info("edit", uidM, "Moved form rule #" + rid.longValue() + " " + dir + " in its group, in language #" + id + " (display only)");
+        return Map.of("ok", true);
+    }
+
     /** Words of this language and its ancestors (for picking a dictionary word as an affix). */
     @GetMapping("/languages/{id}/wordnames")
     public List<Map<String, Object>> wordNames(@PathVariable long id, HttpSession s) {

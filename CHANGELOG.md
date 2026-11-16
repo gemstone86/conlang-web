@@ -2,6 +2,12 @@
 
 Newest first. Versions from 1.x on are the combined app (Root and Rune + Weather generator).
 
+## v1.29.0 (combined app)
+Root and Rune:
+- **Edit a word in the word window.** Clicking a word now has an edit row just above the forms table (gloss, type, build, form, year, notes, tags and *Save word*), so a word can be changed and checked in the same place. Only what was changed is saved, through the same edit as the dictionary's, so it is in the edit log and can be undone.
+- **Evolution tree: changes close together no longer overlap.** The tree places each change by order, not by year: changes in different years get their own column even when the years are one apart, several changes in the same year are put side by side, and a column is as wide as the form and the rule name written in it needs. Branches still line up by year.
+- **Sort a group's rules in Word forms.** Each rule in a group has ▲/▼ buttons (editors and owners) that move it one place up or down within the group, to make the list easier to read. This is only how the rules are shown (new column `form_rules.show_ord`): which rule is used for a word, the *Order* column and the forms that are built are not touched.
+
 ## v1.28.0 (combined app)
 Root and Rune:
 - **Form rules can take the word's old ending off first.** A new optional field on a form rule, *first remove from the end of the word* (a pattern written like a sound change's, e.g. `(aną|ōną|ą|az)$`), is applied to the word before the ending is added (from the start of the word for a prefix). Before, the ending was glued on the whole dictionary form, so the word's old ending sat in the middle of the new form (*ēþmijanąida*), where the sound changes that remove it from the end of a word (`ną$`, `ą$`, `z$` …) could no longer match; the plain dictionary form went through them, the built forms did not. With the pattern: *ēþmijaną* + *-ida* → *ēþmijida*, *atganganą* + *-ida* → *atgangida*, *þeudą* + *-az* → *þeudaz*, at any start year (no need to set the rule's year after the ending-loss rules).

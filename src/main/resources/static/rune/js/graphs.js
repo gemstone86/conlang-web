@@ -42,11 +42,30 @@ function wordTree(hist) {
   };
   walk(rootId);
   const yrs = [...new Set([...by.values()].flatMap(v => v.rows.map(r => r.year)))].sort((a, b) => a - b);
-  const COL = 104, ROW = 66, GUT = 120, X = y => GUT + 40 + yrs.indexOf(y) * COL, Y = id => 36 + lane.get(id) * ROW;
-  const W = GUT + 80 + yrs.length * COL, H = 56 + lane.size * ROW, maxX = X(yrs[yrs.length - 1]);
+  // Every change gets a column: the years in order, and where one language changes the word twice in the same year (two
+  // sound changes at once) the second goes in the next column, so they do not sit on top of each other. A column is as
+  // wide as the longest form or rule name in it needs, so neighbouring forms do not run into each other either.
+  const textW = (t, px) => String(t || '').length * px;
+  const slotOf = new Map(), slots = [];                       // row -> its column; columns: {year, w}
+  for (const y of yrs) {
+    const first = slots.length, per = new Map();
+    for (const id of order) for (const r of by.get(id).rows) {
+      if (r.year !== y) continue;
+      const k = per.get(id) || 0; per.set(id, k + 1);
+      while (slots.length <= first + k) slots.push({ year: y, w: 104 });
+      const lab = r.source === 'RULE' ? r.rule : r.source === 'SPLIT' ? 'split' : r.source === 'OVERRIDE' ? 'locked' : 'coined';
+      const sl = slots[first + k];
+      sl.w = Math.max(sl.w, textW(r.form, 8.2) + 18, textW(String(lab || '').slice(0, 16), 5.6) + 18);
+      slotOf.set(r, first + k);
+    }
+  }
+  const GUT = 120, ROW = 66, left = GUT + 40 - slots[0].w / 2;
+  const centre = []; { let acc = left; for (const sl of slots) { centre.push(acc + sl.w / 2); acc += sl.w; } }
+  const X = r => centre[slotOf.get(r)], Y = id => 36 + lane.get(id) * ROW;
+  const W = Math.ceil(centre[centre.length - 1] + slots[slots.length - 1].w / 2 + 40), H = 56 + lane.size * ROW, maxX = centre[centre.length - 1];
   let g = '';
   for (const id of order) {
-    const v = by.get(id), y = Y(id), xs = X(v.rows[0].year);
+    const v = by.get(id), y = Y(id), xs = X(v.rows[0]);
     g += svgText(6, y + 4, v.name, { size: 12, fill: 'currentColor' });
     g += `<line x1="${xs}" x2="${maxX}" y1="${y}" y2="${y}" stroke="#8886" stroke-width="2" />`;
     const p = parentOf(id);
@@ -55,7 +74,7 @@ function wordTree(hist) {
   for (const id of order) {
     const y = Y(id);
     for (const r of by.get(id).rows) {
-      const x = X(r.year), fill = r.source === 'SPLIT' ? '#fff' : r.source === 'OVERRIDE' ? '#d9822b' : r.source === 'ENTRY' ? '#2e8b57' : '#2a6fdb';
+      const x = X(r), fill = r.source === 'SPLIT' ? '#fff' : r.source === 'OVERRIDE' ? '#d9822b' : r.source === 'ENTRY' ? '#2e8b57' : '#2a6fdb';
       g += `<circle cx="${x}" cy="${y}" r="5" fill="${fill}" stroke="#2a6fdb" stroke-width="2"><title>${esc(r.lang)} ${r.year}: ${esc(r.form)} (${esc(r.source.toLowerCase())}${r.rule ? ': ' + esc(r.rule) : ''})</title></circle>`;
       g += svgText(x, y - 11, r.form, { anchor: 'middle', size: 13, mono: true });
       const lab = r.source === 'RULE' ? r.rule : r.source === 'SPLIT' ? 'split' : r.source === 'OVERRIDE' ? 'locked' : 'coined';
@@ -159,18 +178,26 @@ function typeSection(r, w) {
   return `<div class="small" id="w_type"><h3>Type</h3><p><span class="badge">${esc(w.pos)}</span></p>${why.map(x => '<p class="small">' + x + '</p>').join('')}</div>`;
 }
 
+// the word's own fields, edited in the word window: just above its forms, so a change is checked where it is made
+function wordEditRow(w, r) {
+  const plainForm = !r.ref && !r.loan_from;   // a cross-reference or a borrowed word has no form of its own to type
+  const f = (id, v, ph, size, cls) => `<input id="we_${id}" value="${esc(v ?? '')}" placeholder="${ph}" size="${size}" ${cls ? `class="${cls}"` : ''} data-weid="${id}">`;
+  return `<div class="row wordedit" id="w_editrow" title="Change the word here; the forms below and the evolution tree follow">${f('gloss', w.gloss, 'gloss', 14)}${f('pos', w.pos, 'type', 8)}${f('build', w.build, 'build', 8)}
+    ${plainForm ? f('form', w.form, 'form', 14, 'form') : ''}<input id="we_year" type="number" value="${w.year ?? ''}" placeholder="year" size="6" data-weid="year">${f('notes', w.notes, 'notes', 20)}${f('tags', w.tags, 'tags', 14)}
+    <button class="primary" data-act="saveWordHere" data-id="${w.id}">Save word</button></div>`;
+}
 async function showWord() {
   const r = await api('GET', '/rune/api/words/' + S.openId + '/history');
   r.forms = r.forms || [];
   r.overrides = r.overrides || [];
   const w = r.word;
-  S.openLang = w.language_id; S.openWordYear = w.year;
+  S.openLang = w.language_id; S.openWordYear = w.year; S.openWordData = w;
   const ownLang = (S.worlds || []).flatMap(x => x.languages || []).find(l => l.id === w.language_id);
   const ce = w.language_id === (S.lang && S.lang.id) ? canSuggest() : !!(ownLang && (ownLang.level >= 2 || (S.me && ownLang.can_suggest)));
   const langs = [...new Map(r.history.map(x => [x.lang_id, x.lang])).entries()];
   let h = `<button class="modalx" data-act="closeModal">✕</button><h2>${esc(w.gloss)} <span class="badge">#${w.id}</span> <span class="badge">${esc(w.pos)}</span> <span class="badge">${esc(w.build)}</span></h2>
     <p class="muted small">${S.lang && w.language_id !== S.lang.id ? 'Coined in another language; ' + esc(S.lang.name) + "'s own version is shown in the branch table below. " : ''}Coined ${w.year}${r.loan_from ? ' · borrowed from <strong>' + esc(r.loan_from) + '</strong>' : ''}${w.notes ? ' · ' + esc(w.notes) : ''}</p>
-    <h3>Forms</h3><table><tr><th>Type</th><th>Entered</th><th>Latest per branch</th><th></th></tr>
+    <h3>Forms</h3>${ce ? wordEditRow(w, r) : ''}<table><tr><th>Type</th><th>Entered</th><th>Latest per branch</th><th></th></tr>
     <tr><td>word</td><td class="form">${r.ref ? `reference to <strong>${esc(r.ref.gloss)}</strong> <span class="muted small">(#${r.ref.id}, ${w.year})</span>` : ''}${r.ref ? '' : ce ? `<a data-act="editWordForm" data-id="${w.id}" data-form="${esc(w.form)}" style="cursor:pointer" title="Click to edit">${esc(w.form)}</a>` : esc(w.form)}${r.ref ? '' : ` <span class="muted small">(${w.year})</span>`}</td><td>${lines(lastPerLang(r.history))}</td>
     <td>${ce ? (r.ref ? `<button data-act="popupEdit" data-id="${w.id}">Edit</button>` : `<button data-act="editWordForm" data-id="${w.id}" data-form="${esc(w.form)}">Edit</button>`) : ''}</td></tr>`;
   if (r.spelling && r.spelling.length > 1) h += `<tr><td>spelling</td><td colspan="3" class="small">${r.spelling.map(x => `<span class="form">${esc(x.form)}</span> <span class="muted">(from ${x.year})</span>`).join(' → ')}</td></tr>`;
