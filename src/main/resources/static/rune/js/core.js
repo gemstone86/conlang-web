@@ -99,7 +99,15 @@ async function boot() {
     if (!l && !S.me) { location.href = '/?next=' + encodeURIComponent(location.pathname + location.search); return; }
     history.replaceState(null, '', location.pathname);
     render();
-    if (!l) say('That language was not found, or you can no longer see it.', true);
+    if (!l) {
+      // logged in but no access: ask the owner (they approve it on their Sharing tab)
+      try {
+        const r = await api('POST', '/rune/api/languages/' + lid + '/access-request');
+        say(r.status === 'requested' ? 'You do not have access to that language yet. A request has been sent to its owner; you get a notification when they answer.'
+          : r.status === 'already' ? 'You have already asked for access to that language. It waits for its owner to answer.'
+          : 'That language is open to you; reload the page.', r.status === 'has');
+      } catch (e) { say(e.message, true); }
+    }
     return;
   }
   render();

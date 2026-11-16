@@ -2,6 +2,12 @@
 
 Newest first. Versions from 1.x on are the combined app (Root and Rune + Weather generator).
 
+## v1.31.0 (combined app)
+Root and Rune:
+- **Ask for access with a link.** Someone who is logged in and opens a link to a language they cannot see (`/rune/?lang=…`) now sends a request to the language's owner (and the world's owner) instead of just being told it was not found. The owner gets a notification under the bell, and on the language's *Sharing* tab a box *Asking for access* lists the requests with *Let in as viewer*, *as editor* and *Deny*; letting someone in shares the language with them like the usual sharing does (they get a notification), and a *Deny* tells them no. One open request per person and language, at most 20 open per person.
+- **No account yet.** A visitor who is not logged in is sent to the log-in page with a note that the language is not public and that they can log in to ask for access, or create an account first, and is brought back to the link afterwards, which then sends the request. Only people with an account can ask, so only they can be let in.
+- New table `access_requests`; test `AccessRequestTest`.
+
 ## v1.30.0 (combined app)
 Root and Rune:
 - **Link to a language.** A *Copy link* button next to *Export Excel* copies a link (`/rune/?lang=…`) that opens that language. A public language opens for anyone; a private one opens for the people it is shared with. Someone who is not logged in and follows a link to a language they cannot see is sent to log in and then brought back to the same link.

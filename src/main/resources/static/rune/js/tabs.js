@@ -306,10 +306,12 @@ const TAB = {
   },
   async share() {
     const l = S.lang;
-    const [a, b] = await Promise.all([api('GET', '/rune/api/shares?scope=LANGUAGE&targetId=' + l.id), api('GET', '/rune/api/shares?scope=WORLD&targetId=' + l.world_id).catch(() => [])]);
+    const [a, b, reqs] = await Promise.all([api('GET', '/rune/api/shares?scope=LANGUAGE&targetId=' + l.id), api('GET', '/rune/api/shares?scope=WORLD&targetId=' + l.world_id).catch(() => []), api('GET', base() + '/access-requests').catch(() => [])]);
+    const asking = reqs.length ? `<div class="card pending"><h3>Asking for access</h3><p class="small muted">They followed a link to this language and have an account. Let them in as a viewer or an editor, or say no.</p><table>${reqs.map(r => `<tr><td>${esc(r.username)}</td><td class="small">${esc(String(r.created).slice(0, 16).replace('T', ' '))}</td>
+      <td><button class="primary" data-act="answerAccess" data-id="${r.id}" data-a="viewer">Let in as viewer</button> <button data-act="answerAccess" data-id="${r.id}" data-a="editor">as editor</button> <button class="danger" data-act="answerAccess" data-id="${r.id}" data-a="deny">Deny</button></td></tr>`).join('')}</table></div>` : '';
     const list = rows => rows.length ? rows.map(s => `<tr><td>${esc(s.username)}</td><td>${s.level.toLowerCase()}</td><td>${s.auto_approve ? 'auto-approved' : ''}</td>
       <td><button class="danger" data-act="revoke" data-id="${s.id}">Revoke</button></td></tr>`).join('') : '<tr><td class="muted" colspan="4">Nobody.</td></tr>';
-    return `<div class="card"><div class="row"><input id="s_user" placeholder="username">
+    return `${asking}<div class="card"><div class="row"><input id="s_user" placeholder="username">
       <select id="s_scope"><option value="LANGUAGE">this language</option><option value="WORLD">the whole world</option></select>
       <select id="s_level"><option value="VIEWER">viewer</option><option value="EDITOR">editor</option></select>
       <label style="display:inline;margin:0"><input type="checkbox" id="s_auto"> auto-approve their changes</label>

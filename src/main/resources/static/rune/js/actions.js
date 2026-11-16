@@ -154,6 +154,10 @@ const A = {
     S.connectorNew = await api('POST', '/rune/api/admin/connector-keys', { username: val('cn_user'), label: val('cn_label') });
     await connectorPage();
   },
+  answerAccess: async d => {
+    await api('POST', base() + '/access-requests/' + d.id, { answer: d.a });
+    say(d.a === 'deny' ? 'Request turned down.' : 'They now have access.'); renderPanel();
+  },
   copyLink: async () => {
     const url = location.origin + '/rune/?lang=' + S.lang.id;
     try { await navigator.clipboard.writeText(url); say('Link copied. ' + (S.lang.is_public ? 'The language is public, so anyone can open it.' : 'Only people it is shared with can open it.')); }
