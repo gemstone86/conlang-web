@@ -118,3 +118,8 @@ table.paradigm td, table.paradigm th { padding:.15rem .5rem; }
 button.arrow { border:0; background:none; padding:0 .2rem; cursor:pointer; font-size:.9rem; line-height:1; color:#555; }
 tr.subrow td { background:#fafafa; font-size:.92em; }
 tr.subrow td:first-child { padding-left:1.4rem; }
+
+.movers { white-space:nowrap; margin-right:.3rem; }
+.movers button.arrow { font-size:.7rem; padding:0 .15rem; }
+.movers button.arrow:disabled { opacity:.3; cursor:default; }
+.wordedit input { margin-right:.2rem; }

@@ -295,3 +295,5 @@ ALTER TABLE languages ADD COLUMN IF NOT EXISTS spelling_years VARCHAR(400);
 ALTER TABLE words ADD COLUMN IF NOT EXISTS tags VARCHAR(400) NULL;
 -- A form rule can first take this (a pattern, as a sound change's) off the end of the word it is added to (the start for a prefix)
 ALTER TABLE form_rules ADD COLUMN IF NOT EXISTS strip_re VARCHAR(1000) NULL;
+-- The order the Word forms tab shows a group's rules in (moved with its arrows): only how they are displayed, never which rule is used
+ALTER TABLE form_rules ADD COLUMN IF NOT EXISTS show_ord INT NULL;

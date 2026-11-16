@@ -212,6 +212,7 @@ const A = {
     renderPanel();
   },
   ruleScope: async d => { S.ruleScope = d.v; try { localStorage.setItem('ruleScope', d.v); } catch (x) { /* ignore */ } renderPanel(); },
+  moveFormRule: async d => { await api('POST', base() + '/formrules/move', { id: Number(d.id), dir: d.dir }); renderPanel(); },
   tagFilter: async d => { S.wf = S.wf || {}; S.wf.tag = d.tag; S.page = 0; renderPanel(); },
   clearFilters: async () => { S.wf = {}; S.q = ''; S.page = 0; renderPanel(); },
   toggleForms: async d => { const id = Number(d.id); S.expanded = S.expanded || new Set(); if (S.expanded.has(id)) S.expanded.delete(id); else S.expanded.add(id); drawDict(); },
@@ -219,6 +220,20 @@ const A = {
   popupEdit: async d => {
     const m = $('#modal'); if (m) m.hidden = true; S.openId = null;
     if (S.tab === 'dict' && S.words.some(x => x.id === Number(d.id) && !x.inherited)) await A.editWord(d); else say('Open the word in its own language to edit it.', true);
+  },
+  saveWordHere: async d => {
+    const w = S.openWordData || {}, id = Number(d.id);
+    const now = { gloss: val('we_gloss').trim(), pos: val('we_pos').trim(), build: val('we_build').trim(), notes: val('we_notes'), tags: val('we_tags') };
+    if ($('#we_form')) now.form = val('we_form').trim();
+    const p = {};
+    for (const [k, v] of Object.entries(now)) if (String(v ?? '') !== String(w[k] ?? '')) p[k] = v;
+    const y = val('we_year');
+    if (y !== '' && Number(y) !== Number(w.year)) p.year = Number(y);
+    if (!Object.keys(p).length) { say('Nothing changed.'); return; }
+    if (p.gloss === '') { say('The word needs a gloss.', true); return; }
+    if ('form' in p && p.form === '') { say('The form can\'t be empty.', true); return; }
+    const r = await api('POST', wbase() + '/edit', { entity: 'word', action: 'UPDATE', entityId: id, payload: p });
+    say(r.status === 'pending' ? 'Submitted for the owner to approve.' : 'Saved. Undo is available.'); await afterWordChange();
   },
   editWordForm: async d => {
     const f = prompt('New form of the word (the form it had when coined):', d.form); if (f == null || !f.trim() || f.trim() === d.form) return;

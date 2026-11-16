@@ -165,13 +165,15 @@ const TAB = {
     h += '<table><tr><th>Form</th><th>Applies to</th><th>Affix</th><th>Condition / removes</th><th>Vowel clash</th><th>From</th><th>Order</th><th></th></tr>';
     const order = []; for (const r of rules) { const g = r.grp || ''; if (!order.includes(g)) order.push(g); }
     order.sort((x, y) => (x === '') - (y === ''));
-    const rowOf = r => `<tr><td><strong>${esc(r.label)}</strong>${r.new_pos ? `<div class="small"><span class="badge" title="Derivation: makes a new word">→ ${esc(r.new_pos)}</span> ${esc((r.new_gloss || '{gloss}'))}</div>` : ''}</td><td>${esc(r.pos) || 'all types'}</td><td class="form">${r.affix_word_id ? `⛓ <span class="small">${esc(r.affix_gloss ?? '(deleted word)')}</span> ${r.affix_form ? esc(r.placement === 'prefix' ? r.affix_form + '-' : '-' + r.affix_form) : ''}` : (r.placement === 'prefix' ? esc(r.affix) + '-' : '-' + esc(r.affix))}</td>
+    const rowOf = (r, i, n) => `<tr><td>${canEdit() && n > 1 ? `<span class="movers"><button class="arrow" data-act="moveFormRule" data-id="${r.id}" data-dir="up" title="Show this rule one place higher in its group (display only)" ${i === 0 ? 'disabled' : ''}>▲</button><button class="arrow" data-act="moveFormRule" data-id="${r.id}" data-dir="down" title="Show this rule one place lower in its group (display only)" ${i === n - 1 ? 'disabled' : ''}>▼</button></span> ` : ''}<strong>${esc(r.label)}</strong>${r.new_pos ? `<div class="small"><span class="badge" title="Derivation: makes a new word">→ ${esc(r.new_pos)}</span> ${esc((r.new_gloss || '{gloss}'))}</div>` : ''}</td><td>${esc(r.pos) || 'all types'}</td><td class="form">${r.affix_word_id ? `⛓ <span class="small">${esc(r.affix_gloss ?? '(deleted word)')}</span> ${r.affix_form ? esc(r.placement === 'prefix' ? r.affix_form + '-' : '-' + r.affix_form) : ''}` : (r.placement === 'prefix' ? esc(r.affix) + '-' : '-' + esc(r.affix))}</td>
       <td class="form">${esc(r.cond_re)}${r.strip_re ? `<div class="small" title="Taken off the end of the word before the ending is added"><span class="badge">remove</span> <span class="form">${esc(r.strip_re)}</span></div>` : ''}</td><td>${r.hiatus ? 'drop first vowel' : ''}</td><td>${r.year ?? ''}</td><td>${r.ord}</td>
       <td>${canSuggest() ? `<button data-act="editFormRule" data-id="${r.id}">Edit</button> <button class="danger" data-act="delFormRule" data-id="${r.id}">✕</button>` : ''}
       ${isOwner() && !r.new_pos ? `<button data-act="rebuildForm" data-l="${esc(r.label)}" title="Recompute this form for every word (overwrites hand edits)">Rebuild all</button>` : ''}</td></tr>`;
     for (const g of order) {
       if (order.length > 1 || g) h += `<tr class="grouprow"><th colspan="8">${g ? esc(g) : 'Ungrouped'} ${isOwner() ? `<button data-act="rebuildGroup" data-g="${esc(g)}" title="Recompute every form in this group for every word (overwrites hand edits)">Rebuild group</button>` : ''}</th></tr>`;
-      for (const r of rules.filter(x => (x.grp || '') === g)) h += rowOf(r);
+      // inside a group the rules are shown in the order set with the arrows (only how they are shown; the rules' own order, which decides which one is used, is not touched)
+      const inGroup = rules.filter(x => (x.grp || '') === g).sort(showOrder);
+      inGroup.forEach((r, i) => { h += rowOf(r, i, inGroup.length); });
     }
     return h + '</table>';
   },
@@ -335,4 +337,6 @@ function applyHeadings() {
 }
 const AFTER = { dict: () => drawDict(), grammar: () => { if ($('#gr_cat')) applyHeadings(); } };
 const lines = obj => Object.entries(obj || {}).map(([k, v]) => `<span class="small">${esc(k)}:</span> <span class="form">${esc(v)}</span>${sayBtn(v, langIdByName(k))}`).join('<br>');
+// a group's form rules as the arrows have put them: moved ones first by their place, the others after them in the rules' own order
+const showOrder = (a, b) => (a.show_ord ?? 1e9) - (b.show_ord ?? 1e9) || a.ord - b.ord || a.id - b.id;
 const defForm = w => (w.forms || []).find(f => f.label.toLowerCase() === 'definite');
