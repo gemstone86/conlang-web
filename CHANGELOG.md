@@ -2,6 +2,10 @@
 
 Newest first. Versions from 1.x on are the combined app (Root and Rune + Weather generator).
 
+## v1.29.2 (combined app)
+Weather generator:
+- **Caserion fits the map better.** The Caserion part of the layer *Gordrion, Vambolien & Caserion* was drawn about 4 % smaller than the first Mundana map and sat a few pixels too far south, which is why the south fitted and the north drifted. It is now scaled up 4 % (the north and south halves gave the same scale when fitted) and moved so that its north edge is about 5 map pixels further north; the place names now fall on the first map's. New tool `tools/scale-layer-piece.py` (like `move-layer-piece.py`, with a scale).
+
 ## v1.29.1 (combined app)
 Root and Rune:
 - **Slower speech by default.** The speech engine's default speed goes from 140 to 105 words a minute. A language that has its own speed set (*Settings → Speech → Speed*, 60–400) keeps it; an empty field uses the default, or the parent language's speed.
