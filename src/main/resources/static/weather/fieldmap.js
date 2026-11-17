@@ -178,15 +178,16 @@
         T.flat = !!m.flat;                                     // flat: no pre-merged zoom images; the base map picture plus see-through layers only
         T.chosen = null;                                       // null: the default layers (the zoom images as they are)
         /** The images that make zoom image level/x_y for the chosen layers, bottom first ([] = none). */
-        T.srcs = (level, id) => {
+        T.srcsWithIds = (level, id) => {
           const L = T.levels.find((l) => l.level === level), own = L && L.have.has(id) ? base + level + "/" + id + ".jpg" : null;
-          if (!T.chosen) return own ? [own] : [];
+          if (!T.chosen) return own ? [{ src: own, id: null }] : [];
           const B = T.baseMap, out = [];
-          if (B.tiles[level] && B.tiles[level].has(id)) out.push(base + "base/" + level + "/" + id + ".jpg");
-          else if (!(B.hide[level] && B.hide[level].has(id)) && own) out.push(own);
-          for (const v of T.chosen) if (v.tiles[level] && v.tiles[level].has(id)) out.push(base + "layers/" + v.id + "/" + level + "/" + id + ".webp");
+          if (B.tiles[level] && B.tiles[level].has(id)) out.push({ src: base + "base/" + level + "/" + id + ".jpg", id: null });
+          else if (!(B.hide[level] && B.hide[level].has(id)) && own) out.push({ src: own, id: null });
+          for (const v of T.chosen) if (v.tiles[level] && v.tiles[level].has(id)) out.push({ src: base + "layers/" + v.id + "/" + level + "/" + id + ".webp", id: v.id });
           return out;
         };
+        T.srcs = (level, id) => T.srcsWithIds(level, id).map((x) => x.src);
         this.tiles = T;
         this.setTileLayers(this._tileLayers === undefined ? null : this._tileLayers);
         if (this.onTilesLoaded) this.onTilesLoaded(T.layers);
@@ -241,13 +242,16 @@
       }
       this.draw();
     }
+    /** How far the admins moved each map layer: { id: [dx, dy] } in full-size pixels (settings.layerShift), or null for none. */
+    setLayerShift(o) { this._shift = o && typeof o === "object" ? o : null; this.draw(); }
+    _shiftOf(id) { const a = id && this._shift && this._shift[id]; return Array.isArray(a) ? [+a[0] || 0, +a[1] || 0] : [0, 0]; }
     /** The map layers there are ([{ id, name, def }]); empty when the zoom images have none. */
     tileLayers() { return this.tiles && this.tiles.layers ? this.tiles.layers : []; }
     /** The parts of the map picture to draw over it for the chosen layers, bottom first. */
     _mapPatches() {
       const T = this.tiles;
       if (!T || !T.chosen || !T.patches) return [];
-      return ["base", ...T.chosen.map((v) => v.id)].map((k) => T.patches[k]).filter((p) => p && p.map);
+      return ["base", ...T.chosen.map((v) => v.id)].map((k) => { const p = T.patches[k]; if (p) p.key = k; return p; }).filter((p) => p && p.map);
     }
     _drawTiles() {
       const T = this.tiles, ctx = this.ctx, { s, ox, oy } = this.view, dpr = this.dpr || 1;
@@ -268,20 +272,24 @@
       ctx.save();
       ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = "high";
       const want = new Set();
+      // a moved layer's pieces lie somewhere else than their place in the grid: look further out, and draw layer by layer
+      const order = (T.chosen || []).map((v) => v.id), fw = T.fullW || this.imgW;
+      let padX = 0, padY = 0;
+      for (const id of order) { const [a, b] = this._shiftOf(id); padX = Math.max(padX, Math.abs(a) / fw); padY = Math.max(padY, Math.abs(b) / fw); }
       for (const { L, load } of use) {
-        const ts = T.ts;
-        const tx0 = Math.max(0, Math.floor(vx0 * L.w / ts)), tx1 = Math.min(Math.ceil(L.w / ts) - 1, Math.floor(vx1 * L.w / ts));
-        const ty0 = Math.max(0, Math.floor(vy0 * L.h / ts)), ty1 = Math.min(Math.ceil(L.h / ts) - 1, Math.floor(vy1 * L.h / ts));
+        const ts = T.ts, items = [];
+        const tx0 = Math.max(0, Math.floor((vx0 - padX) * L.w / ts)), tx1 = Math.min(Math.ceil(L.w / ts) - 1, Math.floor((vx1 + padX) * L.w / ts));
+        const ty0 = Math.max(0, Math.floor((vy0 - padY) * L.h / ts)), ty1 = Math.min(Math.ceil(L.h / ts) - 1, Math.floor((vy1 + padY) * L.h / ts));
         if ((tx1 - tx0 + 1) * (ty1 - ty0 + 1) > 400) continue; // far too many: wait until zoomed in further
         for (let ty = ty0; ty <= ty1; ty++) for (let tx = tx0; tx <= tx1; tx++) {
           const id = tx + "_" + ty;
           const key = L.level + "/" + id;
           let t = this.tileCache.get(key);
           if (!t && load) {
-            const srcs = T.srcs(L.level, id);
+            const srcIds = T.srcsWithIds(L.level, id), srcs = srcIds.map((x) => x.src);
             if (!srcs.length) continue;
             // one or more images (base, then see-through layers); shown once all have come
-            t = { imgs: srcs.map(() => new Image()), left: srcs.length, ok: false };
+            t = { imgs: srcs.map(() => new Image()), ids: srcIds.map((x) => x.id), left: srcs.length, ok: false };
             t.imgs.forEach((im, k) => {
               const done = () => { if (--t.left === 0) { t.ok = true; this.draw(); } };
               im.onload = done; im.onerror = () => { im.bad = true; done(); };
@@ -295,8 +303,15 @@
           const tw = Math.min(ts, L.w - tx * ts), th = Math.min(ts, L.h - ty * ts);
           const x0 = Math.floor(ox + tx * ts / L.w * W), y0 = Math.floor(oy + ty * ts / L.h * H);
           const x1 = Math.ceil(ox + (tx * ts + tw) / L.w * W), y1 = Math.ceil(oy + (ty * ts + th) / L.h * H);
-          for (const im of t.imgs) if (!im.bad) ctx.drawImage(im, x0, y0, x1 - x0, y1 - y0);
+          t.imgs.forEach((im, k) => {
+            if (im.bad) return;
+            const lid = t.ids[k], [dx, dy] = this._shiftOf(lid);
+            const ox2 = dx / fw * W, oy2 = dy / fw * W;      // full-size pixels are square: both by the width
+            items.push({ im, o: lid ? order.indexOf(lid) : -1, x0: Math.floor(x0 + ox2), y0: Math.floor(y0 + oy2), x1: Math.ceil(x1 + ox2), y1: Math.ceil(y1 + oy2) });
+          });
         }
+        items.sort((a, b) => a.o - b.o);                    // stable: the base first, then each layer over the ones below
+        for (const it of items) ctx.drawImage(it.im, it.x0, it.y0, it.x1 - it.x0, it.y1 - it.y0);
       }
       ctx.restore();
       // keep memory in check: forget the least recently used tiles that are not on screen
@@ -1117,7 +1132,10 @@
       ctx.imageSmoothingEnabled = true;
       ctx.imageSmoothingQuality = "high";
       ctx.drawImage(this.img, ox, oy, this.imgW * s, this.imgH * s);
-      for (const p of this._mapPatches()) if (p.ok) ctx.drawImage(p.img, ox + p.map.x * s, oy + p.map.y * s, p.map.w * s, p.map.h * s);
+      for (const p of this._mapPatches()) if (p.ok) {
+        const [sx, sy] = p.key === "base" ? [0, 0] : this._shiftOf(p.key), k = this.imgW / (this.tiles.fullW || this.imgW);
+        ctx.drawImage(p.img, ox + (p.map.x + sx * k) * s, oy + (p.map.y + sy * k) * s, p.map.w * s, p.map.h * s);
+      }
       if (this.tiles) this._drawTiles();
 
       if (this.field) {

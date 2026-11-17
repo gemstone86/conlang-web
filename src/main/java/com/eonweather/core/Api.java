@@ -567,6 +567,25 @@ public final class Api {
                         return Http.Response.json(store.map(id, uid));
                     }
                 }
+                case "layer-shift" -> {
+                    // how far a regional map is moved from where its pieces lie, in full-size pixels (settings.layerShift:
+                    // { layerId: [dx, dy] }); set by the server's admins on the standard map, kept over new releases (see DefaultMap)
+                    if (m.equals("PUT")) {
+                        long uid = requireUser(req);
+                        if (!store.isAdmin(uid, admins)) throw new ApiException(403, "Only the server's admins may move a map layer");
+                        Map<String, Object> b = body(req);
+                        if (!(b.get("layer") instanceof String lid) || !lid.matches("[\\w.-]{1,60}")) throw new ApiException(400, "Not a layer id");
+                        if (!(b.get("dx") instanceof Number dx) || !(b.get("dy") instanceof Number dy)) throw new ApiException(400, "Give dx and dy (full-size pixels)");
+                        long x = Math.round(dx.doubleValue()), y = Math.round(dy.doubleValue());
+                        if (Math.abs(x) > 4000 || Math.abs(y) > 4000) throw new ApiException(400, "That is too far (at most 4000 pixels each way)");
+                        Map<String, Object> shifts = new LinkedHashMap<>();
+                        if (store.map(id, uid).get("settings") instanceof Map<?, ?> st && st.get("layerShift") instanceof Map<?, ?> cur)
+                            cur.forEach((k, v) -> shifts.put(String.valueOf(k), v));
+                        if (x == 0 && y == 0) shifts.remove(lid); else shifts.put(lid, List.of(x, y));
+                        store.putDefaultMapSettings(id, java.util.Collections.singletonMap("layerShift", shifts.isEmpty() ? null : shifts));
+                        return Http.Response.json(store.map(id, uid));
+                    }
+                }
                 case "restore" -> {
                     if (m.equals("POST")) { long uid = requireUser(req); store.restoreMap(uid, id); return Http.Response.json(store.map(id, uid)); }
                 }

@@ -696,6 +696,52 @@
     const o = def && def.settings && def.settings.layerOrder;
     return Array.isArray(o) ? o : null;
   }
+  /** How far the admins moved each layer, { id: [dx, dy] } in full-size pixels (the standard map's, also for a map that borrows its zoom images). */
+  function layerShiftFor(map) {
+    const def = map && map.isDefault ? map : (S.maps || []).find((m) => m.isDefault);
+    const o = def && def.settings && def.settings.layerShift;
+    return o && typeof o === "object" ? o : null;
+  }
+  let shiftTimer = null;
+  /** Admins: nudge a map layer by (dx, dy) full-size pixels (8 of them are one pixel of the map picture); saved for everyone shortly after. */
+  function nudgeMapLayer(id, dx, dy, absolute) {
+    const cur = (layerShiftFor(S.map) || {})[id] || [0, 0];
+    const next = absolute ? [dx, dy] : [cur[0] + dx, cur[1] + dy];
+    const all = { ...(layerShiftFor(S.map) || {}) };
+    if (!next[0] && !next[1]) delete all[id]; else all[id] = next;
+    const def = S.map && S.map.isDefault ? S.map : (S.maps || []).find((m) => m.isDefault);
+    if (def) def.settings = { ...(def.settings || {}), layerShift: Object.keys(all).length ? all : undefined };
+    fieldMap.setLayerShift(all);
+    renderMapViews();
+    clearTimeout(shiftTimer);
+    shiftTimer = setTimeout(async () => {
+      try {
+        const m = await api("PUT", `/maps/${def.id}/layer-shift`, { layer: id, dx: next[0], dy: next[1] });
+        def.settings = m.settings;
+        if (S.map && S.map.id === def.id) S.map.settings = m.settings;
+      } catch (e) { setStatus(e.message); }
+    }, 500);
+  }
+  /** Admins: download what is known about the map layers (order, boxes, moves, pieces) as a JSON file. */
+  function exportMapLayers() {
+    const T0 = fieldMap.tiles;
+    if (!T0) return;
+    const shift = layerShiftFor(S.map) || {};
+    const out = {
+      exported: new Date().toISOString(), tiles: S.map && S.map.settings && S.map.settings.tiles, tileSize: T0.ts, fullWidth: T0.fullW,
+      layerOrder: layerOrderFor(S.map), layerShift: shift,
+      note: "layers are listed bottom first; shift is in full-size pixels (x right, y down), 8 of them are one pixel of the map picture",
+      layers: T0.layers.map((v, i) => ({
+        order: i, id: v.id, name: v.name, default: !!v.def, map: v.map, shift: shift[v.id] || [0, 0],
+        pieces: Object.fromEntries(Object.entries(v.tiles).map(([lv, set]) => [lv, [...set]])),
+      })),
+    };
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([JSON.stringify(out, null, 1)], { type: "application/json" }));
+    a.download = "map-layers.json";
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+  }
   /** Admins: move a layer one place in the list (a place further down lies over the ones above); saved for everyone. */
   async function moveMapLayer(id, dir) {
     const ids = fieldMap.tileLayers().map((v) => v.id), i = ids.indexOf(id), j = i + dir;
@@ -744,6 +790,26 @@
         lab.append(moves);
       }
       list.append(lab);
+      if (canOrder) {
+        const sh = (layerShiftFor(S.map) || {})[v.id] || [0, 0];
+        const row = document.createElement("div"); row.className = "ml-shift";
+        const mk = (txt, title, dx, dy) => {
+          const b = document.createElement("button"); b.type = "button"; b.className = "ml-move"; b.textContent = txt; b.title = title;
+          b.onclick = (e) => { e.preventDefault(); e.stopPropagation(); nudgeMapLayer(v.id, dx * (e.shiftKey ? 8 : 1), dy * (e.shiftKey ? 8 : 1)); };
+          return b;
+        };
+        const lbl = document.createElement("span"); lbl.className = "small"; lbl.textContent = T("mlMove") + " " + sh[0] + ", " + sh[1] + " ";
+        row.append(lbl, mk("◀", T("mlNudge"), -8, 0), mk("▲", T("mlNudge"), 0, -8), mk("▼", T("mlNudge"), 0, 8), mk("▶", T("mlNudge"), 8, 0));
+        const r = document.createElement("button"); r.type = "button"; r.className = "ml-move"; r.textContent = "⟲"; r.title = T("mlReset"); r.disabled = !sh[0] && !sh[1];
+        r.onclick = (e) => { e.preventDefault(); e.stopPropagation(); nudgeMapLayer(v.id, 0, 0, true); };
+        row.append(r);
+        list.append(row);
+      }
+    }
+    if (canOrder) {
+      const ex = document.createElement("button"); ex.type = "button"; ex.textContent = T("mlExport"); ex.title = T("mlExportTip");
+      ex.onclick = (e) => { e.preventDefault(); exportMapLayers(); };
+      list.append(ex);
     }
     const hint = document.createElement("div"); hint.className = "ml-hint"; hint.textContent = T("mlHint") + (canOrder ? " " + T("mlAdminHint") : "");
     list.append(hint);

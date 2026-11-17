@@ -2,6 +2,12 @@
 
 Newest first. Versions from 1.x on are the combined app (Root and Rune + Weather generator).
 
+## v1.36.0 (combined app)
+Weather generator:
+- **Move a map layer (admins).** In the *Kartbild* list, every layer has a row of arrows for the admins: each click moves that regional map one map pixel (8 full-size pixels), Shift-click eight map pixels, ⟲ puts it back. It moves the zoom pieces and the map picture alike, is saved for everyone (`settings.layerShift`, `PUT /maps/{id}/layer-shift`) and stays over new releases unless the release says its own is newer (`layerShiftRelease`, set by `tools/apply-export.py`; the admin export carries it as a changed setting). The 3D view does not use the moves yet.
+- **Export map layers (admins).** A button at the bottom of the list downloads `map-layers.json`: order, each layer's box, move and the zoom pieces it has, so it can be sent along for fitting.
+- Tests `LayerShiftTest`.
+
 ## v1.35.0 (combined app)
 Root and Rune:
 - **Missing words from texts.** The *Missing words* tab has a new list, *Needed by texts*: meanings that the language's texts (its own and the ones it inherits) use at any of their years but the language has no word for. Each shows why, which texts and lines need it, and at which years, with the same *Coin word*, *Suggest root* and mark-as-missing buttons as the sentence list. Meanings you have already marked by hand are not repeated. The compound tool's side list shows them too. The list is also in the API as `fromTexts` on `GET /languages/{id}/missing`.

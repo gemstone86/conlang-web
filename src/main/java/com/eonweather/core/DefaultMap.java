@@ -123,6 +123,8 @@ public final class DefaultMap {
             // the order of the map layers is edited in the app by the admins (settings.layerOrder): the app's stays over a new
             // release's unless the release says its order is newer (settings.layerOrderRelease, set by tools/apply-export.py)
             if (before.get("layerOrder") != null && !newRelease.test("layerOrderRelease")) settings.put("layerOrder", before.get("layerOrder"));
+            // likewise how far the admins moved each map layer (settings.layerShift; settings.layerShiftRelease says the release's is newer)
+            if (before.get("layerShift") != null && !newRelease.test("layerShiftRelease")) settings.put("layerShift", before.get("layerShift"));
             boolean changed = store.installDefaultMap(new Store.DefaultMapData(name, Json.write(settings), version,
                     info.type(), image, info.width(), info.height(), heightType, height, anchors, symbols, leylines, zones));
             System.out.println(changed
