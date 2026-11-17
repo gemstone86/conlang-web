@@ -18,7 +18,8 @@ async function renderPanel() {
   ${publishRow(l)}
   <div class="row">${canEdit() ? '<button data-act="undo">↶ Undo</button><button data-act="redo">↷ Redo</button>' : ''}
   <button data-act="copyLink" title="Copy a link that opens this language (people need access to it: it is public, or shared with them)">🔗 Copy link</button>
-  <a href="/rune/api/languages/${l.id}/export.xlsx"><button>Export Excel</button></a></div><div class="tabs">` +
+  <a href="/rune/api/languages/${l.id}/export.xlsx"><button>Export Excel</button></a>
+  <a href="/rune/api/languages/${l.id}/export.json" title="All the words of the language as a JSON file"><button>Export JSON</button></a></div><div class="tabs">` +
     TABS.filter(t => (isOwner() || !['share', 'settings'].includes(t[0])) && (S.me || !['changes', 'log'].includes(t[0])) && (canEdit() || !['bulk', 'compound'].includes(t[0]))).map(t => `<button data-act="tab" data-t="${t[0]}" class="${S.tab === t[0] ? 'on' : ''}">${t[1]}</button>`).join('') +
     '</div><div id="tabbody">Loading…</div>';
   $('#panelbody').innerHTML = h;
@@ -55,9 +56,9 @@ const TAB = {
       <select id="w_loanlang" data-loanlang="1" hidden><option value="">from which language?</option>${loanLangs().map(l => `<option value="${l.id}">${esc(l.name)}</option>`).join('')}</select><input id="w_loanword" list="w_loanwords" placeholder="search by meaning or form" size="28" hidden><datalist id="w_loanwords"></datalist><input id="w_year" placeholder="year" size="6" type="number">
       <input id="w_romanization" placeholder="romanization" size="14" title="The word in the Latin alphabet; the sound changes still work on the form"><input id="w_notes" placeholder="notes" size="20"><input id="w_tags" list="tag_list" placeholder="tags" size="14" title="Comma-separated tags"><input id="w_id" type="hidden">
       <button class="primary" data-act="saveWord" id="w_btn">Add word</button></div>
-      <div class="row"><button data-act="suggestRoots">Suggest new roots</button> <input id="sg_n" type="number" value="10" min="1" max="40" size="3" title="how many">
+      <div class="row"><button data-act="suggestRoots">Suggest new roots</button> <input id="sg_n" type="number" value="10" min="1" max="40" size="3" title="how many"> <input id="sg_year" type="number" placeholder="year" size="6" data-sgyear="1" title="Suggest roots for this year: the syllable shape in force then is used (empty: the latest shape)">
         <select id="sg_syl"><option value="1-1">1 syllable</option><option value="2-2" selected>2 syllables</option><option value="2-3">2-3 syllables</option><option value="3-4">3-4 syllables</option></select>
-        <span class="muted small">New forms that sound like this language and are not close to any existing word. Click one to use it.</span></div><div id="sg_out" class="row"></div>
+        <span class="muted small">New forms that sound like this language and are not close to any existing word. Click one to use it.</span></div><div class="row"><span id="sg_shape" class="small muted"></span></div><div id="sg_out" class="row"></div>
       <div class="muted small">Words get their forms from the rules on the Word forms tab (only irregular forms are stored). Click a word to see and edit all its forms.</div></div>`;
     const fromWhere = {};
     S.words.filter(w => w.inherited).forEach(w => { fromWhere[w.origin_lang] = (fromWhere[w.origin_lang] || 0) + 1; });
@@ -120,7 +121,10 @@ const TAB = {
       <p class="muted small">Leave empty and the language is spelled as it sounds. With years here, the spelling lags behind: a word is spelled the way it sounded at the latest reform (or when it was coined, if that was later), until the next reform catches up with the pronunciation. The dictionary then shows the spelling under a word's form when it differs, and the word window lists the spelling after each reform.</p></div>
       <div class="card"><div class="row"><strong>Syllable shape</strong>
       ${isOwner() ? `<input id="gr_shape" value="${esc(S.lang.syllable_shape || '')}" placeholder="e.g. (V)C(C)V(C)" size="20" class="form"><button data-act="saveShape">Save</button>` : `<span class="form">${esc(S.lang.syllable_shape || 'not set')}</span>`}</div>
-      <p class="muted small">C = consonant, V = vowel, brackets = optional. A leading (V) is an optional vowel at the start of a word only. sh, ch, gh, ng and diphthongs (ai, ou) count as one sound. "Suggest new roots" only proposes forms of this shape, and a language without its own shape uses its parent's.</p></div>`;
+      <p class="muted small">C = consonant, V = vowel, brackets = optional. A leading (V) is an optional vowel at the start of a word only. sh, ch, gh, ng and diphthongs (ai, ou) count as one sound. "Suggest new roots" only proposes forms of this shape, and a language without its own shape uses its parent's.</p>
+      <div class="row"><strong>Other shapes by year</strong></div>
+      ${isOwner() ? `<textarea id="gr_shapeyears" rows="3" placeholder="one per line, e.g.&#10;500: CV(C)&#10;1200: (C)V(C)(C)" class="form">${esc(S.lang.syllable_years || '')}</textarea><button data-act="saveShape">Save</button>` : `<pre class="form small">${esc(S.lang.syllable_years || 'none')}</pre>`}
+      <p class="muted small">A shape from a year is in force from that year until the next one; the shape above is the one from the start. A word must fit the shape in force in the year it was coined (the nearest one in time); a word that does not is marked as a problem in the dictionary.</p></div>`;
     if (canSuggest()) h += `<div class="card"><div class="row"><select id="gr_cat" data-grcat="1">${cats.map(c => `<option>${esc(c)}</option>`).join('')}</select>
       <input id="gr_name" placeholder="name" size="26"><input id="gr_year" type="number" placeholder="from year" size="8"><input id="gr_id" type="hidden"></div>
       <div class="row">${[1, 2, 3, 4, 5, 6].map(k => `<input id="gr_c${k}" placeholder="column ${k}" size="22">`).join('')}</div>
@@ -339,7 +343,7 @@ function applyHeadings() {
   const t = val('gr_cat'), sec = (S.grammar.sections || []).find(x => x.title === t), hd = sec && sec.headings ? sec.headings.split('\t') : [];
   for (let k = 1; k <= 6; k++) { const e = $('#gr_c' + k); if (e) e.placeholder = hd[k - 1] || 'column ' + k; }
 }
-const AFTER = { dict: () => drawDict(), grammar: () => { if ($('#gr_cat')) applyHeadings(); } };
+const AFTER = { dict: () => { drawDict(); shapeNote(); }, grammar: () => { if ($('#gr_cat')) applyHeadings(); } };
 const lines = obj => Object.entries(obj || {}).map(([k, v]) => `<span class="small">${esc(k)}:</span> <span class="form">${esc(v)}</span>${sayBtn(v, langIdByName(k))}`).join('<br>');
 // the dictionary's columns: number (as in the table), name. The gloss always stays. Which are hidden is remembered in the browser.
 const DICT_COLS = [[1, 'ID'], [2, 'Gloss'], [3, 'Type'], [4, 'Build'], [5, 'Year'], [6, 'Form'], [7, 'Romanization'], [8, 'Definite'], [9, 'Len'], [10, 'IPA'], [11, 'Also in'], [12, 'Latest per branch'], [13, 'Edit']];

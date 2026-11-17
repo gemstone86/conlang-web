@@ -102,14 +102,15 @@ const A = {
     say('Spelling reforms saved.'); await loadWorlds(); renderPanel();
   },
   saveShape: async () => {
-    await api('PUT', base(), { syllableShape: val('gr_shape') });
+    await api('PUT', base(), { syllableShape: val('gr_shape'), syllableYears: val('gr_shapeyears') });
     say('Syllable shape saved.'); await loadWorlds(); renderPanel();
   },
   suggestRoots: async () => {
     const [lo, hi] = val('sg_syl').split('-');
     const n = Math.max(1, Math.min(40, Number(val('sg_n')) || 10));
-    const r = await api('GET', base() + '/suggest-roots?count=' + n + '&min=' + lo + '&max=' + hi);
-    const shapeNote = r.shape ? `<span class="muted small">Shape ${esc(r.shape)}${r.mode === 'shape' ? ' (built from the shape and the Sounds tab, since there are too few words to learn from)' : ''}: </span>` : '';
+    const yr = val('sg_year').trim();
+    const r = await api('GET', base() + '/suggest-roots?count=' + n + '&min=' + lo + '&max=' + hi + (yr !== '' ? '&year=' + encodeURIComponent(yr) : ''));
+    const shapeNote = r.shape ? `<span class="muted small">${yr !== '' ? 'Year ' + esc(yr) + ': ' : ''}Shape ${esc(r.shape)}${r.mode === 'shape' ? ' (built from the shape and the Sounds tab, since there are too few words to learn from)' : ''}: </span>` : '';
     $('#sg_out').innerHTML = shapeNote + (r.roots.length ? r.roots.map(x => `<button class="form" data-act="useRoot" data-form="${esc(x)}">${esc(x)}</button>`).join(' ')
       : `<span class="muted small">${esc(r.reason || 'No free form was found. Try again or allow more syllables.')}</span>`);
   },
@@ -670,3 +671,20 @@ function drawAutoSounds(full) {
 document.addEventListener('input', e => {
   if (e.target.dataset.autoslider) { S.autoYear = Number(e.target.value); drawAutoSounds(false); }
 });
+
+// the syllable shape in force in the year typed for "Suggest new roots" (the nearest one in time), shown next to it
+let shapeNoteTimer = 0;
+function shapeNote() {
+  clearTimeout(shapeNoteTimer);
+  shapeNoteTimer = setTimeout(async () => {
+    const el = $('#sg_shape'); if (!el || !S.lang) return;
+    const y = val('sg_year').trim();
+    try {
+      const r = await api('GET', base() + '/syllable-shape' + (y !== '' ? '?year=' + encodeURIComponent(y) : ''));
+      el.innerHTML = r.shape
+        ? `Syllable shape${y !== '' ? ' for year ' + esc(y) : ''}: <span class="form">${esc(r.shape)}</span> <span class="muted">(${r.from == null ? 'the shape from the start' : 'from year ' + r.from}${r.languageId !== S.lang.id ? ', ' + esc(r.language) : ''})</span>`
+        : 'No syllable shape is set for this language (Grammar tab).';
+    } catch (e) { el.textContent = ''; }
+  }, 250);
+}
+document.addEventListener('input', e => { if (e.target.dataset && e.target.dataset.sgyear) shapeNote(); });

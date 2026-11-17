@@ -278,6 +278,8 @@ public class DictService {
                 formsByWord.computeIfAbsent(Db.num(f.get("word_id")), k -> new ArrayList<>()).add(f);
             }
             FormGenerator.Ctx formCtx = formGen.prepare(src, ev);
+            ShapeTimeline shapes = shapeTimeline(src);          // the syllable shapes by year, for the words coined in this language
+            Map<String, SyllableShape> parsedShapes = new HashMap<>();
             for (Map<String, Object> w : db.rows("select * from words where language_id=? order by lower(gloss), year, id", src)) {
                 long id = Db.num(w.get("id"));
                 String form = (String) w.get("form");
@@ -331,6 +333,15 @@ public class DictService {
                 if (form == null || form.isBlank()) problems.add("the form is empty");
                 for (Evolver.Row er : rows) {
                     if (er.source().equals("ERROR") && branchSet.contains(er.langId())) problems.add("sound change error in " + er.langName() + ": " + er.rule());
+                }
+                // the form as it was coined must fit the syllable shape in force then (the nearest shape in time)
+                if (shapes != null && form != null && !form.isBlank() && !Evolver.isLiteral(form) && w.get("ref_word_id") == null && w.get("loan_word_id") == null) {
+                    SyllableShapes.Found sf = shapes.at(wyear);
+                    if (sf != null) {
+                        SyllableShape sh = parsedShapes.computeIfAbsent(sf.shape(), SyllableShape::parse);
+                        if (sh != null && !sh.fits(form))
+                            problems.add("does not fit the syllable shape " + sf.shape() + " (" + (sf.fromYear() == null ? "from the start" : "from year " + sf.fromYear()) + ", " + shapes.langName() + "): " + form);
+                    }
                 }
                 m.put("problems", problems);
                 m.put("has_overrides", ovr.containsKey(id));
@@ -532,13 +543,59 @@ public class DictService {
 
     /** Which languages this one inherits from, and whatever stops their words from reaching it. */
     /** New root forms that sound like the language: learned from the forms it has now, never equal to or close to an existing word. */
+    /**
+     * The syllable shape in force in a year, for this language or the nearest ancestor that has any:
+     * { shape, from (the year it starts, or null for the plain shape), language, year }; shape is null when none is set.
+     * Without a year the latest shape is used.
+     */
+    /** The shapes a language goes by: its own, or those of the nearest ancestor that has any. */
+    private record ShapeTimeline(long langId, String langName, String plain, List<SyllableShapes.Entry> dated) {
+        SyllableShapes.Found at(Integer year) {
+            int y = year != null ? year : dated.isEmpty() ? 0 : dated.get(dated.size() - 1).year();
+            return SyllableShapes.at(plain, dated, y);
+        }
+    }
+
+    private ShapeTimeline shapeTimeline(long langId) {
+        List<Long> chain = new ArrayList<>();
+        chain.add(langId);
+        chain.addAll(access.ancestors(langId));
+        for (long l : chain) {
+            Map<String, Object> row = db.one("select name, syllable_shape, syllable_years from languages where id=?", l);
+            if (row == null) continue;
+            List<SyllableShapes.Entry> dated;
+            try { dated = SyllableShapes.parse((String) row.get("syllable_years")); } catch (IllegalArgumentException e) { dated = List.of(); }
+            String plain = row.get("syllable_shape") == null ? null : row.get("syllable_shape").toString();
+            if (dated.isEmpty() && (plain == null || plain.isBlank())) continue;
+            return new ShapeTimeline(l, (String) row.get("name"), plain, dated);
+        }
+        return null;
+    }
+
+    public Map<String, Object> shapeAt(long langId, Integer year) {
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("year", year);
+        ShapeTimeline t = shapeTimeline(langId);
+        SyllableShapes.Found f = t == null ? null : t.at(year);
+        out.put("shape", f == null ? null : f.shape());
+        if (f != null) { out.put("from", f.fromYear()); out.put("language", t.langName()); out.put("languageId", t.langId()); }
+        return out;
+    }
+
     public Map<String, Object> suggestRoots(long uid, long langId, int count, int minSyl, int maxSyl, Long seed) {
+        return suggestRoots(uid, langId, count, minSyl, maxSyl, seed, null);
+    }
+
+    /** With a year: the roots are for that year (its syllable shape; they are learnt from the words coined by then). */
+    public Map<String, Object> suggestRoots(long uid, long langId, int count, int minSyl, int maxSyl, Long seed, Integer year) {
         access.need(uid, langId, Access.VIEWER);
         List<Map<String, Object>> ws = words(uid, langId);
         List<String> corpus = new ArrayList<>(), taken = new ArrayList<>();
         for (Map<String, Object> w : ws) {
             Object f = w.get("form"), of = w.get("origin_form");
-            if (f != null) { corpus.add(f.toString()); taken.add(f.toString()); }
+            boolean era = year == null || ((Number) w.get("year")).intValue() <= year;     // for a year: learn from the words of that time, as they were entered
+            Object learn = year == null ? f : of != null ? of : f;
+            if (f != null) { if (era && learn != null) corpus.add(learn.toString()); taken.add(f.toString()); }
             if (of != null) taken.add(of.toString());
             Object fs = w.get("forms");
             if (fs instanceof List<?> l) for (Object x : l) if (x instanceof Map<?, ?> fm && fm.get("form") != null) taken.add(fm.get("form").toString());
@@ -546,15 +603,8 @@ public class DictService {
         int c = Math.max(1, Math.min(count, 40)), lo = Math.max(1, Math.min(minSyl, 6)), hi = Math.max(lo, Math.min(maxSyl, 6));
         long sd = seed == null ? System.nanoTime() : seed;
         Map<String, Object> out = new LinkedHashMap<>();
-        String shapeText = null;
-        List<Long> chain = new ArrayList<>();
-        chain.add(langId);
-        chain.addAll(access.ancestors(langId));
-        for (long l : chain) {
-            Map<String, Object> row = db.one("select syllable_shape from languages where id=?", l);
-            Object st = row == null ? null : row.get("syllable_shape");
-            if (st != null && !st.toString().isBlank()) { shapeText = st.toString().strip(); break; }
-        }
+        Map<String, Object> at = shapeAt(langId, year);
+        String shapeText = at.get("shape") == null ? null : at.get("shape").toString();
         SyllableShape shape = null;
         try { shape = SyllableShape.parse(shapeText); } catch (IllegalArgumentException e) { shapeText = null; }
         List<String> roots = RootSuggester.suggest(corpus, taken, c, lo, hi, sd, shape);
@@ -594,6 +644,8 @@ public class DictService {
         out.put("mode", mode);
         out.put("reason", reason);
         out.put("shape", shapeText);
+        out.put("shapeFrom", at.get("from"));
+        out.put("year", year);
         out.put("learnedFrom", corpus.size());
         return out;
     }

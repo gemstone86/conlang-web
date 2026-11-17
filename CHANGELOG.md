@@ -2,6 +2,14 @@
 
 Newest first. Versions from 1.x on are the combined app (Root and Rune + Weather generator).
 
+## v1.34.0 (combined app)
+Root and Rune:
+- **Syllable shapes by year.** Besides the shape from the start, a language can have others from certain years: *Grammar → Syllable shape → Other shapes by year*, one per line, `500: CV(C)` (the owner edits them). A shape is in force from its year until the next one; for a year before all of them the shape from the start is used, or, without one, the earliest. A language without any shapes goes by its parent's, as before.
+- **Words that do not fit are marked.** A word's form as it was coined must fit the shape in force in its coin year (the nearest one in time); one that does not gets a problem line in the dictionary (*does not fit the syllable shape CV(C) (from the start, Elven): pant*), so it shows with the other problems and under *Only problems*. Cross-references, borrowed words and literal forms are not checked.
+- **Roots for a year.** *Suggest new roots* has a *year* box: the roots get the shape in force in that year, and are learnt from the words coined by then (as they were entered). Next to it a line tells which shape that is and where it starts (*Syllable shape for year 900: CV(C)(C) (from year 500)*); without a year it is the latest shape. The Claude connector's *rune_suggest_roots* takes a year too.
+- **Export JSON.** A button beside *Export Excel* downloads every word of the language as a JSON file: id, gloss, type, build, year, form, romanization, pronunciation, notes, tags, where it was coined (for inherited words), the latest form per branch and its forms.
+- New column `languages.syllable_years`; tests `SyllableYearsTest`.
+
 ## v1.33.1 (combined app)
 Weather generator:
 - **Windows taller than the screen scroll, and their buttons stay in view.** The journey settings window (and the other windows: event rules, the symbols, the small question boxes) could be taller than the screen on a low or narrow window, with its *Save* / *OK* buttons off the bottom and no way to scroll. Every window now scrolls inside the screen's height and keeps its row of buttons at the bottom.
