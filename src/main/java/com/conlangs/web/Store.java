@@ -19,7 +19,7 @@ public class Store {
     private static final Map<String, String> TABLE = Map.of("word", "words", "rule", "rules", "override", "word_overrides", "form", "word_forms",
             "gsection", "grammar_sections", "grammar", "grammar_entries", "phoneme", "phonemes", "formrule", "form_rules", "meaning", "word_meanings", "loss", "word_losses");
     private static final Map<String, List<String>> FIELDS = Map.of(
-            "word", List.of("gloss", "pos", "build", "form", "year", "notes", "tags", "ref_word_id", "loan_word_id", "derived_from", "derived_label"),
+            "word", List.of("gloss", "pos", "build", "form", "year", "notes", "tags", "romanization", "ref_word_id", "loan_word_id", "derived_from", "derived_label"),
             "rule", List.of("year", "ord", "name", "pattern", "replacement", "note", "tags"),
             "override", List.of("word_id", "lang_id", "year", "form"),
             "form", List.of("word_id", "label", "form", "year"),
@@ -223,6 +223,11 @@ public class Store {
             }
         }
         if (clean.containsKey("ord") && clean.get("ord") == null) clean.remove("ord");
+        if (entity.equals("word") && clean.containsKey("romanization")) {
+            String rom = clean.get("romanization") == null ? "" : clean.get("romanization").toString().trim();
+            if (rom.length() > 400) throw new ApiException(400, "The romanization can be at most 400 characters.");
+            clean.put("romanization", rom.isEmpty() ? null : rom);
+        }
         if ((entity.equals("rule") || entity.equals("word")) && clean.containsKey("tags")) clean.put("tags", RuleTags.normalize(clean.get("tags")));
         if ((entity.equals("word") || entity.equals("form")) && clean.containsKey("form") && blank(clean.get("form")) && !action.equals("DELETE"))
             throw new ApiException(400, "Form can't be empty.");

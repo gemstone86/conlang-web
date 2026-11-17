@@ -41,12 +41,12 @@ public class ExportService {
         long worldId = Db.num(lang.get("world_id"));
         try (XSSFWorkbook wb = new XSSFWorkbook(); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
             Sheet d = wb.createSheet("Dictionary");
-            row(d, 0, "id", "gloss", "pos", "build", "year", "form", "length", "pronunciation", "notes", "inherited from", "tags");
+            row(d, 0, "id", "gloss", "pos", "build", "year", "form", "length", "pronunciation", "notes", "inherited from", "tags", "romanization");
             int r = 1;
             List<Map<String, Object>> words = dict.words(uid, langId);
             for (Map<String, Object> w : words) {
                 row(d, r++, w.get("id"), w.get("gloss"), w.get("pos"), w.get("build"), w.get("year"), w.get("form"),
-                        w.get("length"), w.get("pronunciation"), w.get("notes"), w.get("origin_lang"), w.get("tags"));
+                        w.get("length"), w.get("pronunciation"), w.get("notes"), w.get("origin_lang"), w.get("tags"), w.get("romanization"));
             }
             Sheet h = wb.createSheet("History");
             row(h, 0, "word id", "gloss", "language", "year", "form", "source", "rule");

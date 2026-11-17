@@ -53,7 +53,7 @@ const TAB = {
       <input id="w_form" placeholder="form" size="14" class="form"><input id="w_ref" list="w_refs" placeholder="refers to which word?" size="22" hidden><datalist id="w_refs">${S.words.filter(x => !x.ref_to).map(x => `<option value="${esc(x.gloss)} #${x.id}">${esc(x.form)}</option>`).join('')}</datalist><label style="display:inline;margin:0" title="The word has no form of its own: it shows the forms of another word"><input type="checkbox" id="w_isref" data-isref="1"> reference to another word</label>
       <label style="display:inline;margin:0" title="Take the word from another language, as it sounded there in the year you give"><input type="checkbox" id="w_isloan" data-isloan="1"> borrow</label>
       <select id="w_loanlang" data-loanlang="1" hidden><option value="">from which language?</option>${loanLangs().map(l => `<option value="${l.id}">${esc(l.name)}</option>`).join('')}</select><input id="w_loanword" list="w_loanwords" placeholder="search by meaning or form" size="28" hidden><datalist id="w_loanwords"></datalist><input id="w_year" placeholder="year" size="6" type="number">
-      <input id="w_notes" placeholder="notes" size="20"><input id="w_tags" list="tag_list" placeholder="tags" size="14" title="Comma-separated tags"><input id="w_id" type="hidden">
+      <input id="w_romanization" placeholder="romanization" size="14" title="The word in the Latin alphabet; the sound changes still work on the form"><input id="w_notes" placeholder="notes" size="20"><input id="w_tags" list="tag_list" placeholder="tags" size="14" title="Comma-separated tags"><input id="w_id" type="hidden">
       <button class="primary" data-act="saveWord" id="w_btn">Add word</button></div>
       <div class="row"><button data-act="suggestRoots">Suggest new roots</button> <input id="sg_n" type="number" value="10" min="1" max="40" size="3" title="how many">
         <select id="sg_syl"><option value="1-1">1 syllable</option><option value="2-2" selected>2 syllables</option><option value="2-3">2-3 syllables</option><option value="3-4">3-4 syllables</option></select>
@@ -68,9 +68,10 @@ const TAB = {
       <button data-act="toggleProblems" id="probbtn"></button>
       <label style="display:inline;margin:0"><input type="checkbox" data-inh="1" ${S.showInherited === false ? '' : 'checked'}> Show inherited words</label>
       <label style="display:inline;margin:0 0 0 10px">Per page</label> <select data-psize="1">${[25, 50, 100, 250].map(n => `<option ${n === S.pageSize ? 'selected' : ''}>${n}</option>`).join('')}</select>
+      <details class="colpick"><summary title="Choose which columns of the table are shown (only on this computer)">Columns</summary><div class="small">${DICT_COLS.map(([n, name]) => n === 2 ? '' : `<label style="display:inline;margin:0 .6rem 0 0"><input type="checkbox" data-col="${n}" ${hiddenCols().has(n) ? '' : 'checked'}> ${name}</label>`).join('')}</div></details>
       <span class="pager"></span></div>
-    <table id="wt"><thead><tr><th>ID</th><th>Gloss</th><th>Type</th><th>Build</th><th>Year</th><th>Form</th><th>Definite</th><th>Len</th><th>IPA</th><th>Also in</th><th>Latest per branch</th><th></th></tr>
-      <tr class="filters">${['id', 'gloss', 'pos', 'build', 'year', 'form'].map(k => `<th><input data-wf="${k}" value="${esc((S.wf || {})[k] || '')}" placeholder="${k === 'year' ? 'year, a..b, <a, >a' : k === 'id' ? 'id' : 'filter'}" style="width:100%;min-width:${k === 'id' ? 3 : 6}rem"></th>`).join('')}<th colspan="6"><input data-wf="tag" list="tag_list" value="${esc((S.wf || {}).tag || '')}" placeholder="tag filter" size="12" title="Only words with these tags (comma-separated)"> <button data-act="clearFilters" class="small">Clear filters</button><datalist id="tag_list">${wordTagList().map(t => `<option value="${esc(t)}">`).join('')}</datalist></th></tr></thead><tbody id="wbody"></tbody></table>
+    <table id="wt" class="${hideClasses()}"><thead><tr><th>ID</th><th>Gloss</th><th>Type</th><th>Build</th><th>Year</th><th>Form</th><th>Romanization</th><th>Definite</th><th>Len</th><th>IPA</th><th>Also in</th><th>Latest per branch</th><th></th></tr>
+      <tr class="filters">${['id', 'gloss', 'pos', 'build', 'year', 'form', 'romanization'].map(k => `<th><input data-wf="${k}" value="${esc((S.wf || {})[k] || '')}" placeholder="${k === 'year' ? 'year, a..b, <a, >a' : k === 'id' ? 'id' : 'filter'}" style="width:100%;min-width:${k === 'id' ? 3 : 6}rem"></th>`).join('')}<th colspan="6"><input data-wf="tag" list="tag_list" value="${esc((S.wf || {}).tag || '')}" placeholder="tag filter" size="12" title="Only words with these tags (comma-separated)"> <button data-act="clearFilters" class="small">Clear filters</button><datalist id="tag_list">${wordTagList().map(t => `<option value="${esc(t)}">`).join('')}</datalist></th></tr></thead><tbody id="wbody"></tbody></table>
     <div class="row"><span class="pager"></span></div>`;
     return h;
   },
@@ -282,7 +283,7 @@ const TAB = {
   },
   async bulk() {
     if (!canEdit()) return '<p class="muted">Editors only.</p>';
-    return excelImportCard() + `<p class="muted small">One word per line: <code>gloss;type;form;year;notes;tags</code> (tab-separated also works; tags are optional, comma-separated). Nothing is added if any line has an error.</p>
+    return excelImportCard() + `<p class="muted small">One word per line: <code>gloss;type;form;year;notes;tags;romanization</code> (tab-separated also works; tags and romanization are optional, tags comma-separated). Nothing is added if any line has an error.</p>
     <div class="row"><input id="b_tags" list="tag_list" placeholder="tag for all these words (optional)" size="34" title="Every word added gets this tag, besides any tags on its own line. Several tags: separate with commas."><datalist id="tag_list">${wordTagList().map(t => `<option value="${esc(t)}">`).join('')}</datalist></div>
     <textarea id="b_text" rows="12"></textarea><div class="row"><label style="display:inline;margin:0"><input type="checkbox" id="b_skip"> skip words that already exist here (same gloss)</label></div><div class="row"><button data-act="bulkCheck">Check only</button><button class="primary" data-act="bulkGo">Add all</button></div><div id="b_out"></div>`;
   },
@@ -340,6 +341,18 @@ function applyHeadings() {
 }
 const AFTER = { dict: () => drawDict(), grammar: () => { if ($('#gr_cat')) applyHeadings(); } };
 const lines = obj => Object.entries(obj || {}).map(([k, v]) => `<span class="small">${esc(k)}:</span> <span class="form">${esc(v)}</span>${sayBtn(v, langIdByName(k))}`).join('<br>');
+// the dictionary's columns: number (as in the table), name. The gloss always stays. Which are hidden is remembered in the browser.
+const DICT_COLS = [[1, 'ID'], [2, 'Gloss'], [3, 'Type'], [4, 'Build'], [5, 'Year'], [6, 'Form'], [7, 'Romanization'], [8, 'Definite'], [9, 'Len'], [10, 'IPA'], [11, 'Also in'], [12, 'Latest per branch'], [13, 'Edit']];
+function hiddenCols() {
+  if (!S.hiddenCols) { try { S.hiddenCols = new Set(JSON.parse(localStorage.getItem('rune.dictHidden') || '[]')); } catch (e) { S.hiddenCols = new Set(); } }
+  return S.hiddenCols;
+}
+const hideClasses = () => [...hiddenCols()].map(n => 'hc' + n).join(' ');
+function setColHidden(n, hide) {
+  const h = hiddenCols(); if (hide) h.add(n); else h.delete(n);
+  try { localStorage.setItem('rune.dictHidden', JSON.stringify([...h])); } catch (e) { /* remembered only for this visit */ }
+  const t = $('#wt'); if (t) t.className = hideClasses();
+}
 // a group's form rules as the arrows have put them: moved ones first by their place, the others after them in the rules' own order
 const showOrder = (a, b) => (a.show_ord ?? 1e9) - (b.show_ord ?? 1e9) || a.ord - b.ord || a.id - b.id;
 const defForm = w => (w.forms || []).find(f => f.label.toLowerCase() === 'definite');

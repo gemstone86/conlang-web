@@ -795,7 +795,7 @@ public class DictService {
         return Map.of("joined", joined.toString(), "parts", used, "steps", out);
     }
 
-    /** Bulk entry: lines of gloss;pos;form;year;notes;tags (tab or semicolon separated). All-or-nothing. */
+    /** Bulk entry: lines of gloss;pos;form;year;notes;tags;romanization (tab or semicolon separated). All-or-nothing. */
     /**
      * A borrowed word takes the form the source word had in the source language in the year of borrowing. The result is
      * stored as an ordinary form (the borrowing language's own sound changes then apply from that year), with loan_word_id
@@ -960,6 +960,7 @@ public class DictService {
             if (f.length > 2) p.put("form", f[2].trim());
             if (f.length > 3 && !f[3].isBlank()) p.put("year", f[3].trim());
             if (f.length > 4) p.put("notes", f[4].trim());
+            if (f.length > 6 && !f[6].isBlank()) p.put("romanization", f[6].trim());
             String own = f.length > 5 ? f[5].trim() : "";
             String joined = (allTags == null ? "" : allTags) + (!own.isEmpty() && allTags != null ? "," : "") + own;
             if (!joined.isBlank()) p.put("tags", joined);

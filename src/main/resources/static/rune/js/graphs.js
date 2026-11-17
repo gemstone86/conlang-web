@@ -111,7 +111,7 @@ const wordTagList = () => [...new Set((S.words || []).flatMap(wordTags))].sort((
 function fieldFilter(w) {
   const f = S.wf || {}, has = (v, q) => !q.trim() || String(v ?? '').toLowerCase().includes(q.trim().toLowerCase());
   if (f.id && f.id.trim()) { const ids = f.id.split(/[,\s]+/).filter(Boolean); if (!ids.includes(String(w.id))) return false; }
-  return has(w.gloss, f.gloss || '') && has(w.pos, f.pos || '') && has(w.build, f.build || '') && yearMatches(f.year || '', w.year) && tagMatches(f.tag || '', w.tags) &&
+  return has(w.gloss, f.gloss || '') && has(w.pos, f.pos || '') && has(w.build, f.build || '') && yearMatches(f.year || '', w.year) && tagMatches(f.tag || '', w.tags) && has(w.romanization, f.romanization || '') &&
     (!(f.form || '').trim() || has(w.form, f.form) || has(w.origin_form, f.form) || has(w.ref_text, f.form));
 }
 function filteredWords() {
@@ -120,7 +120,7 @@ function filteredWords() {
   if (S.onlyProblems) all = all.filter(w => (w.problems || []).length);
   if (S.wf && Object.values(S.wf).some(v => (v || '').trim())) all = all.filter(fieldFilter);
   if (!q) return all;
-  return all.filter(w => [w.id, w.gloss, w.meaning, w.ref_text, w.ref_gloss, w.ref_to ? 'reference see' : '', w.form, w.pos, w.notes, w.tags, ...(w.forms || []).map(f => f.form)].join(' ').toLowerCase().includes(q));
+  return all.filter(w => [w.id, w.gloss, w.meaning, w.ref_text, w.ref_gloss, w.ref_to ? 'reference see' : '', w.form, w.romanization, w.pos, w.notes, w.tags, ...(w.forms || []).map(f => f.form)].join(' ').toLowerCase().includes(q));
 }
 // a word's forms, listed under it when it is expanded: the form's label stands where the id is
 const subForms = w => [...(w.forms || [])].sort((a, b) => String(a.label).toLowerCase().localeCompare(String(b.label).toLowerCase()));
@@ -131,7 +131,7 @@ function formRow(w, f) {
     + (f.manual ? ' <span class="badge">by hand</span>' : '')
     + (f.level_year != null ? ` <span class="badge">levelled ${f.level_year}</span>` : '');
   return `<tr class="subrow${w.lost_year != null ? ' lostword' : ''}"><td class="small" title="A form of word ${w.id}">${esc(f.label)}</td><td><a data-act="openWord" data-id="${w.id}" style="cursor:pointer">${esc(w.gloss)}</a> <span class="muted">· ${esc(w.pos)}</span>${marks}</td><td>${esc(w.pos)}</td><td>form</td><td>${f.year ?? w.year}</td>
-    <td class="form">${esc(f.form)}</td><td></td><td>${[...String(f.form || '')].length}</td><td></td><td></td><td>${lines(f.latest)}</td><td></td></tr>`;
+    <td class="form">${esc(f.form)}</td><td></td><td></td><td>${[...String(f.form || '')].length}</td><td></td><td></td><td>${lines(f.latest)}</td><td></td></tr>`;
 }
 function wordRow(w) {
   const d = defForm(w), more = (w.forms || []).filter(f => f !== d).length;
@@ -143,7 +143,7 @@ function wordRow(w) {
   const subs = hasRuleForms(w), open = subs && S.expanded && S.expanded.has(w.id);
   const arrow = subs ? `<button class="arrow" data-act="toggleForms" data-id="${w.id}" title="${open ? 'Hide' : 'Show'} the forms the rules give " aria-expanded="${open}">${open ? '▾' : '▸'}</button> ` : '';
   return `<tr class="${w.inherited ? 'inherited' : ''}${w.lost_year != null ? ' lostword' : ''}"><td class="muted small">${arrow}${w.id}</td><td><a data-act="openWord" data-id="${w.id}" style="cursor:pointer"><strong>${esc(w.gloss)}</strong></a>${inh}${lost}${tagChips}${w.meaning_changed ? `<div class="small muted">means: ${esc(w.meaning)}</div>` : ''}${w.loan_from ? `<div class="small muted">borrowed from <strong>${esc(w.loan_from)}</strong></div>` : ''}${w.ref_to ? `<div class="small muted">→ same as <strong>${esc(w.ref_gloss)}</strong> (#${w.ref_to})</div>` : ''}${(w.problems || []).map(p => `<div class="small gap">⚠ ${esc(p)}</div>`).join('')}</td><td>${esc(w.pos)}</td><td>${esc(w.build)}</td><td>${w.year}</td>
-    <td class="form">${esc(w.form)}${w.spelling ? `<div class="small muted" title="The spelling lags behind: this is how the word sounded at the latest spelling reform (or when it was coined)">spelt <span class="form">${esc(w.spelling)}</span></div>` : ''}</td><td>${d ? lines(d.latest) : '<span class="muted">—</span>'}${more ? ` <span class="badge">+${more}</span>` : ''}</td>
+    <td class="form">${esc(w.form)}${w.spelling ? `<div class="small muted" title="The spelling lags behind: this is how the word sounded at the latest spelling reform (or when it was coined)">spelt <span class="form">${esc(w.spelling)}</span></div>` : ''}</td><td>${esc(w.romanization || '')}</td><td>${d ? lines(d.latest) : '<span class="muted">—</span>'}${more ? ` <span class="badge">+${more}</span>` : ''}</td>
     <td>${w.length}</td><td>${esc(w.pronunciation)}${sayBtn((w.latest || {})[S.lang.name] || w.form, S.lang.id)}</td><td>${esc((w.exists_in || []).join(', '))}</td>
     <td>${lines(w.latest)}${w.has_overrides ? ' <span class="badge">locked</span>' : ''}</td>
     <td>${act}</td></tr>${open ? subForms(w).map(f => formRow(w, f)).join('') : ''}`;
@@ -154,7 +154,7 @@ function drawDict() {
   if (pb) { pb.textContent = (S.onlyProblems ? 'Show all words' : 'Show only words with problems') + ' (' + nProb + ')'; pb.className = S.onlyProblems ? 'primary' : ''; }
   const list = filteredWords(), size = S.pageSize, pages = Math.max(1, Math.ceil(list.length / size));
   S.page = Math.min(S.page, pages - 1);
-  body.innerHTML = list.slice(S.page * size, (S.page + 1) * size).map(wordRow).join('') || '<tr><td colspan="12" class="muted">No words.</td></tr>';
+  body.innerHTML = list.slice(S.page * size, (S.page + 1) * size).map(wordRow).join('') || '<tr><td colspan="13" class="muted">No words.</td></tr>';
   const html = `<span class="muted small">${list.length ? S.page * size + 1 : 0}–${Math.min(list.length, (S.page + 1) * size)} of ${list.length}</span>
     <button data-act="pagePrev" ${S.page === 0 ? 'disabled' : ''}>‹ Previous</button> <span class="small">page ${S.page + 1} / ${pages}</span>
     <button data-act="pageNext" ${S.page >= pages - 1 ? 'disabled' : ''}>Next ›</button>`;
@@ -183,7 +183,7 @@ function wordEditRow(w, r) {
   const plainForm = !r.ref && !r.loan_from;   // a cross-reference or a borrowed word has no form of its own to type
   const f = (id, v, ph, size, cls) => `<input id="we_${id}" value="${esc(v ?? '')}" placeholder="${ph}" size="${size}" ${cls ? `class="${cls}"` : ''} data-weid="${id}">`;
   return `<div class="row wordedit" id="w_editrow" title="Change the word here; the forms below and the evolution tree follow">${f('gloss', w.gloss, 'gloss', 14)}${f('pos', w.pos, 'type', 8)}${f('build', w.build, 'build', 8)}
-    ${plainForm ? f('form', w.form, 'form', 14, 'form') : ''}<input id="we_year" type="number" value="${w.year ?? ''}" placeholder="year" size="6" data-weid="year">${f('notes', w.notes, 'notes', 20)}${f('tags', w.tags, 'tags', 14)}
+    ${plainForm ? f('form', w.form, 'form', 14, 'form') : ''}<input id="we_year" type="number" value="${w.year ?? ''}" placeholder="year" size="6" data-weid="year">${f('romanization', w.romanization, 'romanization', 14)}${f('notes', w.notes, 'notes', 20)}${f('tags', w.tags, 'tags', 14)}
     <button class="primary" data-act="saveWordHere" data-id="${w.id}">Save word</button></div>`;
 }
 async function showWord() {

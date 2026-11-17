@@ -2,6 +2,12 @@
 
 Newest first. Versions from 1.x on are the combined app (Root and Rune + Weather generator).
 
+## v1.32.0 (combined app)
+Root and Rune:
+- **Romanization column.** A word has a new optional field, *romanization* (the word written in the Latin alphabet), with its own column in the dictionary (after *Form*), a box when adding a word, in the edit row of the word window, and a filter box in the dictionary's filter row; the free-text search finds it too. Bulk entry takes it as a seventh column (`gloss;type;form;year;notes;tags;romanization`), the Excel export has a *romanization* column and the Excel import reads one of that name. It is kept in the full export. It is only for display and search: the sound changes and the forms still work on the *Form*. Up to 400 characters.
+- **Hide columns.** *Columns* above the dictionary table has a tick box for each column (the gloss always stays); what you hide is remembered in the browser. Only how the table looks; nothing else changes.
+- New column `words.romanization`; test `RomanizationTest`.
+
 ## v1.31.0 (combined app)
 Root and Rune:
 - **Ask for access with a link.** Someone who is logged in and opens a link to a language they cannot see (`/rune/?lang=…`) now sends a request to the language's owner (and the world's owner) instead of just being told it was not found. The owner gets a notification under the bell, and on the language's *Sharing* tab a box *Asking for access* lists the requests with *Let in as viewer*, *as editor* and *Deny*; letting someone in shares the language with them like the usual sharing does (they get a notification), and a *Deny* tells them no. One open request per person and language, at most 20 open per person.

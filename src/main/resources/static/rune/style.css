@@ -123,3 +123,39 @@ tr.subrow td:first-child { padding-left:1.4rem; }
 .movers button.arrow { font-size:.7rem; padding:0 .15rem; }
 .movers button.arrow:disabled { opacity:.3; cursor:default; }
 .wordedit input { margin-right:.2rem; }
+
+/* the dictionary's hideable columns (the table's class names the hidden ones) */
+#wt.hc1 thead tr:first-child th:nth-child(1),
+#wt.hc1 tbody td:nth-child(1):not([colspan]),
+#wt.hc1 thead tr.filters th:nth-child(1) { display:none; }
+#wt.hc2 thead tr:first-child th:nth-child(2),
+#wt.hc2 tbody td:nth-child(2):not([colspan]),
+#wt.hc2 thead tr.filters th:nth-child(2) { display:none; }
+#wt.hc3 thead tr:first-child th:nth-child(3),
+#wt.hc3 tbody td:nth-child(3):not([colspan]),
+#wt.hc3 thead tr.filters th:nth-child(3) { display:none; }
+#wt.hc4 thead tr:first-child th:nth-child(4),
+#wt.hc4 tbody td:nth-child(4):not([colspan]),
+#wt.hc4 thead tr.filters th:nth-child(4) { display:none; }
+#wt.hc5 thead tr:first-child th:nth-child(5),
+#wt.hc5 tbody td:nth-child(5):not([colspan]),
+#wt.hc5 thead tr.filters th:nth-child(5) { display:none; }
+#wt.hc6 thead tr:first-child th:nth-child(6),
+#wt.hc6 tbody td:nth-child(6):not([colspan]),
+#wt.hc6 thead tr.filters th:nth-child(6) { display:none; }
+#wt.hc7 thead tr:first-child th:nth-child(7),
+#wt.hc7 tbody td:nth-child(7):not([colspan]),
+#wt.hc7 thead tr.filters th:nth-child(7) { display:none; }
+#wt.hc8 thead tr:first-child th:nth-child(8),
+#wt.hc8 tbody td:nth-child(8):not([colspan]) { display:none; }
+#wt.hc9 thead tr:first-child th:nth-child(9),
+#wt.hc9 tbody td:nth-child(9):not([colspan]) { display:none; }
+#wt.hc10 thead tr:first-child th:nth-child(10),
+#wt.hc10 tbody td:nth-child(10):not([colspan]) { display:none; }
+#wt.hc11 thead tr:first-child th:nth-child(11),
+#wt.hc11 tbody td:nth-child(11):not([colspan]) { display:none; }
+#wt.hc12 thead tr:first-child th:nth-child(12),
+#wt.hc12 tbody td:nth-child(12):not([colspan]) { display:none; }
+#wt.hc13 thead tr:first-child th:nth-child(13),
+#wt.hc13 tbody td:nth-child(13):not([colspan]) { display:none; }
+.colpick { display:inline-block; margin-left:.6rem; } .colpick summary { cursor:pointer; }
