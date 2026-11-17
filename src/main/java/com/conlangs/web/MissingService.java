@@ -21,16 +21,18 @@ public class MissingService {
     private final Db db;
     private final Access access;
     private final SentenceService sentences;
+    private final TextService texts;
     private final AppLog applog;
 
-    public MissingService(Db db, Access access, SentenceService sentences, AppLog applog) {
+    public MissingService(Db db, Access access, SentenceService sentences, TextService texts, AppLog applog) {
         this.db = db;
         this.access = access;
         this.sentences = sentences;
+        this.texts = texts;
         this.applog = applog;
     }
 
-    /** {entries: [{id, gloss, pos, notes, created, created_by_name, word}], fromSentences: [{meaning, reason, sentences}]} */
+    /** {entries: [{id, gloss, pos, notes, created, created_by_name, word}], fromSentences: [{meaning, reason, sentences}], fromTexts: [{meaning, reason, texts}]} */
     public Map<String, Object> list(long uid, long langId) {
         access.need(uid, langId, Access.VIEWER);
         List<Map<String, Object>> entries = db.rows("select m.id, m.gloss, m.pos, m.notes, m.created, u.username as created_by_name "
@@ -47,8 +49,13 @@ public class MissingService {
         for (Map<String, Object> g : sentences.sentenceGaps(uid, langId)) {
             if (!marked.contains(g.get("meaning").toString().toLowerCase())) fromSentences.add(g);
         }
+        List<Map<String, Object>> fromTexts = new ArrayList<>();
+        for (Map<String, Object> g : texts.textGaps(uid, langId)) {
+            if (!marked.contains(g.get("meaning").toString().toLowerCase())) fromTexts.add(g);
+        }
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("entries", entries);
+        out.put("fromTexts", fromTexts);
         out.put("fromSentences", fromSentences);
         return out;
     }

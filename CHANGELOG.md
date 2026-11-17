@@ -2,6 +2,11 @@
 
 Newest first. Versions from 1.x on are the combined app (Root and Rune + Weather generator).
 
+## v1.35.0 (combined app)
+Root and Rune:
+- **Missing words from texts.** The *Missing words* tab has a new list, *Needed by texts*: meanings that the language's texts (its own and the ones it inherits) use at any of their years but the language has no word for. Each shows why, which texts and lines need it, and at which years, with the same *Coin word*, *Suggest root* and mark-as-missing buttons as the sentence list. Meanings you have already marked by hand are not repeated. The compound tool's side list shows them too. The list is also in the API as `fromTexts` on `GET /languages/{id}/missing`.
+- Tests `MissingFromTextsTest`.
+
 ## v1.34.0 (combined app)
 Root and Rune:
 - **Syllable shapes by year.** Besides the shape from the start, a language can have others from certain years: *Grammar → Syllable shape → Other shapes by year*, one per line, `500: CV(C)` (the owner edits them). A shape is in force from its year until the next one; for a year before all of them the shape from the start is used, or, without one, the earliest. A language without any shapes goes by its parent's, as before.

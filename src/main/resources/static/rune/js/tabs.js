@@ -228,7 +228,7 @@ const TAB = {
     const filled = r.entries.filter(e => e.word);
     let h = `<div class="card"><p class="muted small">Meanings ${esc(S.lang.name)} has no word for yet. Mark them here as a to-do list;
       <strong>Coin word</strong> opens the dictionary with the meaning filled in. An entry is ticked off once the language has a word
-      for it (its own or inherited). Below the list are the meanings your saved sentences need but can't find.</p>`;
+      for it (its own or inherited). Below the list are the meanings your saved sentences and texts need but can't find.</p>`;
     if (canEdit()) h += `<div class="row"><input id="m_gloss" placeholder="meaning, e.g. to forgive" size="24"><input id="m_pos" placeholder="type" size="8">
       <input id="m_notes" placeholder="note (optional)" size="30"><button class="primary" data-act="missAdd">Mark as missing</button></div>
       <details><summary class="small">Add several at once</summary>
@@ -251,6 +251,13 @@ const TAB = {
         <td class="small">${g.sentences.map(x => esc(x.translation || x.source)).join('<br>')}</td>
         <td>${canEdit() ? `<button class="primary" data-act="missCoin" data-g="${esc(g.meaning)}" data-p="">Coin word</button> <button data-act="missRoot" data-g="${esc(g.meaning)}" data-p="" title="Root forms that sound like the language; click one to add it as the word">Suggest root</button> <button data-act="missMark" data-g="${esc(g.meaning)}">Mark as missing</button>` : ''}</td></tr>`).join('') + '</table>'
       : '<p class="muted">Every word in the saved sentences is in the dictionary.</p>';
+    const texts = r.fromTexts || [];
+    h += `<h3>Needed by texts (${texts.length})</h3>`;
+    h += texts.length ? `<table><tr><th>Meaning</th><th>Why</th><th>Used in</th><th></th></tr>` +
+      texts.map(g => `<tr><td><strong>${esc(g.meaning)}</strong></td><td class="small muted">${esc(g.reason)}</td>
+        <td class="small">${g.texts.map(x => esc(x.title) + ': ' + esc(x.line) + (x.years && x.years.length ? ' <span class="muted">(' + x.years.join(', ') + ')</span>' : '')).join('<br>')}</td>
+        <td>${canEdit() ? `<button class="primary" data-act="missCoin" data-g="${esc(g.meaning)}" data-p="">Coin word</button> <button data-act="missRoot" data-g="${esc(g.meaning)}" data-p="" title="Root forms that sound like the language; click one to add it as the word">Suggest root</button> <button data-act="missMark" data-g="${esc(g.meaning)}">Mark as missing</button>` : ''}</td></tr>`).join('') + '</table>'
+      : '<p class="muted">Every word in the texts is in the dictionary.</p>';
     return h;
   },
   async sentences() {

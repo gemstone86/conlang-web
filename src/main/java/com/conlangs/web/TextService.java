@@ -7,6 +7,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.springframework.stereotype.Service;
 
 /**
@@ -226,5 +227,52 @@ public class TextService {
         out.put("lines", lines);
         out.put("gaps", gapCount);
         return out;
+    }
+
+    /**
+     * Meanings the language's texts (its own and inherited ones) need at some of their years but the language has
+     * no word for: [{meaning, reason, texts: [{id, title, line, years}]}]. The line is the sentence's translation or source.
+     */
+    @SuppressWarnings("unchecked")
+    public List<Map<String, Object>> textGaps(long uid, long langId) {
+        Map<String, Map<String, Object>> byMeaning = new LinkedHashMap<>();
+        var build = sentences.builder(uid, langId);
+        for (Map<String, Object> row : list(uid, langId)) {
+            Map<String, Object> t = text(Db.num(row.get("id")));
+            List<Integer> ys = years((String) t.get("years"));
+            for (Map<String, Object> l : lines((String) t.get("lines_json"))) {
+                String src = String.valueOf(l.getOrDefault("source", ""));
+                if (src.isBlank()) continue;
+                String tr = String.valueOf(l.getOrDefault("translation", ""));
+                Map<String, Set<Integer>> yearsByMeaning = new LinkedHashMap<>();
+                Map<String, String> reasons = new LinkedHashMap<>();
+                for (int y : ys) {
+                    Map<String, Object> b = build.apply(src, y);
+                    for (Map<String, Object> w : (List<Map<String, Object>>) b.get("words"))
+                        for (Map<String, Object> p : (List<Map<String, Object>>) w.get("parts")) {
+                            String m = SentenceService.gapMeaning(p);
+                            if (m == null) continue;
+                            yearsByMeaning.computeIfAbsent(m, k -> new java.util.TreeSet<>()).add(y);
+                            reasons.putIfAbsent(m, String.valueOf(p.get("reason")));
+                        }
+                }
+                for (var e : yearsByMeaning.entrySet()) {
+                    Map<String, Object> g = byMeaning.computeIfAbsent(e.getKey().toLowerCase(), k -> {
+                        Map<String, Object> m = new LinkedHashMap<>();
+                        m.put("meaning", e.getKey());
+                        m.put("reason", reasons.get(e.getKey()));
+                        m.put("texts", new ArrayList<Map<String, Object>>());
+                        return m;
+                    });
+                    Map<String, Object> ref = new LinkedHashMap<>();
+                    ref.put("id", t.get("id"));
+                    ref.put("title", t.get("title"));
+                    ref.put("line", tr.isBlank() || "null".equals(tr) ? src : tr);
+                    ref.put("years", e.getValue());
+                    ((List<Map<String, Object>>) g.get("texts")).add(ref);
+                }
+            }
+        }
+        return new ArrayList<>(byMeaning.values());
     }
 }
