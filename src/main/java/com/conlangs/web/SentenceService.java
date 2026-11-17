@@ -945,6 +945,13 @@ public class SentenceService {
     private static final int ANY_YEAR = 1_000_000;
 
     /** Is the sentence builder's gap for this part a missing word (not a missing form)? */
+    /** The meaning a builder part needs but the language lacks, or null if the part is fine or only lacks a form. */
+    static String gapMeaning(Map<String, Object> p) {
+        if (!Boolean.FALSE.equals(p.get("ok")) || !(Boolean.TRUE.equals(p.get("missingWord")) || missingWord((String) p.get("reason")))) return null;
+        String m = ID.matcher(p.get("input").toString()).replaceAll("").trim();
+        return m.isEmpty() ? null : m;
+    }
+
     private static boolean missingWord(String reason) {
         return reason != null && (reason.equals("no word with that meaning") || reason.contains("(coined after the split)")
                 || reason.contains("points to a word that doesn't exist"));

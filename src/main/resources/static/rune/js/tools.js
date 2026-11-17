@@ -88,6 +88,9 @@ function compMissList(miss) {
   const item = (g, p, note) => `<a class="misspick${sel === g.toLowerCase() ? ' on' : ''}" data-act="compPick" data-g="${esc(g)}" data-p="${esc(p || '')}" title="${esc(note || 'Coin the compound for this meaning')}">${esc(g)}${p ? ` <span class="small muted">${esc(p)}</span>` : ''}</a>`;
   let h = open.length ? open.map(e => item(e.gloss, e.pos, e.notes)).join('') : '<p class="small muted">None marked as missing.</p>';
   if (miss.fromSentences.length) h += '<h4 class="small muted">Needed by sentences</h4>' + miss.fromSentences.map(g => item(g.meaning, '', 'Used in: ' + g.sentences.map(x => x.translation || x.source).join(' / '))).join('');
+  const seen = new Set(miss.fromSentences.map(g => g.meaning.toLowerCase()));
+  const tx = (miss.fromTexts || []).filter(g => !seen.has(g.meaning.toLowerCase()));
+  if (tx.length) h += '<h4 class="small muted">Needed by texts</h4>' + tx.map(g => item(g.meaning, '', 'Used in: ' + g.texts.map(x => x.title).join(' / '))).join('');
   return h;
 }
 function filterMissList() {
