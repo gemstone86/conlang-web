@@ -855,6 +855,7 @@ public final class Api {
             }
             Map<String, Object> out = new LinkedHashMap<>();
             out.put(layer.name, Json.parse(json));
+            out.put("stamps", ListStamps.of(json));
             out.put("rev", riversRev(json));
             out.put("canEdit", canReview(mapId, viewer));
             return Http.Response.json(out);
@@ -869,9 +870,11 @@ public final class Api {
                 if (base != null && !base.isEmpty() && !base.equals(riversRev(store.list(layer.name, mapId).json())))
                     throw new ApiException(409, "The " + layer.name + " were changed elsewhere since this page loaded them");
                 store.setList(layer.name, mapId, json, "app", uid);
+                json = store.list(layer.name, mapId).json();   // as stored: with the "last edited" stamps, which the version check goes by
             }
             Map<String, Object> out = new LinkedHashMap<>();
             out.put("ok", true);
+            out.put("stamps", ListStamps.of(json));
             out.put("rev", riversRev(json));
             return Http.Response.json(out);
         }

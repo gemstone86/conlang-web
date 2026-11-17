@@ -1190,6 +1190,11 @@ public final class Store {
 
     public void setList(String layer, long mapId, String json, String source, Long userId) {
         String table = listTable(layer);
+        // saved from the app: the items that changed (or are new) get "last edited" (when, and by whom)
+        if ("app".equals(source)) {
+            String by = userId == null ? null : userById(userId).map(User::username).orElse(null);
+            json = ListStamps.stamp(list(layer, mapId).json(), json, java.time.Instant.now().truncatedTo(java.time.temporal.ChronoUnit.SECONDS).toString(), by);
+        }
         byte[] b = json.getBytes(java.nio.charset.StandardCharsets.UTF_8);
         tx(c -> {
             if (update(c, "UPDATE " + table + " SET " + layer + " = ?, source = ?, updated_by = ?, updated_at = CURRENT_TIMESTAMP WHERE map_id = ?", b, source, userId, mapId) == 0)

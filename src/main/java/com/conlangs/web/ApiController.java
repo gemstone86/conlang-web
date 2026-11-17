@@ -350,6 +350,10 @@ public class ApiController {
         String shapeText = b.containsKey("syllableShape") ? str(b, "syllableShape") : (String) l.get("syllable_shape");
         String shapeErr = SyllableShape.check(shapeText);
         if (shapeErr != null) throw new ApiException(400, "Syllable shape: " + shapeErr);
+        if (b.containsKey("syllableYears")) {
+            try { db.update("update languages set syllable_years=? where id=?", SyllableShapes.normalize(str(b, "syllableYears")), id); }
+            catch (IllegalArgumentException e) { throw new ApiException(400, "Syllable shapes by year: " + e.getMessage()); }
+        }
         Long target = b.containsKey("erosionTarget") ? lng(b, "erosionTarget") : null;
         if (b.containsKey("spellingYears")) db.update("update languages set spelling_years=? where id=?", FormMath.yearsText(str(b, "spellingYears")), id);
         db.update("update languages set name=?, parent_id=?, split_year=?, classes=?, erosion=?, erosion_target=?, ipa_map=?, grammar=?, def_suffix=?, syllable_shape=? where id=?",
@@ -835,8 +839,29 @@ public class ApiController {
 
     @GetMapping("/languages/{id}/suggest-roots")
     public Map<String, Object> suggestRoots(@PathVariable long id, @RequestParam(defaultValue = "10") int count, @RequestParam(defaultValue = "2") int min,
-            @RequestParam(defaultValue = "3") int max, @RequestParam(required = false) Long seed, HttpSession s) {
-        return dict.suggestRoots(auth.viewerUid(s), id, count, min, max, seed);
+            @RequestParam(defaultValue = "3") int max, @RequestParam(required = false) Long seed, @RequestParam(required = false) Integer year, HttpSession s) {
+        return dict.suggestRoots(auth.viewerUid(s), id, count, min, max, seed, year);
+    }
+
+    /** The syllable shape in force in a year (the language's own, or its nearest ancestor's), for the form that suggests roots. */
+    @GetMapping("/languages/{id}/syllable-shape")
+    public Map<String, Object> syllableShapeAt(@PathVariable long id, @RequestParam(required = false) Integer year, HttpSession s) {
+        long uid = auth.viewerUid(s);
+        access.need(uid, id, Access.VIEWER);
+        return dict.shapeAt(id, year);
+    }
+
+    /** All the words of a language as a JSON file. */
+    @GetMapping("/languages/{id}/export.json")
+    public ResponseEntity<byte[]> exportJson(@PathVariable long id, HttpSession s) throws Exception {
+        long uid = auth.viewerUid(s);
+        Map<String, Object> l = access.need(uid, id, Access.VIEWER);
+        byte[] data = export.wordlistJson(uid, id);
+        String fn = ((String) l.get("name")).replaceAll("[^A-Za-z0-9_-]", "_") + "-words.json";
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + fn + "\"")
+                .contentType(MediaType.parseMediaType("application/json;charset=UTF-8"))
+                .body(data);
     }
 
     @GetMapping("/languages/{id}/tree-check")

@@ -2,6 +2,7 @@ package com.conlangs.web;
 
 import java.io.ByteArrayOutputStream;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -34,6 +35,39 @@ public class ExportService {
             else if (c instanceof Boolean b) row.createCell(i).setCellValue(b);
             else row.createCell(i).setCellValue(c.toString());
         }
+    }
+
+    /**
+     * Every word of the language as JSON: { language, exported, count, words: [{ id, gloss, pos, build, year, form, romanization,
+     * pronunciation, notes, tags, inherited, coinedIn, coinedAs, lostYear, latest: {branch: form}, forms: [{label, form, latest}] }] }.
+     * "form" is the word as it is in this language now; "coinedAs" the form it was entered with, for an inherited word.
+     */
+    public byte[] wordlistJson(long uid, long langId) throws Exception {
+        Map<String, Object> lang = access.need(uid, langId, Access.VIEWER);
+        List<Map<String, Object>> words = new ArrayList<>();
+        for (Map<String, Object> w : dict.words(uid, langId)) {
+            Map<String, Object> o = new LinkedHashMap<>();
+            for (String k : List.of("id", "gloss", "pos", "build", "year", "form", "romanization", "pronunciation", "notes", "tags")) o.put(k, w.get(k));
+            o.put("inherited", Boolean.TRUE.equals(w.get("inherited")));
+            if (Boolean.TRUE.equals(w.get("inherited"))) { o.put("coinedIn", w.get("origin_lang")); o.put("coinedAs", w.get("origin_form")); }
+            if (w.get("lost_year") != null) o.put("lostYear", w.get("lost_year"));
+            if (w.get("meaning_changed") != null && Boolean.TRUE.equals(w.get("meaning_changed"))) o.put("meaning", w.get("meaning"));
+            o.put("latest", w.get("latest"));
+            List<Map<String, Object>> forms = new ArrayList<>();
+            if (w.get("forms") instanceof List<?> fl) for (Object x : fl) if (x instanceof Map<?, ?> f) {
+                Map<String, Object> fo = new LinkedHashMap<>();
+                fo.put("label", f.get("label")); fo.put("form", f.get("form")); fo.put("latest", f.get("latest"));
+                forms.add(fo);
+            }
+            o.put("forms", forms);
+            words.add(o);
+        }
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("language", lang.get("name"));
+        out.put("exported", java.time.Instant.now().truncatedTo(java.time.temporal.ChronoUnit.SECONDS).toString());
+        out.put("count", words.size());
+        out.put("words", words);
+        return new tools.jackson.databind.ObjectMapper().writerWithDefaultPrettyPrinter().writeValueAsBytes(out);
     }
 
     public byte[] workbook(long uid, long langId) throws Exception {

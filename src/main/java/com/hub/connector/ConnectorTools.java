@@ -185,8 +185,9 @@ public class ConnectorTools {
         add("rune_suggest_roots", "Suggest new roots",
                 "Root and Rune: new root words that sound like the language (built from its syllable shape and existing words), "
                         + "for coining words.",
-                schema(Map.of("language_id", lang, "count", prop("integer", "How many (default 10).")), "language_id"),
-                (c, a) -> rune.suggestRoots(id(a, "language_id"), (int) a.path("count").asLong(10), 2, 3, null, c.session()));
+                schema(Map.of("language_id", lang, "count", prop("integer", "How many (default 10)."),
+                        "year", prop("integer", "Suggest roots for this year (uses the syllable shape in force then); default: the latest.")), "language_id"),
+                (c, a) -> rune.suggestRoots(id(a, "language_id"), (int) a.path("count").asLong(10), 2, 3, null, a.hasNonNull("year") ? (Integer) a.path("year").asInt() : null, c.session()));
 
         add("weather_world", "Weather: regions and calendars",
                 "Weather generator (Eon): every region with its base climate (temperature, rain, wind), the calendars, religions, "
