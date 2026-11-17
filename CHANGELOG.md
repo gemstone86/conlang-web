@@ -2,6 +2,10 @@
 
 Newest first. Versions from 1.x on are the combined app (Root and Rune + Weather generator).
 
+## v1.33.1 (combined app)
+Weather generator:
+- **Windows taller than the screen scroll, and their buttons stay in view.** The journey settings window (and the other windows: event rules, the symbols, the small question boxes) could be taller than the screen on a low or narrow window, with its *Save* / *OK* buttons off the bottom and no way to scroll. Every window now scrolls inside the screen's height and keeps its row of buttons at the bottom.
+
 ## v1.33.0 (combined app)
 Weather generator:
 - **"Last edited" on roads, rivers, lakes, cities, bridges, fords, mountain ranges and nations.** Every item of these lists now remembers when it was last changed and by whom. When a list is saved the server compares it with what was stored: the items that are new or different (renamed, moved, a point changed, …) get the time (UTC) and the account's name, the ones that are the same keep what they had. The information line of the selected item ends with it, in the page's language: *… · last edited 17 Nov 2026 07:55 by boss* (for a nation it is the nation as a whole; changing one of its subdivisions counts as changing the nation).
