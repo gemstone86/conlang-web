@@ -93,6 +93,22 @@ public class Notifications {
                 : who + (approved ? " approved " : " turned down ") + n + " of your suggestions in " + name + ".");
     }
 
+    /** Someone with a link asks for access to a language: its owners hear about it. */
+    public void accessRequested(Map<String, Object> lang, long actorId) {
+        String who = username(actorId), name = (String) lang.get("name");
+        long lid = Db.num(lang.get("id"));
+        for (long o : owners(lang))
+            notify(o, "access", lid, actorId, "/rune/?lang=" + lid + "&tab=share", n -> who + " asks for access to " + name + ". Approve or deny it on the Sharing tab.");
+    }
+
+    /** The owner said no to a request for access. */
+    public void accessDenied(long userId, long deciderId, long langId) {
+        Map<String, Object> l = db.one("select name from languages where id=?", langId);
+        if (l == null) return;
+        String who = username(deciderId);
+        notify(userId, "access", langId, deciderId, "/rune/", n -> who + " did not give you access to " + l.get("name") + ".");
+    }
+
     /** A language or world was shared with someone. */
     public void shared(long userId, long actorId, String scope, long target, String level) {
         String who = username(actorId);

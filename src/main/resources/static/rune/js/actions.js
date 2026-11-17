@@ -119,7 +119,7 @@ const A = {
     $('#w_form').hidden = false; $('#w_form').value = d.form; $('#w_gloss').focus();
   },
   saveWord: async () => {
-    const p = { gloss: val('w_gloss'), pos: val('w_pos'), build: val('w_build'), form: val('w_form'), notes: val('w_notes'), tags: val('w_tags') };
+    const p = { gloss: val('w_gloss'), pos: val('w_pos'), build: val('w_build'), form: val('w_form'), notes: val('w_notes'), tags: val('w_tags'), romanization: val('w_romanization') };
     if (val('w_year') !== '') p.year = Number(val('w_year'));
     if ($('#w_isref') && $('#w_isref').checked) {
       const t = val('w_ref').trim(), m = t.match(/#(\d+)\s*$/);
@@ -140,7 +140,7 @@ const A = {
   },
   editWord: async d => {
     const w = S.words.find(x => x.id === Number(d.id));
-    for (const [k, v] of [['gloss', w.gloss], ['pos', w.pos], ['build', w.build], ['form', w.ref_to ? '' : w.form], ['year', w.year], ['notes', w.notes], ['tags', w.tags]]) $('#w_' + k).value = v ?? '';
+    for (const [k, v] of [['gloss', w.gloss], ['pos', w.pos], ['build', w.build], ['form', w.ref_to ? '' : w.form], ['year', w.year], ['notes', w.notes], ['tags', w.tags], ['romanization', w.romanization]]) $('#w_' + k).value = v ?? '';
     $('#w_isref').checked = !!w.ref_to; $('#w_ref').value = w.ref_to ? w.ref_gloss + ' #' + w.ref_to : ''; syncRefBox();
     $('#w_id').value = w.id; $('#w_btn').textContent = 'Save changes'; window.scrollTo(0, 0);
   },
@@ -153,6 +153,15 @@ const A = {
   connectorCreate: async () => {
     S.connectorNew = await api('POST', '/rune/api/admin/connector-keys', { username: val('cn_user'), label: val('cn_label') });
     await connectorPage();
+  },
+  answerAccess: async d => {
+    await api('POST', base() + '/access-requests/' + d.id, { answer: d.a });
+    say(d.a === 'deny' ? 'Request turned down.' : 'They now have access.'); renderPanel();
+  },
+  copyLink: async () => {
+    const url = location.origin + '/rune/?lang=' + S.lang.id;
+    try { await navigator.clipboard.writeText(url); say('Link copied. ' + (S.lang.is_public ? 'The language is public, so anyone can open it.' : 'Only people it is shared with can open it.')); }
+    catch (e) { window.prompt('Copy this link:', url); }
   },
   connectorCopy: async () => { const i = $('#cn_url'); i.select(); try { await navigator.clipboard.writeText(i.value); say('Copied.'); } catch (e) { document.execCommand('copy'); say('Copied.'); } },
   connectorRevoke: async d => {
@@ -223,7 +232,7 @@ const A = {
   },
   saveWordHere: async d => {
     const w = S.openWordData || {}, id = Number(d.id);
-    const now = { gloss: val('we_gloss').trim(), pos: val('we_pos').trim(), build: val('we_build').trim(), notes: val('we_notes'), tags: val('we_tags') };
+    const now = { gloss: val('we_gloss').trim(), pos: val('we_pos').trim(), build: val('we_build').trim(), notes: val('we_notes'), tags: val('we_tags'), romanization: val('we_romanization') };
     if ($('#we_form')) now.form = val('we_form').trim();
     const p = {};
     for (const [k, v] of Object.entries(now)) if (String(v ?? '') !== String(w[k] ?? '')) p[k] = v;
@@ -622,6 +631,7 @@ document.addEventListener('change', e => {
   if (e.target.dataset.logauto) { stopLogTimer(); if (e.target.checked) S.logTimer = setInterval(() => { if (S.page === 'log') loadLog(true); else stopLogTimer(); }, 10000); return; }
   if (e.target.id === 'gr_cat') { applyHeadings(); return; }
   if (e.target.dataset.soundyear) { S.soundYear = e.target.value === '' ? '' : Number(e.target.value); renderPanel(); return; }
+  if (e.target.dataset.col) { setColHidden(Number(e.target.dataset.col), !e.target.checked); return; }
   if (e.target.dataset.isref) { syncRefBox(); return; }
   if (e.target.dataset.isloan) { syncLoanBox(); return; }
   if (e.target.dataset.loanlang) { fillLoanWords(); return; }

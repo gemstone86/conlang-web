@@ -109,6 +109,7 @@ public class ImportService {
                 p.put("build", b);
                 if (col.containsKey("type")) p.put("pos", text(r.getCell(col.get("type"))));
                 if (col.containsKey("notes")) p.put("notes", text(r.getCell(col.get("notes"))));
+                if (col.containsKey("romanization")) p.put("romanization", text(r.getCell(col.get("romanization"))));
                 if (allTags != null) p.put("tags", allTags);
                 try {
                     Map<String, Object> clean = store.validate(target, "word", "CREATE", null, p);

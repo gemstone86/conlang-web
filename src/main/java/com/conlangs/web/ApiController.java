@@ -436,6 +436,57 @@ public class ApiController {
         return Map.of("ok", true);
     }
 
+    // ---------------- asking for access with a link ----------------
+
+    /**
+     * Someone logged in who followed a link to a language they cannot see asks its owner for access. One open request per
+     * person and language, and at most 20 open ones per person.
+     */
+    @PostMapping("/languages/{id}/access-request")
+    public Map<String, Object> requestAccess(@PathVariable long id, HttpSession s) {
+        long uid = auth.requireUid(s);
+        Map<String, Object> lang = access.language(id);
+        if (access.level(uid, lang) >= Access.VIEWER) return Map.of("status", "has");
+        if (db.count("select count(*) from access_requests where language_id=? and user_id=?", id, uid) > 0) return Map.of("status", "already");
+        if (db.count("select count(*) from access_requests where user_id=?", uid) >= 20)
+            throw new ApiException(400, "You have 20 requests waiting already. Wait for some of them to be answered.");
+        db.insert("insert into access_requests(language_id, user_id) values (?,?)", id, uid);
+        applog.info("share", uid, "Asked for access to language #" + id);
+        notifications.accessRequested(lang, uid);
+        return Map.of("status", "requested");
+    }
+
+    @GetMapping("/languages/{id}/access-requests")
+    public List<Map<String, Object>> accessRequests(@PathVariable long id, HttpSession s) {
+        access.need(auth.requireUid(s), id, Access.OWNER);
+        return db.rows("select r.id, r.created, u.username from access_requests r join users u on u.id=r.user_id where r.language_id=? order by r.id", id);
+    }
+
+    /** The owner lets the person in (as viewer or editor) or turns the request down. */
+    @PostMapping("/languages/{id}/access-requests/{rid}")
+    public Map<String, Object> answerAccessRequest(@PathVariable long id, @PathVariable long rid, @RequestBody Map<String, Object> b, HttpSession s) {
+        long uid = auth.requireUid(s);
+        access.need(uid, id, Access.OWNER);
+        Map<String, Object> r = db.one("select * from access_requests where id=? and language_id=?", rid, id);
+        if (r == null) throw new ApiException(404, "That request is gone (already answered?).");
+        long who = Db.num(r.get("user_id"));
+        String answer = str(b, "answer");
+        if ("deny".equals(answer)) {
+            db.update("delete from access_requests where id=?", rid);
+            notifications.accessDenied(who, uid, id);
+            applog.info("share", uid, "Denied access request #" + rid + " for language #" + id);
+            return Map.of("ok", true);
+        }
+        if (!"viewer".equals(answer) && !"editor".equals(answer)) throw new ApiException(400, "answer must be viewer, editor or deny.");
+        String level = "editor".equals(answer) ? "EDITOR" : "VIEWER";
+        db.update("delete from shares where scope='LANGUAGE' and target_id=? and user_id=?", id, who);
+        db.insert("insert into shares(scope, target_id, user_id, level, auto_approve) values ('LANGUAGE',?,?,?,false)", id, who, level);
+        db.update("delete from access_requests where id=?", rid);
+        applog.info("share", uid, "Approved access request #" + rid + " for language #" + id + " as " + level.toLowerCase());
+        notifications.shared(who, uid, "LANGUAGE", id, level);
+        return Map.of("ok", true);
+    }
+
     // ---------------- dictionary, rules, edits ----------------
 
     @GetMapping("/languages/{id}/words")

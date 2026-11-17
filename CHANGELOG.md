@@ -2,6 +2,34 @@
 
 Newest first. Versions from 1.x on are the combined app (Root and Rune + Weather generator).
 
+## v1.32.0 (combined app)
+Root and Rune:
+- **Romanization column.** A word has a new optional field, *romanization* (the word written in the Latin alphabet), with its own column in the dictionary (after *Form*), a box when adding a word, in the edit row of the word window, and a filter box in the dictionary's filter row; the free-text search finds it too. Bulk entry takes it as a seventh column (`gloss;type;form;year;notes;tags;romanization`), the Excel export has a *romanization* column and the Excel import reads one of that name. It is kept in the full export. It is only for display and search: the sound changes and the forms still work on the *Form*. Up to 400 characters.
+- **Hide columns.** *Columns* above the dictionary table has a tick box for each column (the gloss always stays); what you hide is remembered in the browser. Only how the table looks; nothing else changes.
+- New column `words.romanization`; test `RomanizationTest`.
+
+## v1.31.0 (combined app)
+Root and Rune:
+- **Ask for access with a link.** Someone who is logged in and opens a link to a language they cannot see (`/rune/?lang=…`) now sends a request to the language's owner (and the world's owner) instead of just being told it was not found. The owner gets a notification under the bell, and on the language's *Sharing* tab a box *Asking for access* lists the requests with *Let in as viewer*, *as editor* and *Deny*; letting someone in shares the language with them like the usual sharing does (they get a notification), and a *Deny* tells them no. One open request per person and language, at most 20 open per person.
+- **No account yet.** A visitor who is not logged in is sent to the log-in page with a note that the language is not public and that they can log in to ask for access, or create an account first, and is brought back to the link afterwards, which then sends the request. Only people with an account can ask, so only they can be let in.
+- New table `access_requests`; test `AccessRequestTest`.
+
+## v1.30.0 (combined app)
+Root and Rune:
+- **Link to a language.** A *Copy link* button next to *Export Excel* copies a link (`/rune/?lang=…`) that opens that language. A public language opens for anyone; a private one opens for the people it is shared with. Someone who is not logged in and follows a link to a language they cannot see is sent to log in and then brought back to the same link.
+
+## v1.29.3 (combined app)
+Weather generator:
+- **The Asharien & Damarien layer moved a little to the left.** Fitted against the first Mundana map it sat about 1.3 map pixels (10 full-size pixels) too far to the right; the scale was right. It is moved 10 full-size pixels left with `tools/move-layer-piece.py`. The fit also suggests it could go about one map pixel north; that is left as it is.
+
+## v1.29.2 (combined app)
+Weather generator:
+- **Caserion fits the map better.** The Caserion part of the layer *Gordrion, Vambolien & Caserion* was drawn about 4 % smaller than the first Mundana map and sat a few pixels too far south, which is why the south fitted and the north drifted. It is now scaled up 4 % (the north and south halves gave the same scale when fitted) and moved so that its north edge is about 5 map pixels further north; the place names now fall on the first map's. New tool `tools/scale-layer-piece.py` (like `move-layer-piece.py`, with a scale).
+
+## v1.29.1 (combined app)
+Root and Rune:
+- **Slower speech by default.** The speech engine's default speed goes from 140 to 105 words a minute. A language that has its own speed set (*Settings → Speech → Speed*, 60–400) keeps it; an empty field uses the default, or the parent language's speed.
+
 ## v1.29.0 (combined app)
 Root and Rune:
 - **Edit a word in the word window.** Clicking a word now has an edit row just above the forms table (gloss, type, build, form, year, notes, tags and *Save word*), so a word can be changed and checked in the same place. Only what was changed is saved, through the same edit as the dictionary's, so it is in the edit log and can be undone.

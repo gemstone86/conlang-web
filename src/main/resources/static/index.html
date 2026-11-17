@@ -198,7 +198,9 @@ function render() {
     $('authSwitch').hidden = !reg && !state.regOpen;
     $('p').autocomplete = reg ? 'new-password' : 'current-password';
     $('resetBox').hidden = reg;
-    if (next) msg($('authMsg'), 'Log in to continue.');
+    if (next) msg($('authMsg'), /[?&]lang=/.test(next)
+      ? 'That language is not public. Log in to ask its owner for access' + (state.regOpen ? ', or create an account first if you do not have one.' : '.')
+      : 'Log in to continue.');
   }
 }
 
