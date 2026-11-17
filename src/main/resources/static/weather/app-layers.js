@@ -13,7 +13,7 @@
     if (!map || !fieldMap.setRanges) { fieldMap.setRanges && fieldMap.setRanges([]); S.rangesRev = null; return; }
     try {
       const d = await api("GET", `/maps/${map.id}/ranges?v=${Date.now()}`);
-      if (S.map === map) { fieldMap.setRanges(d.ranges || []); S.rangesRev = d.rev || null; }
+      if (S.map === map) { fieldMap.setRanges(d.ranges || []); S.rangesRev = d.rev || null; setStamps("ranges", d); }
     } catch (e) { fieldMap.setRanges([]); S.rangesRev = null; }
     renderRangeBar();
   }
@@ -21,6 +21,18 @@
   function scheduleRangeSave() {
     clearTimeout(rangeSaveTimer);
     rangeSaveTimer = setTimeout(() => { rangeSaveTimer = 0; if (S.rangesDirty && !fieldMap.rgDrawing) saveRanges(); else if (S.rangesDirty) scheduleRangeSave(); }, 1500);
+  }
+  // "Last edited" on the map's roads, rivers, cities, ranges and nations: the server stamps the items it saved (when, by whom)
+  // and sends them as { id: [time, account] }; shown with the selected item's information
+  S.stamps = S.stamps || {};
+  function setStamps(layer, d) { if (d && d.stamps) S.stamps[layer] = d.stamps; }
+  function stampNote(layer, id) {
+    const s = (S.stamps[layer] || {})[id];
+    if (!s) return "";
+    const when = new Date(s[0]);
+    if (isNaN(when)) return "";
+    const txt = when.toLocaleString(S.lang === "EN" ? "en-GB" : "sv-SE", { dateStyle: "medium", timeStyle: "short" });
+    return " · " + (s[1] ? T("lastEditedBy", txt, s[1]) : T("lastEdited", txt));
   }
   async function saveRanges(force) {
     if (!S.map || SG.suggesting) return;         // a suggestion's edits are sent as a suggestion, not saved
@@ -32,7 +44,7 @@
         const rev = !force && S.rangesRev ? `?rev=${encodeURIComponent(S.rangesRev)}` : "";
         const r = await api("PUT", `/maps/${map.id}/ranges${rev}`, list);
         if (S.map !== map) return;
-        S.rangesRev = r && r.rev || null;
+        S.rangesRev = r && r.rev || null; setStamps("ranges", r);
         if (JSON.stringify(fieldMap.getRanges()) === JSON.stringify(list)) { S.rangesDirty = false; $("rgSave").textContent = T("rgSave"); }
       } catch (e) {
         if (e.status === 409) {
@@ -62,6 +74,7 @@
       info = T("rgInfoText", r.name || T("rgUnnamed"), i && i.lengthKm != null ? km(i.lengthKm) + " km" : "—",
         i && i.widthKm != null ? km(i.widthKm) + " km" : i && i.widthPx != null ? "—" : T("rgNoWidth"), set, r.points.length);
       if (parent) info += " · " + T("rgBranchOf", parent.name || T("rgUnnamed"));
+      info += stampNote("ranges", r.id);
     } else info = T("rgStartHint", (fieldMap.ranges || []).length);
     $("rgInfo").textContent = info;
   }
@@ -113,7 +126,7 @@
     if (!map || !fieldMap.setNations) { fieldMap.setNations && fieldMap.setNations([]); S.nationsRev = null; return; }
     try {
       const d = await api("GET", `/maps/${map.id}/nations?v=${Date.now()}`);
-      if (S.map === map) { fieldMap.setNations(d.nations || []); S.nationsRev = d.rev || null; }
+      if (S.map === map) { fieldMap.setNations(d.nations || []); S.nationsRev = d.rev || null; setStamps("nations", d); }
     } catch (e) { fieldMap.setNations([]); S.nationsRev = null; }
     renderNationBar();
   }
@@ -132,7 +145,7 @@
         const rev = !force && S.nationsRev ? `?rev=${encodeURIComponent(S.nationsRev)}` : "";
         const r = await api("PUT", `/maps/${map.id}/nations${rev}`, list);
         if (S.map !== map) return;
-        S.nationsRev = r && r.rev || null;
+        S.nationsRev = r && r.rev || null; setStamps("nations", r);
         if (JSON.stringify(fieldMap.getNations()) === JSON.stringify(list)) { S.nationsDirty = false; $("ntSave").textContent = T("ntSave"); }
         else scheduleNationSave();
         $("ntInfo").textContent = T("ntSaved");
@@ -216,6 +229,7 @@
     } else if (n) {
       info = T("ntInfoText", n.name || T("ntUnnamed"), km(fieldMap.nationArea(n)), n.parts.length);
       if ((n.subs || []).length) info += T("ntSubsText", n.subs.length, km(n.subs.reduce((s, x) => s + fieldMap.nationArea(x), 0)));
+      info += stampNote("nations", n.id);
     } else info = T("ntStartHint");
     $("ntInfo").textContent = info;
   }
@@ -276,7 +290,7 @@
     if (!map) { fieldMap.setRivers([]); S.riversRev = null; return; }
     try {
       const d = await api("GET", `/maps/${map.id}/rivers?v=${Date.now()}`);
-      if (S.map === map) { fieldMap.setRivers(d.rivers || []); S.riversRev = d.rev || null; }
+      if (S.map === map) { fieldMap.setRivers(d.rivers || []); S.riversRev = d.rev || null; setStamps("rivers", d); }
     } catch (e) { fieldMap.setRivers([]); S.riversRev = null; }
   }
   // River edits save themselves a moment after each change (and when leaving the edit mode), so a reload
@@ -298,7 +312,7 @@
         const rev = !force && S.riversRev ? `?rev=${encodeURIComponent(S.riversRev)}` : "";
         const r = await api("PUT", `/maps/${map.id}/rivers${rev}`, list);
         if (S.map !== map) return;
-        S.riversRev = r && r.rev || null;
+        S.riversRev = r && r.rev || null; setStamps("rivers", r);
         // still dirty if something changed while saving
         if (JSON.stringify(fieldMap.getRiverData()) === JSON.stringify(list)) { S.riversDirty = false; $("rvSave").textContent = T("rvSave"); }
         else scheduleRiverSave();
@@ -345,7 +359,7 @@
     else if (D && D.extend != null && r) info = T(D.end === "tail" ? "rvExtendingTail" : "rvExtendingHead", r.name || T("rvUnnamed"), D.points.length);
     else if (lake) {
       const F = fieldMap.lakeFlow(lake.id);
-      info = F.outs ? T("lkFlowOut", fl(F.in), F.outs) : T("lkFlowNone", fl(F.in));
+      info = (F.outs ? T("lkFlowOut", fl(F.in), F.outs) : T("lkFlowNone", fl(F.in))) + stampNote("rivers", lake.id);
     } else if (r) {
       const total = fl(fieldMap.riverFlows()[r.id].total);
       if (r.joins && r.joins.lake != null) info = T("rvFlowLake", total, lakeName(r.joins.lake));
@@ -357,6 +371,7 @@
       // the current where it starts and at its mouth (with the tributaries' water)
       const c0 = fieldMap.currentAt(r, 0), c1 = fieldMap.currentAt(r, Math.max(0, r.points.length - 1.5));
       info += " · " + T(r.speed != null ? "rvCurrentSet" : "rvCurrentAuto", fmtKmh(c0), fmtKmh(c1));
+      info += stampNote("rivers", r.id);
     } else if (D && D.from != null) info = T("lkDrawingOut", lakeName(D.from), D.points.length - 1);
     else if (D) info = T("rvDrawing", D.points.length);
     else info = T("rvStartHint", size);
@@ -456,7 +471,7 @@
     if (!map) { fieldMap.setRoads([]); S.roadsRev = null; return; }
     try {
       const d = await api("GET", `/maps/${map.id}/roads?v=${Date.now()}`);
-      if (S.map === map) { fieldMap.setRoads(d.roads || []); S.roadsRev = d.rev || null; }
+      if (S.map === map) { fieldMap.setRoads(d.roads || []); S.roadsRev = d.rev || null; setStamps("roads", d); }
     } catch (e) { fieldMap.setRoads([]); S.roadsRev = null; }
     if (window.Travel) Travel.roadsChanged();
   }
@@ -475,7 +490,7 @@
         const rev = !force && S.roadsRev ? `?rev=${encodeURIComponent(S.roadsRev)}` : "";
         const r = await api("PUT", `/maps/${map.id}/roads${rev}`, list);
         if (S.map !== map) return;
-        S.roadsRev = r && r.rev || null;
+        S.roadsRev = r && r.rev || null; setStamps("roads", r);
         if (JSON.stringify(fieldMap.getRoads()) === JSON.stringify(list)) { S.roadsDirty = false; $("wySave").textContent = T("wySave"); }
         else scheduleRoadSave();
         $("wyInfo").textContent = T("wySaved");
@@ -508,6 +523,7 @@
       const st = fieldMap.roadSteepness(r);
       info = T("wyInfoText", r.name || T("wyUnnamed"), T("wyKind_" + r.kind), km(len), st.max.toFixed(1), fieldMap.roadSteep[r.kind]);
       if (st.pieces.length) info += " · " + T("wySteepHere", st.pieces.length);
+      info += stampNote("roads", r.id);
     } else info = T("wyStartHint", (fieldMap.roads || []).length);
     $("wyInfo").textContent = info;
   }
@@ -522,7 +538,7 @@
     if (!map) { fieldMap.setCities([]); S.citiesRev = null; return; }
     try {
       const d = await api("GET", `/maps/${map.id}/cities?v=${Date.now()}`);
-      if (S.map === map) { fieldMap.setCities(d.cities || []); S.citiesRev = d.rev || null; }
+      if (S.map === map) { fieldMap.setCities(d.cities || []); S.citiesRev = d.rev || null; setStamps("cities", d); }
     } catch (e) { fieldMap.setCities([]); S.citiesRev = null; }
     if (window.Travel) Travel.roadsChanged();
   }
@@ -541,7 +557,7 @@
         const rev = !force && S.citiesRev ? `?rev=${encodeURIComponent(S.citiesRev)}` : "";
         const r = await api("PUT", `/maps/${map.id}/cities${rev}`, list);
         if (S.map !== map) return;
-        S.citiesRev = r && r.rev || null;
+        S.citiesRev = r && r.rev || null; setStamps("cities", r);
         if (JSON.stringify(fieldMap.getCities()) === JSON.stringify(list)) { S.citiesDirty = false; $("ctSave").textContent = T("ctSave"); }
         else scheduleCitySave();
         $("ctInfo").textContent = T("ctSaved");
@@ -572,7 +588,8 @@
     if (document.activeElement !== $("ctPopulation")) $("ctPopulation").value = c ? c.population : "";
     $("ctHarbour").checked = !!(c && c.harbour);
     const list = fieldMap.cities || [], harbours = list.filter((x) => x.harbour).length;
-    $("ctInfo").textContent = c && c.kind === "bridge" ? T("ctInfoBridge", c.name || T("ctKind_bridge")) : c && c.kind === "ford" ? T("ctInfoFord", c.name || T("ctKind_ford")) : c ? T("ctInfoText", c.name || T("ctUnnamed"), (c.population || 0).toLocaleString(S.lang === "EN" ? "en" : "sv")) : T("ctStartHint", list.length, harbours);
+    $("ctInfo").textContent = ctInfoText() + (c ? stampNote("cities", c.id) : "");
+    function ctInfoText() { return c && c.kind === "bridge" ? T("ctInfoBridge", c.name || T("ctKind_bridge")) : c && c.kind === "ford" ? T("ctInfoFord", c.name || T("ctKind_ford")) : c ? T("ctInfoText", c.name || T("ctUnnamed"), (c.population || 0).toLocaleString(S.lang === "EN" ? "en" : "sv")) : T("ctStartHint", list.length, harbours); }
   }
   function wireCities() {
     $("ctName").oninput = (e) => fieldMap.ctSetName(e.target.value);

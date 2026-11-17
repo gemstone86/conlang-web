@@ -2,6 +2,13 @@
 
 Newest first. Versions from 1.x on are the combined app (Root and Rune + Weather generator).
 
+## v1.33.0 (combined app)
+Weather generator:
+- **"Last edited" on roads, rivers, lakes, cities, bridges, fords, mountain ranges and nations.** Every item of these lists now remembers when it was last changed and by whom. When a list is saved the server compares it with what was stored: the items that are new or different (renamed, moved, a point changed, …) get the time (UTC) and the account's name, the ones that are the same keep what they had. The information line of the selected item ends with it, in the page's language: *… · last edited 17 Nov 2026 07:55 by boss* (for a nation it is the nation as a whole; changing one of its subdivisions counts as changing the nation).
+  - Items that nobody has changed since this version (including everything the standard map ships with) show nothing until they are edited. Painted layers (forest, ice, marsh) and the height map are images, so they have no per-item date.
+  - The lists carry `edited` and `editedBy` in their JSON (so the downloaded `.json` files and the map export have them too); the answers of the list endpoints also have `stamps` (`{ id: [time, account] }`), and the version check (`rev`) goes by the stored list, stamps included.
+  - New `ListStamps`; tests `ListStampsTest`, `LastEditedTest`.
+
 ## v1.32.0 (combined app)
 Root and Rune:
 - **Romanization column.** A word has a new optional field, *romanization* (the word written in the Latin alphabet), with its own column in the dictionary (after *Form*), a box when adding a word, in the edit row of the word window, and a filter box in the dictionary's filter row; the free-text search finds it too. Bulk entry takes it as a seventh column (`gloss;type;form;year;notes;tags;romanization`), the Excel export has a *romanization* column and the Excel import reads one of that name. It is kept in the full export. It is only for display and search: the sound changes and the forms still work on the *Form*. Up to 400 characters.
