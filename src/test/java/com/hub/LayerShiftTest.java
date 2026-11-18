@@ -78,8 +78,17 @@ class LayerShiftTest {
         JsonNode export = json.readTree(get(admin, "/weather/api/maps/" + mapId + "/export?summary=1").body());
         assertEquals(16, export.path("changes").path("settings").path("layerShift").path("consaber").get(0).asInt(), export.toString());
 
+        // scale: kept with the move, limited, and 1 means none
+        HttpResponse<String> sc = send(admin, "PUT", url, "{\"layer\":\"consaber\",\"dx\":16,\"dy\":-8,\"scale\":1.005}", true);
+        assertEquals(200, sc.statusCode(), sc.body());
+        assertEquals(1.005, json.readTree(sc.body()).path("settings").path("layerShift").path("consaber").get(2).asDouble(), 1e-9);
+        assertEquals(400, send(admin, "PUT", url, "{\"layer\":\"consaber\",\"dx\":0,\"dy\":0,\"scale\":2}", true).statusCode());
+        assertEquals(400, send(admin, "PUT", url, "{\"layer\":\"consaber\",\"dx\":0,\"dy\":0,\"scale\":\"big\"}", true).statusCode());
+        assertEquals(200, send(admin, "PUT", url, "{\"layer\":\"consaber\",\"dx\":0,\"dy\":0,\"scale\":1.01}", true).statusCode(), "scaled only is still a change");
+        assertEquals(2, json.readTree(get(anon, "/weather/api/maps/" + mapId).body()).path("settings").path("layerShift").size());
+
         // 0, 0 puts a layer back; the last one removes the setting
-        assertEquals(200, send(admin, "PUT", url, "{\"layer\":\"consaber\",\"dx\":0,\"dy\":0}", true).statusCode());
+        assertEquals(200, send(admin, "PUT", url, "{\"layer\":\"consaber\",\"dx\":0,\"dy\":0,\"scale\":1}", true).statusCode());
         assertEquals(200, send(admin, "PUT", url, "{\"layer\":\"asharien\",\"dx\":0,\"dy\":0}", true).statusCode());
         assertTrue(json.readTree(get(anon, "/weather/api/maps/" + mapId).body()).path("settings").path("layerShift").isMissingNode());
     }

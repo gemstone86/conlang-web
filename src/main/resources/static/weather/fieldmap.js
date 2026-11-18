@@ -242,9 +242,24 @@
       }
       this.draw();
     }
-    /** How far the admins moved each map layer: { id: [dx, dy] } in full-size pixels (settings.layerShift), or null for none. */
+    /** How the admins moved and scaled each map layer: { id: [dx, dy, scale] } (full-size pixels; scale 1 = as drawn; scaled about the middle of the layer's pieces), or null. */
     setLayerShift(o) { this._shift = o && typeof o === "object" ? o : null; this.draw(); }
-    _shiftOf(id) { const a = id && this._shift && this._shift[id]; return Array.isArray(a) ? [+a[0] || 0, +a[1] || 0] : [0, 0]; }
+    _shiftOf(id) { const a = id && this._shift && this._shift[id]; return Array.isArray(a) ? [+a[0] || 0, +a[1] || 0, +a[2] || 1] : [0, 0, 1]; }
+    /** The middle (cx, cy) and size (w, h) of the area the layer's pieces cover, in full-size pixels. */
+    _layerBox(id) {
+      const T = this.tiles, v = T && T.layers.find((x) => x.id === id);
+      if (!v) return null;
+      if (v.box) return v.box;
+      for (const L of [...T.levels].filter((l) => !l.extra).sort((a, b) => a.w - b.w)) {
+        const set = v.tiles[L.level];
+        if (!set || !set.size) continue;
+        const f = T.fullW / L.w, xs = [], ys = [];
+        for (const k of set) { const [x, y] = k.split("_").map(Number); xs.push(x); ys.push(y); }
+        const x0 = Math.min(...xs) * T.ts * f, x1 = (Math.max(...xs) + 1) * T.ts * f, y0 = Math.min(...ys) * T.ts * f, y1 = (Math.max(...ys) + 1) * T.ts * f;
+        return (v.box = { cx: (x0 + x1) / 2, cy: (y0 + y1) / 2, w: x1 - x0, h: y1 - y0 });
+      }
+      return null;
+    }
     /** The map layers there are ([{ id, name, def }]); empty when the zoom images have none. */
     tileLayers() { return this.tiles && this.tiles.layers ? this.tiles.layers : []; }
     /** The parts of the map picture to draw over it for the chosen layers, bottom first. */
@@ -274,8 +289,12 @@
       const want = new Set();
       // a moved layer's pieces lie somewhere else than their place in the grid: look further out, and draw layer by layer
       const order = (T.chosen || []).map((v) => v.id), fw = T.fullW || this.imgW;
+      const fh = fw * this.imgH / this.imgW;
       let padX = 0, padY = 0;
-      for (const id of order) { const [a, b] = this._shiftOf(id); padX = Math.max(padX, Math.abs(a) / fw); padY = Math.max(padY, Math.abs(b) / fw); }
+      for (const id of order) {
+        const [a, b, sc] = this._shiftOf(id), bx = this._layerBox(id) || { w: 0, h: 0 };
+        padX = Math.max(padX, (Math.abs(a) + Math.abs(sc - 1) * bx.w) / fw); padY = Math.max(padY, (Math.abs(b) + Math.abs(sc - 1) * bx.h) / fh);
+      }
       for (const { L, load } of use) {
         const ts = T.ts, items = [];
         const tx0 = Math.max(0, Math.floor((vx0 - padX) * L.w / ts)), tx1 = Math.min(Math.ceil(L.w / ts) - 1, Math.floor((vx1 + padX) * L.w / ts));
@@ -305,9 +324,14 @@
           const x1 = Math.ceil(ox + (tx * ts + tw) / L.w * W), y1 = Math.ceil(oy + (ty * ts + th) / L.h * H);
           t.imgs.forEach((im, k) => {
             if (im.bad) return;
-            const lid = t.ids[k], [dx, dy] = this._shiftOf(lid);
-            const ox2 = dx / fw * W, oy2 = dy / fw * W;      // full-size pixels are square: both by the width
-            items.push({ im, o: lid ? order.indexOf(lid) : -1, x0: Math.floor(x0 + ox2), y0: Math.floor(y0 + oy2), x1: Math.ceil(x1 + ox2), y1: Math.ceil(y1 + oy2) });
+            const lid = t.ids[k], [dx, dy, sc] = this._shiftOf(lid);
+            let a0 = x0, b0 = y0, a1 = x1, b1 = y1;
+            if (lid && (dx || dy || sc !== 1)) {
+              const bx = this._layerBox(lid), ax = ox + (bx ? bx.cx : 0) / fw * W, ay = oy + (bx ? bx.cy : 0) / fw * W;   // full-size pixels are square: both by the width
+              a0 = ax + (x0 - ax) * sc + dx / fw * W; a1 = ax + (x1 - ax) * sc + dx / fw * W;
+              b0 = ay + (y0 - ay) * sc + dy / fw * W; b1 = ay + (y1 - ay) * sc + dy / fw * W;
+            }
+            items.push({ im, o: lid ? order.indexOf(lid) : -1, x0: Math.floor(a0), y0: Math.floor(b0), x1: Math.ceil(a1), y1: Math.ceil(b1) });
           });
         }
         items.sort((a, b) => a.o - b.o);                    // stable: the base first, then each layer over the ones below
@@ -1133,8 +1157,10 @@
       ctx.imageSmoothingQuality = "high";
       ctx.drawImage(this.img, ox, oy, this.imgW * s, this.imgH * s);
       for (const p of this._mapPatches()) if (p.ok) {
-        const [sx, sy] = p.key === "base" ? [0, 0] : this._shiftOf(p.key), k = this.imgW / (this.tiles.fullW || this.imgW);
-        ctx.drawImage(p.img, ox + (p.map.x + sx * k) * s, oy + (p.map.y + sy * k) * s, p.map.w * s, p.map.h * s);
+        const [sx, sy, sc] = p.key === "base" ? [0, 0, 1] : this._shiftOf(p.key), k = this.imgW / (this.tiles.fullW || this.imgW);
+        const b = p.key === "base" ? null : this._layerBox(p.key), ax = b ? b.cx * k : 0, ay = b ? b.cy * k : 0;
+        const mx = ax + (p.map.x - ax) * sc + sx * k, my = ay + (p.map.y - ay) * sc + sy * k;
+        ctx.drawImage(p.img, ox + mx * s, oy + my * s, p.map.w * sc * s, p.map.h * sc * s);
       }
       if (this.tiles) this._drawTiles();
 

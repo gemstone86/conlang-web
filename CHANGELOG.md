@@ -2,6 +2,10 @@
 
 Newest first. Versions from 1.x on are the combined app (Root and Rune + Weather generator).
 
+## v1.37.0 (combined app)
+Weather generator:
+- **Scale a map layer (admins).** Next to the arrows in the *Kartbild* list each layer has *Storlek* with **−** and **+**: one step is 0.5 % (Shift: 1 %), from 80 % to 125 %. A layer is scaled about the middle of the area its pieces cover, so combine it with the arrows to put it right. Like the move it is saved for everyone (`settings.layerShift` is now `[dx, dy]` or `[dx, dy, scale]`; `PUT /maps/{id}/layer-shift` takes an optional `scale`), and ⟲ puts both back. `map-layers.json` has each layer's `scale` and `box` (its middle and size).
+
 ## v1.36.0 (combined app)
 Weather generator:
 - **Move a map layer (admins).** In the *Kartbild* list, every layer has a row of arrows for the admins: each click moves that regional map one map pixel (8 full-size pixels), Shift-click eight map pixels, ⟲ puts it back. It moves the zoom pieces and the map picture alike, is saved for everyone (`settings.layerShift`, `PUT /maps/{id}/layer-shift`) and stays over new releases unless the release says its own is newer (`layerShiftRelease`, set by `tools/apply-export.py`; the admin export carries it as a changed setting). The 3D view does not use the moves yet.

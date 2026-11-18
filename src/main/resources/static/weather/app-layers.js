@@ -703,12 +703,17 @@
     return o && typeof o === "object" ? o : null;
   }
   let shiftTimer = null;
-  /** Admins: nudge a map layer by (dx, dy) full-size pixels (8 of them are one pixel of the map picture); saved for everyone shortly after. */
-  function nudgeMapLayer(id, dx, dy, absolute) {
-    const cur = (layerShiftFor(S.map) || {})[id] || [0, 0];
-    const next = absolute ? [dx, dy] : [cur[0] + dx, cur[1] + dy];
+  /**
+   * Admins: nudge a map layer by (dx, dy) full-size pixels (8 of them are one pixel of the map picture) and/or scale it
+   * by ds (steps of 0.5 %, about the middle of the layer's pieces); saved for everyone shortly after. reset puts it back.
+   */
+  function nudgeMapLayer(id, dx, dy, ds, reset) {
+    const cur = (layerShiftFor(S.map) || {})[id] || [0, 0, 1];
+    const sc = reset ? 1 : Math.round(((cur[2] || 1) + ds * 0.005) * 1000) / 1000;
+    const next = reset ? [0, 0, 1] : [cur[0] + dx, cur[1] + dy, sc];
+    if (next[2] < 0.8 || next[2] > 1.25) return;
     const all = { ...(layerShiftFor(S.map) || {}) };
-    if (!next[0] && !next[1]) delete all[id]; else all[id] = next;
+    if (!next[0] && !next[1] && next[2] === 1) delete all[id]; else all[id] = next[2] === 1 ? [next[0], next[1]] : next;
     const def = S.map && S.map.isDefault ? S.map : (S.maps || []).find((m) => m.isDefault);
     if (def) def.settings = { ...(def.settings || {}), layerShift: Object.keys(all).length ? all : undefined };
     fieldMap.setLayerShift(all);
@@ -716,7 +721,7 @@
     clearTimeout(shiftTimer);
     shiftTimer = setTimeout(async () => {
       try {
-        const m = await api("PUT", `/maps/${def.id}/layer-shift`, { layer: id, dx: next[0], dy: next[1] });
+        const m = await api("PUT", `/maps/${def.id}/layer-shift`, { layer: id, dx: next[0], dy: next[1], scale: next[2] });
         def.settings = m.settings;
         if (S.map && S.map.id === def.id) S.map.settings = m.settings;
       } catch (e) { setStatus(e.message); }
@@ -730,9 +735,9 @@
     const out = {
       exported: new Date().toISOString(), tiles: S.map && S.map.settings && S.map.settings.tiles, tileSize: T0.ts, fullWidth: T0.fullW,
       layerOrder: layerOrderFor(S.map), layerShift: shift,
-      note: "layers are listed bottom first; shift is in full-size pixels (x right, y down), 8 of them are one pixel of the map picture",
+      note: "layers are listed bottom first; shift is in full-size pixels (x right, y down), 8 of them are one pixel of the map picture; scale is about the middle of the layer's pieces (box: its middle and size in full-size pixels)",
       layers: T0.layers.map((v, i) => ({
-        order: i, id: v.id, name: v.name, default: !!v.def, map: v.map, shift: shift[v.id] || [0, 0],
+        order: i, id: v.id, name: v.name, default: !!v.def, map: v.map, shift: (shift[v.id] || [0, 0]).slice(0, 2), scale: (shift[v.id] || [])[2] || 1, box: fieldMap._layerBox(v.id),
         pieces: Object.fromEntries(Object.entries(v.tiles).map(([lv, set]) => [lv, [...set]])),
       })),
     };
@@ -791,18 +796,19 @@
       }
       list.append(lab);
       if (canOrder) {
-        const sh = (layerShiftFor(S.map) || {})[v.id] || [0, 0];
+        const sh = (layerShiftFor(S.map) || {})[v.id] || [0, 0], scl = sh[2] || 1;
         const row = document.createElement("div"); row.className = "ml-shift";
-        const mk = (txt, title, dx, dy) => {
+        const mk = (txt, title, dx, dy, ds) => {
           const b = document.createElement("button"); b.type = "button"; b.className = "ml-move"; b.textContent = txt; b.title = title;
-          b.onclick = (e) => { e.preventDefault(); e.stopPropagation(); nudgeMapLayer(v.id, dx * (e.shiftKey ? 8 : 1), dy * (e.shiftKey ? 8 : 1)); };
+          b.onclick = (e) => { e.preventDefault(); e.stopPropagation(); const m = e.shiftKey ? 8 : 1; nudgeMapLayer(v.id, dx * m, dy * m, (ds || 0) * (e.shiftKey ? 2 : 1)); };
           return b;
         };
         const lbl = document.createElement("span"); lbl.className = "small"; lbl.textContent = T("mlMove") + " " + sh[0] + ", " + sh[1] + " ";
         row.append(lbl, mk("◀", T("mlNudge"), -8, 0), mk("▲", T("mlNudge"), 0, -8), mk("▼", T("mlNudge"), 0, 8), mk("▶", T("mlNudge"), 8, 0));
-        const r = document.createElement("button"); r.type = "button"; r.className = "ml-move"; r.textContent = "⟲"; r.title = T("mlReset"); r.disabled = !sh[0] && !sh[1];
-        r.onclick = (e) => { e.preventDefault(); e.stopPropagation(); nudgeMapLayer(v.id, 0, 0, true); };
-        row.append(r);
+        const r = document.createElement("button"); r.type = "button"; r.className = "ml-move"; r.textContent = "⟲"; r.title = T("mlReset"); r.disabled = !sh[0] && !sh[1] && scl === 1;
+        r.onclick = (e) => { e.preventDefault(); e.stopPropagation(); nudgeMapLayer(v.id, 0, 0, 0, true); };
+        const sl = document.createElement("span"); sl.className = "small"; sl.textContent = " " + T("mlScale") + " " + (scl * 100).toFixed(1) + " % ";
+        row.append(r, sl, mk("−", T("mlScaleTip"), 0, 0, -1), mk("+", T("mlScaleTip"), 0, 0, 1));
         list.append(row);
       }
     }
