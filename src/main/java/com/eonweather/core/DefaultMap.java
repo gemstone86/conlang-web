@@ -125,6 +125,8 @@ public final class DefaultMap {
             if (before.get("layerOrder") != null && !newRelease.test("layerOrderRelease")) settings.put("layerOrder", before.get("layerOrder"));
             // likewise how far the admins moved each map layer (settings.layerShift; settings.layerShiftRelease says the release's is newer)
             if (before.get("layerShift") != null && !newRelease.test("layerShiftRelease")) settings.put("layerShift", before.get("layerShift"));
+            // and how transparent they are drawn (settings.layerTransparency; settings.layerTransparencyRelease says the release's is newer)
+            if (before.get("layerTransparency") != null && !newRelease.test("layerTransparencyRelease")) settings.put("layerTransparency", before.get("layerTransparency"));
             boolean changed = store.installDefaultMap(new Store.DefaultMapData(name, Json.write(settings), version,
                     info.type(), image, info.width(), info.height(), heightType, height, anchors, symbols, leylines, zones));
             System.out.println(changed

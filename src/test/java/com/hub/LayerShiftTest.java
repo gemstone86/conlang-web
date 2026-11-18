@@ -46,11 +46,18 @@ class LayerShiftTest {
         return c.send(b.build(), HttpResponse.BodyHandlers.ofString());
     }
 
+    /** The first account of the database is the admin; the second test of the class finds them already registered. */
+    private void account(HttpClient c, String name) throws Exception {
+        String body = "{\"username\":\"" + name + "\",\"password\":\"secret-pass\"}";
+        if (send(c, "POST", "/api/auth/register", body, false).statusCode() == 409)
+            assertEquals(200, send(c, "POST", "/api/auth/login", body, false).statusCode());
+    }
+
     @Test
     void onlyAdminsMoveALayer() throws Exception {
         HttpClient admin = client(), member = client(), anon = client();
-        assertEquals(200, send(admin, "POST", "/api/auth/register", "{\"username\":\"boss\",\"password\":\"secret-pass\"}", false).statusCode());
-        assertEquals(200, send(member, "POST", "/api/auth/register", "{\"username\":\"someone\",\"password\":\"secret-pass\"}", false).statusCode());
+        account(admin, "boss");
+        account(member, "someone");
         long mapId = -1;
         for (JsonNode m : json.readTree(get(admin, "/weather/api/maps").body())) if (m.path("isDefault").asBoolean()) mapId = m.path("id").asLong();
         String url = "/weather/api/maps/" + mapId + "/layer-shift";
@@ -91,5 +98,30 @@ class LayerShiftTest {
         assertEquals(200, send(admin, "PUT", url, "{\"layer\":\"consaber\",\"dx\":0,\"dy\":0,\"scale\":1}", true).statusCode());
         assertEquals(200, send(admin, "PUT", url, "{\"layer\":\"asharien\",\"dx\":0,\"dy\":0}", true).statusCode());
         assertTrue(json.readTree(get(anon, "/weather/api/maps/" + mapId).body()).path("settings").path("layerShift").isMissingNode());
+    }
+
+    @Test
+    void onlyAdminsSetTransparency() throws Exception {
+        HttpClient admin = client(), member = client(), anon = client();
+        account(admin, "boss");
+        account(member, "someone");
+        long mapId = -1;
+        for (JsonNode m : json.readTree(get(admin, "/weather/api/maps").body())) if (m.path("isDefault").asBoolean()) mapId = m.path("id").asLong();
+        String url = "/weather/api/maps/" + mapId + "/layer-transparency";
+        assertEquals(401, send(anon, "PUT", url, "{\"layer\":\"consaber\",\"percent\":50}", true).statusCode());
+        assertEquals(403, send(member, "PUT", url, "{\"layer\":\"consaber\",\"percent\":50}", true).statusCode());
+        assertEquals(400, send(admin, "PUT", url, "{\"layer\":\"consaber\",\"percent\":101}", true).statusCode());
+        assertEquals(400, send(admin, "PUT", url, "{\"layer\":\"../x\",\"percent\":5}", true).statusCode());
+        assertEquals(400, send(admin, "PUT", url, "{\"layer\":\"consaber\"}", true).statusCode());
+        assertEquals(200, send(admin, "PUT", url, "{\"layer\":\"consaber\",\"percent\":60}", true).statusCode());
+        assertEquals(200, send(admin, "PUT", url, "{\"layer\":\"asharien\",\"percent\":100}", true).statusCode());
+        JsonNode seen = json.readTree(get(anon, "/weather/api/maps/" + mapId).body()).path("settings").path("layerTransparency");
+        assertEquals(60, seen.path("consaber").asInt());
+        assertEquals(100, seen.path("asharien").asInt());
+        JsonNode export = json.readTree(get(admin, "/weather/api/maps/" + mapId + "/export?summary=1").body());
+        assertEquals(60, export.path("changes").path("settings").path("layerTransparency").path("consaber").asInt(), export.toString());
+        assertEquals(200, send(admin, "PUT", url, "{\"layer\":\"consaber\",\"percent\":0}", true).statusCode());
+        assertEquals(200, send(admin, "PUT", url, "{\"layer\":\"asharien\",\"percent\":0}", true).statusCode());
+        assertTrue(json.readTree(get(anon, "/weather/api/maps/" + mapId).body()).path("settings").path("layerTransparency").isMissingNode());
     }
 }

@@ -588,6 +588,24 @@ public final class Api {
                         return Http.Response.json(store.map(id, uid));
                     }
                 }
+                case "layer-transparency" -> {
+                    // how see-through a regional map is drawn, 0 (solid) to 100 (invisible) percent (settings.layerTransparency:
+                    // { layerId: percent }); set by the server's admins on the standard map, kept over new releases (see DefaultMap)
+                    if (m.equals("PUT")) {
+                        long uid = requireUser(req);
+                        if (!store.isAdmin(uid, admins)) throw new ApiException(403, "Only the server's admins may change how transparent a map layer is");
+                        Map<String, Object> b = body(req);
+                        if (!(b.get("layer") instanceof String lid) || !lid.matches("[\\w.-]{1,60}")) throw new ApiException(400, "Not a layer id");
+                        if (!(b.get("percent") instanceof Number pc) || pc.doubleValue() < 0 || pc.doubleValue() > 100) throw new ApiException(400, "Give a percent from 0 to 100");
+                        long v = Math.round(pc.doubleValue());
+                        Map<String, Object> all = new LinkedHashMap<>();
+                        if (store.map(id, uid).get("settings") instanceof Map<?, ?> st && st.get("layerTransparency") instanceof Map<?, ?> cur)
+                            cur.forEach((k, x) -> all.put(String.valueOf(k), x));
+                        if (v == 0) all.remove(lid); else all.put(lid, v);
+                        store.putDefaultMapSettings(id, java.util.Collections.singletonMap("layerTransparency", all.isEmpty() ? null : all));
+                        return Http.Response.json(store.map(id, uid));
+                    }
+                }
                 case "restore" -> {
                     if (m.equals("POST")) { long uid = requireUser(req); store.restoreMap(uid, id); return Http.Response.json(store.map(id, uid)); }
                 }

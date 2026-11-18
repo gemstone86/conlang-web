@@ -96,6 +96,8 @@ def main():
         if "layerShift" in ch["settings"]:
             # how far the map layers were moved: likewise installed once over the app's
             st["layerShiftRelease"] = man.get("exportedAt")
+        if "layerTransparency" in ch["settings"]:
+            st["layerTransparencyRelease"] = man.get("exportedAt")
     if "image" in ch:
         f = ch["image"]["file"]
         if f.endswith(".jpg"):

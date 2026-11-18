@@ -92,6 +92,7 @@
     fieldMap.setTileLayers(S.mapLayers || null);
     fieldMap.setLayerOrder(layerOrderFor(S.map));
     fieldMap.setLayerShift(layerShiftFor(S.map));
+    fieldMap.setLayerTransparency(layerSetting(S.map, "layerTransparency"));
     fieldMap.setTiles(S.map.settings && typeof S.map.settings.tiles === "string" ? S.map.settings.tiles : null);
     renderTileChoices();
     renderMapViews();

@@ -702,6 +702,29 @@
     const o = def && def.settings && def.settings.layerShift;
     return o && typeof o === "object" ? o : null;
   }
+  /** A setting of the standard map (also for a map that borrows its zoom images). */
+  function layerSetting(map, key) {
+    const def = map && map.isDefault ? map : (S.maps || []).find((m) => m.isDefault);
+    const o = def && def.settings && def.settings[key];
+    return o && typeof o === "object" ? o : null;
+  }
+  let transpTimer = null;
+  /** Admins: how see-through a layer is, 0 (solid) to 100 percent; saved for everyone shortly after. */
+  function setLayerTransparency(id, percent) {
+    const all = { ...(layerSetting(S.map, "layerTransparency") || {}) };
+    if (percent > 0) all[id] = percent; else delete all[id];
+    const def = S.map && S.map.isDefault ? S.map : (S.maps || []).find((m) => m.isDefault);
+    if (def) def.settings = { ...(def.settings || {}), layerTransparency: Object.keys(all).length ? all : undefined };
+    fieldMap.setLayerTransparency(all);
+    clearTimeout(transpTimer);
+    transpTimer = setTimeout(async () => {
+      try {
+        const m = await api("PUT", `/maps/${def.id}/layer-transparency`, { layer: id, percent });
+        def.settings = m.settings;
+        if (S.map && S.map.id === def.id) S.map.settings = m.settings;
+      } catch (e) { setStatus(e.message); }
+    }, 400);
+  }
   let shiftTimer = null;
   /**
    * Admins: nudge a map layer by (dx, dy) full-size pixels (8 of them are one pixel of the map picture) and/or scale it
@@ -734,10 +757,10 @@
     const shift = layerShiftFor(S.map) || {};
     const out = {
       exported: new Date().toISOString(), tiles: S.map && S.map.settings && S.map.settings.tiles, tileSize: T0.ts, fullWidth: T0.fullW,
-      layerOrder: layerOrderFor(S.map), layerShift: shift,
+      layerOrder: layerOrderFor(S.map), layerShift: shift, layerTransparency: layerSetting(S.map, "layerTransparency") || {},
       note: "layers are listed bottom first; shift is in full-size pixels (x right, y down), 8 of them are one pixel of the map picture; scale is about the middle of the layer's pieces (box: its middle and size in full-size pixels)",
       layers: T0.layers.map((v, i) => ({
-        order: i, id: v.id, name: v.name, default: !!v.def, map: v.map, shift: (shift[v.id] || [0, 0]).slice(0, 2), scale: (shift[v.id] || [])[2] || 1, box: fieldMap._layerBox(v.id),
+        order: i, id: v.id, name: v.name, default: !!v.def, map: v.map, shift: (shift[v.id] || [0, 0]).slice(0, 2), scale: (shift[v.id] || [])[2] || 1, transparencyPercent: ((layerSetting(S.map, "layerTransparency") || {})[v.id]) || 0, box: fieldMap._layerBox(v.id),
         pieces: Object.fromEntries(Object.entries(v.tiles).map(([lv, set]) => [lv, [...set]])),
       })),
     };
@@ -810,6 +833,14 @@
         const sl = document.createElement("span"); sl.className = "small"; sl.textContent = " " + T("mlScale") + " " + (scl * 100).toFixed(1) + " % ";
         row.append(r, sl, mk("−", T("mlScaleTip"), 0, 0, -1), mk("+", T("mlScaleTip"), 0, 0, 1));
         list.append(row);
+        const tr = document.createElement("div"); tr.className = "ml-shift";
+        const pc = (layerSetting(S.map, "layerTransparency") || {})[v.id] || 0;
+        const tl = document.createElement("span"); tl.className = "small"; tl.textContent = T("mlTransp") + " " + pc + " %";
+        const tsl = document.createElement("input"); tsl.type = "range"; tsl.min = 0; tsl.max = 100; tsl.step = 5; tsl.value = pc; tsl.style.width = "7rem"; tsl.title = T("mlTranspTip");
+        tsl.oninput = () => { tl.textContent = T("mlTransp") + " " + tsl.value + " %"; setLayerTransparency(v.id, +tsl.value); };
+        tsl.onclick = (e) => e.stopPropagation();
+        tr.append(tl, tsl);
+        list.append(tr);
       }
     }
     if (canOrder) {

@@ -244,6 +244,9 @@
     }
     /** How the admins moved and scaled each map layer: { id: [dx, dy, scale] } (full-size pixels; scale 1 = as drawn; scaled about the middle of the layer's pieces), or null. */
     setLayerShift(o) { this._shift = o && typeof o === "object" ? o : null; this.draw(); }
+    /** How see-through each map layer is drawn: { id: percent } (settings.layerTransparency), or null for none. */
+    setLayerTransparency(o) { this._transp = o && typeof o === "object" ? o : null; this.draw(); }
+    _alphaOf(id) { const v = id && this._transp ? +this._transp[id] : 0; return v > 0 ? Math.max(0, 1 - Math.min(100, v) / 100) : 1; }
     _shiftOf(id) { const a = id && this._shift && this._shift[id]; return Array.isArray(a) ? [+a[0] || 0, +a[1] || 0, +a[2] || 1] : [0, 0, 1]; }
     /** The middle (cx, cy) and size (w, h) of the area the layer's pieces cover, in full-size pixels. */
     _layerBox(id) {
@@ -331,11 +334,12 @@
               a0 = ax + (x0 - ax) * sc + dx / fw * W; a1 = ax + (x1 - ax) * sc + dx / fw * W;
               b0 = ay + (y0 - ay) * sc + dy / fw * W; b1 = ay + (y1 - ay) * sc + dy / fw * W;
             }
-            items.push({ im, o: lid ? order.indexOf(lid) : -1, x0: Math.floor(a0), y0: Math.floor(b0), x1: Math.ceil(a1), y1: Math.ceil(b1) });
+            items.push({ im, a: this._alphaOf(lid), o: lid ? order.indexOf(lid) : -1, x0: Math.floor(a0), y0: Math.floor(b0), x1: Math.ceil(a1), y1: Math.ceil(b1) });
           });
         }
         items.sort((a, b) => a.o - b.o);                    // stable: the base first, then each layer over the ones below
-        for (const it of items) ctx.drawImage(it.im, it.x0, it.y0, it.x1 - it.x0, it.y1 - it.y0);
+        for (const it of items) { ctx.globalAlpha = it.a; ctx.drawImage(it.im, it.x0, it.y0, it.x1 - it.x0, it.y1 - it.y0); }
+        ctx.globalAlpha = 1;
       }
       ctx.restore();
       // keep memory in check: forget the least recently used tiles that are not on screen
@@ -1160,7 +1164,10 @@
         const [sx, sy, sc] = p.key === "base" ? [0, 0, 1] : this._shiftOf(p.key), k = this.imgW / (this.tiles.fullW || this.imgW);
         const b = p.key === "base" ? null : this._layerBox(p.key), ax = b ? b.cx * k : 0, ay = b ? b.cy * k : 0;
         const mx = ax + (p.map.x - ax) * sc + sx * k, my = ay + (p.map.y - ay) * sc + sy * k;
+        const al = p.key === "base" ? 1 : this._alphaOf(p.key);
+        if (al < 1) ctx.globalAlpha = al;
         ctx.drawImage(p.img, ox + mx * s, oy + my * s, p.map.w * sc * s, p.map.h * sc * s);
+        ctx.globalAlpha = 1;
       }
       if (this.tiles) this._drawTiles();
 
