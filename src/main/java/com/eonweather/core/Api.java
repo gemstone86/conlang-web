@@ -567,6 +567,45 @@ public final class Api {
                         return Http.Response.json(store.map(id, uid));
                     }
                 }
+                case "layer-shift" -> {
+                    // how far a regional map is moved from where its pieces lie, in full-size pixels, and how much it is scaled about the middle of its pieces (settings.layerShift:
+                    // { layerId: [dx, dy] or [dx, dy, scale] }); set by the server's admins on the standard map, kept over new releases (see DefaultMap)
+                    if (m.equals("PUT")) {
+                        long uid = requireUser(req);
+                        if (!store.isAdmin(uid, admins)) throw new ApiException(403, "Only the server's admins may move a map layer");
+                        Map<String, Object> b = body(req);
+                        if (!(b.get("layer") instanceof String lid) || !lid.matches("[\\w.-]{1,60}")) throw new ApiException(400, "Not a layer id");
+                        if (!(b.get("dx") instanceof Number dx) || !(b.get("dy") instanceof Number dy)) throw new ApiException(400, "Give dx and dy (full-size pixels)");
+                        long x = Math.round(dx.doubleValue()), y = Math.round(dy.doubleValue());
+                        if (Math.abs(x) > 4000 || Math.abs(y) > 4000) throw new ApiException(400, "That is too far (at most 4000 pixels each way)");
+                        double sc = b.get("scale") == null ? 1 : b.get("scale") instanceof Number n ? Math.round(n.doubleValue() * 10000) / 10000.0 : Double.NaN;
+                        if (!(sc >= 0.8 && sc <= 1.25)) throw new ApiException(400, "The scale must be between 0.8 and 1.25 (1 = as drawn)");
+                        Map<String, Object> shifts = new LinkedHashMap<>();
+                        if (store.map(id, uid).get("settings") instanceof Map<?, ?> st && st.get("layerShift") instanceof Map<?, ?> cur)
+                            cur.forEach((k, v) -> shifts.put(String.valueOf(k), v));
+                        if (x == 0 && y == 0 && sc == 1) shifts.remove(lid); else shifts.put(lid, sc == 1 ? List.of(x, y) : List.of(x, y, sc));
+                        store.putDefaultMapSettings(id, java.util.Collections.singletonMap("layerShift", shifts.isEmpty() ? null : shifts));
+                        return Http.Response.json(store.map(id, uid));
+                    }
+                }
+                case "layer-transparency" -> {
+                    // how see-through a regional map is drawn, 0 (solid) to 100 (invisible) percent (settings.layerTransparency:
+                    // { layerId: percent }); set by the server's admins on the standard map, kept over new releases (see DefaultMap)
+                    if (m.equals("PUT")) {
+                        long uid = requireUser(req);
+                        if (!store.isAdmin(uid, admins)) throw new ApiException(403, "Only the server's admins may change how transparent a map layer is");
+                        Map<String, Object> b = body(req);
+                        if (!(b.get("layer") instanceof String lid) || !lid.matches("[\\w.-]{1,60}")) throw new ApiException(400, "Not a layer id");
+                        if (!(b.get("percent") instanceof Number pc) || pc.doubleValue() < 0 || pc.doubleValue() > 100) throw new ApiException(400, "Give a percent from 0 to 100");
+                        long v = Math.round(pc.doubleValue());
+                        Map<String, Object> all = new LinkedHashMap<>();
+                        if (store.map(id, uid).get("settings") instanceof Map<?, ?> st && st.get("layerTransparency") instanceof Map<?, ?> cur)
+                            cur.forEach((k, x) -> all.put(String.valueOf(k), x));
+                        if (v == 0) all.remove(lid); else all.put(lid, v);
+                        store.putDefaultMapSettings(id, java.util.Collections.singletonMap("layerTransparency", all.isEmpty() ? null : all));
+                        return Http.Response.json(store.map(id, uid));
+                    }
+                }
                 case "restore" -> {
                     if (m.equals("POST")) { long uid = requireUser(req); store.restoreMap(uid, id); return Http.Response.json(store.map(id, uid)); }
                 }

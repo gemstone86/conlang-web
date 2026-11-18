@@ -696,6 +696,80 @@
     const o = def && def.settings && def.settings.layerOrder;
     return Array.isArray(o) ? o : null;
   }
+  /** How far the admins moved each layer, { id: [dx, dy] } in full-size pixels (the standard map's, also for a map that borrows its zoom images). */
+  function layerShiftFor(map) {
+    const def = map && map.isDefault ? map : (S.maps || []).find((m) => m.isDefault);
+    const o = def && def.settings && def.settings.layerShift;
+    return o && typeof o === "object" ? o : null;
+  }
+  /** A setting of the standard map (also for a map that borrows its zoom images). */
+  function layerSetting(map, key) {
+    const def = map && map.isDefault ? map : (S.maps || []).find((m) => m.isDefault);
+    const o = def && def.settings && def.settings[key];
+    return o && typeof o === "object" ? o : null;
+  }
+  let transpTimer = null;
+  /** Admins: how see-through a layer is, 0 (solid) to 100 percent; saved for everyone shortly after. */
+  function setLayerTransparency(id, percent) {
+    const all = { ...(layerSetting(S.map, "layerTransparency") || {}) };
+    if (percent > 0) all[id] = percent; else delete all[id];
+    const def = S.map && S.map.isDefault ? S.map : (S.maps || []).find((m) => m.isDefault);
+    if (def) def.settings = { ...(def.settings || {}), layerTransparency: Object.keys(all).length ? all : undefined };
+    fieldMap.setLayerTransparency(all);
+    clearTimeout(transpTimer);
+    transpTimer = setTimeout(async () => {
+      try {
+        const m = await api("PUT", `/maps/${def.id}/layer-transparency`, { layer: id, percent });
+        def.settings = m.settings;
+        if (S.map && S.map.id === def.id) S.map.settings = m.settings;
+      } catch (e) { setStatus(e.message); }
+    }, 400);
+  }
+  let shiftTimer = null;
+  /**
+   * Admins: nudge a map layer by (dx, dy) full-size pixels (8 of them are one pixel of the map picture) and/or scale it
+   * by ds (steps of 0.5 %, about the middle of the layer's pieces); saved for everyone shortly after. reset puts it back.
+   */
+  function nudgeMapLayer(id, dx, dy, ds, reset) {
+    const cur = (layerShiftFor(S.map) || {})[id] || [0, 0, 1];
+    const sc = reset ? 1 : Math.round(((cur[2] || 1) + ds * 0.005) * 1000) / 1000;
+    const next = reset ? [0, 0, 1] : [cur[0] + dx, cur[1] + dy, sc];
+    if (next[2] < 0.8 || next[2] > 1.25) return;
+    const all = { ...(layerShiftFor(S.map) || {}) };
+    if (!next[0] && !next[1] && next[2] === 1) delete all[id]; else all[id] = next[2] === 1 ? [next[0], next[1]] : next;
+    const def = S.map && S.map.isDefault ? S.map : (S.maps || []).find((m) => m.isDefault);
+    if (def) def.settings = { ...(def.settings || {}), layerShift: Object.keys(all).length ? all : undefined };
+    fieldMap.setLayerShift(all);
+    renderMapViews();
+    clearTimeout(shiftTimer);
+    shiftTimer = setTimeout(async () => {
+      try {
+        const m = await api("PUT", `/maps/${def.id}/layer-shift`, { layer: id, dx: next[0], dy: next[1], scale: next[2] });
+        def.settings = m.settings;
+        if (S.map && S.map.id === def.id) S.map.settings = m.settings;
+      } catch (e) { setStatus(e.message); }
+    }, 500);
+  }
+  /** Admins: download what is known about the map layers (order, boxes, moves, pieces) as a JSON file. */
+  function exportMapLayers() {
+    const T0 = fieldMap.tiles;
+    if (!T0) return;
+    const shift = layerShiftFor(S.map) || {};
+    const out = {
+      exported: new Date().toISOString(), tiles: S.map && S.map.settings && S.map.settings.tiles, tileSize: T0.ts, fullWidth: T0.fullW,
+      layerOrder: layerOrderFor(S.map), layerShift: shift, layerTransparency: layerSetting(S.map, "layerTransparency") || {},
+      note: "layers are listed bottom first; shift is in full-size pixels (x right, y down), 8 of them are one pixel of the map picture; scale is about the middle of the layer's pieces (box: its middle and size in full-size pixels)",
+      layers: T0.layers.map((v, i) => ({
+        order: i, id: v.id, name: v.name, default: !!v.def, map: v.map, shift: (shift[v.id] || [0, 0]).slice(0, 2), scale: (shift[v.id] || [])[2] || 1, transparencyPercent: ((layerSetting(S.map, "layerTransparency") || {})[v.id]) || 0, box: fieldMap._layerBox(v.id),
+        pieces: Object.fromEntries(Object.entries(v.tiles).map(([lv, set]) => [lv, [...set]])),
+      })),
+    };
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([JSON.stringify(out, null, 1)], { type: "application/json" }));
+    a.download = "map-layers.json";
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+  }
   /** Admins: move a layer one place in the list (a place further down lies over the ones above); saved for everyone. */
   async function moveMapLayer(id, dir) {
     const ids = fieldMap.tileLayers().map((v) => v.id), i = ids.indexOf(id), j = i + dir;
@@ -744,6 +818,35 @@
         lab.append(moves);
       }
       list.append(lab);
+      if (canOrder) {
+        const sh = (layerShiftFor(S.map) || {})[v.id] || [0, 0], scl = sh[2] || 1;
+        const row = document.createElement("div"); row.className = "ml-shift";
+        const mk = (txt, title, dx, dy, ds) => {
+          const b = document.createElement("button"); b.type = "button"; b.className = "ml-move"; b.textContent = txt; b.title = title;
+          b.onclick = (e) => { e.preventDefault(); e.stopPropagation(); const m = e.shiftKey ? 8 : 1; nudgeMapLayer(v.id, dx * m, dy * m, (ds || 0) * (e.shiftKey ? 2 : 1)); };
+          return b;
+        };
+        const lbl = document.createElement("span"); lbl.className = "small"; lbl.textContent = T("mlMove") + " " + sh[0] + ", " + sh[1] + " ";
+        row.append(lbl, mk("◀", T("mlNudge"), -8, 0), mk("▲", T("mlNudge"), 0, -8), mk("▼", T("mlNudge"), 0, 8), mk("▶", T("mlNudge"), 8, 0));
+        const r = document.createElement("button"); r.type = "button"; r.className = "ml-move"; r.textContent = "⟲"; r.title = T("mlReset"); r.disabled = !sh[0] && !sh[1] && scl === 1;
+        r.onclick = (e) => { e.preventDefault(); e.stopPropagation(); nudgeMapLayer(v.id, 0, 0, 0, true); };
+        const sl = document.createElement("span"); sl.className = "small"; sl.textContent = " " + T("mlScale") + " " + (scl * 100).toFixed(1) + " % ";
+        row.append(r, sl, mk("−", T("mlScaleTip"), 0, 0, -1), mk("+", T("mlScaleTip"), 0, 0, 1));
+        list.append(row);
+        const tr = document.createElement("div"); tr.className = "ml-shift";
+        const pc = (layerSetting(S.map, "layerTransparency") || {})[v.id] || 0;
+        const tl = document.createElement("span"); tl.className = "small"; tl.textContent = T("mlTransp") + " " + pc + " %";
+        const tsl = document.createElement("input"); tsl.type = "range"; tsl.min = 0; tsl.max = 100; tsl.step = 5; tsl.value = pc; tsl.style.width = "7rem"; tsl.title = T("mlTranspTip");
+        tsl.oninput = () => { tl.textContent = T("mlTransp") + " " + tsl.value + " %"; setLayerTransparency(v.id, +tsl.value); };
+        tsl.onclick = (e) => e.stopPropagation();
+        tr.append(tl, tsl);
+        list.append(tr);
+      }
+    }
+    if (canOrder) {
+      const ex = document.createElement("button"); ex.type = "button"; ex.textContent = T("mlExport"); ex.title = T("mlExportTip");
+      ex.onclick = (e) => { e.preventDefault(); exportMapLayers(); };
+      list.append(ex);
     }
     const hint = document.createElement("div"); hint.className = "ml-hint"; hint.textContent = T("mlHint") + (canOrder ? " " + T("mlAdminHint") : "");
     list.append(hint);

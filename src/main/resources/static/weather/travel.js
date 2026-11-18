@@ -1052,6 +1052,19 @@
       ctx.setLineDash([]);
       this._trBoats(c.pts.map((p) => [p.x, p.y, p.k]), sel ? 2 : 1.5);
     }
+    (tv.via || []).forEach((p, i) => {
+      const [x, y] = this.toScreen(p.x, p.y);
+      if (p.ret && p.from) {                                       // where the detour branches off, joined to its place
+        const [fx, fy] = this.toScreen(p.from.x, p.from.y);
+        ctx.setLineDash([4, 4]); ctx.strokeStyle = "#ffb347"; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(fx, fy); ctx.lineTo(x, y); ctx.stroke(); ctx.setLineDash([]);
+        ctx.fillStyle = "#ffb347"; ctx.strokeStyle = "#18212a"; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(fx, fy - 6); ctx.lineTo(fx + 6, fy); ctx.lineTo(fx, fy + 6); ctx.lineTo(fx - 6, fy); ctx.closePath(); ctx.fill(); ctx.stroke();
+      }
+      ctx.fillStyle = p.ret ? "#ffb347" : "#5fb6ff"; ctx.strokeStyle = "#18212a"; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(x, y, 6, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = "#18212a"; ctx.font = "bold 9px sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(String(i + 1), x, y + 0.5);
+    });
+    if (tv.picking_from) { const [x, y] = this.toScreen(tv.picking_from.x, tv.picking_from.y); ctx.fillStyle = "#ffb347"; ctx.beginPath(); ctx.arc(x, y, 5, 0, Math.PI * 2); ctx.fill(); }
     for (const p of [tv.start, tv.end]) if (p) {
       const [x, y] = this.toScreen(p.x, p.y);
       ctx.fillStyle = p === tv.start ? "#7bd88f" : "#ef6f6c"; ctx.strokeStyle = "#18212a"; ctx.lineWidth = 2;
@@ -1151,7 +1164,7 @@
       ASPECT = (this.fm.imgH || 1) / (this.fm.imgW || 2);
       this.tv.cfg = this.cfg(); this.fm.roadSteep = this.tv.cfg.steep;      // the world's rules may have arrived since
       this.tv.trips = [];
-      this.tv.candidates = null; this.tv.start = this.tv.end = null;
+      this.tv.candidates = null; this.tv.start = this.tv.end = null; this.tv.via = [];
       this._grid = null;
       if (!S.map) { this.render(); return; }
       try {
@@ -1173,9 +1186,9 @@
       this.fm.draw();
     },
     close() {
-      this.tv.panelOpen = false;
+      this.tv.panelOpen = false; this.tv.editTrip = null; this.tv.keep = null;
       this._stopPicking();
-      this.tv.candidates = null; this.tv.start = this.tv.end = null; this.tv.chosen = null;
+      this.tv.candidates = null; this.tv.start = this.tv.end = null; this.tv.via = []; this.tv.chosen = null;
       this.$("trPanel").hidden = true;
       this.$("travelBtn").classList.remove("active");
       this.fm.draw();
@@ -1184,27 +1197,164 @@
     // planning: pick the start and the end on the map
     startPlanning() {
       const tv = this.tv;
-      tv.candidates = null; tv.start = tv.end = null; tv.chosen = null;
+      tv.editTrip = null; tv.keep = null;
+      tv.candidates = null; tv.start = tv.end = null; tv.via = []; tv.chosen = null;
       this.picking = "start";
       this.fm.mapTool = {
         click: (nx, ny) => {
           if (this.picking === "start") { tv.start = { x: nx, y: ny }; this.picking = "end"; this.render(); this.fm.draw(); return true; }
           if (this.picking === "end") { tv.end = { x: nx, y: ny }; this.picking = null; this.fm.draw(); this._plan(); return true; }
+          if (this.picking === "via") { this._addVia(nx, ny); return true; }
+          if (this.picking === "detourFrom") { this._detourFrom = tv.picking_from = this._routePointNear(nx, ny); this.picking = "detourTo"; this.render(); this.fm.draw(); return true; }
+          if (this.picking === "detourTo") { this._addDetour(this._detourFrom, nx, ny); return true; }
           if (tv.candidates) {                       // a click on one of the two routes chooses it
             const c = this._candidateNear(nx, ny);
             if (c) { tv.chosen = c.mode; this.renderCands(); this.fm.draw(); return true; }
           }
           return false;
         },
-        context: () => { if (this.picking === "end") { tv.start = null; this.picking = "start"; this.render(); this.fm.draw(); } else this._stopPicking(true); },
+        // drag the start, the end or a waypoint to change the journey; the routes are found again when it is let go
+        down: (sx, sy, button) => {
+          if (button !== 0 || !tv.candidates || this.picking === "start" || this.picking === "end") return false;
+          const h = this._hitStop(sx, sy);
+          if (!h) return false;
+          const p0 = this._stopOf(h);
+          this._drag = { ...h, moved: false, from: { x: p0.x, y: p0.y } };
+          this.fm.stage.classList.add("dragging");
+          return true;
+        },
+        move: (sx, sy) => {
+          const d = this._drag;
+          if (!d) { this.fm.stage && (this.fm.stage.style.cursor = this._hitStop(sx, sy) && tv.candidates ? "grab" : ""); return; }
+          const [nx, ny] = this.fm.toMap(sx, sy), p = this._stopOf(d);
+          if (!p) return;
+          p.x = clamp(nx, 0, 1); p.y = clamp(ny, 0, 1); d.moved = true;
+          this.fm.draw();
+        },
+        up: () => {
+          const d = this._drag; this._drag = null;
+          this.fm.stage && this.fm.stage.classList.remove("dragging");
+          if (d && d.moved) {
+            // a place no route can reach: the point goes back where it was
+            this._revert = () => { const p = this._stopOf(d); if (p) { p.x = d.from.x; p.y = d.from.y; } };
+            this._plan();
+          }
+        },
+        context: (sx, sy) => {
+          if (this.picking === "via" || this.picking === "detourFrom" || this.picking === "detourTo") { if (!this._removeViaNear(sx, sy)) this._stopVia(); return; }
+          if (this._removeViaNear(sx, sy)) return;
+          if (this.picking === "end") { tv.start = null; this.picking = "start"; this.render(); this.fm.draw(); } else this._stopPicking(true);
+        },
       };
       this.$("stage").classList.add("picking");
       this.render();
     },
+    /**
+     * The places the routes go through, in order: the start, the waypoints and the end. A detour (a waypoint with ret) is a
+     * side trip: from where it branches off (its own `from` on the route, else the place before it) to it and back again.
+     */
+    _stops() {
+      const tv = this.tv, out = [{ x: tv.start.x, y: tv.start.y }];
+      const same = (a, b) => Math.hypot((a.x - b.x) * this.fm.imgW, (a.y - b.y) * this.fm.imgH) < 1.5;
+      const push = (p) => { if (!same(out[out.length - 1], p)) out.push({ x: p.x, y: p.y }); };
+      for (const v of tv.via || []) {
+        if (v.ret) { const base = v.from || out[out.length - 1]; push(base); push(v); push(base); }
+        else push(v);
+      }
+      push(tv.end);
+      return out;
+    },
+    /** Waypoints (mellanpunkter): the routes are found from the start through them, in order, to the end. */
+    startVia() {
+      const tv = this.tv;
+      if (!tv.candidates || !tv.start || !tv.end) return;
+      this.picking = "via";
+      this.$("stage").classList.add("picking");
+      this.render();
+    },
+    _stopVia() {
+      this.picking = null; this._detourFrom = this.tv.picking_from = null;
+      this.$("stage").classList.remove("picking");
+      this.render(); this.fm.draw();
+    },
+    /** Where in the list of waypoints a place on the chosen route belongs (the index to insert at). */
+    _viaOrder(nx, ny) {
+      const tv = this.tv;
+      tv.via = tv.via || [];
+      const c = (tv.candidates || []).find((o) => o.mode === tv.chosen) || (tv.candidates || [])[0];
+      if (!c) return tv.via.length;
+      const near = (p) => { let bi = 0, bd = Infinity; c.pts.forEach((q, i) => { const d = (q.x - p.x) ** 2 + (q.y - p.y) ** 2; if (d < bd) { bd = d; bi = i; } }); return bi; };
+      const ctrl = [tv.start, ...tv.via, tv.end], idx = ctrl.map(near), j = near({ x: nx, y: ny });
+      let k = 0;
+      for (let i = 0; i < ctrl.length - 1; i++) if (idx[i] <= j) k = i;
+      return k;                                                      // between ctrl[k] and ctrl[k + 1]
+    },
+    /** A waypoint at a click, placed in the order the chosen route passes the points. */
+    _addVia(nx, ny) {
+      const tv = this.tv, at = this._viaOrder(nx, ny);
+      tv.via.splice(at, 0, { x: nx, y: ny });
+      this._viaAdded = at;
+      this.render(); this.fm.draw();
+      this._plan();
+    },
+    /** A detour: branches off the route at `from` (a point on it), goes to (x, y) and comes back (ret) or carries on from there. */
+    _addDetour(from, nx, ny) {
+      const tv = this.tv, at = this._viaOrder(from.x, from.y);
+      tv.via.splice(at, 0, { x: nx, y: ny, ret: true, from: { x: from.x, y: from.y } });
+      this._viaAdded = at;
+      this.picking = null; this._detourFrom = null; tv.picking_from = null;
+      this.$("stage").classList.remove("picking");
+      this.render(); this.fm.draw();
+      this._plan();
+    },
+    startDetour() {
+      const tv = this.tv;
+      if (!tv.candidates || !tv.start || !tv.end) return;
+      this.picking = "detourFrom";
+      this.$("stage").classList.add("picking");
+      this.render();
+    },
+    /** The point of the chosen route nearest to a click (a detour branches off there). */
+    _routePointNear(nx, ny) {
+      const tv = this.tv, c = (tv.candidates || []).find((o) => o.mode === tv.chosen) || (tv.candidates || [])[0];
+      if (!c) return { x: nx, y: ny };
+      let best = null, bd = Infinity;
+      for (let i = 0; i + 1 < c.pts.length; i++) {
+        const a = c.pts[i], b = c.pts[i + 1], dx = b.x - a.x, dy = b.y - a.y, L = dx * dx + dy * dy, t = L ? clamp(((nx - a.x) * dx + (ny - a.y) * dy) / L, 0, 1) : 0;
+        const x = a.x + dx * t, y = a.y + dy * t, d = (x - nx) ** 2 + (y - ny) ** 2;
+        if (d < bd) { bd = d; best = { x, y }; }
+      }
+      return best || { x: nx, y: ny };
+    },
+    _stopOf(h) { const tv = this.tv; return h.kind === "start" ? tv.start : h.kind === "end" ? tv.end : h.kind === "from" ? tv.via[h.i].from : tv.via[h.i]; },
+    /** The start, end or waypoint under a screen point: { kind: "start" | "end" | "via", i } or null. */
+    _hitStop(sx, sy) {
+      const tv = this.tv, fm = this.fm, hit = (p) => { const [x, y] = fm.toScreen(p.x, p.y); return Math.hypot(x - sx, y - sy) <= 11; };
+      for (let i = (tv.via || []).length - 1; i >= 0; i--) {
+        if (hit(tv.via[i])) return { kind: "via", i };
+        if (tv.via[i].ret && tv.via[i].from && hit(tv.via[i].from)) return { kind: "from", i };
+      }
+      if (tv.end && hit(tv.end)) return { kind: "end" };
+      if (tv.start && hit(tv.start)) return { kind: "start" };
+      return null;
+    },
+    _removeViaNear(sx, sy) {
+      const tv = this.tv, fm = this.fm;
+      let bi = -1, bd = 14;
+      (tv.via || []).forEach((p, i) => { const [x, y] = fm.toScreen(p.x, p.y), d = Math.hypot(x - sx, y - sy); if (d < bd) { bd = d; bi = i; } });
+      if (bi < 0) return false;
+      this._removeVia(bi);
+      return true;
+    },
+    _removeVia(i) {
+      this.tv.via.splice(i, 1);
+      this.render(); this.fm.draw();
+      this._plan();
+    },
     _stopPicking(clear) {
       this.picking = null;
       if (this.fm.mapTool && !this.tv.candidates) this.fm.mapTool = null;
-      if (clear) { this.fm.mapTool = null; this.tv.candidates = null; this.tv.start = this.tv.end = null; this.tv.chosen = null; }
+      if (clear) { this.tv.editTrip = null; this.tv.keep = null; this.fm.mapTool = null; this.tv.candidates = null; this.tv.start = this.tv.end = null; this.tv.via = []; this.tv.chosen = null; }
       this.$("stage").classList.remove("picking");
       this.render(); this.fm.draw();
     },
@@ -1237,22 +1387,45 @@
         if (F === undefined) { try { F = await this.ctx.fetchField(serial); } catch (e) { F = null; } this.fieldCache.set(serial, F); }
         opt.windAt = (x, y) => { const w = weatherAt(fm, x, y, F, hg); return w ? w.wind : null; };
       }
+      // the way from the start through the waypoints to the end: each stretch is found the same way as a plain journey
+      const stops = this._stops();
+      const route = (mode, o) => {
+        let all = null, km = 0, hours = 0;
+        for (let i = 0; i + 1 < stops.length; i++) {
+          const q = findRoute(fm, this._grid, this._roads, stops[i], stops[i + 1], mode, cfg, pace, o);
+          if (!q) return null;
+          if (all) all.pop();                                       // the stretch ends where the next starts
+          all = (all || []).concat(q.pts);
+          km += q.km; hours += q.hours;
+        }
+        return { pts: all, km, hours };
+      };
       for (const mode of ["fast", "easy", "short", "safe"]) {
-        let r = findRoute(fm, this._grid, this._roads, tv.start, tv.end, mode, cfg, pace, opt);
+        let r = route(mode, opt);
         // Säkrast may not take more than maxTimes the time of Snabbast: otherwise ease the extra caution
         // off (halving the gap each time) until it fits; at nothing it is Snabbast itself
         const fast = out.find((o) => o.mode === "fast");
         if (r && mode === "safe" && fast && fast.hours > 0 && r.hours > cfg.safe.maxTimes * fast.hours) {
           let lo = 0, hi = 1, best = null;
           for (let i = 0; i < 5; i++) {
-            const mid = (lo + hi) / 2, q = findRoute(fm, this._grid, this._roads, tv.start, tv.end, "safe", cfg, pace, { ...opt, safeScale: mid });
+            const mid = (lo + hi) / 2, q = route("safe", { ...opt, safeScale: mid });
             if (q && q.hours <= cfg.safe.maxTimes * fast.hours) { lo = mid; best = q; } else hi = mid;
           }
           r = best || fast;
         }
         if (r) out.push({ mode, ...r, sum: routeSummary(fm, r.pts, this._grid.rivers, cfg, opt.ferry) });
       }
-      if (!out.length) { this.msg(this.T(opt.sea ? "trNoWayAtAll" : "trNoWay")); tv.end = null; this.picking = "end"; this.render(); fm.draw(); return; }
+      if (!out.length) {
+        this.msg(this.T(opt.sea ? "trNoWayAtAll" : "trNoWay"));
+        if (this._revert && tv.candidates) { this._revert(); this._revert = null; this.render(); fm.draw(); return; }
+        if (tv.via && tv.via.length && this._viaAdded != null) {           // the waypoint just added can't be reached: take it away again
+          tv.via.splice(Math.min(this._viaAdded, tv.via.length - 1), 1); this._viaAdded = null;
+          if (tv.candidates) { this.render(); fm.draw(); return; }
+        }
+        if (tv.editTrip) { this._stopPicking(true); this.msg(this.T(opt.sea ? "trNoWayAtAll" : "trNoWay")); return; }
+        tv.end = null; tv.via = []; this.picking = "end"; this.render(); fm.draw(); return;
+      }
+      this._viaAdded = null; this._revert = null;
       // the same route twice (no roads, flat ground): one is enough
       // (the card then carries both names: "Snabbast och Lättast")
       for (let i = out.length - 1; i > 0; i--) {
@@ -1299,6 +1472,44 @@
       return simulate(this.fm, trip, cfg, (s) => this.fieldCache.get(s) || null, climateFor);
     },
 
+    /** Change a saved journey from where its token is now: the part already travelled stays, the rest is planned again. */
+    startEdit(trip) {
+      const T0 = this.fm.T || 0, at = tripAt(trip, T0);
+      if (!at || at.state === "after") { this.msg(this.T("trEditOver")); return; }
+      this.startPlanning();
+      const tv = this.tv, r = trip.route, last = r[r.length - 1], here = at.state === "before" ? { x: r[0][0], y: r[0][1], i: 0 } : at;
+      tv.editTrip = trip;
+      tv.keep = r.slice(0, here.i + 1).map((q) => q.slice());                 // up to the start of the stretch the token is on
+      tv.start = { x: here.x, y: here.y }; tv.end = { x: last[0], y: last[1] };
+      const idxOf = (p) => { let bi = 0, bd = Infinity; r.forEach((q, i) => { const d = (q[0] - p.x) ** 2 + (q[1] - p.y) ** 2; if (d < bd) { bd = d; bi = i; } }); return bi; };
+      tv.via = (trip.via || []).map((v) => JSON.parse(JSON.stringify(v))).filter((v) => idxOf(v) > here.i);   // the places not yet reached
+      for (const v of tv.via) if (v.from && idxOf(v.from) <= here.i) delete v.from;
+      this.ferry = !!trip.ferry; this.sea = !!trip.sea; this.landAny = !!trip.landAny; this.mount = trip.mount || "foot"; this.wagonOff = trip.wagonOff;
+      tv.chosen = null; this.picking = null;
+      this.$("stage").classList.remove("picking");
+      this.focus && this.focus(trip);
+      this._plan();
+    },
+    async saveEdit() {
+      const tv = this.tv, trip = tv.editTrip, c = (tv.candidates || []).find((x) => x.mode === tv.chosen);
+      if (!trip || !c) return;
+      const pl = this._planned || {};
+      trip.route = tv.keep.concat(c.pts.map((p) => (p.c != null ? [+p.x.toFixed(6), +p.y.toFixed(6), p.k, +p.c.toFixed(2)] : [+p.x.toFixed(6), +p.y.toFixed(6), p.k])));
+      if (tv.via.length) trip.via = JSON.parse(JSON.stringify(tv.via)); else delete trip.via;
+      trip.mode = c.mode;
+      for (const [k, v] of [["ferry", pl.ferry], ["sea", pl.sea], ["landAny", pl.landAny], ["mount", pl.mount], ["wagonOff", pl.wagonOff]]) { if (v) trip[k] = v; else delete trip[k]; }
+      for (const k of ["_samples", "_cum", "_fords", "_towns", "_ev", "_evKey"]) delete trip[k];
+      this.msg(this.T("trWorking"));
+      const planTl = await this._timeline({ ...trip, delays: [] });
+      const tl = (trip.delays && trip.delays.length) ? await this._timeline(trip) : planTl;
+      const pack = (x) => ({ km: x.km.map((v) => +v.toFixed(3)), total: +x.total.toFixed(3), arriveT: x.arriveT, nights: x.nights || [] });
+      trip.plan = pack(planTl); trip.timeline = pack(tl);
+      try { await this._save(trip); } catch (e) { this.msg(this.T("saveFailed") + e.message); return; }
+      tv.editTrip = null; tv.keep = null; tv.candidates = null; tv.start = tv.end = null; tv.via = []; tv.chosen = null;
+      this.fm.mapTool = null; this.picking = null; this.$("stage").classList.remove("picking");
+      this.msg(this.T("trEditDone", trip.name, this.ctx.fmtT(trip.timeline.arriveT)));
+      this.render(); this.fm.draw();
+    },
     async startTrip() {
       const tv = this.tv, c = (tv.candidates || []).find((x) => x.mode === tv.chosen);
       if (!c) return;
@@ -1310,27 +1521,28 @@
       const trip = this._tripFrom(c, { pace, startT: this.fm.T || 0, dayStart });
       trip.hoursPerDay = hoursPerDay;
       trip.name = name; trip.shared = this.$("trShared").checked; trip.mode = c.mode;
+      if ((tv.via || []).length) trip.via = JSON.parse(JSON.stringify(tv.via));
       if (this.$("trEvents").checked) { trip.events = true; trip.seed = newSeed(); }
       trip.color = COLOURS[(tv.trips.length) % COLOURS.length];
       this.msg(this.T("trWorking"));
       const tl = await this._timeline(trip);
       trip.timeline = { km: tl.km.map((v) => +v.toFixed(3)), total: +tl.total.toFixed(3), arriveT: tl.arriveT, nights: tl.nights || [] };
       trip.plan = trip.timeline;                 // the journey as planned, without delays (the events belong to it)
-      const body = { ...trip }; delete body._samples; delete body._cum; delete body._fords; delete body._ev; delete body._evKey;
+      const body = { ...trip }; delete body._samples; delete body._cum; delete body._fords; delete body._towns; delete body._ev; delete body._evKey;
       try {
         const r = await api("POST", `/maps/${S.map.id}/trips`, body);
         trip.id = r.id; trip.mine = true; trip.owner = S.user && S.user.username;
         tv.trips.push(trip);
         tv.selId = trip.id;
       } catch (e) { this.msg(this.T("saveFailed") + e.message); return; }
-      tv.candidates = null; tv.start = tv.end = null; tv.chosen = null;
+      tv.candidates = null; tv.start = tv.end = null; tv.via = []; tv.chosen = null;
       this.fm.mapTool = null; this.$("stage").classList.remove("picking");
       this.msg(this.T("trStarted", name, this.ctx.fmtT(trip.timeline.arriveT)));
       this.render(); this.fm.draw();
     },
     async _save(trip) {
       const { S, api } = this.ctx, body = { ...trip };
-      for (const k of ["_samples", "_cum", "_fords", "_ev", "_evKey", "id", "mine", "owner"]) delete body[k];
+      for (const k of ["_samples", "_cum", "_fords", "_towns", "_ev", "_evKey", "id", "mine", "owner"]) delete body[k];
       await api("PUT", `/maps/${S.map.id}/trips/${trip.id}`, body);
     },
     async addDelay(trip) {
@@ -1560,7 +1772,7 @@
       for (const [k, label] of rows) {
         const lab = document.createElement("label"); lab.className = "tr-set";
         const span = document.createElement("span"); span.textContent = label;
-        const inp = document.createElement("input"); inp.type = "number"; inp.step = "0.05"; inp.value = get(k); inp.dataset.key = k;
+        const inp = document.createElement("input"); inp.type = "number"; inp.step = "any"; inp.value = get(k); inp.dataset.key = k;
         lab.append(span, inp); body.append(lab);
       }
       // where the values come from, and the admins' buttons
@@ -1665,13 +1877,32 @@
       const btn = (label, fn, primary) => { const b = document.createElement("button"); b.type = "button"; b.textContent = label; if (primary) b.className = "primary"; b.onclick = fn; return b; };
       const p = (text, cls) => { const e = document.createElement("p"); e.textContent = text; e.className = cls || "tr-note"; return e; };
       if (!S.user) plan.append(p(T("trLogin")));
-      else if (this.picking) {
+      else if (this.picking && this.picking !== "via" && this.picking !== "detourFrom" && this.picking !== "detourTo") {
         plan.append(p(T(this.picking === "start" ? "trPickStart" : "trPickEnd")), btn(T("cancel"), () => this._stopPicking(true)));
       } else if (tv.candidates) {
+        // waypoints and detours: add by clicking, drag to move, remove with ✕ or a right-click on one
+        const via = document.createElement("div"); via.className = "tr-via";
+        if (this.picking === "via") via.append(p(T("trViaPick")), btn(T("trViaDone"), () => this._stopVia(), true));
+        else if (this.picking === "detourFrom" || this.picking === "detourTo") via.append(p(T(this.picking === "detourFrom" ? "trDetourFrom" : "trDetourTo")), btn(T("cancel"), () => this._stopVia()));
+        else via.append(btn(T("trAddVia"), () => this.startVia()), btn(T("trAddDetour"), () => this.startDetour()));
+        (tv.via || []).forEach((v, i) => {
+          const chip = document.createElement("span"); chip.className = "tr-via-chip"; chip.textContent = T(v.ret ? "trDetourN" : "trViaN", i + 1) + " ";
+          if (v.ret) { const r = document.createElement("button"); r.type = "button"; r.textContent = "↩"; r.title = T("trDetourBack"); r.onclick = () => { delete v.ret; delete v.from; this.render(); this.fm.draw(); this._plan(); }; chip.append(r); }
+          else { const r = document.createElement("button"); r.type = "button"; r.textContent = "⤺"; r.title = T("trViaToDetour"); r.onclick = () => { v.ret = true; this.render(); this.fm.draw(); this._plan(); }; chip.append(r); }
+          const x = document.createElement("button"); x.type = "button"; x.textContent = "✕"; x.title = T("trViaRemove"); x.onclick = () => this._removeVia(i);
+          chip.append(x); via.append(chip);
+        });
+        plan.append(via);
         const list = document.createElement("div"); list.className = "tr-cands"; list.id = "trCands";
         plan.append(list);
         this.renderCands();
         // the journey's details
+        if (tv.editTrip) {
+          plan.append(p(T("trEditNote", tv.editTrip.name)));
+          const erow = document.createElement("div"); erow.className = "tr-row";
+          erow.append(btn(T("trEditSave"), () => this.saveEdit(), true), btn(T("cancel"), () => this._stopPicking(true)));
+          plan.append(erow);
+        } else {
         const form = document.createElement("div"); form.className = "tr-form";
         form.innerHTML = `
           <label class="field slim"><span></span><input type="text" id="trName" maxlength="80"></label>
@@ -1703,6 +1934,7 @@
         row.append(btn(T("trStart"), () => this.startTrip(), true), btn(T("trAgain"), () => this.startPlanning()), btn(T("cancel"), () => this._stopPicking(true)));
         plan.append(row);
         plan.append(p(T("trDeparts", this.ctx.fmtT(this.fm.T || 0))));
+        }
       } else {
         plan.append(btn(T("trNew"), () => this.startPlanning(), true));
       }
@@ -1799,7 +2031,7 @@
         const b = (label, fn) => { const e = document.createElement("button"); e.type = "button"; e.textContent = label; e.onclick = fn; return e; };
         row.append(b(T("trShow"), () => this.focus(trip)));
         if (trip.mine) {
-          row.append(b(T("trDelay") + "…", () => this.addDelay(trip)), b(T("trDelete"), () => this.deleteTrip(trip)));
+          row.append(b(T("trDelay") + "…", () => this.addDelay(trip)), b(T("trEdit") + "…", () => this.startEdit(trip)), b(T("trDelete"), () => this.deleteTrip(trip)));
           const sh = document.createElement("label"); sh.className = "check"; sh.innerHTML = `<input type="checkbox"><span></span>`;
           sh.firstChild.checked = !!trip.shared; sh.lastChild.textContent = T("trSharedShort");
           sh.firstChild.onchange = (e) => this.toggleShared(trip, e.target.checked);

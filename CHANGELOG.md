@@ -2,6 +2,48 @@
 
 Newest first. Versions from 1.x on are the combined app (Root and Rune + Weather generator).
 
+## v1.43.0 (combined app)
+Weather generator:
+- **Detours.** Next to *Lägg till mellanpunkt* there is *Lägg till avstickare*: click the route where the detour branches off, then click the place to visit. The journey goes from that point to the place and **back** to the route, then carries on; each stretch is found with the same rules as the rest. Detours are orange on the map (a diamond where it branches off, a dashed line to the place) and can be dragged like the other points. In the list, ↩ on a detour turns it into an ordinary waypoint that carries on forward, and ⤺ on a waypoint makes it a detour.
+- **Change a saved journey.** Your own journeys have *Ändra resa…*: the part already travelled stays, and the rest is planned again from where the token is now, with the start (the token), the end, waypoints and detours all draggable, and all four route kinds available. *Spara ändringen* replaces the journey's route, keeps its delays and events settings, works out the new arrival and saves it; journeys keep their waypoints (`via`) so they can be changed again.
+- Fix: a saved journey no longer carries its cached town list in the data it saves.
+
+## v1.42.0 (combined app)
+Weather generator:
+- **Drag the start, the end and the waypoints.** Once a journey's routes are shown, grab the green start, the red end or a numbered waypoint and move it; the routes are found again when you let go. If no route reaches the new place the point goes back and you get the "no way over land" message instead of losing the plan.
+
+## v1.41.0 (combined app)
+Weather generator:
+- **Waypoints on a journey (mellanpunkter).** Once the routes for a journey are shown, *Lägg till mellanpunkt* lets you click the map to add waypoints: the routes are found from the start through the points, in order, to the end, each stretch with the same rules as before (Snabbast, Lättast, Kortast and Säkrast, with the ferry, sea and mount choices), and the totals are for the whole way. A new point is put in the order the chosen route passes the points. Points are numbered on the map and listed as chips with ✕; right-click a point on the map to remove it (right-click elsewhere ends adding). If a point can't be reached it is taken away again with the message. Saved journeys keep the whole route as before.
+
+## v1.40.0 (combined app)
+Weather generator:
+- **Fix: Cancel in the travel settings.** *Avbryt* (and *Återställ*, *Händelseregler…*) failed with a complaint about a value that could not be set, because the number boxes only accepted multiples of 0.05 and the browser checked them before closing. The number boxes accept any value now, and the buttons that don't save skip the check.
+- **Jargien fitted to the first map.** Measured against the first Mundana map, Jargien lay about 1.5 map pixels too far south (up to 3–4 in its north part, where the rivers jump at its north edge) and half a pixel too far east; its size agrees within 0.5 %, so it is only moved: 4 full-size pixels left and 12 up (a layer move, undoable with ⟲).
+
+## v1.39.1 (combined app)
+Weather generator:
+- **Consaber re-fitted to Thalamur (Egor) along the join.** Measured on the strip where the two maps overlap (the roads and names near Consaber's west edge, where Qatada, Svrox and Ivani are), Consaber needs to lie about 8 full-size pixels left and 18 down from Thalamur, not 4 and 12. Its move is now 16 right and 2 up (Egor's move plus that). The two are drawn differently (names and roads are placed differently, and the pictures only agree to about 1 map pixel), so they can be made to meet at the join but not to be identical.
+
+## v1.39.0 (combined app)
+Weather generator:
+- **Egor and Consaber fit their neighbours.** Where the layers overlap (Gordrion–Egor around the Qatada region, Egor–Consaber around Coloniska sjön) the names and coasts lay a few pixels apart and showed double. Fitted against each other (no layer was off in size: Egor and Consaber are within 1 % of the first map): **Egor** is moved 24 full-size pixels right and 20 up to match Gordrion, and **Consaber** 20 right and 8 up (its fit to Egor, 4 left and 12 down, on top of Egor's move). They are shipped as layer moves in the release (`layerShift`, with `layerShiftRelease` so they are installed over what is saved in the app), not as new zoom pieces, so an admin can tune or undo them with the arrows and ⟲ in the *Kartbild* list.
+
+## v1.38.0 (combined app)
+Weather generator:
+- **Transparent map layers (admins).** Under each layer in the *Kartbild* list there is a *Genomskinlig* slider, 0 % (solid) to 100 % (invisible) in steps of 5, so a layer can be seen through when fitting it against the one below. It applies to the zoom pieces and the map picture alike, is saved for everyone (`settings.layerTransparency`, `PUT /maps/{id}/layer-transparency`) and stays over new releases unless the release says its own is newer (`layerTransparencyRelease`, set by `tools/apply-export.py`). `map-layers.json` has each layer's `transparencyPercent`. Remember to set it back to 0 % when you are done.
+- Tests: `LayerShiftTest` also covers this.
+
+## v1.37.0 (combined app)
+Weather generator:
+- **Scale a map layer (admins).** Next to the arrows in the *Kartbild* list each layer has *Storlek* with **−** and **+**: one step is 0.5 % (Shift: 1 %), from 80 % to 125 %. A layer is scaled about the middle of the area its pieces cover, so combine it with the arrows to put it right. Like the move it is saved for everyone (`settings.layerShift` is now `[dx, dy]` or `[dx, dy, scale]`; `PUT /maps/{id}/layer-shift` takes an optional `scale`), and ⟲ puts both back. `map-layers.json` has each layer's `scale` and `box` (its middle and size).
+
+## v1.36.0 (combined app)
+Weather generator:
+- **Move a map layer (admins).** In the *Kartbild* list, every layer has a row of arrows for the admins: each click moves that regional map one map pixel (8 full-size pixels), Shift-click eight map pixels, ⟲ puts it back. It moves the zoom pieces and the map picture alike, is saved for everyone (`settings.layerShift`, `PUT /maps/{id}/layer-shift`) and stays over new releases unless the release says its own is newer (`layerShiftRelease`, set by `tools/apply-export.py`; the admin export carries it as a changed setting). The 3D view does not use the moves yet.
+- **Export map layers (admins).** A button at the bottom of the list downloads `map-layers.json`: order, each layer's box, move and the zoom pieces it has, so it can be sent along for fitting.
+- Tests `LayerShiftTest`.
+
 ## v1.35.0 (combined app)
 Root and Rune:
 - **Missing words from texts.** The *Missing words* tab has a new list, *Needed by texts*: meanings that the language's texts (its own and the ones it inherits) use at any of their years but the language has no word for. Each shows why, which texts and lines need it, and at which years, with the same *Coin word*, *Suggest root* and mark-as-missing buttons as the sentence list. Meanings you have already marked by hand are not repeated. The compound tool's side list shows them too. The list is also in the API as `fromTexts` on `GET /languages/{id}/missing`.

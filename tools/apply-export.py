@@ -93,6 +93,11 @@ def main():
         if "layerOrder" in ch["settings"]:
             # the order of the map layers (bottom first): the release's version is installed once, over the app's
             st["layerOrderRelease"] = man.get("exportedAt")
+        if "layerShift" in ch["settings"]:
+            # how far the map layers were moved: likewise installed once over the app's
+            st["layerShiftRelease"] = man.get("exportedAt")
+        if "layerTransparency" in ch["settings"]:
+            st["layerTransparencyRelease"] = man.get("exportedAt")
     if "image" in ch:
         f = ch["image"]["file"]
         if f.endswith(".jpg"):
