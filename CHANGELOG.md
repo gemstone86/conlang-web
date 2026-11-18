@@ -2,6 +2,12 @@
 
 Newest first. Versions from 1.x on are the combined app (Root and Rune + Weather generator).
 
+## v1.43.0 (combined app)
+Weather generator:
+- **Detours.** Next to *Lägg till mellanpunkt* there is *Lägg till avstickare*: click the route where the detour branches off, then click the place to visit. The journey goes from that point to the place and **back** to the route, then carries on; each stretch is found with the same rules as the rest. Detours are orange on the map (a diamond where it branches off, a dashed line to the place) and can be dragged like the other points. In the list, ↩ on a detour turns it into an ordinary waypoint that carries on forward, and ⤺ on a waypoint makes it a detour.
+- **Change a saved journey.** Your own journeys have *Ändra resa…*: the part already travelled stays, and the rest is planned again from where the token is now, with the start (the token), the end, waypoints and detours all draggable, and all four route kinds available. *Spara ändringen* replaces the journey's route, keeps its delays and events settings, works out the new arrival and saves it; journeys keep their waypoints (`via`) so they can be changed again.
+- Fix: a saved journey no longer carries its cached town list in the data it saves.
+
 ## v1.42.0 (combined app)
 Weather generator:
 - **Drag the start, the end and the waypoints.** Once a journey's routes are shown, grab the green start, the red end or a numbered waypoint and move it; the routes are found again when you let go. If no route reaches the new place the point goes back and you get the "no way over land" message instead of losing the plan.
