@@ -1052,6 +1052,12 @@
       ctx.setLineDash([]);
       this._trBoats(c.pts.map((p) => [p.x, p.y, p.k]), sel ? 2 : 1.5);
     }
+    (tv.via || []).forEach((p, i) => {
+      const [x, y] = this.toScreen(p.x, p.y);
+      ctx.fillStyle = "#5fb6ff"; ctx.strokeStyle = "#18212a"; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(x, y, 6, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = "#18212a"; ctx.font = "bold 9px sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(String(i + 1), x, y + 0.5);
+    });
     for (const p of [tv.start, tv.end]) if (p) {
       const [x, y] = this.toScreen(p.x, p.y);
       ctx.fillStyle = p === tv.start ? "#7bd88f" : "#ef6f6c"; ctx.strokeStyle = "#18212a"; ctx.lineWidth = 2;
@@ -1151,7 +1157,7 @@
       ASPECT = (this.fm.imgH || 1) / (this.fm.imgW || 2);
       this.tv.cfg = this.cfg(); this.fm.roadSteep = this.tv.cfg.steep;      // the world's rules may have arrived since
       this.tv.trips = [];
-      this.tv.candidates = null; this.tv.start = this.tv.end = null;
+      this.tv.candidates = null; this.tv.start = this.tv.end = null; this.tv.via = [];
       this._grid = null;
       if (!S.map) { this.render(); return; }
       try {
@@ -1175,7 +1181,7 @@
     close() {
       this.tv.panelOpen = false;
       this._stopPicking();
-      this.tv.candidates = null; this.tv.start = this.tv.end = null; this.tv.chosen = null;
+      this.tv.candidates = null; this.tv.start = this.tv.end = null; this.tv.via = []; this.tv.chosen = null;
       this.$("trPanel").hidden = true;
       this.$("travelBtn").classList.remove("active");
       this.fm.draw();
@@ -1184,27 +1190,75 @@
     // planning: pick the start and the end on the map
     startPlanning() {
       const tv = this.tv;
-      tv.candidates = null; tv.start = tv.end = null; tv.chosen = null;
+      tv.candidates = null; tv.start = tv.end = null; tv.via = []; tv.chosen = null;
       this.picking = "start";
       this.fm.mapTool = {
         click: (nx, ny) => {
           if (this.picking === "start") { tv.start = { x: nx, y: ny }; this.picking = "end"; this.render(); this.fm.draw(); return true; }
           if (this.picking === "end") { tv.end = { x: nx, y: ny }; this.picking = null; this.fm.draw(); this._plan(); return true; }
+          if (this.picking === "via") { this._addVia(nx, ny); return true; }
           if (tv.candidates) {                       // a click on one of the two routes chooses it
             const c = this._candidateNear(nx, ny);
             if (c) { tv.chosen = c.mode; this.renderCands(); this.fm.draw(); return true; }
           }
           return false;
         },
-        context: () => { if (this.picking === "end") { tv.start = null; this.picking = "start"; this.render(); this.fm.draw(); } else this._stopPicking(true); },
+        context: (sx, sy) => {
+          if (this.picking === "via") { if (!this._removeViaNear(sx, sy)) this._stopVia(); return; }
+          if (this.picking === "end") { tv.start = null; this.picking = "start"; this.render(); this.fm.draw(); } else this._stopPicking(true);
+        },
       };
       this.$("stage").classList.add("picking");
       this.render();
     },
+    /** Waypoints (mellanpunkter): the routes are found from the start through them, in order, to the end. */
+    startVia() {
+      const tv = this.tv;
+      if (!tv.candidates || !tv.start || !tv.end) return;
+      this.picking = "via";
+      this.$("stage").classList.add("picking");
+      this.render();
+    },
+    _stopVia() {
+      this.picking = null;
+      this.$("stage").classList.remove("picking");
+      this.render(); this.fm.draw();
+    },
+    /** A waypoint at a click, placed in the order the chosen route passes the points. */
+    _addVia(nx, ny) {
+      const tv = this.tv;
+      tv.via = tv.via || [];
+      const c = (tv.candidates || []).find((o) => o.mode === tv.chosen) || (tv.candidates || [])[0];
+      let at = tv.via.length;                                       // after the last waypoint by default
+      if (c) {
+        const near = (p) => { let bi = 0, bd = Infinity; c.pts.forEach((q, i) => { const d = (q.x - p.x) ** 2 + (q.y - p.y) ** 2; if (d < bd) { bd = d; bi = i; } }); return bi; };
+        const ctrl = [tv.start, ...tv.via, tv.end], idx = ctrl.map(near), j = near({ x: nx, y: ny });
+        let k = 0;
+        for (let i = 0; i < ctrl.length - 1; i++) if (idx[i] <= j) k = i;
+        at = k;                                                       // between ctrl[k] and ctrl[k + 1]
+      }
+      tv.via.splice(at, 0, { x: nx, y: ny });
+      this._viaAdded = at;
+      this.render(); this.fm.draw();
+      this._plan();
+    },
+    _removeViaNear(sx, sy) {
+      const tv = this.tv, fm = this.fm;
+      let bi = -1, bd = 14;
+      (tv.via || []).forEach((p, i) => { const [x, y] = fm.toScreen(p.x, p.y), d = Math.hypot(x - sx, y - sy); if (d < bd) { bd = d; bi = i; } });
+      if (bi < 0) return false;
+      this._removeVia(bi);
+      return true;
+    },
+    _removeVia(i) {
+      this.tv.via.splice(i, 1);
+      this.render(); this.fm.draw();
+      this._plan();
+    },
     _stopPicking(clear) {
       this.picking = null;
       if (this.fm.mapTool && !this.tv.candidates) this.fm.mapTool = null;
-      if (clear) { this.fm.mapTool = null; this.tv.candidates = null; this.tv.start = this.tv.end = null; this.tv.chosen = null; }
+      if (clear) { this.fm.mapTool = null; this.tv.candidates = null; this.tv.start = this.tv.end = null; this.tv.via = []; this.tv.chosen = null; }
       this.$("stage").classList.remove("picking");
       this.render(); this.fm.draw();
     },
@@ -1237,22 +1291,43 @@
         if (F === undefined) { try { F = await this.ctx.fetchField(serial); } catch (e) { F = null; } this.fieldCache.set(serial, F); }
         opt.windAt = (x, y) => { const w = weatherAt(fm, x, y, F, hg); return w ? w.wind : null; };
       }
+      // the way from the start through the waypoints to the end: each stretch is found the same way as a plain journey
+      const stops = [tv.start, ...(tv.via || []), tv.end];
+      const route = (mode, o) => {
+        let all = null, km = 0, hours = 0;
+        for (let i = 0; i + 1 < stops.length; i++) {
+          const q = findRoute(fm, this._grid, this._roads, stops[i], stops[i + 1], mode, cfg, pace, o);
+          if (!q) return null;
+          if (all) all.pop();                                       // the stretch ends where the next starts
+          all = (all || []).concat(q.pts);
+          km += q.km; hours += q.hours;
+        }
+        return { pts: all, km, hours };
+      };
       for (const mode of ["fast", "easy", "short", "safe"]) {
-        let r = findRoute(fm, this._grid, this._roads, tv.start, tv.end, mode, cfg, pace, opt);
+        let r = route(mode, opt);
         // Säkrast may not take more than maxTimes the time of Snabbast: otherwise ease the extra caution
         // off (halving the gap each time) until it fits; at nothing it is Snabbast itself
         const fast = out.find((o) => o.mode === "fast");
         if (r && mode === "safe" && fast && fast.hours > 0 && r.hours > cfg.safe.maxTimes * fast.hours) {
           let lo = 0, hi = 1, best = null;
           for (let i = 0; i < 5; i++) {
-            const mid = (lo + hi) / 2, q = findRoute(fm, this._grid, this._roads, tv.start, tv.end, "safe", cfg, pace, { ...opt, safeScale: mid });
+            const mid = (lo + hi) / 2, q = route("safe", { ...opt, safeScale: mid });
             if (q && q.hours <= cfg.safe.maxTimes * fast.hours) { lo = mid; best = q; } else hi = mid;
           }
           r = best || fast;
         }
         if (r) out.push({ mode, ...r, sum: routeSummary(fm, r.pts, this._grid.rivers, cfg, opt.ferry) });
       }
-      if (!out.length) { this.msg(this.T(opt.sea ? "trNoWayAtAll" : "trNoWay")); tv.end = null; this.picking = "end"; this.render(); fm.draw(); return; }
+      if (!out.length) {
+        this.msg(this.T(opt.sea ? "trNoWayAtAll" : "trNoWay"));
+        if (tv.via && tv.via.length && this._viaAdded != null) {           // the waypoint just added can't be reached: take it away again
+          tv.via.splice(Math.min(this._viaAdded, tv.via.length - 1), 1); this._viaAdded = null;
+          if (tv.candidates) { this.render(); fm.draw(); return; }
+        }
+        tv.end = null; tv.via = []; this.picking = "end"; this.render(); fm.draw(); return;
+      }
+      this._viaAdded = null;
       // the same route twice (no roads, flat ground): one is enough
       // (the card then carries both names: "Snabbast och Lättast")
       for (let i = out.length - 1; i > 0; i--) {
@@ -1323,7 +1398,7 @@
         tv.trips.push(trip);
         tv.selId = trip.id;
       } catch (e) { this.msg(this.T("saveFailed") + e.message); return; }
-      tv.candidates = null; tv.start = tv.end = null; tv.chosen = null;
+      tv.candidates = null; tv.start = tv.end = null; tv.via = []; tv.chosen = null;
       this.fm.mapTool = null; this.$("stage").classList.remove("picking");
       this.msg(this.T("trStarted", name, this.ctx.fmtT(trip.timeline.arriveT)));
       this.render(); this.fm.draw();
@@ -1665,9 +1740,19 @@
       const btn = (label, fn, primary) => { const b = document.createElement("button"); b.type = "button"; b.textContent = label; if (primary) b.className = "primary"; b.onclick = fn; return b; };
       const p = (text, cls) => { const e = document.createElement("p"); e.textContent = text; e.className = cls || "tr-note"; return e; };
       if (!S.user) plan.append(p(T("trLogin")));
-      else if (this.picking) {
+      else if (this.picking && this.picking !== "via") {
         plan.append(p(T(this.picking === "start" ? "trPickStart" : "trPickEnd")), btn(T("cancel"), () => this._stopPicking(true)));
       } else if (tv.candidates) {
+        // waypoints: add by clicking, remove with ✕ or a right-click on one
+        const via = document.createElement("div"); via.className = "tr-via";
+        if (this.picking === "via") via.append(p(T("trViaPick")), btn(T("trViaDone"), () => this._stopVia(), true));
+        else via.append(btn(T("trAddVia"), () => this.startVia()));
+        (tv.via || []).forEach((v, i) => {
+          const chip = document.createElement("span"); chip.className = "tr-via-chip"; chip.textContent = T("trViaN", i + 1) + " ";
+          const x = document.createElement("button"); x.type = "button"; x.textContent = "✕"; x.title = T("trViaRemove"); x.onclick = () => this._removeVia(i);
+          chip.append(x); via.append(chip);
+        });
+        plan.append(via);
         const list = document.createElement("div"); list.className = "tr-cands"; list.id = "trCands";
         plan.append(list);
         this.renderCands();

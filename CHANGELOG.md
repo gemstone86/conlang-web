@@ -2,6 +2,10 @@
 
 Newest first. Versions from 1.x on are the combined app (Root and Rune + Weather generator).
 
+## v1.41.0 (combined app)
+Weather generator:
+- **Waypoints on a journey (mellanpunkter).** Once the routes for a journey are shown, *Lägg till mellanpunkt* lets you click the map to add waypoints: the routes are found from the start through the points, in order, to the end, each stretch with the same rules as before (Snabbast, Lättast, Kortast and Säkrast, with the ferry, sea and mount choices), and the totals are for the whole way. A new point is put in the order the chosen route passes the points. Points are numbered on the map and listed as chips with ✕; right-click a point on the map to remove it (right-click elsewhere ends adding). If a point can't be reached it is taken away again with the message. Saved journeys keep the whole route as before.
+
 ## v1.40.0 (combined app)
 Weather generator:
 - **Fix: Cancel in the travel settings.** *Avbryt* (and *Återställ*, *Händelseregler…*) failed with a complaint about a value that could not be set, because the number boxes only accepted multiples of 0.05 and the browser checked them before closing. The number boxes accept any value now, and the buttons that don't save skip the check.
