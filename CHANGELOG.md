@@ -2,6 +2,11 @@
 
 Newest first. Versions from 1.x on are the combined app (Root and Rune + Weather generator).
 
+## v1.44.0 (combined app)
+Site:
+- **Visitor counts on the admin page.** *Admin* now has a *Visitors* section: how many different visitors and page views each day had (the last 30 days), in total and for the start page, Root and Rune and the weather generator. It is counted inside the site, without cookies and without storing anyone's address: a visitor is a short code made from their address and browser mixed with a random salt kept only in memory and thrown away at midnight (UTC), so nobody can be followed between days or traced back. Only the daily numbers are saved (table `visit_stats`, kept about two years).
+- Only page loads count (not the API, scripts or images), and robots and browsers that send Do Not Track / Global Privacy Control are left out. A visitor is counted once per day (and once more if the server restarts that day); the per-page figures can add up to more than the total, since a visitor to two pages counts in both.
+
 ## v1.43.0 (combined app)
 Weather generator:
 - **Detours.** Next to *Lägg till mellanpunkt* there is *Lägg till avstickare*: click the route where the detour branches off, then click the place to visit. The journey goes from that point to the place and **back** to the route, then carries on; each stretch is found with the same rules as the rest. Detours are orange on the map (a diamond where it branches off, a dashed line to the place) and can be dragged like the other points. In the list, ↩ on a detour turns it into an ordinary waypoint that carries on forward, and ⤺ on a waypoint makes it a detour.
