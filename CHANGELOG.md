@@ -2,6 +2,10 @@
 
 Newest first. Versions from 1.x on are the combined app (Root and Rune + Weather generator).
 
+## v1.42.0 (combined app)
+Weather generator:
+- **Drag the start, the end and the waypoints.** Once a journey's routes are shown, grab the green start, the red end or a numbered waypoint and move it; the routes are found again when you let go. If no route reaches the new place the point goes back and you get the "no way over land" message instead of losing the plan.
+
 ## v1.41.0 (combined app)
 Weather generator:
 - **Waypoints on a journey (mellanpunkter).** Once the routes for a journey are shown, *Lägg till mellanpunkt* lets you click the map to add waypoints: the routes are found from the start through the points, in order, to the end, each stretch with the same rules as before (Snabbast, Lättast, Kortast and Säkrast, with the ferry, sea and mount choices), and the totals are for the whole way. A new point is put in the order the chosen route passes the points. Points are numbered on the map and listed as chips with ✕; right-click a point on the map to remove it (right-click elsewhere ends adding). If a point can't be reached it is taken away again with the message. Saved journeys keep the whole route as before.

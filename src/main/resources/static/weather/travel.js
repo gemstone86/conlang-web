@@ -1203,6 +1203,33 @@
           }
           return false;
         },
+        // drag the start, the end or a waypoint to change the journey; the routes are found again when it is let go
+        down: (sx, sy, button) => {
+          if (button !== 0 || !tv.candidates || this.picking === "start" || this.picking === "end") return false;
+          const h = this._hitStop(sx, sy);
+          if (!h) return false;
+          const p0 = h.kind === "start" ? tv.start : h.kind === "end" ? tv.end : tv.via[h.i];
+          this._drag = { ...h, moved: false, from: { x: p0.x, y: p0.y } };
+          this.fm.stage.classList.add("dragging");
+          return true;
+        },
+        move: (sx, sy) => {
+          const d = this._drag;
+          if (!d) { this.fm.stage && (this.fm.stage.style.cursor = this._hitStop(sx, sy) && tv.candidates ? "grab" : ""); return; }
+          const [nx, ny] = this.fm.toMap(sx, sy), p = d.kind === "start" ? tv.start : d.kind === "end" ? tv.end : tv.via[d.i];
+          if (!p) return;
+          p.x = clamp(nx, 0, 1); p.y = clamp(ny, 0, 1); d.moved = true;
+          this.fm.draw();
+        },
+        up: () => {
+          const d = this._drag; this._drag = null;
+          this.fm.stage && this.fm.stage.classList.remove("dragging");
+          if (d && d.moved) {
+            // a place no route can reach: the point goes back where it was
+            this._revert = () => { const p = d.kind === "start" ? tv.start : d.kind === "end" ? tv.end : tv.via[d.i]; if (p) { p.x = d.from.x; p.y = d.from.y; } };
+            this._plan();
+          }
+        },
         context: (sx, sy) => {
           if (this.picking === "via") { if (!this._removeViaNear(sx, sy)) this._stopVia(); return; }
           if (this.picking === "end") { tv.start = null; this.picking = "start"; this.render(); this.fm.draw(); } else this._stopPicking(true);
@@ -1241,6 +1268,14 @@
       this._viaAdded = at;
       this.render(); this.fm.draw();
       this._plan();
+    },
+    /** The start, end or waypoint under a screen point: { kind: "start" | "end" | "via", i } or null. */
+    _hitStop(sx, sy) {
+      const tv = this.tv, fm = this.fm, hit = (p) => { const [x, y] = fm.toScreen(p.x, p.y); return Math.hypot(x - sx, y - sy) <= 11; };
+      for (let i = (tv.via || []).length - 1; i >= 0; i--) if (hit(tv.via[i])) return { kind: "via", i };
+      if (tv.end && hit(tv.end)) return { kind: "end" };
+      if (tv.start && hit(tv.start)) return { kind: "start" };
+      return null;
     },
     _removeViaNear(sx, sy) {
       const tv = this.tv, fm = this.fm;
@@ -1321,13 +1356,14 @@
       }
       if (!out.length) {
         this.msg(this.T(opt.sea ? "trNoWayAtAll" : "trNoWay"));
+        if (this._revert && tv.candidates) { this._revert(); this._revert = null; this.render(); fm.draw(); return; }
         if (tv.via && tv.via.length && this._viaAdded != null) {           // the waypoint just added can't be reached: take it away again
           tv.via.splice(Math.min(this._viaAdded, tv.via.length - 1), 1); this._viaAdded = null;
           if (tv.candidates) { this.render(); fm.draw(); return; }
         }
         tv.end = null; tv.via = []; this.picking = "end"; this.render(); fm.draw(); return;
       }
-      this._viaAdded = null;
+      this._viaAdded = null; this._revert = null;
       // the same route twice (no roads, flat ground): one is enough
       // (the card then carries both names: "Snabbast och Lättast")
       for (let i = out.length - 1; i > 0; i--) {
