@@ -61,43 +61,48 @@ class LayerShiftTest {
         long mapId = -1;
         for (JsonNode m : json.readTree(get(admin, "/weather/api/maps").body())) if (m.path("isDefault").asBoolean()) mapId = m.path("id").asLong();
         String url = "/weather/api/maps/" + mapId + "/layer-shift";
-        String body = "{\"layer\":\"consaber\",\"dx\":16,\"dy\":-8}";
+        String body = "{\"layer\":\"jargien\",\"dx\":16,\"dy\":-8}";
 
         assertEquals(401, send(anon, "PUT", url, body, true).statusCode());
         assertEquals(403, send(member, "PUT", url, body, true).statusCode());
         assertEquals(400, send(admin, "PUT", url, "{\"layer\":\"../x\",\"dx\":1,\"dy\":1}", true).statusCode());
-        assertEquals(400, send(admin, "PUT", url, "{\"layer\":\"consaber\",\"dx\":99999,\"dy\":1}", true).statusCode());
-        assertEquals(400, send(admin, "PUT", url, "{\"layer\":\"consaber\"}", true).statusCode());
+        assertEquals(400, send(admin, "PUT", url, "{\"layer\":\"jargien\",\"dx\":99999,\"dy\":1}", true).statusCode());
+        assertEquals(400, send(admin, "PUT", url, "{\"layer\":\"jargien\"}", true).statusCode());
 
         HttpResponse<String> ok = send(admin, "PUT", url, body, true);
         assertEquals(200, ok.statusCode(), ok.body());
         JsonNode s = json.readTree(ok.body()).path("settings").path("layerShift");
-        assertEquals(16, s.path("consaber").get(0).asInt());
-        assertEquals(-8, s.path("consaber").get(1).asInt());
+        assertEquals(16, s.path("jargien").get(0).asInt());
+        assertEquals(-8, s.path("jargien").get(1).asInt());
         assertTrue(json.readTree(ok.body()).path("settings").has("tiles"));
 
         // a second layer keeps the first
-        assertEquals(200, send(admin, "PUT", url, "{\"layer\":\"asharien\",\"dx\":0,\"dy\":8}", true).statusCode());
+        assertEquals(200, send(admin, "PUT", url, "{\"layer\":\"damarien\",\"dx\":0,\"dy\":8}", true).statusCode());
         JsonNode seen = json.readTree(get(anon, "/weather/api/maps/" + mapId).body()).path("settings").path("layerShift");
-        assertEquals(2, seen.size());
+        assertEquals(4, seen.size());
 
         // in the admin export
         JsonNode export = json.readTree(get(admin, "/weather/api/maps/" + mapId + "/export?summary=1").body());
-        assertEquals(16, export.path("changes").path("settings").path("layerShift").path("consaber").get(0).asInt(), export.toString());
+        assertEquals(16, export.path("changes").path("settings").path("layerShift").path("jargien").get(0).asInt(), export.toString());
 
         // scale: kept with the move, limited, and 1 means none
-        HttpResponse<String> sc = send(admin, "PUT", url, "{\"layer\":\"consaber\",\"dx\":16,\"dy\":-8,\"scale\":1.005}", true);
+        HttpResponse<String> sc = send(admin, "PUT", url, "{\"layer\":\"jargien\",\"dx\":16,\"dy\":-8,\"scale\":1.005}", true);
         assertEquals(200, sc.statusCode(), sc.body());
-        assertEquals(1.005, json.readTree(sc.body()).path("settings").path("layerShift").path("consaber").get(2).asDouble(), 1e-9);
-        assertEquals(400, send(admin, "PUT", url, "{\"layer\":\"consaber\",\"dx\":0,\"dy\":0,\"scale\":2}", true).statusCode());
-        assertEquals(400, send(admin, "PUT", url, "{\"layer\":\"consaber\",\"dx\":0,\"dy\":0,\"scale\":\"big\"}", true).statusCode());
-        assertEquals(200, send(admin, "PUT", url, "{\"layer\":\"consaber\",\"dx\":0,\"dy\":0,\"scale\":1.01}", true).statusCode(), "scaled only is still a change");
-        assertEquals(2, json.readTree(get(anon, "/weather/api/maps/" + mapId).body()).path("settings").path("layerShift").size());
+        assertEquals(1.005, json.readTree(sc.body()).path("settings").path("layerShift").path("jargien").get(2).asDouble(), 1e-9);
+        assertEquals(400, send(admin, "PUT", url, "{\"layer\":\"jargien\",\"dx\":0,\"dy\":0,\"scale\":2}", true).statusCode());
+        assertEquals(400, send(admin, "PUT", url, "{\"layer\":\"jargien\",\"dx\":0,\"dy\":0,\"scale\":\"big\"}", true).statusCode());
+        assertEquals(200, send(admin, "PUT", url, "{\"layer\":\"jargien\",\"dx\":0,\"dy\":0,\"scale\":1.01}", true).statusCode(), "scaled only is still a change");
+        assertEquals(4, json.readTree(get(anon, "/weather/api/maps/" + mapId).body()).path("settings").path("layerShift").size(), "the release ships two");
 
         // 0, 0 puts a layer back; the last one removes the setting
-        assertEquals(200, send(admin, "PUT", url, "{\"layer\":\"consaber\",\"dx\":0,\"dy\":0,\"scale\":1}", true).statusCode());
-        assertEquals(200, send(admin, "PUT", url, "{\"layer\":\"asharien\",\"dx\":0,\"dy\":0}", true).statusCode());
-        assertTrue(json.readTree(get(anon, "/weather/api/maps/" + mapId).body()).path("settings").path("layerShift").isMissingNode());
+        assertEquals(200, send(admin, "PUT", url, "{\"layer\":\"jargien\",\"dx\":0,\"dy\":0,\"scale\":1}", true).statusCode());
+        assertEquals(200, send(admin, "PUT", url, "{\"layer\":\"damarien\",\"dx\":0,\"dy\":0}", true).statusCode());
+        JsonNode left = json.readTree(get(anon, "/weather/api/maps/" + mapId).body()).path("settings").path("layerShift");
+        assertEquals(2, left.size(), "only the release's own moves are left");
+        assertEquals(24, left.path("egor").get(0).asInt());
+        assertEquals(-20, left.path("egor").get(1).asInt());
+        assertEquals(20, left.path("consaber").get(0).asInt());
+        assertEquals(-8, left.path("consaber").get(1).asInt());
     }
 
     @Test

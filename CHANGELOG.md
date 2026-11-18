@@ -2,6 +2,10 @@
 
 Newest first. Versions from 1.x on are the combined app (Root and Rune + Weather generator).
 
+## v1.39.0 (combined app)
+Weather generator:
+- **Egor and Consaber fit their neighbours.** Where the layers overlap (Gordrion–Egor around the Qatada region, Egor–Consaber around Coloniska sjön) the names and coasts lay a few pixels apart and showed double. Fitted against each other (no layer was off in size: Egor and Consaber are within 1 % of the first map): **Egor** is moved 24 full-size pixels right and 20 up to match Gordrion, and **Consaber** 20 right and 8 up (its fit to Egor, 4 left and 12 down, on top of Egor's move). They are shipped as layer moves in the release (`layerShift`, with `layerShiftRelease` so they are installed over what is saved in the app), not as new zoom pieces, so an admin can tune or undo them with the arrows and ⟲ in the *Kartbild* list.
+
 ## v1.38.0 (combined app)
 Weather generator:
 - **Transparent map layers (admins).** Under each layer in the *Kartbild* list there is a *Genomskinlig* slider, 0 % (solid) to 100 % (invisible) in steps of 5, so a layer can be seen through when fitting it against the one below. It applies to the zoom pieces and the map picture alike, is saved for everyone (`settings.layerTransparency`, `PUT /maps/{id}/layer-transparency`) and stays over new releases unless the release says its own is newer (`layerTransparencyRelease`, set by `tools/apply-export.py`). `map-layers.json` has each layer's `transparencyPercent`. Remember to set it back to 0 % when you are done.
