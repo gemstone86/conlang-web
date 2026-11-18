@@ -18,8 +18,8 @@
   "forestRelease": "2026-11-15T19:23:16.885114100Z",
   "marshRelease": "2026-11-15T19:23:16.885114100Z",
   "citiesRelease": "2026-11-15T19:23:16.885114100Z",
-  "layerShift": {"egor": [24, -20], "consaber": [20, -8]},
-  "layerShiftRelease": "2026-11-18-egor-consaber-fit"
+  "layerShift": {"egor": [24, -20], "consaber": [16, -2]},
+  "layerShiftRelease": "2026-11-18-egor-consaber-fit-2"
  },
  "symbols": {
   "Astrotropi": "symbols/Astrotropi.png",

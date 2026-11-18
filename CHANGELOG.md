@@ -2,6 +2,10 @@
 
 Newest first. Versions from 1.x on are the combined app (Root and Rune + Weather generator).
 
+## v1.39.1 (combined app)
+Weather generator:
+- **Consaber re-fitted to Thalamur (Egor) along the join.** Measured on the strip where the two maps overlap (the roads and names near Consaber's west edge, where Qatada, Svrox and Ivani are), Consaber needs to lie about 8 full-size pixels left and 18 down from Thalamur, not 4 and 12. Its move is now 16 right and 2 up (Egor's move plus that). The two are drawn differently (names and roads are placed differently, and the pictures only agree to about 1 map pixel), so they can be made to meet at the join but not to be identical.
+
 ## v1.39.0 (combined app)
 Weather generator:
 - **Egor and Consaber fit their neighbours.** Where the layers overlap (Gordrion–Egor around the Qatada region, Egor–Consaber around Coloniska sjön) the names and coasts lay a few pixels apart and showed double. Fitted against each other (no layer was off in size: Egor and Consaber are within 1 % of the first map): **Egor** is moved 24 full-size pixels right and 20 up to match Gordrion, and **Consaber** 20 right and 8 up (its fit to Egor, 4 left and 12 down, on top of Egor's move). They are shipped as layer moves in the release (`layerShift`, with `layerShiftRelease` so they are installed over what is saved in the app), not as new zoom pieces, so an admin can tune or undo them with the arrows and ⟲ in the *Kartbild* list.

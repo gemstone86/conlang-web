@@ -101,8 +101,8 @@ class LayerShiftTest {
         assertEquals(2, left.size(), "only the release's own moves are left");
         assertEquals(24, left.path("egor").get(0).asInt());
         assertEquals(-20, left.path("egor").get(1).asInt());
-        assertEquals(20, left.path("consaber").get(0).asInt());
-        assertEquals(-8, left.path("consaber").get(1).asInt());
+        assertEquals(16, left.path("consaber").get(0).asInt());
+        assertEquals(-2, left.path("consaber").get(1).asInt());
     }
 
     @Test
