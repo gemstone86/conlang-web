@@ -1560,7 +1560,7 @@
       for (const [k, label] of rows) {
         const lab = document.createElement("label"); lab.className = "tr-set";
         const span = document.createElement("span"); span.textContent = label;
-        const inp = document.createElement("input"); inp.type = "number"; inp.step = "0.05"; inp.value = get(k); inp.dataset.key = k;
+        const inp = document.createElement("input"); inp.type = "number"; inp.step = "any"; inp.value = get(k); inp.dataset.key = k;
         lab.append(span, inp); body.append(lab);
       }
       // where the values come from, and the admins' buttons

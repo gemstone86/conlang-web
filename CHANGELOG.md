@@ -2,6 +2,11 @@
 
 Newest first. Versions from 1.x on are the combined app (Root and Rune + Weather generator).
 
+## v1.40.0 (combined app)
+Weather generator:
+- **Fix: Cancel in the travel settings.** *Avbryt* (and *Återställ*, *Händelseregler…*) failed with a complaint about a value that could not be set, because the number boxes only accepted multiples of 0.05 and the browser checked them before closing. The number boxes accept any value now, and the buttons that don't save skip the check.
+- **Jargien fitted to the first map.** Measured against the first Mundana map, Jargien lay about 1.5 map pixels too far south (up to 3–4 in its north part, where the rivers jump at its north edge) and half a pixel too far east; its size agrees within 0.5 %, so it is only moved: 4 full-size pixels left and 12 up (a layer move, undoable with ⟲).
+
 ## v1.39.1 (combined app)
 Weather generator:
 - **Consaber re-fitted to Thalamur (Egor) along the join.** Measured on the strip where the two maps overlap (the roads and names near Consaber's west edge, where Qatada, Svrox and Ivani are), Consaber needs to lie about 8 full-size pixels left and 18 down from Thalamur, not 4 and 12. Its move is now 16 right and 2 up (Egor's move plus that). The two are drawn differently (names and roads are placed differently, and the pictures only agree to about 1 map pixel), so they can be made to meet at the join but not to be identical.
