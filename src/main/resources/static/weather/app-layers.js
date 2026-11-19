@@ -812,6 +812,14 @@
       return true;
     } };
   }
+  /** The ids of a river and everything connected to it: the rivers that run into it and the one it runs into (and theirs), and the lakes between. */
+  function mvNetwork(id) {
+    const items = fieldMap.rivers || [], adj = new Map(), link = (a, b) => { if (a == null || b == null) return; (adj.get(a) || adj.set(a, new Set()).get(a)).add(b); (adj.get(b) || adj.set(b, new Set()).get(b)).add(a); };
+    for (const r of items) { if (r.joins) link(r.id, r.joins.river != null ? r.joins.river : r.joins.lake); if (r.from && r.from.lake != null) link(r.id, r.from.lake); }
+    const seen = new Set([id]), todo = [id];
+    while (todo.length) for (const n of adj.get(todo.pop()) || []) if (!seen.has(n)) { seen.add(n); todo.push(n); }
+    return seen;
+  }
   /** Drag: press on a river (it is picked, if it wasn't) and pull; all the picked rivers follow the mouse and are moved for good when it is let go. A click without pulling picks or drops a river. */
   function mvDragRivers() {
     mvStopTool();
@@ -820,7 +828,8 @@
     const shownAt = (dxn, dyn) => {
       for (const r of fieldMap.rivers || []) {
         const o = d.orig.get(r.id);
-        if (o) r.points.forEach((q, i) => { q.x = Math.max(0, Math.min(1, o[i].x + dxn)); q.y = Math.max(0, Math.min(1, o[i].y + dyn)); });
+        if (o && r.points) r.points.forEach((q, i) => { q.x = Math.max(0, Math.min(1, o[i].x + dxn)); q.y = Math.max(0, Math.min(1, o[i].y + dyn)); });
+        else if (o) { r.x = Math.max(0, Math.min(1, o.x + dxn)); r.y = Math.max(0, Math.min(1, o.y + dyn)); }       // a lake
       }
       fieldMap.draw();
     };
@@ -830,9 +839,9 @@
         const h = fieldMap._rvHitLine(x, y, 10, null);
         if (!h) return false;                                    // empty ground: the map is panned as usual
         const was = MV.picked.has(h.r.id);
-        MV.picked.add(h.r.id);
+        for (const n of mvNetwork(h.r.id)) MV.picked.add(n);        // the river and all that is connected to it
         d = { id: h.r.id, was, from: fieldMap.toMap(x, y), sx: x, sy: y, moved: false, dxn: 0, dyn: 0, orig: new Map() };
-        for (const r of fieldMap.rivers || []) if (MV.picked.has(r.id) && r.points) d.orig.set(r.id, r.points.map((q) => ({ x: q.x, y: q.y })));
+        for (const r of fieldMap.rivers || []) if (MV.picked.has(r.id)) d.orig.set(r.id, r.points ? r.points.map((q) => ({ x: q.x, y: q.y })) : { x: r.x, y: r.y });
         mvRefresh();
         return true;
       },
@@ -847,7 +856,7 @@
       up() {
         if (!d) return;
         const e = d; d = null;
-        if (!e.moved) { if (e.was) MV.picked.delete(e.id); mvRefresh(); return; }
+        if (!e.moved) { if (e.was) for (const n of mvNetwork(e.id)) MV.picked.delete(n); mvRefresh(); return; }
         const dx = +(e.dxn * fieldMap.imgW).toFixed(4), dy = +(e.dyn * fieldMap.imgH).toFixed(4);
         mvMove(dx, dy).then(() => mvReload(["rivers"])).then(mvRefresh);      // the saved places replace the ones shown while dragging
       } };

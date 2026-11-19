@@ -2,6 +2,10 @@
 
 Newest first. Versions from 1.x on are the combined app (Root and Rune + Weather generator).
 
+## v1.50.0 (combined app)
+Weather generator:
+- **Drag takes the whole river system.** Pressing on a river with *Dra…* now picks that river and everything connected to it: the rivers that run into it, the river it runs into (and their tributaries), and the lakes between, so a whole river system moves together and keeps its joins. A click without pulling drops the system again.
+
 ## v1.49.0 (combined app)
 Weather generator:
 - **Drag rivers with the mouse.** *Flytta floder m.m.…* has a new *Dra…* button: press on a river (it is picked if it wasn't) and pull; all the picked rivers follow the mouse while you pull and are saved in the new place when you let go. A click without pulling picks or drops a river; pressing on empty ground pans the map as usual. A drag is one step in *Ångra*, so it can be undone, and the arrows and the size buttons can still be used afterwards for exact placing.
