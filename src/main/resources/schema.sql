@@ -310,3 +310,12 @@ ALTER TABLE words ADD COLUMN IF NOT EXISTS romanization VARCHAR(400) NULL;
 ALTER TABLE form_rules ADD COLUMN IF NOT EXISTS strip_re VARCHAR(1000) NULL;
 -- The order the Word forms tab shows a group's rules in (moved with its arrows): only how they are displayed, never which rule is used
 ALTER TABLE form_rules ADD COLUMN IF NOT EXISTS show_ord INT NULL;
+
+-- v1.44: how many different visitors the pages get per day (counted without cookies and without keeping anyone's address: see VisitFilter)
+CREATE TABLE IF NOT EXISTS visit_stats (
+    visit_day DATE NOT NULL,
+    area VARCHAR(16) NOT NULL,
+    uniques INT NOT NULL DEFAULT 0,
+    views INT NOT NULL DEFAULT 0,
+    PRIMARY KEY (visit_day, area)
+);

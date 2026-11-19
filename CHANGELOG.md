@@ -2,6 +2,39 @@
 
 Newest first. Versions from 1.x on are the combined app (Root and Rune + Weather generator).
 
+## v1.50.0 (combined app)
+Weather generator:
+- **Drag takes the whole river system.** Pressing on a river with *Dra…* now picks that river and everything connected to it: the rivers that run into it, the river it runs into (and their tributaries), and the lakes between, so a whole river system moves together and keeps its joins. A click without pulling drops the system again.
+
+## v1.49.0 (combined app)
+Weather generator:
+- **Drag rivers with the mouse.** *Flytta floder m.m.…* has a new *Dra…* button: press on a river (it is picked if it wasn't) and pull; all the picked rivers follow the mouse while you pull and are saved in the new place when you let go. A click without pulling picks or drops a river; pressing on empty ground pans the map as usual. A drag is one step in *Ångra*, so it can be undone, and the arrows and the size buttons can still be used afterwards for exact placing.
+
+## v1.48.0 (combined app)
+Weather generator:
+- **Undo a move.** *Flytta floder m.m.…* has *Ångra (n)*: it takes back the latest move (up to 30 steps, one per arrow press or *Flytta*), also a scaling, and for a box also the height, forest and marsh pictures inside it. Only what the move changed is put back: anything you drew or edited in the rivers, roads etc. since stays as it is. The steps are kept in the server's memory, so they are gone after a restart or a new release.
+
+## v1.47.0 (combined app)
+Weather generator:
+- **Scale rivers like a layer.** *Flytta floder m.m.…* also has *Storlek* (%) with − / + (steps of 0.05–1 %): picked rivers (or the lines and places in a box) are scaled and then moved. *Lika mycket som lagret* now fills in the layer's move **and** its size, and the scaling is about the middle of that layer's pieces, exactly as the layer itself is scaled, so rivers drawn on a layer follow it. Without a layer the scaling is about the middle of the picked rivers (or the box). The pictures (height, forest, marsh) can only be moved, not scaled.
+
+## v1.46.0 (combined app)
+Weather generator:
+- **Route kinds in a drop-down.** The suggested routes (fastest, easiest, shortest, safest) are now chosen from a drop-down, with the chosen one described below it; clicking a route on the map still chooses it.
+- **Drag the stops of a saved journey.** With the travel panel open and one of your journeys chosen, its waypoints (numbered) and its end are shown and can be dragged straight on the map: the journey goes into *Ändra resa* with that stop in hand, and the rest is planned again when you let go (then *Spara ändringen* as before). A waypoint already passed can't be moved.
+- **Move rivers etc.:** *Lika mycket som lagret* now lists every map layer (also those that haven't been moved, such as Gordrion, Vambolien & Caserion), for taking a layer's move as the number to move by.
+
+## v1.45.0 (combined app)
+Weather generator (admins, standard map):
+- **Move what is drawn without changing its shape.** In the map-layer list there is *Flytta floder m.m.…*, a window beside the map. By default you **pick rivers** by clicking them (click again to drop one; they turn gold), and the arrows ◀▲▼▶ move the picked rivers **at once**, in steps of 0.02, 0.05, 0.1, 0.25, 0.5 or 1 map pixel, so they can be placed exactly and independently of the map layer below; the opposite arrow undoes a move. Numbers can also be typed, or taken from a layer's own move (*Lika mycket som lagret*, e.g. Jargien).
+- Or choose **Allt i en ruta**: drag a box and move everything in it together: rivers, roads, mountain ranges, cities and the height, forest and marsh maps (pictures are moved smoothly, so a half pixel is a half pixel; outside the box they are as before). Saved for everyone at once.
+- A picked river that runs into one that isn't picked keeps its meeting point on that river, so its last point may come to lie a little beside it; drag it back with the river tool.
+
+## v1.44.0 (combined app)
+Site:
+- **Visitor counts on the admin page.** *Admin* now has a *Visitors* section: how many different visitors and page views each day had (the last 30 days), in total and for the start page, Root and Rune and the weather generator. It is counted inside the site, without cookies and without storing anyone's address: a visitor is a short code made from their address and browser mixed with a random salt kept only in memory and thrown away at midnight (UTC), so nobody can be followed between days or traced back. Only the daily numbers are saved (table `visit_stats`, kept about two years).
+- Only page loads count (not the API, scripts or images), and robots and browsers that send Do Not Track / Global Privacy Control are left out. A visitor is counted once per day (and once more if the server restarts that day); the per-page figures can add up to more than the total, since a visitor to two pages counts in both.
+
 ## v1.43.0 (combined app)
 Weather generator:
 - **Detours.** Next to *Lägg till mellanpunkt* there is *Lägg till avstickare*: click the route where the detour branches off, then click the place to visit. The journey goes from that point to the place and **back** to the route, then carries on; each stretch is found with the same rules as the rest. Detours are orange on the map (a diamond where it branches off, a dashed line to the place) and can be dragged like the other points. In the list, ↩ on a detour turns it into an ordinary waypoint that carries on forward, and ⤺ on a waypoint makes it a detour.

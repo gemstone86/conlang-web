@@ -61,4 +61,28 @@ public class AdminController {
         out.put("registrationOpen", auth.registrationOpen());
         return out;
     }
+
+    /**
+     * {days: [{day, all: {uniques, views}, home: {...}, rune: {...}, weather: {...}}], total: {uniques, views}}: the
+     * visitors the pages had the last `days` days (default 30), newest first (see VisitFilter). Admins only.
+     */
+    @GetMapping("/visits")
+    public Map<String, Object> visits(HttpSession s, @org.springframework.web.bind.annotation.RequestParam(defaultValue = "30") int days) {
+        auth.requireAdmin(s);
+        int n = Math.max(1, Math.min(days, 800));
+        List<Map<String, Object>> rows = db.rows("select visit_day, area, uniques, views from visit_stats where visit_day > ? order by visit_day desc",
+                java.sql.Date.valueOf(java.time.LocalDate.now(java.time.ZoneOffset.UTC).minusDays(n)));
+        Map<String, Map<String, Object>> byDay = new LinkedHashMap<>();
+        long uniques = 0, views = 0;
+        for (Map<String, Object> r : rows) {
+            String day = String.valueOf(r.get("visit_day")).substring(0, 10), area = (String) r.get("area");
+            Map<String, Object> d = byDay.computeIfAbsent(day, k -> { Map<String, Object> m = new LinkedHashMap<>(); m.put("day", k); return m; });
+            d.put(area, Map.of("uniques", Db.num(r.get("uniques")), "views", Db.num(r.get("views"))));
+            if (area.equals("all")) { uniques += Db.num(r.get("uniques")); views += Db.num(r.get("views")); }
+        }
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("days", new ArrayList<>(byDay.values()));
+        out.put("total", Map.of("uniques", uniques, "views", views));
+        return out;
+    }
 }

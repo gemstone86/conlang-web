@@ -784,6 +784,192 @@
       renderMapViews();
     } catch (e) { setStatus(e.message); }
   }
+
+  // ── Move what is drawn ────────────────────────────────────────────
+  // For admins on the standard map (a window beside the map): hand-picked rivers, or everything inside a box, moved without changing
+  // their shape (POST /maps/:id/move-data). Picked rivers move at once with each arrow, in steps down to 0.02 map pixel.
+  const MV = { picked: new Set(), box: null, busy: false, total: [0, 0], center: null };
+  const MV_WHAT = ["rivers", "roads", "ranges", "cities", "height", "forest", "marsh"];
+  function mvMode() { const r = document.querySelector('input[name="mvMode"]:checked'); return r ? r.value : "rivers"; }
+  function mvMsg(t, bad) { const m = $("mvMsg"); m.textContent = t || ""; m.style.color = bad ? "var(--err, #e08a7a)" : ""; }
+  function mvRefresh() {
+    const rv = mvMode() === "rivers";
+    $("mvBoxRow").hidden = rv; $("mvRiverRow").hidden = !rv;
+    $("mvPicked").textContent = MV.picked.size ? T("mvPickedN", MV.picked.size, [...MV.picked].map((id) => { const r = (fieldMap.rivers || []).find((x) => x.id === id); return r && r.name ? r.name : "#" + id; }).slice(0, 6).join(", ")) : T("mvPickedNone");
+    $("mvBoxInfo").textContent = MV.box ? T("mvBoxSet") : T("mvBoxNone");
+    fieldMap.rvPicked = MV.picked; fieldMap.moveBox = rv ? null : MV.box;
+    fieldMap.draw();
+  }
+  function mvStopTool() { if (fieldMap.mapTool && fieldMap.mapTool.mvTool) fieldMap.mapTool = null; $("stage").classList.remove("picking"); $("mvPick").classList.remove("primary"); $("mvDraw").classList.remove("primary"); $("mvDragBtn").classList.remove("primary"); }
+  function mvPickRivers() {
+    mvStopTool();
+    $("mvPick").classList.add("primary");
+    fieldMap.mapTool = { mvTool: true, click(nx, ny, x, y) {
+      const h = fieldMap._rvHitLine(x, y, 10, null);
+      if (!h) return true;
+      MV.picked.has(h.r.id) ? MV.picked.delete(h.r.id) : MV.picked.add(h.r.id);
+      mvRefresh();
+      return true;
+    } };
+  }
+  /** The ids of a river and everything connected to it: the rivers that run into it and the one it runs into (and theirs), and the lakes between. */
+  function mvNetwork(id) {
+    const items = fieldMap.rivers || [], adj = new Map(), link = (a, b) => { if (a == null || b == null) return; (adj.get(a) || adj.set(a, new Set()).get(a)).add(b); (adj.get(b) || adj.set(b, new Set()).get(b)).add(a); };
+    for (const r of items) { if (r.joins) link(r.id, r.joins.river != null ? r.joins.river : r.joins.lake); if (r.from && r.from.lake != null) link(r.id, r.from.lake); }
+    const seen = new Set([id]), todo = [id];
+    while (todo.length) for (const n of adj.get(todo.pop()) || []) if (!seen.has(n)) { seen.add(n); todo.push(n); }
+    return seen;
+  }
+  /** Drag: press on a river (it is picked, if it wasn't) and pull; all the picked rivers follow the mouse and are moved for good when it is let go. A click without pulling picks or drops a river. */
+  function mvDragRivers() {
+    mvStopTool();
+    $("mvDragBtn").classList.add("primary");
+    let d = null;
+    const shownAt = (dxn, dyn) => {
+      for (const r of fieldMap.rivers || []) {
+        const o = d.orig.get(r.id);
+        if (o && r.points) r.points.forEach((q, i) => { q.x = Math.max(0, Math.min(1, o[i].x + dxn)); q.y = Math.max(0, Math.min(1, o[i].y + dyn)); });
+        else if (o) { r.x = Math.max(0, Math.min(1, o.x + dxn)); r.y = Math.max(0, Math.min(1, o.y + dyn)); }       // a lake
+      }
+      fieldMap.draw();
+    };
+    fieldMap.mapTool = { mvTool: true,
+      down(x, y, button) {
+        if (button !== 0 || MV.busy) return false;
+        const h = fieldMap._rvHitLine(x, y, 10, null);
+        if (!h) return false;                                    // empty ground: the map is panned as usual
+        const was = MV.picked.has(h.r.id);
+        for (const n of mvNetwork(h.r.id)) MV.picked.add(n);        // the river and all that is connected to it
+        d = { id: h.r.id, was, from: fieldMap.toMap(x, y), sx: x, sy: y, moved: false, dxn: 0, dyn: 0, orig: new Map() };
+        for (const r of fieldMap.rivers || []) if (MV.picked.has(r.id)) d.orig.set(r.id, r.points ? r.points.map((q) => ({ x: q.x, y: q.y })) : { x: r.x, y: r.y });
+        mvRefresh();
+        return true;
+      },
+      move(x, y) {
+        if (!d) return;
+        if (!d.moved && Math.hypot(x - d.sx, y - d.sy) < 4) return;
+        d.moved = true;
+        const t = fieldMap.toMap(x, y);
+        d.dxn = t[0] - d.from[0]; d.dyn = t[1] - d.from[1];
+        shownAt(d.dxn, d.dyn);
+      },
+      up() {
+        if (!d) return;
+        const e = d; d = null;
+        if (!e.moved) { if (e.was) for (const n of mvNetwork(e.id)) MV.picked.delete(n); mvRefresh(); return; }
+        const dx = +(e.dxn * fieldMap.imgW).toFixed(4), dy = +(e.dyn * fieldMap.imgH).toFixed(4);
+        mvMove(dx, dy).then(() => mvReload(["rivers"])).then(mvRefresh);      // the saved places replace the ones shown while dragging
+      } };
+  }
+  function mvDrawBox() {
+    mvStopTool();
+    $("mvDraw").classList.add("primary");
+    let from = null;
+    fieldMap.mapTool = { mvTool: true,
+      down(x, y) { from = fieldMap.toMap(x, y); MV.box = { x0: from[0], y0: from[1], x1: from[0], y1: from[1] }; mvRefresh(); return true; },
+      move(x, y) { if (!from) return; const t = fieldMap.toMap(x, y); MV.box = { x0: from[0], y0: from[1], x1: t[0], y1: t[1] }; mvRefresh(); },
+      up() { from = null; mvStopTool(); mvRefresh(); } };
+  }
+  /** Where scaling is about: the chosen layer's middle (as the layer itself is scaled), else the middle of what is picked or boxed. */
+  function mvCenter() {
+    if (MV.center) return MV.center;
+    if (mvMode() === "rivers") {
+      let x0 = 1, y0 = 1, x1 = 0, y1 = 0;
+      for (const r of fieldMap.rivers || []) if (MV.picked.has(r.id) && r.points) for (const q of r.points) { x0 = Math.min(x0, q.x); x1 = Math.max(x1, q.x); y0 = Math.min(y0, q.y); y1 = Math.max(y1, q.y); }
+      return x1 >= x0 ? { x: (x0 + x1) / 2, y: (y0 + y1) / 2 } : { x: 0.5, y: 0.5 };
+    }
+    return MV.box ? { x: (MV.box.x0 + MV.box.x1) / 2, y: (MV.box.y0 + MV.box.y1) / 2 } : { x: 0.5, y: 0.5 };
+  }
+  function mvUndoCount(n) { const b = $("mvUndo"); b.disabled = !n; b.textContent = n ? T("mvUndo") + " (" + n + ")" : T("mvUndo"); }
+  async function mvReload(kinds) {
+    const jobs = [];
+    if (kinds.includes("rivers")) jobs.push(loadRivers());
+    if (kinds.includes("roads")) jobs.push(loadRoads());
+    if (kinds.includes("ranges")) jobs.push(loadRanges());
+    if (kinds.includes("cities")) jobs.push(loadCities());
+    if (kinds.includes("height")) jobs.push(loadHeight());
+    if (kinds.includes("forest")) jobs.push(loadForest());
+    if (kinds.includes("marsh")) jobs.push(loadMarsh());
+    await Promise.all(jobs);
+  }
+  async function mvUndo() {
+    if (MV.busy) return;
+    MV.busy = true; mvMsg(T("mvWorking"));
+    try {
+      const r = await api("POST", `/maps/${S.map.id}/move-data/undo`);
+      await mvReload(r.moved || []);
+      mvUndoCount(r.undo);
+      MV.total = [0, 0]; MV.scaled = 1;
+      mvMsg(T("mvUndone"));
+    } catch (e) { mvMsg(e.message || String(e), true); }
+    MV.busy = false;
+  }
+  async function mvMove(dx, dy, scale) {
+    if (MV.busy) return;
+    const rv = mvMode() === "rivers";
+    scale = scale || 1;
+    if (!dx && !dy && scale === 1) { mvMsg(T("mvZero"), true); return; }
+    const body = { dx, dy };
+    if (scale !== 1) { body.scale = +scale.toFixed(6); body.center = mvCenter(); }
+    if (rv) { if (!MV.picked.size) { mvMsg(T("mvNoRivers"), true); return; } body.what = ["rivers"]; body.rivers = [...MV.picked]; }
+    else {
+      const what = MV_WHAT.filter((k) => $("mvW_" + k) && $("mvW_" + k).checked);
+      if (!MV.box) { mvMsg(T("mvNoBox"), true); return; }
+      if (!what.length) { mvMsg(T("mvNoWhat"), true); return; }
+      if (!window.confirm(T("mvConfirm", what.map((k) => T("mvW_" + k)).join(", "), dx, dy))) return;
+      body.what = what; body.box = { x0: Math.min(MV.box.x0, MV.box.x1), y0: Math.min(MV.box.y0, MV.box.y1), x1: Math.max(MV.box.x0, MV.box.x1), y1: Math.max(MV.box.y0, MV.box.y1) };
+    }
+    MV.busy = true; mvMsg(T("mvWorking"));
+    try {
+      const res = await api("POST", `/maps/${S.map.id}/move-data`, body);
+      MV.total = [MV.total[0] + dx, MV.total[1] + dy];
+      if (scale !== 1) MV.scaled = (MV.scaled || 1) * scale;
+      await mvReload(body.what);
+      mvUndoCount(res.undo);
+      mvMsg(T("mvDone", +MV.total[0].toFixed(3), +MV.total[1].toFixed(3)) + (MV.scaled && MV.scaled !== 1 ? " · " + T("mvDoneScale", +(MV.scaled * 100).toFixed(3)) : ""));
+    } catch (e) { mvMsg(e.message || String(e), true); }
+    MV.busy = false;
+  }
+  function openMoveData() {
+    const dlg = $("moveDlg");
+    if (!$("mvWhat").children.length) {
+      $("mvWhat").innerHTML = MV_WHAT.map((k) => `<label><input type="checkbox" id="mvW_${k}" checked> ${T("mvW_" + k)}</label>`).join("");
+      $("mvDraw").onclick = mvDrawBox; $("mvPick").onclick = mvPickRivers; $("mvDragBtn").onclick = mvDragRivers;
+      $("mvClear").onclick = () => { MV.picked.clear(); mvRefresh(); };
+      document.querySelectorAll('input[name="mvMode"]').forEach((r) => r.onchange = () => { mvStopTool(); mvRefresh(); if (mvMode() === "rivers") mvPickRivers(); });
+      $("mvUndo").onclick = mvUndo;
+      $("mvApply").onclick = () => mvMove(+$("mvDx").value || 0, +$("mvDy").value || 0, (+$("mvSc").value || 100) / 100);
+      document.querySelectorAll("#moveDlg .mv-pad button[data-sc]").forEach((b) => b.onclick = () => {
+        const f = 1 + (+b.dataset.sc) * (+$("mvScStep").value || 0.25) / 100;
+        if (mvMode() === "rivers") { mvMove(0, 0, f); $("mvSc").value = 100; }     // each press is a step on its own, so the box goes back to 100 %
+        else $("mvSc").value = +(f * 100).toFixed(4);
+      });
+      document.querySelectorAll("#moveDlg .mv-pad button[data-d]").forEach((b) => b.onclick = () => {
+        const [a, c] = b.dataset.d.split(",").map(Number), st = +$("mvStep").value || 0.1;
+        const dx = +(a * st).toFixed(4), dy = +(c * st).toFixed(4);
+        $("mvDx").value = dx; $("mvDy").value = dy;
+        if (mvMode() === "rivers") mvMove(dx, dy);               // picked rivers: at once, so they can be placed by eye
+      });
+      $("mvClose").onclick = () => { mvStopTool(); MV.picked.clear(); fieldMap.rvPicked = null; fieldMap.moveBox = null; fieldMap.draw(); dlg.close(); };
+      const sel = $("mvLike"), layers = fieldMap.tileLayers(), shift = layerShiftFor(S.map) || {};
+      sel.innerHTML = `<option value="">–</option>` + layers.map((v) => { const sh = shift[v.id] || [0, 0]; return `<option value="${v.id}">${typeof v.name === "string" ? v.name : (v.name.sv || v.id)} (${sh[0] / 8}, ${sh[1] / 8})</option>`; }).join("");
+      sel.onchange = () => {
+        const s = sel.value ? (shift[sel.value] || [0, 0]) : null;
+        MV.center = null;
+        if (s) {
+          $("mvDx").value = s[0] / 8; $("mvDy").value = s[1] / 8; $("mvSc").value = +((s[2] || 1) * 100).toFixed(4);
+          const bx = fieldMap._layerBox(sel.value), fw = fieldMap.tiles && fieldMap.tiles.fullW;
+          if (bx && fw) MV.center = { x: bx.cx / fw, y: bx.cy / (fw * fieldMap.imgH / fieldMap.imgW) };     // the layer is scaled about the middle of its pieces
+        }
+        $("mvScAbout").textContent = MV.center ? T("mvAboutLayer") : "";
+      };
+    }
+    MV.total = [0, 0]; MV.scaled = 1; mvMsg("");
+    api("GET", `/maps/${S.map.id}/move-data`).then((r) => mvUndoCount(r.undo)).catch(() => {});
+    if (!dlg.open) dlg.show();
+    mvRefresh();
+    if (mvMode() === "rivers") mvPickRivers();
+  }
   function renderMapViews() {
     let layers = [];
     try { layers = fieldMap.tileLayers(); } catch (e) { return; } // called before the map exists
@@ -847,6 +1033,9 @@
       const ex = document.createElement("button"); ex.type = "button"; ex.textContent = T("mlExport"); ex.title = T("mlExportTip");
       ex.onclick = (e) => { e.preventDefault(); exportMapLayers(); };
       list.append(ex);
+      const mvb = document.createElement("button"); mvb.type = "button"; mvb.textContent = T("mvOpen"); mvb.title = T("mvOpenTip");
+      mvb.onclick = (e) => { e.preventDefault(); $("mapLayerDrop").open = false; openMoveData(); };
+      list.append(mvb);
     }
     const hint = document.createElement("div"); hint.className = "ml-hint"; hint.textContent = T("mlHint") + (canOrder ? " " + T("mlAdminHint") : "");
     list.append(hint);

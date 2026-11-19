@@ -684,6 +684,18 @@ public final class Api {
                         return Http.Response.json(store.map(id, uid));
                     }
                 }
+                case "move-data" -> {
+                    // POST { dx, dy (map pixels, may be fractions), optional scale (0.5–2) about center {x,y} (0–1; lines and places only, applied before the move), what: ["rivers","roads","ranges","cities","height","forest","marsh"],
+                    // and either box: {x0,y0,x1,y1} (0–1) or rivers: [ids] (then only rivers move) }: moves what is drawn on the map, shape and all
+                    // (see MapDataMove); for the map's owner (default map: the admins)
+                    if (p.length == 4 && p[3].equals("undo") && m.equals("POST")) return Http.Response.json(undoMove(req, id));
+                    if (m.equals("GET")) {
+                        long uid = requireUser(req);
+                        if (!canReview(id, uid)) throw new ApiException(403, "Only the map's owner (for the default map: the admins) can move its drawings");
+                        synchronized (moveUndo) { return Http.Response.json(Map.of("undo", moveUndo.getOrDefault(id, new ArrayDeque<>()).size())); }
+                    }
+                    if (m.equals("POST")) return Http.Response.json(moveData(req, id));
+                }
                 case "suggestions" -> { return suggestions(m, p, req, id); }
                 case "layer-suggestions" -> { return layerSuggestions(m, p, req, id); }
                 case "rivers" -> { return listLayer(m, req, id, ListLayer.RIVERS); }
@@ -879,6 +891,128 @@ public final class Api {
             for (ListLayer l : values()) if (l.name.equals(name)) return l;
             throw new ApiException(404, "Not found");
         }
+    }
+
+    /** What a move changed, so that it can be undone: the old lists with the ids of the items that moved, and the old pictures with the box. Kept in memory (until the server restarts). */
+    private record MoveUndo(Map<String, String> oldLists, Map<String, Set<Long>> changed, Map<String, byte[]> oldPictures, MapDataMove.Box box) {
+        long pictureBytes() { return oldPictures.values().stream().mapToLong(b -> b.length).sum(); }
+    }
+    private final Map<Long, Deque<MoveUndo>> moveUndo = new HashMap<>();
+    private static final int MOVE_UNDO_STEPS = 30;
+    private static final long MOVE_UNDO_PICTURE_BYTES = 30_000_000L;
+
+    private Map<String, Object> undoMove(Http.Request req, long id) {
+        long uid = requireUser(req);
+        if (!canReview(id, uid)) throw new ApiException(403, "Only the map's owner (for the default map: the admins) can move its drawings");
+        MoveUndo u;
+        synchronized (moveUndo) {
+            Deque<MoveUndo> stack = moveUndo.get(id);
+            if (stack == null || stack.isEmpty()) throw new ApiException(404, "There is no move to undo");
+            u = stack.pop();
+        }
+        List<String> restored = new ArrayList<>();
+        u.oldLists().forEach((l, old) -> {
+            store.setList(l, id, MapDataMove.restoreItems(store.list(l, id).json(), old, u.changed().get(l)), "app", uid);
+            restored.add(l);
+        });
+        u.oldPictures().forEach((k, old) -> {
+            byte[] now = k.equals("height") ? store.heightImage(id, uid).bytes() : store.painted(k, id) == null ? null : store.painted(k, id).image();
+            byte[] back = now == null ? null : MapDataMove.restorePicture(now, old, u.box());
+            if (back == null) return;
+            if (k.equals("height")) store.replaceHeightImage(id, "image/png", back); else store.setPainted(k, id, "image/png", back, "app", uid);
+            restored.add(k);
+        });
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("ok", true);
+        out.put("moved", restored);
+        synchronized (moveUndo) { out.put("undo", moveUndo.getOrDefault(id, new ArrayDeque<>()).size()); }
+        return out;
+    }
+
+    private Map<String, Object> moveData(Http.Request req, long id) {
+        long uid = requireUser(req);
+        if (!canReview(id, uid)) throw new ApiException(403, "Only the map's owner (for the default map: the admins) can move its drawings");
+        Map<String, Object> mp = store.map(id, uid);
+        if (mp.containsKey("removedAt")) throw new ApiException(409, "The map is removed. Restore it to change it.");
+        Map<String, Object> b = body(req);
+        if (!(b.get("dx") instanceof Number dxn) || !(b.get("dy") instanceof Number dyn) || !Double.isFinite(dxn.doubleValue()) || !Double.isFinite(dyn.doubleValue()))
+            throw new ApiException(400, "Give dx and dy (map pixels)");
+        double dx = dxn.doubleValue(), dy = dyn.doubleValue();
+        if (Math.abs(dx) > 200 || Math.abs(dy) > 200) throw new ApiException(400, "That is too far (at most 200 map pixels each way)");
+        double scale = b.get("scale") == null ? 1 : b.get("scale") instanceof Number sn ? sn.doubleValue() : Double.NaN;
+        if (!(scale >= 0.5 && scale <= 2)) throw new ApiException(400, "The scale must be between 0.5 and 2 (1 = as it is)");
+        double cx = 0.5, cy = 0.5;
+        if (b.get("center") instanceof Map<?, ?> cm) {
+            if (!(cm.get("x") instanceof Number cxn) || !(cm.get("y") instanceof Number cyn) || !(cxn.doubleValue() >= 0 && cxn.doubleValue() <= 1 && cyn.doubleValue() >= 0 && cyn.doubleValue() <= 1))
+                throw new ApiException(400, "The centre of the scaling is x and y between 0 and 1");
+            cx = cxn.doubleValue(); cy = cyn.doubleValue();
+        }
+        if (dx == 0 && dy == 0 && scale == 1) throw new ApiException(400, "Nothing to move");
+        int w = ((Number) mp.get("width")).intValue(), h = ((Number) mp.get("height")).intValue();
+        Set<String> what = new LinkedHashSet<>();
+        if (b.get("what") instanceof List<?> wl) for (Object o : wl) {
+            if (!(o instanceof String s) || !Set.of("rivers", "roads", "ranges", "cities", "height", "forest", "marsh").contains(s)) throw new ApiException(400, "Not something that can be moved: " + o);
+            what.add(s);
+        }
+        if (what.isEmpty()) throw new ApiException(400, "Say what to move");
+        if (scale != 1 && !Set.of("rivers", "roads", "ranges", "cities").containsAll(what)) throw new ApiException(400, "Only the drawn lines and places can be scaled, not the pictures");
+        MapDataMove.Box box = null;
+        Set<Long> rivers = new HashSet<>();
+        if (b.get("box") instanceof Map<?, ?> bx) {
+            double[] v = new double[4];
+            String[] keys = { "x0", "y0", "x1", "y1" };
+            for (int i = 0; i < 4; i++) {
+                if (!(bx.get(keys[i]) instanceof Number n) || !(n.doubleValue() >= 0 && n.doubleValue() <= 1)) throw new ApiException(400, "The box needs x0, y0, x1, y1 between 0 and 1");
+                v[i] = n.doubleValue();
+            }
+            box = new MapDataMove.Box(Math.min(v[0], v[2]), Math.min(v[1], v[3]), Math.max(v[0], v[2]), Math.max(v[1], v[3]));
+            if (box.x1() - box.x0() < 0.0005 || box.y1() - box.y0() < 0.0005) throw new ApiException(400, "The box is too small");
+        } else if (b.get("rivers") instanceof List<?> rl) {
+            for (Object o : rl) if (o instanceof Number n) rivers.add(n.longValue());
+            if (rivers.isEmpty()) throw new ApiException(400, "Pick at least one river");
+            if (!what.equals(Set.of("rivers"))) throw new ApiException(400, "Picked rivers move by themselves: what must be [\"rivers\"]");
+        } else throw new ApiException(400, "Give a box, or rivers to move");
+        // worked out first, saved after, so a problem with one part leaves everything as it was
+        MapDataMove.Tf tf = new MapDataMove.Tf(dx / w, dy / h, scale, cx, cy);
+        Map<String, Object> moved = new LinkedHashMap<>();
+        Map<String, String> lists = new LinkedHashMap<>();
+        for (String l : List.of("rivers", "roads", "ranges", "cities")) {
+            if (!what.contains(l)) continue;
+            MapDataMove.Counts n = new MapDataMove.Counts();
+            lists.put(l, MapDataMove.moveList(store.list(l, id).json(), box, rivers, tf, n));
+            moved.put(l, n.items);
+        }
+        Map<String, byte[]> pictures = new LinkedHashMap<>();
+        for (String k : List.of("height", "forest", "marsh")) {
+            if (!what.contains(k)) continue;
+            if (k.equals("height")) pictures.put(k, MapDataMove.movePicture(store.heightImage(id, uid).bytes(), box, dx, dy, w));
+            else {
+                Store.Forest f = store.painted(k, id);
+                if (f != null) pictures.put(k, MapDataMove.movePicture(f.image(), box, dx, dy, w));
+            }
+            moved.put(k, pictures.containsKey(k));
+        }
+        // what is needed to undo it
+        Map<String, String> oldLists = new LinkedHashMap<>();
+        Map<String, Set<Long>> changed = new LinkedHashMap<>();
+        lists.forEach((l, json) -> { String old = store.list(l, id).json(); Set<Long> ch = MapDataMove.changedIds(old, json); if (!ch.isEmpty()) { oldLists.put(l, old); changed.put(l, ch); } });
+        Map<String, byte[]> oldPictures = new LinkedHashMap<>();
+        for (String k : pictures.keySet()) oldPictures.put(k, k.equals("height") ? store.heightImage(id, uid).bytes() : store.painted(k, id).image());
+        if (!oldLists.isEmpty() || !oldPictures.isEmpty()) synchronized (moveUndo) {
+            Deque<MoveUndo> stack = moveUndo.computeIfAbsent(id, k -> new ArrayDeque<>());
+            stack.push(new MoveUndo(oldLists, changed, oldPictures, box));
+            while (stack.size() > MOVE_UNDO_STEPS || stack.stream().mapToLong(MoveUndo::pictureBytes).sum() > MOVE_UNDO_PICTURE_BYTES) {
+                if (stack.size() <= 1) break;
+                stack.removeLast();
+            }
+        }
+        lists.forEach((l, json) -> store.setList(l, id, json, "app", uid));
+        pictures.forEach((k, png) -> { if (k.equals("height")) store.replaceHeightImage(id, "image/png", png); else store.setPainted(k, id, "image/png", png, "app", uid); });
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("ok", true);
+        out.put("moved", moved);
+        synchronized (moveUndo) { out.put("undo", moveUndo.getOrDefault(id, new ArrayDeque<>()).size()); }
+        return out;
     }
 
     private Http.Response listLayer(String m, Http.Request req, long mapId, ListLayer layer) {

@@ -1092,6 +1092,17 @@
         ctx.setLineDash([7, 5]); ctx.strokeStyle = col; ctx.lineWidth = 3; ctx.stroke(); ctx.setLineDash([]);
       }
       this._trBoats(r, 1.5);
+      if (sel && trip.mine && tv.panelOpen && !tv.candidates && at.state !== "after") {      // its waypoints and its end: these can be dragged
+        (trip.via || []).forEach((v, i) => {
+          const [vx, vy] = this.toScreen(v.x, v.y);
+          ctx.fillStyle = v.ret ? "#ffb347" : "#5fb6ff"; ctx.strokeStyle = "#18212a"; ctx.lineWidth = 2;
+          ctx.beginPath(); ctx.arc(vx, vy, 6, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+          ctx.fillStyle = "#18212a"; ctx.font = "bold 9px sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(String(i + 1), vx, vy + 0.5);
+        });
+        const le = r[r.length - 1], [ex, ey] = this.toScreen(le[0], le[1]);
+        ctx.fillStyle = "#ef6f6c"; ctx.strokeStyle = "#18212a"; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.arc(ex, ey, 6.5, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      }
       if (sel && trip.mine && trip.events && tv.evMarks) tv.evMarks(trip, T);
       // the token
       const [x, y] = this.toScreen(at.x, at.y);
@@ -1180,13 +1191,14 @@
 
     open() {
       this.tv.panelOpen = true;
+      this.fm.idleTool = { down: (x, y, b) => this._idleDown(x, y, b) };      // lets the stops of the chosen journey be dragged
       this.$("trPanel").hidden = false;
       this.$("travelBtn").classList.add("active");
       this.render();
       this.fm.draw();
     },
     close() {
-      this.tv.panelOpen = false; this.tv.editTrip = null; this.tv.keep = null;
+      this.tv.panelOpen = false; this.tv.editTrip = null; this.tv.keep = null; this.fm.idleTool = null;
       this._stopPicking();
       this.tv.candidates = null; this.tv.start = this.tv.end = null; this.tv.via = []; this.tv.chosen = null;
       this.$("trPanel").hidden = true;
@@ -1238,7 +1250,7 @@
             // a place no route can reach: the point goes back where it was
             this._revert = () => { const p = this._stopOf(d); if (p) { p.x = d.from.x; p.y = d.from.y; } };
             this._plan();
-          }
+          } else if (d && tv.editTrip && !tv.candidates) this._plan();     // grabbed on a saved journey and let go without moving
         },
         context: (sx, sy) => {
           if (this.picking === "via" || this.picking === "detourFrom" || this.picking === "detourTo") { if (!this._removeViaNear(sx, sy)) this._stopVia(); return; }
@@ -1473,9 +1485,9 @@
     },
 
     /** Change a saved journey from where its token is now: the part already travelled stays, the rest is planned again. */
-    startEdit(trip) {
+    startEdit(trip, grab) {
       const T0 = this.fm.T || 0, at = tripAt(trip, T0);
-      if (!at || at.state === "after") { this.msg(this.T("trEditOver")); return; }
+      if (!at || at.state === "after") { this.msg(this.T("trEditOver")); return false; }
       this.startPlanning();
       const tv = this.tv, r = trip.route, last = r[r.length - 1], here = at.state === "before" ? { x: r[0][0], y: r[0][1], i: 0 } : at;
       tv.editTrip = trip;
@@ -1487,8 +1499,34 @@
       this.ferry = !!trip.ferry; this.sea = !!trip.sea; this.landAny = !!trip.landAny; this.mount = trip.mount || "foot"; this.wagonOff = trip.wagonOff;
       tv.chosen = null; this.picking = null;
       this.$("stage").classList.remove("picking");
+      if (grab) {
+        // a stop of the journey was grabbed on the map: the drag goes on in the editing (the routes are found when it is let go)
+        const i = grab.kind === "via" ? tv.via.findIndex((v) => v.x === grab.via.x && v.y === grab.via.y) : -1;
+        const h = grab.kind === "end" ? { kind: "end" } : i >= 0 ? { kind: "via", i } : null;
+        if (!h) { this._stopPicking(true); this.msg(this.T("trStopPassed")); return false; }
+        const p0 = this._stopOf(h);
+        this._drag = { ...h, moved: false, from: { x: p0.x, y: p0.y } };
+        this.fm.stage.classList.add("dragging");
+        this.render(); this.fm.draw();
+        return true;
+      }
       this.focus && this.focus(trip);
       this._plan();
+    },
+    /** A press on a stop (waypoint or end) of the chosen journey of yours, when nothing is being planned: starts changing the journey with that stop in hand. */
+    _idleDown(sx, sy, button) {
+      const tv = this.tv, fm = this.fm;
+      if (button !== 0 || this.picking || tv.candidates) return false;
+      const trip = (tv.trips || []).find((t) => t.id === tv.selId && t.mine);
+      if (!trip) return false;
+      const at = tripAt(trip, fm.T || 0);
+      if (!at || at.state === "after") return false;
+      const near = (p) => { const [x, y] = fm.toScreen(p.x, p.y); return Math.hypot(x - sx, y - sy) <= 11; };
+      const via = trip.via || [];
+      for (let i = via.length - 1; i >= 0; i--) if (near(via[i])) return this.startEdit(trip, { kind: "via", via: via[i] }) !== false;
+      const last = trip.route[trip.route.length - 1];
+      if (near({ x: last[0], y: last[1] })) return this.startEdit(trip, { kind: "end" }) !== false;
+      return false;
     },
     async saveEdit() {
       const tv = this.tv, trip = tv.editTrip, c = (tv.candidates || []).find((x) => x.mode === tv.chosen);
@@ -1975,23 +2013,33 @@
       const list = this.$("trCands"), tv = this.tv, T = (...a) => this.T(...a), cfg = this.cfg();
       if (!list) return;
       list.innerHTML = "";
-      for (const c of tv.candidates || []) {
-        const b = document.createElement("button"); b.type = "button"; b.className = "tr-cand" + (tv.chosen === c.mode ? " on" : "");
-        const roadKm = c.sum.byKind[1] + c.sum.byKind[2] + c.sum.byKind[3];
-        const eta = c.eta ? T("trEta", this.ctx.fmtDur(c.eta.arriveT - (this.fm.T || 0))) : T("trEtaWorking");
-        b.innerHTML = `<b></b><span></span><span></span>`;
-        b.children[0].textContent = [c.mode, ...(c.also || [])].map((m) => T(MODE_TXT[m])).join(" " + T("trAnd") + " ");
-        const by = c.sum.byKind, riverKm = by[4] + by[6] + by[7], seaKm = by[5];
-        b.children[1].textContent = T("trCandText", Math.round(c.km), Math.round(roadKm / Math.max(1, c.km) * 100), Math.round(c.sum.climb))
-          + (c.sum.fords ? " · " + T(c.sum.ferries ? "trFordsFerries" : "trFords", c.sum.fords, fmtH(c.sum.fordHours), c.sum.ferries) : "")
-          + (riverKm >= 1 ? " · " + T("trRiverKm", Math.round(riverKm), Math.round(by[4]), Math.round(by[6])) : "")
-          + (seaKm >= 1 ? " · " + T("trSeaKm", Math.round(seaKm)) : "")
-          + (c.sum.boards ? " · " + T("trBoards", c.sum.boards, fmtH(c.sum.boards * cfg.boardHours)) : "");
-        b.children[2].textContent = eta;
-        b.style.borderLeft = `4px solid ${MODE_COL[c.mode]}`;
-        b.onclick = () => { tv.chosen = c.mode; this.renderCands(); this.fm.draw(); };
-        list.append(b);
+      const cands = tv.candidates || [];
+      if (!cands.length) return;
+      const name = (c) => [c.mode, ...(c.also || [])].map((m) => T(MODE_TXT[m])).join(" " + T("trAnd") + " ");
+      // the kinds of route (fastest, easiest ...) in a drop-down; the chosen one is described below it
+      const sel = document.createElement("select"); sel.className = "tr-cand-sel"; sel.setAttribute("aria-label", T("trRouteKind"));
+      for (const c of cands) {
+        const o = document.createElement("option"); o.value = c.mode; o.textContent = name(c) + " · " + Math.round(c.km) + " km";
+        sel.append(o);
       }
+      const c = cands.find((o) => o.mode === tv.chosen) || cands[0];
+      sel.value = c.mode;
+      sel.onchange = () => { tv.chosen = sel.value; this.renderCands(); this.fm.draw(); };
+      list.append(sel);
+      const b = document.createElement("div"); b.className = "tr-cand on";
+      const roadKm = c.sum.byKind[1] + c.sum.byKind[2] + c.sum.byKind[3];
+      const eta = c.eta ? T("trEta", this.ctx.fmtDur(c.eta.arriveT - (this.fm.T || 0))) : T("trEtaWorking");
+      b.innerHTML = `<b></b><span></span><span></span>`;
+      b.children[0].textContent = name(c);
+      const by = c.sum.byKind, riverKm = by[4] + by[6] + by[7], seaKm = by[5];
+      b.children[1].textContent = T("trCandText", Math.round(c.km), Math.round(roadKm / Math.max(1, c.km) * 100), Math.round(c.sum.climb))
+        + (c.sum.fords ? " · " + T(c.sum.ferries ? "trFordsFerries" : "trFords", c.sum.fords, fmtH(c.sum.fordHours), c.sum.ferries) : "")
+        + (riverKm >= 1 ? " · " + T("trRiverKm", Math.round(riverKm), Math.round(by[4]), Math.round(by[6])) : "")
+        + (seaKm >= 1 ? " · " + T("trSeaKm", Math.round(seaKm)) : "")
+        + (c.sum.boards ? " · " + T("trBoards", c.sum.boards, fmtH(c.sum.boards * cfg.boardHours)) : "");
+      b.children[2].textContent = eta;
+      b.style.borderLeft = `4px solid ${MODE_COL[c.mode]}`;
+      list.append(b);
     },
     renderList() {
       const list = this.$("trList");

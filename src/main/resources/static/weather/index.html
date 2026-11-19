@@ -639,6 +639,42 @@
   </form>
 </dialog>
 
+<dialog id="moveDlg" class="move-dlg">
+  <h2 data-i18n="mvTitle">Flytta det ritade</h2>
+  <p class="dialog-text" data-i18n="mvHelp">Flyttar floder, vägar, bergskedjor, städer och höjd-, skogs- och sumpkartan utan att ändra formen, till exempel när en regionkarta under dem har flyttats.</p>
+  <div class="mv-row">
+    <label><input type="radio" name="mvMode" value="rivers" checked> <span data-i18n="mvModeRivers">Valda floder</span></label>
+    <label><input type="radio" name="mvMode" value="box"> <span data-i18n="mvModeBox">Allt i en ruta</span></label>
+  </div>
+  <div id="mvBoxRow" class="mv-row" hidden>
+    <button type="button" id="mvDraw" data-i18n="mvDraw">Rita ruta…</button> <span id="mvBoxInfo" class="small"></span>
+    <div id="mvWhat" class="mv-what"></div>
+  </div>
+  <div id="mvRiverRow" class="mv-row">
+    <button type="button" id="mvPick" data-i18n="mvPick">Välj floder…</button> <button type="button" id="mvDragBtn" data-i18n="mvDrag" data-i18n-title="mvDragTip" title="Tryck på en flod och dra den med musen; floden och allt som hänger ihop med den följer med">Dra…</button> <button type="button" id="mvClear" data-i18n="mvClear">Rensa</button> <span id="mvPicked" class="small"></span>
+  </div>
+  <div class="mv-row">
+    <span data-i18n="mvBy">Flytta</span>
+    <input id="mvDx" type="number" step="0.01" value="0" aria-label="x"> ×
+    <input id="mvDy" type="number" step="0.01" value="0" aria-label="y"> <span class="small" data-i18n="mvUnit">kartpixlar (+ åt höger / nedåt)</span>
+    <label><span data-i18n="mvStep">Steg</span> <select id="mvStep"><option>0.02</option><option>0.05</option><option selected>0.1</option><option>0.25</option><option>0.5</option><option>1</option></select></label>
+    <span class="mv-pad"><button type="button" data-d="-1,0">◀</button><button type="button" data-d="0,-1">▲</button><button type="button" data-d="0,1">▼</button><button type="button" data-d="1,0">▶</button></span>
+  </div>
+  <div class="mv-row">
+    <span data-i18n="mvSize">Storlek</span> <input id="mvSc" type="number" step="0.01" value="100" aria-label="%"> %
+    <label><span data-i18n="mvStep">Steg</span> <select id="mvScStep"><option>0.05</option><option>0.1</option><option selected>0.25</option><option>0.5</option><option>1</option></select> %</label>
+    <span class="mv-pad"><button type="button" data-sc="-1">−</button><button type="button" data-sc="1">+</button></span>
+    <span class="small" id="mvScAbout"></span>
+  </div>
+  <div class="mv-row"><label><span data-i18n="mvLike">Lika mycket som lagret</span> <select id="mvLike"></select></label></div>
+  <div class="dialog-actions">
+    <button type="button" id="mvApply" class="primary" data-i18n="mvApply">Flytta enligt rutan ovan</button>
+    <button type="button" id="mvUndo" disabled data-i18n="mvUndo" data-i18n-title="mvUndoTip" title="Ta tillbaka den senaste förflyttningen (bara det den flyttade; sådant du ändrat sedan påverkas inte)">Ångra</button>
+    <button type="button" id="mvClose" data-i18n="close">Stäng</button>
+    <span id="mvMsg" class="small" role="status"></span>
+  </div>
+</dialog>
+
 <dialog id="promptDialog">
   <form method="dialog" id="promptForm">
     <h2 id="promptTitle"></h2>
