@@ -2,6 +2,10 @@
 
 Newest first. Versions from 1.x on are the combined app (Root and Rune + Weather generator).
 
+## v1.51.0 (combined app)
+Weather generator:
+- **Choose what *Dra…* grabs.** Next to the buttons there is *Dra:* with *hela flodsystemet* (as before), *bara en flod* (just the one you press on) and *floden och bifloderna* (it and the rivers that run into it, recursively). Rivers that run into a single moved river keep their meeting point on it; a moved river's own mouth stays where the river it runs into is, so fix that end with the river tool if needed.
+
 ## v1.50.0 (combined app)
 Weather generator:
 - **Drag takes the whole river system.** Pressing on a river with *Dra…* now picks that river and everything connected to it: the rivers that run into it, the river it runs into (and their tributaries), and the lakes between, so a whole river system moves together and keeps its joins. A click without pulling drops the system again.
