@@ -2068,6 +2068,7 @@
         if (e.target.closest && e.target.closest(".popup, button, a, input, select, textarea, label")) return;
         const [x, y] = pos(e);
         if (this.mapTool && this.mapTool.down && this.mapTool.down(x, y, e.button)) { this._toolActive = true; st.setPointerCapture(e.pointerId); return; }
+        if (!this.mapTool && this.idleTool && this.idleTool.down(x, y, e.button)) { this._toolActive = true; st.setPointerCapture(e.pointerId); return; }   // a tool that only starts on a press on something of its own
         if (this.editing && this.editMode === "road" && this.wyPointerDown && this.wyPointerDown(x, y)) {
           this._wyActive = true; st.setPointerCapture(e.pointerId); return;
         }

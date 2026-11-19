@@ -2,6 +2,12 @@
 
 Newest first. Versions from 1.x on are the combined app (Root and Rune + Weather generator).
 
+## v1.46.0 (combined app)
+Weather generator:
+- **Route kinds in a drop-down.** The suggested routes (fastest, easiest, shortest, safest) are now chosen from a drop-down, with the chosen one described below it; clicking a route on the map still chooses it.
+- **Drag the stops of a saved journey.** With the travel panel open and one of your journeys chosen, its waypoints (numbered) and its end are shown and can be dragged straight on the map: the journey goes into *Ändra resa* with that stop in hand, and the rest is planned again when you let go (then *Spara ändringen* as before). A waypoint already passed can't be moved.
+- **Move rivers etc.:** *Lika mycket som lagret* now lists every map layer (also those that haven't been moved, such as Gordrion, Vambolien & Caserion), for taking a layer's move as the number to move by.
+
 ## v1.45.0 (combined app)
 Weather generator (admins, standard map):
 - **Move what is drawn without changing its shape.** In the map-layer list there is *Flytta floder m.m.…*, a window beside the map. By default you **pick rivers** by clicking them (click again to drop one; they turn gold), and the arrows ◀▲▼▶ move the picked rivers **at once**, in steps of 0.02, 0.05, 0.1, 0.25, 0.5 or 1 map pixel, so they can be placed exactly and independently of the map layer below; the opposite arrow undoes a move. Numbers can also be typed, or taken from a layer's own move (*Lika mycket som lagret*, e.g. Jargien).

@@ -867,8 +867,8 @@
       });
       $("mvClose").onclick = () => { mvStopTool(); MV.picked.clear(); fieldMap.rvPicked = null; fieldMap.moveBox = null; fieldMap.draw(); dlg.close(); };
       const sel = $("mvLike"), layers = fieldMap.tileLayers(), shift = layerShiftFor(S.map) || {};
-      sel.innerHTML = `<option value="">–</option>` + layers.filter((v) => shift[v.id] && (shift[v.id][0] || shift[v.id][1])).map((v) => `<option value="${v.id}">${typeof v.name === "string" ? v.name : (v.name.sv || v.id)} (${shift[v.id][0] / 8}, ${shift[v.id][1] / 8})</option>`).join("");
-      sel.onchange = () => { const s = shift[sel.value]; if (s) { $("mvDx").value = s[0] / 8; $("mvDy").value = s[1] / 8; } };
+      sel.innerHTML = `<option value="">–</option>` + layers.map((v) => { const sh = shift[v.id] || [0, 0]; return `<option value="${v.id}">${typeof v.name === "string" ? v.name : (v.name.sv || v.id)} (${sh[0] / 8}, ${sh[1] / 8})</option>`; }).join("");
+      sel.onchange = () => { const s = sel.value ? (shift[sel.value] || [0, 0]) : null; if (s) { $("mvDx").value = s[0] / 8; $("mvDy").value = s[1] / 8; } };
     }
     MV.total = [0, 0]; mvMsg("");
     if (!dlg.open) dlg.show();

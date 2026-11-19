@@ -641,3 +641,6 @@ button.icon.tiny { padding: 0 0.25rem; min-width: 0; min-height: 0; line-height:
 .move-dlg .mv-what { display: flex; flex-wrap: wrap; gap: .2rem .8rem; width: 100%; }
 .move-dlg .mv-pad button { min-width: 2rem; }
 .move-dlg .dialog-actions { position: static; margin: .6rem 0 0; padding: 0; }
+
+.tr-cand-sel { width: 100%; margin-bottom: 0.3rem; }
+div.tr-cand { cursor: default; }
