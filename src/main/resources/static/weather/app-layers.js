@@ -784,6 +784,97 @@
       renderMapViews();
     } catch (e) { setStatus(e.message); }
   }
+
+  // ── Move what is drawn ────────────────────────────────────────────
+  // For admins on the standard map (a window beside the map): hand-picked rivers, or everything inside a box, moved without changing
+  // their shape (POST /maps/:id/move-data). Picked rivers move at once with each arrow, in steps down to 0.02 map pixel.
+  const MV = { picked: new Set(), box: null, busy: false, total: [0, 0] };
+  const MV_WHAT = ["rivers", "roads", "ranges", "cities", "height", "forest", "marsh"];
+  function mvMode() { const r = document.querySelector('input[name="mvMode"]:checked'); return r ? r.value : "rivers"; }
+  function mvMsg(t, bad) { const m = $("mvMsg"); m.textContent = t || ""; m.style.color = bad ? "var(--err, #e08a7a)" : ""; }
+  function mvRefresh() {
+    const rv = mvMode() === "rivers";
+    $("mvBoxRow").hidden = rv; $("mvRiverRow").hidden = !rv;
+    $("mvPicked").textContent = MV.picked.size ? T("mvPickedN", MV.picked.size, [...MV.picked].map((id) => { const r = (fieldMap.rivers || []).find((x) => x.id === id); return r && r.name ? r.name : "#" + id; }).slice(0, 6).join(", ")) : T("mvPickedNone");
+    $("mvBoxInfo").textContent = MV.box ? T("mvBoxSet") : T("mvBoxNone");
+    fieldMap.rvPicked = MV.picked; fieldMap.moveBox = rv ? null : MV.box;
+    fieldMap.draw();
+  }
+  function mvStopTool() { if (fieldMap.mapTool && fieldMap.mapTool.mvTool) fieldMap.mapTool = null; $("stage").classList.remove("picking"); $("mvPick").classList.remove("primary"); $("mvDraw").classList.remove("primary"); }
+  function mvPickRivers() {
+    mvStopTool();
+    $("mvPick").classList.add("primary");
+    fieldMap.mapTool = { mvTool: true, click(nx, ny, x, y) {
+      const h = fieldMap._rvHitLine(x, y, 10, null);
+      if (!h) return true;
+      MV.picked.has(h.r.id) ? MV.picked.delete(h.r.id) : MV.picked.add(h.r.id);
+      mvRefresh();
+      return true;
+    } };
+  }
+  function mvDrawBox() {
+    mvStopTool();
+    $("mvDraw").classList.add("primary");
+    let from = null;
+    fieldMap.mapTool = { mvTool: true,
+      down(x, y) { from = fieldMap.toMap(x, y); MV.box = { x0: from[0], y0: from[1], x1: from[0], y1: from[1] }; mvRefresh(); return true; },
+      move(x, y) { if (!from) return; const t = fieldMap.toMap(x, y); MV.box = { x0: from[0], y0: from[1], x1: t[0], y1: t[1] }; mvRefresh(); },
+      up() { from = null; mvStopTool(); mvRefresh(); } };
+  }
+  async function mvMove(dx, dy) {
+    if (MV.busy) return;
+    const rv = mvMode() === "rivers";
+    if (!dx && !dy) { mvMsg(T("mvZero"), true); return; }
+    const body = { dx, dy };
+    if (rv) { if (!MV.picked.size) { mvMsg(T("mvNoRivers"), true); return; } body.what = ["rivers"]; body.rivers = [...MV.picked]; }
+    else {
+      const what = MV_WHAT.filter((k) => $("mvW_" + k) && $("mvW_" + k).checked);
+      if (!MV.box) { mvMsg(T("mvNoBox"), true); return; }
+      if (!what.length) { mvMsg(T("mvNoWhat"), true); return; }
+      if (!window.confirm(T("mvConfirm", what.map((k) => T("mvW_" + k)).join(", "), dx, dy))) return;
+      body.what = what; body.box = { x0: Math.min(MV.box.x0, MV.box.x1), y0: Math.min(MV.box.y0, MV.box.y1), x1: Math.max(MV.box.x0, MV.box.x1), y1: Math.max(MV.box.y0, MV.box.y1) };
+    }
+    MV.busy = true; mvMsg(T("mvWorking"));
+    try {
+      await api("POST", `/maps/${S.map.id}/move-data`, body);
+      MV.total = [MV.total[0] + dx, MV.total[1] + dy];
+      const w = body.what, jobs = [];
+      if (w.includes("rivers")) jobs.push(loadRivers());
+      if (w.includes("roads")) jobs.push(loadRoads());
+      if (w.includes("ranges")) jobs.push(loadRanges());
+      if (w.includes("cities")) jobs.push(loadCities());
+      if (w.includes("height")) jobs.push(loadHeight());
+      if (w.includes("forest")) jobs.push(loadForest());
+      if (w.includes("marsh")) jobs.push(loadMarsh());
+      await Promise.all(jobs);
+      mvMsg(T("mvDone", +MV.total[0].toFixed(3), +MV.total[1].toFixed(3)));
+    } catch (e) { mvMsg(e.message || String(e), true); }
+    MV.busy = false;
+  }
+  function openMoveData() {
+    const dlg = $("moveDlg");
+    if (!$("mvWhat").children.length) {
+      $("mvWhat").innerHTML = MV_WHAT.map((k) => `<label><input type="checkbox" id="mvW_${k}" checked> ${T("mvW_" + k)}</label>`).join("");
+      $("mvDraw").onclick = mvDrawBox; $("mvPick").onclick = mvPickRivers;
+      $("mvClear").onclick = () => { MV.picked.clear(); mvRefresh(); };
+      document.querySelectorAll('input[name="mvMode"]').forEach((r) => r.onchange = () => { mvStopTool(); mvRefresh(); if (mvMode() === "rivers") mvPickRivers(); });
+      $("mvApply").onclick = () => mvMove(+$("mvDx").value || 0, +$("mvDy").value || 0);
+      document.querySelectorAll("#moveDlg .mv-pad button").forEach((b) => b.onclick = () => {
+        const [a, c] = b.dataset.d.split(",").map(Number), st = +$("mvStep").value || 0.1;
+        const dx = +(a * st).toFixed(4), dy = +(c * st).toFixed(4);
+        $("mvDx").value = dx; $("mvDy").value = dy;
+        if (mvMode() === "rivers") mvMove(dx, dy);               // picked rivers: at once, so they can be placed by eye
+      });
+      $("mvClose").onclick = () => { mvStopTool(); MV.picked.clear(); fieldMap.rvPicked = null; fieldMap.moveBox = null; fieldMap.draw(); dlg.close(); };
+      const sel = $("mvLike"), layers = fieldMap.tileLayers(), shift = layerShiftFor(S.map) || {};
+      sel.innerHTML = `<option value="">–</option>` + layers.filter((v) => shift[v.id] && (shift[v.id][0] || shift[v.id][1])).map((v) => `<option value="${v.id}">${typeof v.name === "string" ? v.name : (v.name.sv || v.id)} (${shift[v.id][0] / 8}, ${shift[v.id][1] / 8})</option>`).join("");
+      sel.onchange = () => { const s = shift[sel.value]; if (s) { $("mvDx").value = s[0] / 8; $("mvDy").value = s[1] / 8; } };
+    }
+    MV.total = [0, 0]; mvMsg("");
+    if (!dlg.open) dlg.show();
+    mvRefresh();
+    if (mvMode() === "rivers") mvPickRivers();
+  }
   function renderMapViews() {
     let layers = [];
     try { layers = fieldMap.tileLayers(); } catch (e) { return; } // called before the map exists
@@ -847,6 +938,9 @@
       const ex = document.createElement("button"); ex.type = "button"; ex.textContent = T("mlExport"); ex.title = T("mlExportTip");
       ex.onclick = (e) => { e.preventDefault(); exportMapLayers(); };
       list.append(ex);
+      const mvb = document.createElement("button"); mvb.type = "button"; mvb.textContent = T("mvOpen"); mvb.title = T("mvOpenTip");
+      mvb.onclick = (e) => { e.preventDefault(); $("mapLayerDrop").open = false; openMoveData(); };
+      list.append(mvb);
     }
     const hint = document.createElement("div"); hint.className = "ml-hint"; hint.textContent = T("mlHint") + (canOrder ? " " + T("mlAdminHint") : "");
     list.append(hint);

@@ -299,7 +299,7 @@
     });
     for (const pass of [0, 1]) {
       for (const pc of pieces) {
-        const sel = editing && this.rvSel === pc.r.id;
+        const sel = (editing && this.rvSel === pc.r.id) || !!(this.rvPicked && this.rvPicked.has(pc.r.id));
         ctx.beginPath();
         pc.pts.forEach((p, i) => { const [x, y] = this.toScreen(p.x, p.y); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); });
         const w = this._rvWidth(pc.flow);

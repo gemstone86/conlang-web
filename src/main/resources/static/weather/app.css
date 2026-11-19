@@ -631,3 +631,13 @@ button.icon.tiny { padding: 0 0.25rem; min-width: 0; min-height: 0; line-height:
 .tr-via .tr-note { flex: 1 1 100%; margin: 0; }
 .tr-via-chip { display: inline-flex; align-items: center; gap: 0.2rem; padding: 0 0.4rem; border: 1px solid #5fb6ff; border-radius: 999px; font-size: 0.75rem; }
 .tr-via-chip button { border: 0; background: transparent; color: inherit; cursor: pointer; padding: 0 0.15rem; }
+
+/* the "move what is drawn" window: stays beside the map so the box and rivers can be chosen on it */
+.move-dlg { position: fixed; inset: auto 1rem 1rem auto; margin: 0; width: min(25rem, calc(100% - 2rem)); max-height: calc(100dvh - 2rem); overflow-y: auto; z-index: 30; }
+.move-dlg h2 { margin-bottom: .4rem; }
+.move-dlg .mv-row { display: flex; flex-wrap: wrap; gap: .4rem .7rem; align-items: center; margin: .45rem 0; }
+.move-dlg input[type="number"] { width: 4.8rem; }
+.move-dlg input[type="radio"] { width: auto; }
+.move-dlg .mv-what { display: flex; flex-wrap: wrap; gap: .2rem .8rem; width: 100%; }
+.move-dlg .mv-pad button { min-width: 2rem; }
+.move-dlg .dialog-actions { position: static; margin: .6rem 0 0; padding: 0; }

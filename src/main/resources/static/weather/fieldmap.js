@@ -1263,6 +1263,11 @@
       if (regionEdit) this._drawAnchors();
       if (this.kmPerPx) this._drawScaleBar();
       this._startFx();
+      if (this.moveBox) {                                   // the box the admin is drawing to move what is drawn inside it
+        const b = this.moveBox, [bx0, by0] = this.toScreen(Math.min(b.x0, b.x1), Math.min(b.y0, b.y1)), [bx1, by1] = this.toScreen(Math.max(b.x0, b.x1), Math.max(b.y0, b.y1));
+        ctx.save(); ctx.fillStyle = "rgba(255,224,138,0.12)"; ctx.strokeStyle = "rgba(255,224,138,0.95)"; ctx.lineWidth = 1.5; ctx.setLineDash([6, 4]);
+        ctx.fillRect(bx0, by0, bx1 - bx0, by1 - by0); ctx.strokeRect(bx0, by0, bx1 - bx0, by1 - by0); ctx.restore();
+      }
       if (this.highlight) {
         const [hx, hy] = this.toScreen(this.highlight.x, this.highlight.y);
         ctx.strokeStyle = "#e7e1d1"; ctx.lineWidth = 1.5;

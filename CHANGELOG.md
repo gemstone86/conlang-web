@@ -2,6 +2,12 @@
 
 Newest first. Versions from 1.x on are the combined app (Root and Rune + Weather generator).
 
+## v1.45.0 (combined app)
+Weather generator (admins, standard map):
+- **Move what is drawn without changing its shape.** In the map-layer list there is *Flytta floder m.m.…*, a window beside the map. By default you **pick rivers** by clicking them (click again to drop one; they turn gold), and the arrows ◀▲▼▶ move the picked rivers **at once**, in steps of 0.02, 0.05, 0.1, 0.25, 0.5 or 1 map pixel, so they can be placed exactly and independently of the map layer below; the opposite arrow undoes a move. Numbers can also be typed, or taken from a layer's own move (*Lika mycket som lagret*, e.g. Jargien).
+- Or choose **Allt i en ruta**: drag a box and move everything in it together: rivers, roads, mountain ranges, cities and the height, forest and marsh maps (pictures are moved smoothly, so a half pixel is a half pixel; outside the box they are as before). Saved for everyone at once.
+- A picked river that runs into one that isn't picked keeps its meeting point on that river, so its last point may come to lie a little beside it; drag it back with the river tool.
+
 ## v1.44.0 (combined app)
 Site:
 - **Visitor counts on the admin page.** *Admin* now has a *Visitors* section: how many different visitors and page views each day had (the last 30 days), in total and for the start page, Root and Rune and the weather generator. It is counted inside the site, without cookies and without storing anyone's address: a visitor is a short code made from their address and browser mixed with a random salt kept only in memory and thrown away at midnight (UTC), so nobody can be followed between days or traced back. Only the daily numbers are saved (table `visit_stats`, kept about two years).

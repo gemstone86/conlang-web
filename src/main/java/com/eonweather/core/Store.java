@@ -509,6 +509,15 @@ public final class Store {
         });
     }
 
+    /** Replaces the height map without asking who owns the map (the caller has checked that; for the default map: the admins). */
+    public void replaceHeightImage(long mapId, String type, byte[] image) {
+        tx(c -> {
+            if (update(c, "UPDATE map_heights SET image_type = ?, image = ?, rev = rev + 1 WHERE map_id = ?", type, image, mapId) == 0)
+                throw new ApiException(404, "This map has no height map");
+            return null;
+        });
+    }
+
     public void deleteHeightImage(long ownerId, long mapId) {
         tx(c -> {
             requireMapOwner(c, ownerId, mapId);

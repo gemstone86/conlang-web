@@ -684,6 +684,12 @@ public final class Api {
                         return Http.Response.json(store.map(id, uid));
                     }
                 }
+                case "move-data" -> {
+                    // POST { dx, dy (map pixels, may be fractions), what: ["rivers","roads","ranges","cities","height","forest","marsh"],
+                    // and either box: {x0,y0,x1,y1} (0–1) or rivers: [ids] (then only rivers move) }: moves what is drawn on the map, shape and all
+                    // (see MapDataMove); for the map's owner (default map: the admins)
+                    if (m.equals("POST")) return Http.Response.json(moveData(req, id));
+                }
                 case "suggestions" -> { return suggestions(m, p, req, id); }
                 case "layer-suggestions" -> { return layerSuggestions(m, p, req, id); }
                 case "rivers" -> { return listLayer(m, req, id, ListLayer.RIVERS); }
@@ -879,6 +885,68 @@ public final class Api {
             for (ListLayer l : values()) if (l.name.equals(name)) return l;
             throw new ApiException(404, "Not found");
         }
+    }
+
+    private Map<String, Object> moveData(Http.Request req, long id) {
+        long uid = requireUser(req);
+        if (!canReview(id, uid)) throw new ApiException(403, "Only the map's owner (for the default map: the admins) can move its drawings");
+        Map<String, Object> mp = store.map(id, uid);
+        if (mp.containsKey("removedAt")) throw new ApiException(409, "The map is removed. Restore it to change it.");
+        Map<String, Object> b = body(req);
+        if (!(b.get("dx") instanceof Number dxn) || !(b.get("dy") instanceof Number dyn) || !Double.isFinite(dxn.doubleValue()) || !Double.isFinite(dyn.doubleValue()))
+            throw new ApiException(400, "Give dx and dy (map pixels)");
+        double dx = dxn.doubleValue(), dy = dyn.doubleValue();
+        if (Math.abs(dx) > 200 || Math.abs(dy) > 200) throw new ApiException(400, "That is too far (at most 200 map pixels each way)");
+        if (dx == 0 && dy == 0) throw new ApiException(400, "Nothing to move");
+        int w = ((Number) mp.get("width")).intValue(), h = ((Number) mp.get("height")).intValue();
+        Set<String> what = new LinkedHashSet<>();
+        if (b.get("what") instanceof List<?> wl) for (Object o : wl) {
+            if (!(o instanceof String s) || !Set.of("rivers", "roads", "ranges", "cities", "height", "forest", "marsh").contains(s)) throw new ApiException(400, "Not something that can be moved: " + o);
+            what.add(s);
+        }
+        if (what.isEmpty()) throw new ApiException(400, "Say what to move");
+        MapDataMove.Box box = null;
+        Set<Long> rivers = new HashSet<>();
+        if (b.get("box") instanceof Map<?, ?> bx) {
+            double[] v = new double[4];
+            String[] keys = { "x0", "y0", "x1", "y1" };
+            for (int i = 0; i < 4; i++) {
+                if (!(bx.get(keys[i]) instanceof Number n) || !(n.doubleValue() >= 0 && n.doubleValue() <= 1)) throw new ApiException(400, "The box needs x0, y0, x1, y1 between 0 and 1");
+                v[i] = n.doubleValue();
+            }
+            box = new MapDataMove.Box(Math.min(v[0], v[2]), Math.min(v[1], v[3]), Math.max(v[0], v[2]), Math.max(v[1], v[3]));
+            if (box.x1() - box.x0() < 0.0005 || box.y1() - box.y0() < 0.0005) throw new ApiException(400, "The box is too small");
+        } else if (b.get("rivers") instanceof List<?> rl) {
+            for (Object o : rl) if (o instanceof Number n) rivers.add(n.longValue());
+            if (rivers.isEmpty()) throw new ApiException(400, "Pick at least one river");
+            if (!what.equals(Set.of("rivers"))) throw new ApiException(400, "Picked rivers move by themselves: what must be [\"rivers\"]");
+        } else throw new ApiException(400, "Give a box, or rivers to move");
+        // worked out first, saved after, so a problem with one part leaves everything as it was
+        double ddx = dx / w, ddy = dy / h;
+        Map<String, Object> moved = new LinkedHashMap<>();
+        Map<String, String> lists = new LinkedHashMap<>();
+        for (String l : List.of("rivers", "roads", "ranges", "cities")) {
+            if (!what.contains(l)) continue;
+            MapDataMove.Counts n = new MapDataMove.Counts();
+            lists.put(l, MapDataMove.moveList(store.list(l, id).json(), box, rivers, ddx, ddy, n));
+            moved.put(l, n.items);
+        }
+        Map<String, byte[]> pictures = new LinkedHashMap<>();
+        for (String k : List.of("height", "forest", "marsh")) {
+            if (!what.contains(k)) continue;
+            if (k.equals("height")) pictures.put(k, MapDataMove.movePicture(store.heightImage(id, uid).bytes(), box, dx, dy, w));
+            else {
+                Store.Forest f = store.painted(k, id);
+                if (f != null) pictures.put(k, MapDataMove.movePicture(f.image(), box, dx, dy, w));
+            }
+            moved.put(k, pictures.containsKey(k));
+        }
+        lists.forEach((l, json) -> store.setList(l, id, json, "app", uid));
+        pictures.forEach((k, png) -> { if (k.equals("height")) store.replaceHeightImage(id, "image/png", png); else store.setPainted(k, id, "image/png", png, "app", uid); });
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("ok", true);
+        out.put("moved", moved);
+        return out;
     }
 
     private Http.Response listLayer(String m, Http.Request req, long mapId, ListLayer layer) {
