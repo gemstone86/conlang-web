@@ -800,7 +800,7 @@
     fieldMap.rvPicked = MV.picked; fieldMap.moveBox = rv ? null : MV.box;
     fieldMap.draw();
   }
-  function mvStopTool() { if (fieldMap.mapTool && fieldMap.mapTool.mvTool) fieldMap.mapTool = null; $("stage").classList.remove("picking"); $("mvPick").classList.remove("primary"); $("mvDraw").classList.remove("primary"); }
+  function mvStopTool() { if (fieldMap.mapTool && fieldMap.mapTool.mvTool) fieldMap.mapTool = null; $("stage").classList.remove("picking"); $("mvPick").classList.remove("primary"); $("mvDraw").classList.remove("primary"); $("mvDragBtn").classList.remove("primary"); }
   function mvPickRivers() {
     mvStopTool();
     $("mvPick").classList.add("primary");
@@ -811,6 +811,46 @@
       mvRefresh();
       return true;
     } };
+  }
+  /** Drag: press on a river (it is picked, if it wasn't) and pull; all the picked rivers follow the mouse and are moved for good when it is let go. A click without pulling picks or drops a river. */
+  function mvDragRivers() {
+    mvStopTool();
+    $("mvDragBtn").classList.add("primary");
+    let d = null;
+    const shownAt = (dxn, dyn) => {
+      for (const r of fieldMap.rivers || []) {
+        const o = d.orig.get(r.id);
+        if (o) r.points.forEach((q, i) => { q.x = Math.max(0, Math.min(1, o[i].x + dxn)); q.y = Math.max(0, Math.min(1, o[i].y + dyn)); });
+      }
+      fieldMap.draw();
+    };
+    fieldMap.mapTool = { mvTool: true,
+      down(x, y, button) {
+        if (button !== 0 || MV.busy) return false;
+        const h = fieldMap._rvHitLine(x, y, 10, null);
+        if (!h) return false;                                    // empty ground: the map is panned as usual
+        const was = MV.picked.has(h.r.id);
+        MV.picked.add(h.r.id);
+        d = { id: h.r.id, was, from: fieldMap.toMap(x, y), sx: x, sy: y, moved: false, dxn: 0, dyn: 0, orig: new Map() };
+        for (const r of fieldMap.rivers || []) if (MV.picked.has(r.id) && r.points) d.orig.set(r.id, r.points.map((q) => ({ x: q.x, y: q.y })));
+        mvRefresh();
+        return true;
+      },
+      move(x, y) {
+        if (!d) return;
+        if (!d.moved && Math.hypot(x - d.sx, y - d.sy) < 4) return;
+        d.moved = true;
+        const t = fieldMap.toMap(x, y);
+        d.dxn = t[0] - d.from[0]; d.dyn = t[1] - d.from[1];
+        shownAt(d.dxn, d.dyn);
+      },
+      up() {
+        if (!d) return;
+        const e = d; d = null;
+        if (!e.moved) { if (e.was) MV.picked.delete(e.id); mvRefresh(); return; }
+        const dx = +(e.dxn * fieldMap.imgW).toFixed(4), dy = +(e.dyn * fieldMap.imgH).toFixed(4);
+        mvMove(dx, dy).then(() => mvReload(["rivers"])).then(mvRefresh);      // the saved places replace the ones shown while dragging
+      } };
   }
   function mvDrawBox() {
     mvStopTool();
@@ -877,7 +917,7 @@
       if (scale !== 1) MV.scaled = (MV.scaled || 1) * scale;
       await mvReload(body.what);
       mvUndoCount(res.undo);
-      mvMsg(T("mvDone", +MV.total[0].toFixed(3), +MV.total[1].toFixed(3)) + (MV.scaled ? " · " + T("mvDoneScale", +(MV.scaled * 100).toFixed(3)) : ""));
+      mvMsg(T("mvDone", +MV.total[0].toFixed(3), +MV.total[1].toFixed(3)) + (MV.scaled && MV.scaled !== 1 ? " · " + T("mvDoneScale", +(MV.scaled * 100).toFixed(3)) : ""));
     } catch (e) { mvMsg(e.message || String(e), true); }
     MV.busy = false;
   }
@@ -885,7 +925,7 @@
     const dlg = $("moveDlg");
     if (!$("mvWhat").children.length) {
       $("mvWhat").innerHTML = MV_WHAT.map((k) => `<label><input type="checkbox" id="mvW_${k}" checked> ${T("mvW_" + k)}</label>`).join("");
-      $("mvDraw").onclick = mvDrawBox; $("mvPick").onclick = mvPickRivers;
+      $("mvDraw").onclick = mvDrawBox; $("mvPick").onclick = mvPickRivers; $("mvDragBtn").onclick = mvDragRivers;
       $("mvClear").onclick = () => { MV.picked.clear(); mvRefresh(); };
       document.querySelectorAll('input[name="mvMode"]').forEach((r) => r.onchange = () => { mvStopTool(); mvRefresh(); if (mvMode() === "rivers") mvPickRivers(); });
       $("mvUndo").onclick = mvUndo;

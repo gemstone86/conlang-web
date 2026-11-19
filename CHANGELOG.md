@@ -2,6 +2,10 @@
 
 Newest first. Versions from 1.x on are the combined app (Root and Rune + Weather generator).
 
+## v1.49.0 (combined app)
+Weather generator:
+- **Drag rivers with the mouse.** *Flytta floder m.m.…* has a new *Dra…* button: press on a river (it is picked if it wasn't) and pull; all the picked rivers follow the mouse while you pull and are saved in the new place when you let go. A click without pulling picks or drops a river; pressing on empty ground pans the map as usual. A drag is one step in *Ångra*, so it can be undone, and the arrows and the size buttons can still be used afterwards for exact placing.
+
 ## v1.48.0 (combined app)
 Weather generator:
 - **Undo a move.** *Flytta floder m.m.…* has *Ångra (n)*: it takes back the latest move (up to 30 steps, one per arrow press or *Flytta*), also a scaling, and for a box also the height, forest and marsh pictures inside it. Only what the move changed is put back: anything you drew or edited in the rivers, roads etc. since stays as it is. The steps are kept in the server's memory, so they are gone after a restart or a new release.
