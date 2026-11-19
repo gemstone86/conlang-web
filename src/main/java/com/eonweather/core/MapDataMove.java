@@ -126,4 +126,36 @@ final class MapDataMove {
         }
         return HeightImages.encodeGrey(g.w(), g.h(), out);
     }
+
+    /** The ids of the items that differ between two lists (JSON): what a move changed. */
+    static Set<Long> changedIds(String oldJson, String newJson) {
+        Map<Long, Object> before = new java.util.HashMap<>();
+        if (Json.parse(oldJson) instanceof List<?> ol) for (Object o : ol) if (o instanceof Map<?, ?> m && m.get("id") instanceof Number n) before.put(n.longValue(), o);
+        Set<Long> out = new java.util.HashSet<>();
+        if (Json.parse(newJson) instanceof List<?> nl) for (Object o : nl) if (o instanceof Map<?, ?> m && m.get("id") instanceof Number n && !java.util.Objects.equals(before.get(n.longValue()), o)) out.add(n.longValue());
+        return out;
+    }
+
+    /** The list with the items of the given ids put back as they were in the old list (items that are gone now stay gone; other items are left as they are now). */
+    static String restoreItems(String currentJson, String oldJson, Set<Long> ids) {
+        Map<Long, Object> before = new java.util.HashMap<>();
+        if (Json.parse(oldJson) instanceof List<?> ol) for (Object o : ol) if (o instanceof Map<?, ?> m && m.get("id") instanceof Number n) before.put(n.longValue(), o);
+        List<Object> out = new ArrayList<>();
+        if (Json.parse(currentJson) instanceof List<?> cl) for (Object o : cl) {
+            Object old = o instanceof Map<?, ?> m && m.get("id") instanceof Number n && ids.contains(n.longValue()) ? before.get(n.longValue()) : null;
+            out.add(old != null ? old : o);
+        }
+        return Json.write(out);
+    }
+
+    /** The current picture with the part inside the box taken back from the old one (the rest as it is now). Null if the pictures differ in size. */
+    static byte[] restorePicture(byte[] currentPng, byte[] oldPng, Box box) {
+        HeightImages.Grey c = HeightImages.decodeGrey(currentPng), o = HeightImages.decodeGrey(oldPng);
+        if (c.w() != o.w() || c.h() != o.h()) return null;
+        int x0 = Math.max(0, (int) Math.floor(box.x0() * c.w())), x1 = Math.min(c.w() - 1, (int) Math.ceil(box.x1() * c.w()) - 1);
+        int y0 = Math.max(0, (int) Math.floor(box.y0() * c.h())), y1 = Math.min(c.h() - 1, (int) Math.ceil(box.y1() * c.h()) - 1);
+        byte[] out = c.data().clone();
+        for (int y = y0; y <= y1; y++) System.arraycopy(o.data(), y * c.w() + x0, out, y * c.w() + x0, x1 - x0 + 1);
+        return HeightImages.encodeGrey(c.w(), c.h(), out);
+    }
 }

@@ -831,6 +831,30 @@
     }
     return MV.box ? { x: (MV.box.x0 + MV.box.x1) / 2, y: (MV.box.y0 + MV.box.y1) / 2 } : { x: 0.5, y: 0.5 };
   }
+  function mvUndoCount(n) { const b = $("mvUndo"); b.disabled = !n; b.textContent = n ? T("mvUndo") + " (" + n + ")" : T("mvUndo"); }
+  async function mvReload(kinds) {
+    const jobs = [];
+    if (kinds.includes("rivers")) jobs.push(loadRivers());
+    if (kinds.includes("roads")) jobs.push(loadRoads());
+    if (kinds.includes("ranges")) jobs.push(loadRanges());
+    if (kinds.includes("cities")) jobs.push(loadCities());
+    if (kinds.includes("height")) jobs.push(loadHeight());
+    if (kinds.includes("forest")) jobs.push(loadForest());
+    if (kinds.includes("marsh")) jobs.push(loadMarsh());
+    await Promise.all(jobs);
+  }
+  async function mvUndo() {
+    if (MV.busy) return;
+    MV.busy = true; mvMsg(T("mvWorking"));
+    try {
+      const r = await api("POST", `/maps/${S.map.id}/move-data/undo`);
+      await mvReload(r.moved || []);
+      mvUndoCount(r.undo);
+      MV.total = [0, 0]; MV.scaled = 1;
+      mvMsg(T("mvUndone"));
+    } catch (e) { mvMsg(e.message || String(e), true); }
+    MV.busy = false;
+  }
   async function mvMove(dx, dy, scale) {
     if (MV.busy) return;
     const rv = mvMode() === "rivers";
@@ -848,18 +872,11 @@
     }
     MV.busy = true; mvMsg(T("mvWorking"));
     try {
-      await api("POST", `/maps/${S.map.id}/move-data`, body);
+      const res = await api("POST", `/maps/${S.map.id}/move-data`, body);
       MV.total = [MV.total[0] + dx, MV.total[1] + dy];
       if (scale !== 1) MV.scaled = (MV.scaled || 1) * scale;
-      const w = body.what, jobs = [];
-      if (w.includes("rivers")) jobs.push(loadRivers());
-      if (w.includes("roads")) jobs.push(loadRoads());
-      if (w.includes("ranges")) jobs.push(loadRanges());
-      if (w.includes("cities")) jobs.push(loadCities());
-      if (w.includes("height")) jobs.push(loadHeight());
-      if (w.includes("forest")) jobs.push(loadForest());
-      if (w.includes("marsh")) jobs.push(loadMarsh());
-      await Promise.all(jobs);
+      await mvReload(body.what);
+      mvUndoCount(res.undo);
       mvMsg(T("mvDone", +MV.total[0].toFixed(3), +MV.total[1].toFixed(3)) + (MV.scaled ? " · " + T("mvDoneScale", +(MV.scaled * 100).toFixed(3)) : ""));
     } catch (e) { mvMsg(e.message || String(e), true); }
     MV.busy = false;
@@ -871,6 +888,7 @@
       $("mvDraw").onclick = mvDrawBox; $("mvPick").onclick = mvPickRivers;
       $("mvClear").onclick = () => { MV.picked.clear(); mvRefresh(); };
       document.querySelectorAll('input[name="mvMode"]').forEach((r) => r.onchange = () => { mvStopTool(); mvRefresh(); if (mvMode() === "rivers") mvPickRivers(); });
+      $("mvUndo").onclick = mvUndo;
       $("mvApply").onclick = () => mvMove(+$("mvDx").value || 0, +$("mvDy").value || 0, (+$("mvSc").value || 100) / 100);
       document.querySelectorAll("#moveDlg .mv-pad button[data-sc]").forEach((b) => b.onclick = () => {
         const f = 1 + (+b.dataset.sc) * (+$("mvScStep").value || 0.25) / 100;
@@ -898,6 +916,7 @@
       };
     }
     MV.total = [0, 0]; MV.scaled = 1; mvMsg("");
+    api("GET", `/maps/${S.map.id}/move-data`).then((r) => mvUndoCount(r.undo)).catch(() => {});
     if (!dlg.open) dlg.show();
     mvRefresh();
     if (mvMode() === "rivers") mvPickRivers();

@@ -688,6 +688,12 @@ public final class Api {
                     // POST { dx, dy (map pixels, may be fractions), optional scale (0.5–2) about center {x,y} (0–1; lines and places only, applied before the move), what: ["rivers","roads","ranges","cities","height","forest","marsh"],
                     // and either box: {x0,y0,x1,y1} (0–1) or rivers: [ids] (then only rivers move) }: moves what is drawn on the map, shape and all
                     // (see MapDataMove); for the map's owner (default map: the admins)
+                    if (p.length == 4 && p[3].equals("undo") && m.equals("POST")) return Http.Response.json(undoMove(req, id));
+                    if (m.equals("GET")) {
+                        long uid = requireUser(req);
+                        if (!canReview(id, uid)) throw new ApiException(403, "Only the map's owner (for the default map: the admins) can move its drawings");
+                        synchronized (moveUndo) { return Http.Response.json(Map.of("undo", moveUndo.getOrDefault(id, new ArrayDeque<>()).size())); }
+                    }
                     if (m.equals("POST")) return Http.Response.json(moveData(req, id));
                 }
                 case "suggestions" -> { return suggestions(m, p, req, id); }
@@ -887,6 +893,42 @@ public final class Api {
         }
     }
 
+    /** What a move changed, so that it can be undone: the old lists with the ids of the items that moved, and the old pictures with the box. Kept in memory (until the server restarts). */
+    private record MoveUndo(Map<String, String> oldLists, Map<String, Set<Long>> changed, Map<String, byte[]> oldPictures, MapDataMove.Box box) {
+        long pictureBytes() { return oldPictures.values().stream().mapToLong(b -> b.length).sum(); }
+    }
+    private final Map<Long, Deque<MoveUndo>> moveUndo = new HashMap<>();
+    private static final int MOVE_UNDO_STEPS = 30;
+    private static final long MOVE_UNDO_PICTURE_BYTES = 30_000_000L;
+
+    private Map<String, Object> undoMove(Http.Request req, long id) {
+        long uid = requireUser(req);
+        if (!canReview(id, uid)) throw new ApiException(403, "Only the map's owner (for the default map: the admins) can move its drawings");
+        MoveUndo u;
+        synchronized (moveUndo) {
+            Deque<MoveUndo> stack = moveUndo.get(id);
+            if (stack == null || stack.isEmpty()) throw new ApiException(404, "There is no move to undo");
+            u = stack.pop();
+        }
+        List<String> restored = new ArrayList<>();
+        u.oldLists().forEach((l, old) -> {
+            store.setList(l, id, MapDataMove.restoreItems(store.list(l, id).json(), old, u.changed().get(l)), "app", uid);
+            restored.add(l);
+        });
+        u.oldPictures().forEach((k, old) -> {
+            byte[] now = k.equals("height") ? store.heightImage(id, uid).bytes() : store.painted(k, id) == null ? null : store.painted(k, id).image();
+            byte[] back = now == null ? null : MapDataMove.restorePicture(now, old, u.box());
+            if (back == null) return;
+            if (k.equals("height")) store.replaceHeightImage(id, "image/png", back); else store.setPainted(k, id, "image/png", back, "app", uid);
+            restored.add(k);
+        });
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("ok", true);
+        out.put("moved", restored);
+        synchronized (moveUndo) { out.put("undo", moveUndo.getOrDefault(id, new ArrayDeque<>()).size()); }
+        return out;
+    }
+
     private Map<String, Object> moveData(Http.Request req, long id) {
         long uid = requireUser(req);
         if (!canReview(id, uid)) throw new ApiException(403, "Only the map's owner (for the default map: the admins) can move its drawings");
@@ -950,11 +992,26 @@ public final class Api {
             }
             moved.put(k, pictures.containsKey(k));
         }
+        // what is needed to undo it
+        Map<String, String> oldLists = new LinkedHashMap<>();
+        Map<String, Set<Long>> changed = new LinkedHashMap<>();
+        lists.forEach((l, json) -> { String old = store.list(l, id).json(); Set<Long> ch = MapDataMove.changedIds(old, json); if (!ch.isEmpty()) { oldLists.put(l, old); changed.put(l, ch); } });
+        Map<String, byte[]> oldPictures = new LinkedHashMap<>();
+        for (String k : pictures.keySet()) oldPictures.put(k, k.equals("height") ? store.heightImage(id, uid).bytes() : store.painted(k, id).image());
+        if (!oldLists.isEmpty() || !oldPictures.isEmpty()) synchronized (moveUndo) {
+            Deque<MoveUndo> stack = moveUndo.computeIfAbsent(id, k -> new ArrayDeque<>());
+            stack.push(new MoveUndo(oldLists, changed, oldPictures, box));
+            while (stack.size() > MOVE_UNDO_STEPS || stack.stream().mapToLong(MoveUndo::pictureBytes).sum() > MOVE_UNDO_PICTURE_BYTES) {
+                if (stack.size() <= 1) break;
+                stack.removeLast();
+            }
+        }
         lists.forEach((l, json) -> store.setList(l, id, json, "app", uid));
         pictures.forEach((k, png) -> { if (k.equals("height")) store.replaceHeightImage(id, "image/png", png); else store.setPainted(k, id, "image/png", png, "app", uid); });
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("ok", true);
         out.put("moved", moved);
+        synchronized (moveUndo) { out.put("undo", moveUndo.getOrDefault(id, new ArrayDeque<>()).size()); }
         return out;
     }
 

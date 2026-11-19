@@ -123,5 +123,24 @@ class MoveDataTest {
         for (JsonNode r : json.readTree(get(admin, base + "/rivers").body()).path("rivers")) if (r.path("id").asLong() == rid) scaled = r;
         assertEquals(cx + (bx - cx) * 1.01, scaled.path("points").get(0).path("x").asDouble(), 2e-6);
         assertEquals(cy + (by - cy) * 1.01, scaled.path("points").get(0).path("y").asDouble(), 2e-6);
+    
+        // undo: the latest move first, rivers and the picture back as they were; only for those who may move things
+        assertEquals(403, post(member, url + "/undo", "{}").statusCode());
+        assertEquals(3, json.readTree(get(admin, url).body()).path("undo").asInt());
+        assertEquals(200, post(admin, url + "/undo", "{}").statusCode());                    // the scaling
+        assertEquals(bx, riverX(admin, base, rid), 2e-6);
+        assertEquals(200, post(admin, url + "/undo", "{}").statusCode());                    // the picked move
+        assertEquals(x0 + 2 / w, riverX(admin, base, rid), 2e-6);
+        HttpResponse<String> last = post(admin, url + "/undo", "{}");                         // the box move
+        assertEquals(200, last.statusCode(), last.body());
+        assertEquals(x0, riverX(admin, base, rid), 2e-6);
+        BufferedImage h2 = ImageIO.read(new ByteArrayInputStream(bytes(admin, base + "/height")));
+        assertEquals(h0.getRaster().getSample(px, py, 0), h2.getRaster().getSample(px, py, 0), "the height is back");
+        assertEquals(404, post(admin, url + "/undo", "{}").statusCode());
+    }
+
+    private double riverX(HttpClient c, String base, long rid) throws Exception {
+        for (JsonNode r : json.readTree(get(c, base + "/rivers").body()).path("rivers")) if (r.path("id").asLong() == rid) return r.path("points").get(0).path("x").asDouble();
+        throw new IllegalStateException("no river " + rid);
     }
 }

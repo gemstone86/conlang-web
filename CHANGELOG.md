@@ -2,6 +2,10 @@
 
 Newest first. Versions from 1.x on are the combined app (Root and Rune + Weather generator).
 
+## v1.48.0 (combined app)
+Weather generator:
+- **Undo a move.** *Flytta floder m.m.…* has *Ångra (n)*: it takes back the latest move (up to 30 steps, one per arrow press or *Flytta*), also a scaling, and for a box also the height, forest and marsh pictures inside it. Only what the move changed is put back: anything you drew or edited in the rivers, roads etc. since stays as it is. The steps are kept in the server's memory, so they are gone after a restart or a new release.
+
 ## v1.47.0 (combined app)
 Weather generator:
 - **Scale rivers like a layer.** *Flytta floder m.m.…* also has *Storlek* (%) with − / + (steps of 0.05–1 %): picked rivers (or the lines and places in a box) are scaled and then moved. *Lika mycket som lagret* now fills in the layer's move **and** its size, and the scaling is about the middle of that layer's pieces, exactly as the layer itself is scaled, so rivers drawn on a layer follow it. Without a layer the scaling is about the middle of the picked rivers (or the box). The pictures (height, forest, marsh) can only be moved, not scaled.
