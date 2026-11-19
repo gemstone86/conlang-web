@@ -20,6 +20,12 @@ final class MapDataMove {
         boolean has(double x, double y) { return x >= x0 && x <= x1 && y >= y0 && y <= y1; }
     }
 
+    /** A move: scaled by s about (cx, cy) (0–1 positions), then moved by (dx, dy) (0–1 units). */
+    record Tf(double dx, double dy, double s, double cx, double cy) {
+        double x(double x) { return cx + (x - cx) * s + dx; }
+        double y(double y) { return cy + (y - cy) * s + dy; }
+    }
+
     /** What a move changed: points moved per kind of list. */
     static final class Counts { int points; int items; }
 
@@ -28,7 +34,7 @@ final class MapDataMove {
      * point with another river and a lake's place count as points). With rivers: only the points of the rivers (and lakes)
      * with those ids, and the meeting points where another river joins one of them.
      */
-    static String moveList(String json, Box box, Set<Long> rivers, double dx, double dy, Counts n) {
+    static String moveList(String json, Box box, Set<Long> rivers, Tf t, Counts n) {
         Object parsed = Json.parse(json);
         if (!(parsed instanceof List<?> list)) return json;
         List<Object> out = new ArrayList<>();
@@ -39,14 +45,14 @@ final class MapDataMove {
             long id = m.get("id") instanceof Number x ? x.longValue() : -1;
             int before = n.points;
             if (box != null) {
-                shift(m, box, dx, dy, n, true);
+                shift(m, box, t, n, true);
             } else {
                 boolean own = rivers.contains(id);
                 if (own) {
-                    shift(m, null, dx, dy, n, false);                    // its points, and a lake's place
-                    if (m.get("joins") instanceof Map<?, ?> j && targetMoves(j, rivers)) m.put("joins", moved(j, dx, dy, n));
+                    shift(m, null, t, n, false);                    // its points, and a lake's place
+                    if (m.get("joins") instanceof Map<?, ?> j && targetMoves(j, rivers)) m.put("joins", moved(j, t, n));
                 } else if (m.get("joins") instanceof Map<?, ?> j && targetMoves(j, rivers)) {
-                    m.put("joins", moved(j, dx, dy, n));                 // another river that runs into a moved one keeps its meeting point on it
+                    m.put("joins", moved(j, t, n));                 // another river that runs into a moved one keeps its meeting point on it
                 }
             }
             if (n.points != before) n.items++;
@@ -60,17 +66,17 @@ final class MapDataMove {
         return t instanceof Number x && ids.contains(x.longValue());
     }
 
-    private static Map<String, Object> moved(Map<?, ?> p, double dx, double dy, Counts n) {
+    private static Map<String, Object> moved(Map<?, ?> p, Tf t, Counts n) {
         Map<String, Object> m = new LinkedHashMap<>();
         p.forEach((k, v) -> m.put(String.valueOf(k), v));
-        move(m, dx, dy, n);
+        move(m, t, n);
         return m;
     }
 
-    private static void move(Map<String, Object> p, double dx, double dy, Counts n) {
+    private static void move(Map<String, Object> p, Tf t, Counts n) {
         if (p.get("x") instanceof Number x && p.get("y") instanceof Number y) {
-            p.put("x", clamp(x.doubleValue() + dx));
-            p.put("y", clamp(y.doubleValue() + dy));
+            p.put("x", clamp(t.x(x.doubleValue())));
+            p.put("y", clamp(t.y(y.doubleValue())));
             n.points++;
         }
     }
@@ -79,20 +85,20 @@ final class MapDataMove {
 
     /** Moves the points found in this item (in "points" lists, and a lake's or city's own x and y); the join of a river only inside a box. */
     @SuppressWarnings("unchecked")
-    private static void shift(Map<String, Object> m, Box box, double dx, double dy, Counts n, boolean includeJoins) {
+    private static void shift(Map<String, Object> m, Box box, Tf t, Counts n, boolean includeJoins) {
         if (m.get("x") instanceof Number && m.get("y") instanceof Number && (box == null || box.has(((Number) m.get("x")).doubleValue(), ((Number) m.get("y")).doubleValue())))
-            move(m, dx, dy, n);
+            move(m, t, n);
         if (m.get("points") instanceof List<?> pts) {
             List<Object> np = new ArrayList<>();
             for (Object o : pts) {
                 if (o instanceof Map<?, ?> pm && pm.get("x") instanceof Number x && pm.get("y") instanceof Number y && (box == null || box.has(x.doubleValue(), y.doubleValue())))
-                    np.add(moved(pm, dx, dy, n));
+                    np.add(moved(pm, t, n));
                 else np.add(o);
             }
             m.put("points", np);
         }
         if (includeJoins && m.get("joins") instanceof Map<?, ?> j && j.get("x") instanceof Number x && j.get("y") instanceof Number y && box.has(x.doubleValue(), y.doubleValue()))
-            m.put("joins", moved(j, dx, dy, n));
+            m.put("joins", moved(j, t, n));
     }
 
     /**

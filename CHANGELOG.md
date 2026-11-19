@@ -2,6 +2,10 @@
 
 Newest first. Versions from 1.x on are the combined app (Root and Rune + Weather generator).
 
+## v1.47.0 (combined app)
+Weather generator:
+- **Scale rivers like a layer.** *Flytta floder m.m.…* also has *Storlek* (%) with − / + (steps of 0.05–1 %): picked rivers (or the lines and places in a box) are scaled and then moved. *Lika mycket som lagret* now fills in the layer's move **and** its size, and the scaling is about the middle of that layer's pieces, exactly as the layer itself is scaled, so rivers drawn on a layer follow it. Without a layer the scaling is about the middle of the picked rivers (or the box). The pictures (height, forest, marsh) can only be moved, not scaled.
+
 ## v1.46.0 (combined app)
 Weather generator:
 - **Route kinds in a drop-down.** The suggested routes (fastest, easiest, shortest, safest) are now chosen from a drop-down, with the chosen one described below it; clicking a route on the map still chooses it.

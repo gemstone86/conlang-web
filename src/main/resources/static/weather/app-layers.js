@@ -788,7 +788,7 @@
   // ── Move what is drawn ────────────────────────────────────────────
   // For admins on the standard map (a window beside the map): hand-picked rivers, or everything inside a box, moved without changing
   // their shape (POST /maps/:id/move-data). Picked rivers move at once with each arrow, in steps down to 0.02 map pixel.
-  const MV = { picked: new Set(), box: null, busy: false, total: [0, 0] };
+  const MV = { picked: new Set(), box: null, busy: false, total: [0, 0], center: null };
   const MV_WHAT = ["rivers", "roads", "ranges", "cities", "height", "forest", "marsh"];
   function mvMode() { const r = document.querySelector('input[name="mvMode"]:checked'); return r ? r.value : "rivers"; }
   function mvMsg(t, bad) { const m = $("mvMsg"); m.textContent = t || ""; m.style.color = bad ? "var(--err, #e08a7a)" : ""; }
@@ -821,11 +821,23 @@
       move(x, y) { if (!from) return; const t = fieldMap.toMap(x, y); MV.box = { x0: from[0], y0: from[1], x1: t[0], y1: t[1] }; mvRefresh(); },
       up() { from = null; mvStopTool(); mvRefresh(); } };
   }
-  async function mvMove(dx, dy) {
+  /** Where scaling is about: the chosen layer's middle (as the layer itself is scaled), else the middle of what is picked or boxed. */
+  function mvCenter() {
+    if (MV.center) return MV.center;
+    if (mvMode() === "rivers") {
+      let x0 = 1, y0 = 1, x1 = 0, y1 = 0;
+      for (const r of fieldMap.rivers || []) if (MV.picked.has(r.id) && r.points) for (const q of r.points) { x0 = Math.min(x0, q.x); x1 = Math.max(x1, q.x); y0 = Math.min(y0, q.y); y1 = Math.max(y1, q.y); }
+      return x1 >= x0 ? { x: (x0 + x1) / 2, y: (y0 + y1) / 2 } : { x: 0.5, y: 0.5 };
+    }
+    return MV.box ? { x: (MV.box.x0 + MV.box.x1) / 2, y: (MV.box.y0 + MV.box.y1) / 2 } : { x: 0.5, y: 0.5 };
+  }
+  async function mvMove(dx, dy, scale) {
     if (MV.busy) return;
     const rv = mvMode() === "rivers";
-    if (!dx && !dy) { mvMsg(T("mvZero"), true); return; }
+    scale = scale || 1;
+    if (!dx && !dy && scale === 1) { mvMsg(T("mvZero"), true); return; }
     const body = { dx, dy };
+    if (scale !== 1) { body.scale = +scale.toFixed(6); body.center = mvCenter(); }
     if (rv) { if (!MV.picked.size) { mvMsg(T("mvNoRivers"), true); return; } body.what = ["rivers"]; body.rivers = [...MV.picked]; }
     else {
       const what = MV_WHAT.filter((k) => $("mvW_" + k) && $("mvW_" + k).checked);
@@ -838,6 +850,7 @@
     try {
       await api("POST", `/maps/${S.map.id}/move-data`, body);
       MV.total = [MV.total[0] + dx, MV.total[1] + dy];
+      if (scale !== 1) MV.scaled = (MV.scaled || 1) * scale;
       const w = body.what, jobs = [];
       if (w.includes("rivers")) jobs.push(loadRivers());
       if (w.includes("roads")) jobs.push(loadRoads());
@@ -847,7 +860,7 @@
       if (w.includes("forest")) jobs.push(loadForest());
       if (w.includes("marsh")) jobs.push(loadMarsh());
       await Promise.all(jobs);
-      mvMsg(T("mvDone", +MV.total[0].toFixed(3), +MV.total[1].toFixed(3)));
+      mvMsg(T("mvDone", +MV.total[0].toFixed(3), +MV.total[1].toFixed(3)) + (MV.scaled ? " · " + T("mvDoneScale", +(MV.scaled * 100).toFixed(3)) : ""));
     } catch (e) { mvMsg(e.message || String(e), true); }
     MV.busy = false;
   }
@@ -858,8 +871,13 @@
       $("mvDraw").onclick = mvDrawBox; $("mvPick").onclick = mvPickRivers;
       $("mvClear").onclick = () => { MV.picked.clear(); mvRefresh(); };
       document.querySelectorAll('input[name="mvMode"]').forEach((r) => r.onchange = () => { mvStopTool(); mvRefresh(); if (mvMode() === "rivers") mvPickRivers(); });
-      $("mvApply").onclick = () => mvMove(+$("mvDx").value || 0, +$("mvDy").value || 0);
-      document.querySelectorAll("#moveDlg .mv-pad button").forEach((b) => b.onclick = () => {
+      $("mvApply").onclick = () => mvMove(+$("mvDx").value || 0, +$("mvDy").value || 0, (+$("mvSc").value || 100) / 100);
+      document.querySelectorAll("#moveDlg .mv-pad button[data-sc]").forEach((b) => b.onclick = () => {
+        const f = 1 + (+b.dataset.sc) * (+$("mvScStep").value || 0.25) / 100;
+        if (mvMode() === "rivers") { mvMove(0, 0, f); $("mvSc").value = 100; }     // each press is a step on its own, so the box goes back to 100 %
+        else $("mvSc").value = +(f * 100).toFixed(4);
+      });
+      document.querySelectorAll("#moveDlg .mv-pad button[data-d]").forEach((b) => b.onclick = () => {
         const [a, c] = b.dataset.d.split(",").map(Number), st = +$("mvStep").value || 0.1;
         const dx = +(a * st).toFixed(4), dy = +(c * st).toFixed(4);
         $("mvDx").value = dx; $("mvDy").value = dy;
@@ -868,9 +886,18 @@
       $("mvClose").onclick = () => { mvStopTool(); MV.picked.clear(); fieldMap.rvPicked = null; fieldMap.moveBox = null; fieldMap.draw(); dlg.close(); };
       const sel = $("mvLike"), layers = fieldMap.tileLayers(), shift = layerShiftFor(S.map) || {};
       sel.innerHTML = `<option value="">–</option>` + layers.map((v) => { const sh = shift[v.id] || [0, 0]; return `<option value="${v.id}">${typeof v.name === "string" ? v.name : (v.name.sv || v.id)} (${sh[0] / 8}, ${sh[1] / 8})</option>`; }).join("");
-      sel.onchange = () => { const s = sel.value ? (shift[sel.value] || [0, 0]) : null; if (s) { $("mvDx").value = s[0] / 8; $("mvDy").value = s[1] / 8; } };
+      sel.onchange = () => {
+        const s = sel.value ? (shift[sel.value] || [0, 0]) : null;
+        MV.center = null;
+        if (s) {
+          $("mvDx").value = s[0] / 8; $("mvDy").value = s[1] / 8; $("mvSc").value = +((s[2] || 1) * 100).toFixed(4);
+          const bx = fieldMap._layerBox(sel.value), fw = fieldMap.tiles && fieldMap.tiles.fullW;
+          if (bx && fw) MV.center = { x: bx.cx / fw, y: bx.cy / (fw * fieldMap.imgH / fieldMap.imgW) };     // the layer is scaled about the middle of its pieces
+        }
+        $("mvScAbout").textContent = MV.center ? T("mvAboutLayer") : "";
+      };
     }
-    MV.total = [0, 0]; mvMsg("");
+    MV.total = [0, 0]; MV.scaled = 1; mvMsg("");
     if (!dlg.open) dlg.show();
     mvRefresh();
     if (mvMode() === "rivers") mvPickRivers();

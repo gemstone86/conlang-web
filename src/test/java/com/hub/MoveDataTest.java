@@ -110,5 +110,18 @@ class MoveDataTest {
             if (a.path("id").asLong() == rid) assertNotEquals(b.path("points").get(0).path("x").asDouble(), a.path("points").get(0).path("x").asDouble());
             else if (a.has("points")) assertEquals(b.path("points").get(0).path("x").asDouble(), a.path("points").get(0).path("x").asDouble(), 1e-9, "river " + a.path("id"));
         }
+    
+        // scaling picked rivers about a centre (as a layer is scaled), alone or with a move; not the pictures
+        double cx = 0.5, cy = 0.5;
+        JsonNode one = null;
+        for (JsonNode r : again) if (r.path("id").asLong() == rid) one = r;
+        double bx = one.path("points").get(0).path("x").asDouble(), by = one.path("points").get(0).path("y").asDouble();
+        assertEquals(400, post(admin, url, "{\"dx\":0,\"dy\":0,\"scale\":3,\"what\":[\"rivers\"],\"rivers\":[" + rid + "]}").statusCode());
+        assertEquals(400, post(admin, url, "{\"dx\":0,\"dy\":0,\"scale\":1.01,\"what\":[\"height\"],\"box\":" + box + "}").statusCode());
+        assertEquals(200, post(admin, url, "{\"dx\":0,\"dy\":0,\"scale\":1.01,\"center\":{\"x\":0.5,\"y\":0.5},\"what\":[\"rivers\"],\"rivers\":[" + rid + "]}").statusCode());
+        JsonNode scaled = null;
+        for (JsonNode r : json.readTree(get(admin, base + "/rivers").body()).path("rivers")) if (r.path("id").asLong() == rid) scaled = r;
+        assertEquals(cx + (bx - cx) * 1.01, scaled.path("points").get(0).path("x").asDouble(), 2e-6);
+        assertEquals(cy + (by - cy) * 1.01, scaled.path("points").get(0).path("y").asDouble(), 2e-6);
     }
 }

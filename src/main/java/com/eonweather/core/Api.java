@@ -685,7 +685,7 @@ public final class Api {
                     }
                 }
                 case "move-data" -> {
-                    // POST { dx, dy (map pixels, may be fractions), what: ["rivers","roads","ranges","cities","height","forest","marsh"],
+                    // POST { dx, dy (map pixels, may be fractions), optional scale (0.5–2) about center {x,y} (0–1; lines and places only, applied before the move), what: ["rivers","roads","ranges","cities","height","forest","marsh"],
                     // and either box: {x0,y0,x1,y1} (0–1) or rivers: [ids] (then only rivers move) }: moves what is drawn on the map, shape and all
                     // (see MapDataMove); for the map's owner (default map: the admins)
                     if (m.equals("POST")) return Http.Response.json(moveData(req, id));
@@ -897,7 +897,15 @@ public final class Api {
             throw new ApiException(400, "Give dx and dy (map pixels)");
         double dx = dxn.doubleValue(), dy = dyn.doubleValue();
         if (Math.abs(dx) > 200 || Math.abs(dy) > 200) throw new ApiException(400, "That is too far (at most 200 map pixels each way)");
-        if (dx == 0 && dy == 0) throw new ApiException(400, "Nothing to move");
+        double scale = b.get("scale") == null ? 1 : b.get("scale") instanceof Number sn ? sn.doubleValue() : Double.NaN;
+        if (!(scale >= 0.5 && scale <= 2)) throw new ApiException(400, "The scale must be between 0.5 and 2 (1 = as it is)");
+        double cx = 0.5, cy = 0.5;
+        if (b.get("center") instanceof Map<?, ?> cm) {
+            if (!(cm.get("x") instanceof Number cxn) || !(cm.get("y") instanceof Number cyn) || !(cxn.doubleValue() >= 0 && cxn.doubleValue() <= 1 && cyn.doubleValue() >= 0 && cyn.doubleValue() <= 1))
+                throw new ApiException(400, "The centre of the scaling is x and y between 0 and 1");
+            cx = cxn.doubleValue(); cy = cyn.doubleValue();
+        }
+        if (dx == 0 && dy == 0 && scale == 1) throw new ApiException(400, "Nothing to move");
         int w = ((Number) mp.get("width")).intValue(), h = ((Number) mp.get("height")).intValue();
         Set<String> what = new LinkedHashSet<>();
         if (b.get("what") instanceof List<?> wl) for (Object o : wl) {
@@ -905,6 +913,7 @@ public final class Api {
             what.add(s);
         }
         if (what.isEmpty()) throw new ApiException(400, "Say what to move");
+        if (scale != 1 && !Set.of("rivers", "roads", "ranges", "cities").containsAll(what)) throw new ApiException(400, "Only the drawn lines and places can be scaled, not the pictures");
         MapDataMove.Box box = null;
         Set<Long> rivers = new HashSet<>();
         if (b.get("box") instanceof Map<?, ?> bx) {
@@ -922,13 +931,13 @@ public final class Api {
             if (!what.equals(Set.of("rivers"))) throw new ApiException(400, "Picked rivers move by themselves: what must be [\"rivers\"]");
         } else throw new ApiException(400, "Give a box, or rivers to move");
         // worked out first, saved after, so a problem with one part leaves everything as it was
-        double ddx = dx / w, ddy = dy / h;
+        MapDataMove.Tf tf = new MapDataMove.Tf(dx / w, dy / h, scale, cx, cy);
         Map<String, Object> moved = new LinkedHashMap<>();
         Map<String, String> lists = new LinkedHashMap<>();
         for (String l : List.of("rivers", "roads", "ranges", "cities")) {
             if (!what.contains(l)) continue;
             MapDataMove.Counts n = new MapDataMove.Counts();
-            lists.put(l, MapDataMove.moveList(store.list(l, id).json(), box, rivers, ddx, ddy, n));
+            lists.put(l, MapDataMove.moveList(store.list(l, id).json(), box, rivers, tf, n));
             moved.put(l, n.items);
         }
         Map<String, byte[]> pictures = new LinkedHashMap<>();
