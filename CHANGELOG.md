@@ -2,6 +2,27 @@
 
 Newest first. Versions from 1.x on are the combined app (Root and Rune + Weather generator).
 
+## v1.54.1 (combined app)
+Weather generator:
+- **Journey hours are local time at the start.** The daily travel hours (and the first day's start) are the local time at the place the journey starts, kept for the whole journey (the party doesn't change time zone on the way). The departure moment typed in the form is now turned from local time into the app's clock the same way, so *Resa varje dag från kl 08:00* leaves at 08:00 local time, however far east or west the start lies.
+
+## v1.54.0 (combined app)
+Weather generator:
+- **Daily travel hours as clock times.** The journey form now has *Resa varje dag från kl* and *… till kl* (HH:MM, shown from the rules' start and hours a day), replacing the day start and the hours a day. A time to the next morning (e.g. 20:00 to 04:00) works too.
+- **First day of its own.** Tick *Första dagen börjar annorlunda* and give a time: the first day the party travels from that time (to the same end time, e.g. 15:00 to 18:00) and every later day from the daily start (e.g. 08:00 to 18:00). The journey leaves at that time on the start date (the calendar's date, or the *Startdatum* typed), and the arrival times, the nights in cities and the route's times all follow it. Journeys made before keep their own hours.
+
+## v1.53.0 (combined app)
+Weather generator:
+- **Lättast and Säkrast keep out of the mountain ranges.** The marked mountain ranges now cost more to cross off the roads: the area of a range (its crest line with the width lines drawn to each side) costs extra, and the cells the crest line itself runs over cost more still. The defaults are **+100 % in the range and +300 % on the crest** (more than the +25 % / +50 % that were asked for as a minimum, which still lets a long range be crossed when the way round is long); both can be changed in the travel settings (*Bergskedja: extra kostnad…*, saved for everyone with *Spara för alla*). Roads and paths keep their passes, *Snabbast* and *Kortast* are not affected, and the routes' rounding-off and meander no longer cut into a range that was gone round. The time of a Säkrast journey is still its real walking time.
+
+## v1.52.0 (combined app)
+Weather generator:
+- **Start date for a journey.** The journey form has *Startdatum (dag/månad år)*, filled in with the calendar's date: change it to plan a journey that starts on another day (at the day's start hour). The routes, the fords that are open in that month, the snow and the weather along the way are worked out for that date; *Nu* puts the calendar's date back. A journey that starts later is shown from its start date as usual.
+
+## v1.51.0 (combined app)
+Weather generator:
+- **Choose what *Dra…* grabs.** Next to the buttons there is *Dra:* with *hela flodsystemet* (as before), *bara en flod* (just the one you press on) and *floden och bifloderna* (it and the rivers that run into it, recursively). Rivers that run into a single moved river keep their meeting point on it; a moved river's own mouth stays where the river it runs into is, so fix that end with the river tool if needed.
+
 ## v1.50.0 (combined app)
 Weather generator:
 - **Drag takes the whole river system.** Pressing on a river with *Dra…* now picks that river and everything connected to it: the rivers that run into it, the river it runs into (and their tributaries), and the lakes between, so a whole river system moves together and keeps its joins. A click without pulling drops the system again.

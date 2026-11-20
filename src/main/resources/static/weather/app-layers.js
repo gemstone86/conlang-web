@@ -453,7 +453,7 @@
     Travel.init({ fieldMap, api, T, S, ask, saveState, fetchField,
       // the clock: pause (returns whether it was running) and start again
       pause: () => { const was = playing; if (playing) togglePlay(); return was; }, play: () => { if (!playing) togglePlay(); },
-      fmtT: fmtTime, fmtDur: fmtDuration,
+      fmtT: fmtTime, fmtDur: fmtDuration, serialOf, dateOfSerial,
       climateFor: (serial) => { const d = dateOfSerial(serial); return climateOn(d.month, d.day); } });
     fieldMap.monthOf = (serial) => dateOfSerial(serial).month;
     if (S.map) Travel.load();
@@ -814,6 +814,13 @@
   }
   /** The ids of a river and everything connected to it: the rivers that run into it and the one it runs into (and theirs), and the lakes between. */
   function mvNetwork(id) {
+    const scope = $("mvScope") ? $("mvScope").value : "system";
+    if (scope === "single") return new Set([id]);
+    if (scope === "up") {                                     // the river and the rivers that run into it, and into those
+      const up = new Set([id]), todo = [id];
+      while (todo.length) { const n = todo.pop(); for (const r of fieldMap.rivers || []) if (r.joins && !up.has(r.id) && (r.joins.river === n || r.joins.lake === n)) { up.add(r.id); todo.push(r.id); } }
+      return up;
+    }
     const items = fieldMap.rivers || [], adj = new Map(), link = (a, b) => { if (a == null || b == null) return; (adj.get(a) || adj.set(a, new Set()).get(a)).add(b); (adj.get(b) || adj.set(b, new Set()).get(b)).add(a); };
     for (const r of items) { if (r.joins) link(r.id, r.joins.river != null ? r.joins.river : r.joins.lake); if (r.from && r.from.lake != null) link(r.id, r.from.lake); }
     const seen = new Set([id]), todo = [id];
