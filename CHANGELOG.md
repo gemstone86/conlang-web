@@ -2,6 +2,10 @@
 
 Newest first. Versions from 1.x on are the combined app (Root and Rune + Weather generator).
 
+## v1.56.0 (combined app)
+Weather generator:
+- **Blocked way: ask to reroute.** When the weather (deep snow, storm) makes a stretch too slow to walk (under *Blockerad väg*, default 0.5 km/h; 0 turns it off), the journey notes where it gets blocked. When the clock reaches that point, a box asks whether to plan a new route from where the party is (it opens the usual *Ändra resa* from there, planned for the conditions of that day) or to carry on. Asked once per blocked stretch, for your own journeys.
+
 ## v1.55.0 (combined app)
 Weather generator:
 - **Rak väg.** A journey option that turns off the wiggle: the route follows the best path without the small bends and meanders. Saved with the journey.

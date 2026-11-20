@@ -118,3 +118,13 @@ test("rak väg: no wiggle, and a straight route is never longer", () => {
   const st = route(w, a, b, "fast", { straight: true }, c), wg = route(w, a, b, "fast", {}, c);
   assert.ok(st.km <= wg.km + 1e-6);
 });
+
+test("a stretch too slow to walk is noted as blocked, once", () => {
+  const w = world(map({})), r = route(w, { x: 0.1, y: 0.5 }, { x: 0.1 + 100 / 2000, y: 0.5 });
+  const sim = (c) => T._simulate(w.fm, { route: r.pts.map((p) => [p.x, p.y, p.k]), startT: 1000 + 8 / 24, pace: 4, dayStart: 8, dayEnd: 18, offset: 0, delays: [] }, c, () => null, () => () => null);
+  assert.equal(sim(cfg()).blocks.length, 0);
+  const slow = cfg(); slow.blockSpeed = 100;
+  const b = sim(slow).blocks;
+  assert.equal(b.length, 1);
+  assert.equal(b[0].km, 0);
+});

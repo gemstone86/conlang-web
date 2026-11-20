@@ -70,6 +70,8 @@
     wiggle: 1,
     // the rivers swell in the spring thaw of their region: the flow counts this much more (0.5 = +50 %) in the months 3–4 (north) or 9–10 (south)
     springRise: 0.5,
+    // on foot, below this speed (km/h) the way counts as blocked (deep snow, storm): the journey asks about a new route (0 = never)
+    blockSpeed: 0.5,
     // Säkrast: off the roads the time counts (off + perKm × km from anything civilised, at most max) times as
     // much (nation: inside a nation's borders instead; path: on a path), plus forest × the share of trees;
     // the route is never allowed to take more than maxTimes the time of Snabbast
@@ -974,7 +976,8 @@
     // pend: travel hours to spend (fords, boarding, and delays made before 2.16); hold: clock hours the
     // party stands still whatever the hour (a delay: 24 is a whole day)
     let t = trip.startT, d = 0, i = 0, pend = 0, hold = 0, di = 0, h = 0, fi = 0;
-    const climCache = new Map();
+    const climCache = new Map(), blocks = [];
+    let inBlock = false;
     while (d < total - 1e-9 && t < trip.startT + 200) {
       while (di < delays.length && delays[di].at <= t + 1e-9) {
         const dl = delays[di++];
@@ -1018,6 +1021,8 @@
             const wx = weatherLevel(fm, cfg, s.x, s.y, F, hourG);
             v = speedAt(cfg, trip.pace, s.k, s.f, s.g, deepSnow(climCache.get(ck), s.h, s.ice), wx, s.m, mt);
             lastV = v;
+            // a blocked stretch: noted where it starts (a new one once the way is open again)
+            if (cfg.blockSpeed > 0 && v < cfg.blockSpeed) { if (!inBlock) blocks.push({ t: +t.toFixed(4), km: +d.toFixed(2) }); inBlock = true; } else inBlock = false;
           }
           let nd = Math.min(total, d + v * dt);
           if (fi < fords.length && fords[fi].km <= nd) {
@@ -1051,7 +1056,7 @@
       if (h >= 1 - 1e-9) { km.push(d); h = 0; }
     }
     if (h > 0) km.push(d);
-    return { km, total, arriveT: t, nights };
+    return { km, total, arriveT: t, nights, blocks };
   }
 
   // ── journeys on the map ──
@@ -1248,7 +1253,7 @@
       this.fm = fm;
       ASPECT = (fm.imgH || 1) / (fm.imgW || 2);
       this.tv = fm._travel = { trips: [], candidates: null, start: null, end: null, chosen: null, panelOpen: false, cfg: this.cfg(), selId: null,
-        onDraw: (T) => { this._checkEvents(T); this._onTime(T); }, evMarks: (trip, T) => this._drawEvents(trip, T) };
+        onDraw: (T) => { this._checkBlocks(T); this._checkEvents(T); this._onTime(T); }, evMarks: (trip, T) => this._drawEvents(trip, T) };
       this.evOpen = new Set();
       fm.roadSteep = this.cfg().steep;
       this.fieldCache = new Map();
@@ -1663,7 +1668,7 @@
       trip.color = COLOURS[(tv.trips.length) % COLOURS.length];
       this.msg(this.T("trWorking"));
       const tl = await this._timeline(trip);
-      trip.timeline = { km: tl.km.map((v) => +v.toFixed(3)), total: +tl.total.toFixed(3), arriveT: tl.arriveT, nights: tl.nights || [] };
+      trip.timeline = { km: tl.km.map((v) => +v.toFixed(3)), total: +tl.total.toFixed(3), arriveT: tl.arriveT, nights: tl.nights || [], blocks: tl.blocks || [] };
       trip.plan = trip.timeline;                 // the journey as planned, without delays (the events belong to it)
       const body = { ...trip }; delete body._samples; delete body._cum; delete body._fords; delete body._towns; delete body._ev; delete body._evKey;
       try {
@@ -1707,14 +1712,14 @@
       if (trip.plan) return;
       if (!(trip.delays && trip.delays.length)) { trip.plan = trip.timeline; return; }
       const tl = await this._timeline({ ...trip, delays: [] });
-      trip.plan = { km: tl.km.map((v) => +v.toFixed(3)), total: +tl.total.toFixed(3), arriveT: tl.arriveT, nights: tl.nights || [] };
+      trip.plan = { km: tl.km.map((v) => +v.toFixed(3)), total: +tl.total.toFixed(3), arriveT: tl.arriveT, nights: tl.nights || [], blocks: tl.blocks || [] };
     },
     async _recompute(trip) {
       this.msg(this.T("trWorking"));
       trip._samples = null; trip._fords = null;
       await this._ensurePlan(trip);
       const tl = await this._timeline(trip);
-      trip.timeline = { km: tl.km.map((v) => +v.toFixed(3)), total: +tl.total.toFixed(3), arriveT: tl.arriveT, nights: tl.nights || [] };
+      trip.timeline = { km: tl.km.map((v) => +v.toFixed(3)), total: +tl.total.toFixed(3), arriveT: tl.arriveT, nights: tl.nights || [], blocks: tl.blocks || [] };
       try { await this._save(trip); this.msg(this.T("trArrives", trip.name, this.ctx.fmtT(trip.timeline.arriveT))); }
       catch (e) { this.msg(this.T("saveFailed") + e.message); }
       this.render(); this.fm.draw();
@@ -1746,6 +1751,35 @@
       this.renderList(); this.fm.draw();
     },
     /** Called on every frame: events of the user's own journeys that the clock has just passed. */
+    /** A saved journey of yours whose way is blocked ahead: asks whether to plan a new route from where the party is. */
+    _checkBlocks(T) {
+      if (this._evBusy) return;
+      const prev = this._blkLastT;
+      this._blkLastT = T;
+      if (prev == null || T <= prev) return;
+      for (const trip of this.tv.trips) {
+        if (!trip.mine || !trip.timeline || !trip.timeline.blocks) continue;
+        const seen = new Set(trip.blocksSeen || []);
+        const b = trip.timeline.blocks.find((x) => x.t > prev && x.t <= T && !seen.has(Math.round(x.km)));
+        if (!b) continue;
+        this._evBusy = true;
+        const wasPlaying = this.ctx.pause ? this.ctx.pause() : false;
+        this._blockPopup(trip, b, wasPlaying).finally(() => { this._evBusy = false; });
+        return;
+      }
+    },
+    async _blockPopup(trip, b, wasPlaying) {
+      const at = pointAtKm(trip, b.km);
+      this.tv.selId = trip.id;
+      this._centre(at.x, at.y);
+      trip.blocksSeen = [...new Set([...(trip.blocksSeen || []), Math.round(b.km)])];
+      this._save(trip).catch((err) => this.msg(this.T("saveFailed") + err.message));
+      const pick = await this.ctx.ask({ title: this.T("blkTitle"), text: this.T("blkText", trip.name || "?", Math.round(b.km), this.ctx.fmtT(b.t + (trip.offset || 0) / 24) + " " + this.T("evLocal")),
+        buttons: [{ id: "reroute", label: this.T("blkReroute"), primary: true }, { id: "go", label: this.T("evContinue") }], cancel: false });
+      if (pick === "reroute") { if (!this.tv.panelOpen) this.open(); this.startEdit(trip); }
+      else if (wasPlaying && this.ctx.play) this.ctx.play();
+      this.renderList();
+    },
     _checkEvents(T) {
       // while a box is open nothing moves on: what the clock passes meanwhile is caught when it closes
       if (this._evBusy || !window.TravelEvents) return;
@@ -1909,7 +1943,7 @@
         ["steep.path", T("trSetSteepPath")], ["steep.road", T("trSetSteepRoad")], ["steep.highway", T("trSetSteepHighway")],
         ["boat.still", T("trSetBoatStill")], ["boat.downShare", T("trSetBoatShare")], ["boat.minUp", T("trSetBoatMinUp")], ["boatMinFlow", T("trSetBoatMin")],
         ["sea.normal", T("trSetSeaNormal")], ["sea.sight", T("trSetSeaSight")], ["sea.far", T("trSetSeaFar")], ["landHours", T("trSetLandHours")], ["sea.good", T("trSetSeaGood")], ["sea.bad", T("trSetSeaBad")],
-        ["mount.horse", T("trSetHorse")], ["mount.wagon", T("trSetWagon")], ["mount.wagonOff", T("trSetWagonOff")], ["cityStop", T("trSetCityStop")], ["cityPush", T("trSetCityPush")], ["crossingReach", T("trSetCrossingReach")], ["wiggle", T("trSetWiggle")], ["springRise", T("trSetSpring")], ["safe.off", T("trSetSafeOff")], ["safe.perKm", T("trSetSafePerKm")], ["safe.max", T("trSetSafeMax")], ["safe.nation", T("trSetSafeNation")], ["safe.path", T("trSetSafePath")], ["safe.forest", T("trSetSafeForest")], ["safe.maxTimes", T("trSetSafeMaxTimes")], ["windGood", T("trSetWindGood")], ["windCalm", T("trSetWindCalm")], ["seaAllDay", T("trSetSeaAllDay")], ["boardHours", T("trSetBoard")],
+        ["mount.horse", T("trSetHorse")], ["mount.wagon", T("trSetWagon")], ["mount.wagonOff", T("trSetWagonOff")], ["cityStop", T("trSetCityStop")], ["cityPush", T("trSetCityPush")], ["crossingReach", T("trSetCrossingReach")], ["wiggle", T("trSetWiggle")], ["springRise", T("trSetSpring")], ["blockSpeed", T("trSetBlock")], ["safe.off", T("trSetSafeOff")], ["safe.perKm", T("trSetSafePerKm")], ["safe.max", T("trSetSafeMax")], ["safe.nation", T("trSetSafeNation")], ["safe.path", T("trSetSafePath")], ["safe.forest", T("trSetSafeForest")], ["safe.maxTimes", T("trSetSafeMaxTimes")], ["windGood", T("trSetWindGood")], ["windCalm", T("trSetWindCalm")], ["seaAllDay", T("trSetSeaAllDay")], ["boardHours", T("trSetBoard")],
       ];
       const get = (k) => k.split(".").reduce((o, p) => o[p], cfg);
       const dlg = this.$("trSettings"), body = this.$("trSettingsBody");
