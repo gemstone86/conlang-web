@@ -974,7 +974,7 @@
       const local = (((hourG + (trip.offset || 0)) % 24) + 24) % 24;
       // the journey's own hours a day (chosen when it started), else the rules'
       // (a daily end time, else the start plus the hours; the first day may start at its own time)
-      const first = trip.firstStart != null && serial === Math.floor(trip.startT + 1e-9), dayStart = first ? trip.firstStart : trip.dayStart;
+      const lo = (trip.offset || 0) / 24, first = trip.firstStart != null && Math.floor(t + lo + 1e-9) === Math.floor(trip.startT + lo + 1e-9), dayStart = first ? trip.firstStart : trip.dayStart;
       const end = trip.dayEnd != null ? (trip.dayEnd > trip.dayStart + 1e-9 ? trip.dayEnd : trip.dayEnd + 24) : trip.dayStart + clamp(+trip.hoursPerDay || cfg.hoursPerDay, 0.5, 24);
       while (i + 1 < S.length && S[i + 1].km <= d) i++;
       // at sea a ship sails day and night (when the rules say so)
@@ -1918,7 +1918,9 @@
       let d = this.depart;
       if (!d && day.firstStart != null && this.ctx.S) d = { y: this.ctx.S.year, m: this.ctx.S.month, d: this.ctx.S.day };     // a first day of its own: it starts at that time on the calendar's date
       if (!d || !this.ctx.serialOf) return fm.T || 0;
-      return this.ctx.serialOf(d.y, d.m, d.d) + clamp(day.firstStart != null ? day.firstStart : day.dayStart, 0, 23.99) / 24;
+      // the hours typed are local time at the start (like the daily hours); the app's clock is the same everywhere, so the offset of the start's place comes off
+      const off = this.tv.start && fm.spotOffset ? fm.spotOffset(this.tv.start.x) : 0;
+      return this.ctx.serialOf(d.y, d.m, d.d) + (clamp(day.firstStart != null ? day.firstStart : day.dayStart, 0, 23.99) - off) / 24;
     },
     msg(t) { const el = this.$("trMsg"); if (el) el.textContent = t || ""; },
     /** The grid the routes are found on, for the date shown (made again when the date or the heights change). */

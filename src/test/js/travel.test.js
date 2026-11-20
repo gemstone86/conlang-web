@@ -94,3 +94,12 @@ test("a journey travels from a daily start to a daily end, and the first day may
   const nextDay = kmAt(late, 17 + 1);
   assert.ok(nextDay > still, "and walks again from 08:00");
 });
+
+test("the daily hours are local time at the start: a start place two hours east leaves two hours earlier on the app's clock", () => {
+  const w = world(map({})), r = route(w, { x: 0.1, y: 0.5 }, { x: 0.1 + 100 / 2000, y: 0.5 });
+  const sim = (extra) => T._simulate(w.fm, Object.assign({ route: r.pts.map((p) => [p.x, p.y, p.k]), pace: 4, dayStart: 8, dayEnd: 18, delays: [] }, extra), cfg(), () => null, () => () => null);
+  const here = sim({ offset: 0, startT: 1000 + 8 / 24 }), east = sim({ offset: 2, startT: 1000 + 6 / 24 });      // 08:00 local either way
+  assert.ok(Math.abs(here.arriveT - east.arriveT + 2 / 24) < 0.01, "the same journey, two hours earlier by the clock");
+  const first = sim({ offset: 2, startT: 1000 + 13 / 24, firstStart: 15 });                                       // 15:00 local on the first day
+  assert.ok(first.km[3] > 8 && Math.abs(first.km[10] - first.km[3]) < 0.5, "three hours the first day, to 18:00 local");
+});

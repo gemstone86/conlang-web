@@ -2,6 +2,10 @@
 
 Newest first. Versions from 1.x on are the combined app (Root and Rune + Weather generator).
 
+## v1.54.1 (combined app)
+Weather generator:
+- **Journey hours are local time at the start.** The daily travel hours (and the first day's start) are the local time at the place the journey starts, kept for the whole journey (the party doesn't change time zone on the way). The departure moment typed in the form is now turned from local time into the app's clock the same way, so *Resa varje dag från kl 08:00* leaves at 08:00 local time, however far east or west the start lies.
+
 ## v1.54.0 (combined app)
 Weather generator:
 - **Daily travel hours as clock times.** The journey form now has *Resa varje dag från kl* and *… till kl* (HH:MM, shown from the rules' start and hours a day), replacing the day start and the hours a day. A time to the next morning (e.g. 20:00 to 04:00) works too.
