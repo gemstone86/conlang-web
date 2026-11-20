@@ -2,6 +2,11 @@
 
 Newest first. Versions from 1.x on are the combined app (Root and Rune + Weather generator).
 
+## v1.54.0 (combined app)
+Weather generator:
+- **Daily travel hours as clock times.** The journey form now has *Resa varje dag från kl* and *… till kl* (HH:MM, shown from the rules' start and hours a day), replacing the day start and the hours a day. A time to the next morning (e.g. 20:00 to 04:00) works too.
+- **First day of its own.** Tick *Första dagen börjar annorlunda* and give a time: the first day the party travels from that time (to the same end time, e.g. 15:00 to 18:00) and every later day from the daily start (e.g. 08:00 to 18:00). The journey leaves at that time on the start date (the calendar's date, or the *Startdatum* typed), and the arrival times, the nights in cities and the route's times all follow it. Journeys made before keep their own hours.
+
 ## v1.53.0 (combined app)
 Weather generator:
 - **Lättast and Säkrast keep out of the mountain ranges.** The marked mountain ranges now cost more to cross off the roads: the area of a range (its crest line with the width lines drawn to each side) costs extra, and the cells the crest line itself runs over cost more still. The defaults are **+100 % in the range and +300 % on the crest** (more than the +25 % / +50 % that were asked for as a minimum, which still lets a long range be crossed when the way round is long); both can be changed in the travel settings (*Bergskedja: extra kostnad…*, saved for everyone with *Spara för alla*). Roads and paths keep their passes, *Snabbast* and *Kortast* are not affected, and the routes' rounding-off and meander no longer cut into a range that was gone round. The time of a Säkrast journey is still its real walking time.

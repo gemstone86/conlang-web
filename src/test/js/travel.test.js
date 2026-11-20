@@ -81,3 +81,16 @@ test("Lättast and Säkrast go round a mountain range, Snabbast goes straight ov
   const over = world(map({ ranges: [range], _rgNormals: P._rgNormals, _rgWidths: P._rgWidths, roads: [{ kind: "road", points: [{ x: 0.1, y: 0.5 }, { x: 0.9, y: 0.5 }] }] }));
   assert.ok(route(over, a, b, "easy").pts.some(inRange), "a road goes over the pass");
 });
+
+test("a journey travels from a daily start to a daily end, and the first day may start at its own time", () => {
+  const w = world(map({})), r = route(w, { x: 0.1, y: 0.5 }, { x: 0.1 + 100 / 2000, y: 0.5 });     // about 100 km
+  const sim = (extra) => T._simulate(w.fm, Object.assign({ route: r.pts.map((p) => [p.x, p.y, p.k]), startT: 1000 + 8 / 24, pace: 4, dayStart: 8, dayEnd: 18, offset: 0, delays: [] }, extra), cfg(), () => null, () => () => null);
+  const plain = sim({}), late = sim({ startT: 1000 + 15 / 24, firstStart: 15 });
+  assert.ok(plain.arriveT > 1000 && late.arriveT > plain.arriveT, "a late first day arrives later");
+  // the first day only has 15:00-18:00: three hours of the walk, then a full day from 08:00
+  const kmAt = (r2, hours) => r2.km[Math.min(r2.km.length - 1, Math.round(hours))];
+  const day1 = kmAt(late, 3), still = kmAt(late, 10);
+  assert.ok(day1 > 8 && Math.abs(still - day1) < 0.5, "it stops at 18:00 and stands until the next morning");
+  const nextDay = kmAt(late, 17 + 1);
+  assert.ok(nextDay > still, "and walks again from 08:00");
+});

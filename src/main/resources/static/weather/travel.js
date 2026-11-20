@@ -973,17 +973,19 @@
       const serial = Math.floor(t + 1e-9), hourG = (t - serial) * 24;
       const local = (((hourG + (trip.offset || 0)) % 24) + 24) % 24;
       // the journey's own hours a day (chosen when it started), else the rules'
-      const end = trip.dayStart + clamp(+trip.hoursPerDay || cfg.hoursPerDay, 0.5, 24);
+      // (a daily end time, else the start plus the hours; the first day may start at its own time)
+      const first = trip.firstStart != null && serial === Math.floor(trip.startT + 1e-9), dayStart = first ? trip.firstStart : trip.dayStart;
+      const end = trip.dayEnd != null ? (trip.dayEnd > trip.dayStart + 1e-9 ? trip.dayEnd : trip.dayEnd + 24) : trip.dayStart + clamp(+trip.hoursPerDay || cfg.hoursPerDay, 0.5, 24);
       while (i + 1 < S.length && S[i + 1].km <= d) i++;
       // at sea a ship sails day and night (when the rules say so)
       const atSea = S[i] && S[i].k === 5 && cfg.seaAllDay;
-      let travelling = atSea || (end <= 24 ? local >= trip.dayStart - 1e-6 && local < end - 1e-6 : local >= trip.dayStart - 1e-6 || local < end - 24 - 1e-6);
+      let travelling = atSea || (end <= 24 ? local >= dayStart - 1e-6 && local < end - 1e-6 : local >= dayStart - 1e-6 || local < end - 24 - 1e-6);
       // nights in cities: resting in one until the next morning; and a city close ahead at the day's end is worth pushing on for
       const onFoot = S[i] && !MODE_OF(S[i].k);
       while (ti < towns.length && towns[ti].km <= d + 1e-6) ti++;
       let pushing = false;
       if (!atSea && t < restUntil - 1e-9) travelling = false;
-      else if (!travelling && onFoot && cfg.cityPush > 0 && ti < towns.length && end - trip.dayStart < 24 - cfg.cityPush) {
+      else if (!travelling && onFoot && cfg.cityPush > 0 && ti < towns.length && end - dayStart < 24 - cfg.cityPush) {
         const past = (((local - end) % 24) + 24) % 24;
         if (past < cfg.cityPush && towns[ti].km - d <= Math.max(1, lastV) * (cfg.cityPush - past)) { travelling = true; pushing = true; }
       }
@@ -1441,7 +1443,7 @@
       const pace = cfg.pace.normal;
       planMonth = fm.monthOf ? fm.monthOf(Math.floor(this._departT())) : null;
       const out = [], opt = { mount: mountOf(cfg, this.mount, this.wagonOff), ferry: !!this.ferry, sea: !!this.sea, landAnywhere: !!this.sea && !!this.landAny, boats: this.ferry ? this._ensureBoats() : null,
-        hours: clamp(+String(this._lastHours || cfg.hoursPerDay).replace(",", ".") || cfg.hoursPerDay, 0.5, 24) };
+        hours: this._day().hoursPerDay };
       if (opt.sea) {
         // the wind at planning time bends a ship's course out at sea
         const dT = this._departT(), serial = Math.floor(dT), hg = (dT - serial) * 24;
@@ -1503,11 +1505,11 @@
     /** How long each suggested route takes at a normal pace and the hours a day chosen, with the weather along the way. */
     async _etas() {
       const tv = this.tv, cfg = this.cfg(), run = (this._etaRun = (this._etaRun || 0) + 1);
-      const hours = clamp(+String(this._lastHours || cfg.hoursPerDay).replace(",", ".") || cfg.hoursPerDay, 0.5, 24);
+      const day = this._day(), hours = day.hoursPerDay;
       for (const c of tv.candidates || []) c.eta = null;
       if (this.$("trCands")) this.renderCands(); else this.render();
       for (const c of tv.candidates || []) {
-        const trip = this._tripFrom(c, { pace: cfg.pace.normal, startT: this._departT() });
+        const trip = this._tripFrom(c, { pace: cfg.pace.normal, startT: this._departT(), dayStart: day.dayStart, dayEnd: day.dayEnd, firstStart: day.firstStart });
         trip.hoursPerDay = hours;
         const tl = await this._timeline(trip);
         if (run !== this._etaRun) return;                         // the hours were changed meanwhile
@@ -1517,7 +1519,7 @@
     },
     _tripFrom(c, o) {
       return { route: c.pts.map((p) => (p.c != null ? [+p.x.toFixed(6), +p.y.toFixed(6), p.k, +p.c.toFixed(2)] : [+p.x.toFixed(6), +p.y.toFixed(6), p.k])), startT: o.startT, pace: o.pace,
-        dayStart: o.dayStart != null ? o.dayStart : this.cfg().dayStart, offset: this.fm.spotOffset ? this.fm.spotOffset(c.pts[0].x) : 0, delays: o.delays || [],
+        dayStart: o.dayStart != null ? o.dayStart : this.cfg().dayStart, dayEnd: o.dayEnd, firstStart: o.firstStart, offset: this.fm.spotOffset ? this.fm.spotOffset(c.pts[0].x) : 0, delays: o.delays || [],
         ...(this._planned && this._planned.ferry ? { ferry: true } : {}), ...(this._planned && this._planned.sea ? { sea: true } : {}), ...(this._planned && this._planned.landAny ? { landAny: true } : {}), ...(this._planned && this._planned.mount ? { mount: this._planned.mount } : {}), ...(this._planned && this._planned.wagonOff != null ? { wagonOff: this._planned.wagonOff } : {}) };
     },
     /** The journey's hour-by-hour progress, fetching the days' weather it needs. */
@@ -1604,10 +1606,9 @@
       const { S, api } = this.ctx, cfg = this.cfg();
       const name = this.$("trName").value.trim() || this.T("trDefaultName");
       const paceSel = this.$("trPace").value, pace = paceSel === "custom" ? Math.max(0.5, +this.$("trPaceNum").value || cfg.pace.normal) : cfg.pace[paceSel] || cfg.pace.normal;
-      const dayStart = clamp(+this.$("trDayStart").value || cfg.dayStart, 0, 23.99);
-      const hoursPerDay = clamp(+String(this.$("trHours").value).replace(",", ".") || cfg.hoursPerDay, 0.5, 24);
-      const trip = this._tripFrom(c, { pace, startT: this._departT(), dayStart });
-      trip.hoursPerDay = hoursPerDay;
+      const day = this._day(), dayStart = clamp(day.dayStart, 0, 23.99);
+      const trip = this._tripFrom(c, { pace, startT: this._departT(), dayStart, dayEnd: day.dayEnd, firstStart: day.firstStart });
+      trip.hoursPerDay = day.hoursPerDay;
       trip.name = name; trip.shared = this.$("trShared").checked; trip.mode = c.mode;
       if ((tv.via || []).length) trip.via = JSON.parse(JSON.stringify(tv.via));
       if (this.$("trEvents").checked) { trip.events = true; trip.seed = newSeed(); }
@@ -1900,12 +1901,24 @@
       this.fm.draw(); this.render();
     },
 
+    /**
+     * The travelling hours typed in the form: { dayStart, dayEnd (hours, 0–24), firstStart (hours, or undefined), hoursPerDay }. Kept between renderings,
+     * and the rules' own (day start, and the hours a day after it) until something is typed.
+     */
+    _day() {
+      const cfg = this.cfg(), L = this._lastDay || (this._lastDay = {}), hh = (v, d) => { const m = /^(\d{1,2}):(\d{2})$/.exec(v || ""); return m ? Math.min(24, +m[1] + +m[2] / 60) : d; };
+      const dayStart = hh(L.start, cfg.dayStart), dayEnd = hh(L.end, (cfg.dayStart + cfg.hoursPerDay) % 24);
+      const firstStart = L.firstOn ? hh(L.first, dayStart) : undefined;
+      const span = (((dayEnd - dayStart) % 24) + 24) % 24;
+      return { dayStart, dayEnd, firstStart, hoursPerDay: span < 1e-6 ? 24 : span };
+    },
     /** When the journey being planned leaves: the date typed in the form (at the day's start hour), else the calendar's time now. */
     _departT() {
-      const fm = this.fm, d = this.depart;
+      const fm = this.fm, day = this._day();
+      let d = this.depart;
+      if (!d && day.firstStart != null && this.ctx.S) d = { y: this.ctx.S.year, m: this.ctx.S.month, d: this.ctx.S.day };     // a first day of its own: it starts at that time on the calendar's date
       if (!d || !this.ctx.serialOf) return fm.T || 0;
-      const ds = this.$("trDayStart"), h = ds ? clamp(+ds.value || 0, 0, 23.99) : this.cfg().dayStart;
-      return this.ctx.serialOf(d.y, d.m, d.d) + h / 24;
+      return this.ctx.serialOf(d.y, d.m, d.d) + clamp(day.firstStart != null ? day.firstStart : day.dayStart, 0, 23.99) / 24;
     },
     msg(t) { const el = this.$("trMsg"); if (el) el.textContent = t || ""; },
     /** The grid the routes are found on, for the date shown (made again when the date or the heights change). */
@@ -2003,15 +2016,17 @@
         form.innerHTML = `
           <label class="field slim"><span></span><input type="text" id="trName" maxlength="80"></label>
           <label class="field slim"><span></span><select id="trPace"></select><input type="number" id="trPaceNum" class="num-small" step="0.5" min="0.5" hidden></label>
-          <label class="field slim"><span></span><input type="number" id="trDayStart" class="num-small" min="0" max="23" step="0.5"></label>
+          <label class="field slim"><span></span><input type="time" id="trDayStart" class="num-small"></label>
+          <label class="field slim"><span></span><input type="time" id="trDayEnd" class="num-small"></label>
+          <label class="check"><input type="checkbox" id="trFirstOn"><span></span></label>
+          <label class="field slim" id="trFirstRow" hidden><span></span><input type="time" id="trFirst" class="num-small"></label>
           <div class="field slim tr-date"><span></span><span class="tr-date-in"><input type="number" id="trDD" class="num-small" min="1" max="28" step="1" aria-label="d">/<input type="number" id="trDM" class="num-small" min="1" max="12" step="1" aria-label="m"> <input type="number" id="trDY" class="num-small tr-year" min="1" step="1" aria-label="y"> <button type="button" id="trDNow"></button></span></div>
-          <label class="field slim"><span></span><input type="number" id="trHours" class="num-small" min="1" max="24" step="0.5"></label>
           <label class="check"><input type="checkbox" id="trShared"><span></span></label>
           <label class="check"><input type="checkbox" id="trEvents"><span></span></label>`;
         const sp = form.querySelectorAll("label > span");
-        sp[0].textContent = T("trName"); sp[1].textContent = T("trPace"); sp[2].textContent = T("trDayStart"); sp[3].textContent = T("trHours"); sp[4].textContent = T("trShared"); sp[5].textContent = T("evSwitch");
-        sp[5].parentElement.title = T("evSwitchTip");
-        sp[3].parentElement.title = T("trHoursTip");
+        sp[0].textContent = T("trName"); sp[1].textContent = T("trPace"); sp[2].textContent = T("trDayStart"); sp[3].textContent = T("trDayEnd"); sp[4].textContent = T("trFirstOn"); sp[5].textContent = T("trFirstStart"); sp[6].textContent = T("trShared"); sp[7].textContent = T("evSwitch");
+        sp[7].parentElement.title = T("evSwitchTip");
+        sp[3].parentElement.title = T("trHoursTip"); sp[4].parentElement.title = T("trFirstTip");
         form.querySelector(".tr-date > span").textContent = T("trStartDate");
         form.querySelector("#trDNow").textContent = T("trNow");
         plan.append(form);
@@ -2036,10 +2051,21 @@
         sel.value = "normal";
         sel.onchange = () => { this.$("trPaceNum").hidden = sel.value !== "custom"; };
         this.$("trPaceNum").value = cfg.pace.normal;
-        this.$("trDayStart").value = cfg.dayStart;
-        this.$("trHours").value = this._lastHours || cfg.hoursPerDay;
-        this.$("trHours").oninput = (e) => { this._lastHours = e.target.value; };
-        this.$("trHours").onchange = () => (this.sea && this.cfg().seaAllDay ? this._plan() : this._etas());
+        {
+          // the travelling hours: every day from – to, and a first day of its own if wanted
+          const L = this._lastDay || (this._lastDay = {}), d0 = this._day(), f2 = (h) => String(Math.floor(h + 1e-9) % 24).padStart(2, "0") + ":" + String(Math.round((h - Math.floor(h + 1e-9)) * 60) % 60).padStart(2, "0");
+          this.$("trDayStart").value = L.start || f2(d0.dayStart);
+          this.$("trDayEnd").value = L.end || f2(d0.dayEnd);
+          this.$("trFirstOn").checked = !!L.firstOn;
+          this.$("trFirst").value = L.first || f2(d0.dayStart);
+          this.$("trFirstRow").hidden = !L.firstOn;
+          const changed = () => {
+            L.start = this.$("trDayStart").value; L.end = this.$("trDayEnd").value; L.first = this.$("trFirst").value; L.firstOn = this.$("trFirstOn").checked;
+            this.$("trFirstRow").hidden = !L.firstOn;
+            if (tv.candidates && tv.start && tv.end) this._plan(); else this.render();
+          };
+          for (const id of ["trDayStart", "trDayEnd", "trFirstOn", "trFirst"]) this.$(id).onchange = changed;
+        }
         this.$("trEvents").checked = !!this._lastEvents;
         this.$("trEvents").onchange = (e) => { this._lastEvents = e.target.checked; };
         this.$("trName").value = this._lastName || "";
@@ -2047,7 +2073,7 @@
         const row = document.createElement("div"); row.className = "tr-row";
         row.append(btn(T("trStart"), () => this.startTrip(), true), btn(T("trAgain"), () => this.startPlanning()), btn(T("cancel"), () => this._stopPicking(true)));
         plan.append(row);
-        plan.append(p(this.depart ? T("trDepartsOn", this.ctx.fmtT(this._departT())) : T("trDeparts", this.ctx.fmtT(this.fm.T || 0))));
+        plan.append(p(this.depart || this._day().firstStart != null ? T("trDepartsOn", this.ctx.fmtT(this._departT())) : T("trDeparts", this.ctx.fmtT(this.fm.T || 0))));
         }
       } else {
         plan.append(btn(T("trNew"), () => this.startPlanning(), true));
