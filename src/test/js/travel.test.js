@@ -2,6 +2,7 @@
 const test = require("node:test"), assert = require("node:assert/strict");
 const { load, map } = require("./load.js");
 load("travel.js");
+load("ranges.js");
 const T = window.Travel, cfg = () => JSON.parse(JSON.stringify(T._defaults));
 const world = (fm) => { const G = T._buildGrid(fm, null); G.rivers = T._riverIndex(fm); return { fm, G, RD: T._buildRoads(fm, G, null) }; };
 const route = (w, a, b, mode = "fast", opt = {}, c = cfg()) => T._findRoute(w.fm, w.G, w.RD, a, b, mode, c, 4, opt);
@@ -64,4 +65,19 @@ test("Säkrast goes round by the road through the nation, within three times the
   assert.ok(Math.max(...safe.pts.map((p) => p.y)) > 0.7, "down to the road");
   assert.ok(Math.max(...fast.pts.map((p) => p.y)) < 0.3, "the fastest goes straight");
   assert.ok(safe.hours <= 3 * fast.hours);
+});
+
+test("Lättast and Säkrast go round a mountain range, Snabbast goes straight over it", () => {
+  const P = FieldMap.prototype;
+  const range = { id: 1, name: "R", points: [{ x: 0.5, y: 0.45, l: 20, r: 20 }, { x: 0.5, y: 0.55, l: 20, r: 20 }] };
+  const fm = map({ ranges: [range], _rgNormals: P._rgNormals, _rgWidths: P._rgWidths });
+  const w = world(fm), a = { x: 0.2, y: 0.5 }, b = { x: 0.8, y: 0.5 };
+  const inRange = (p) => Math.abs(p.x - 0.5) < 0.035 && p.y > 0.46 && p.y < 0.54;      // well inside the range (the edge is only brushed)
+  assert.ok(route(w, a, b, "fast").pts.some(inRange), "the fastest goes straight over");
+  for (const mode of ["easy", "safe"]) assert.ok(!route(w, a, b, mode).pts.some(inRange), mode + " goes round the range");
+  const crest = w.G.rng.filter((v) => v === 2).length;
+  assert.ok(crest >= 9 && crest <= 13, "the crest line is about ten cells long, was " + crest);
+  // roads keep their passes: a road over the range is used as it is
+  const over = world(map({ ranges: [range], _rgNormals: P._rgNormals, _rgWidths: P._rgWidths, roads: [{ kind: "road", points: [{ x: 0.1, y: 0.5 }, { x: 0.9, y: 0.5 }] }] }));
+  assert.ok(route(over, a, b, "easy").pts.some(inRange), "a road goes over the pass");
 });

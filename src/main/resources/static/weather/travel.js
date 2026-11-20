@@ -44,7 +44,7 @@
   const DEFAULTS = {
     pace: { slow: 3, normal: 4, fast: 5 },
     road: { path: 0.5, road: 1, highway: 1.5 },
-    offRoad: 0, riverHoursPerSize: 0.25, forestPer25: 0.5, marshPer25: 0.75, bad: 1, veryBad: 1, snow: 2, slopeUp: 1, slopeDown: 0.5, minSpeed: 1,
+    offRoad: 0, rangeArea: 1, rangeCrest: 3, riverHoursPerSize: 0.25, forestPer25: 0.5, marshPer25: 0.75, bad: 1, veryBad: 1, snow: 2, slopeUp: 1, slopeDown: 0.5, minSpeed: 1,
     badRain: 2, badWind: 14, veryBadRain: 6, veryBadWind: 20,
     hoursPerDay: 10, dayStart: 7, keepDays: 3,
     steep: { path: 5, road: 3, highway: 2 },
@@ -323,7 +323,41 @@
       const ci = clamp(Math.floor(c.x * W / CELL), 0, gw - 1), cj = clamp(Math.floor(c.y * H / CELL), 0, gh - 1);
       for (let j = Math.max(0, cj - 2); j <= Math.min(gh - 1, cj + 2); j++) for (let i = Math.max(0, ci - 2); i <= Math.min(gw - 1, ci + 2); i++) harbour[j * gw + i] = 1;
     }
-    return { gw, gh, n, h, water, forest, marsh, snow, steep, harbour, hasHarbours, W, H, HG };
+    const rng = rangeCells(fm, gw, gh);
+    return { gw, gh, n, h, water, forest, marsh, snow, steep, harbour, hasHarbours, W, H, HG, rng };
+  }
+  /**
+   * The mountain ranges on the routing grid: 1 in a cell inside a range (its crest line with the width lines drawn to each side), 2 in a cell the
+   * crest line itself crosses. A range without width lines is only its crest.
+   */
+  function rangeCells(fm, gw, gh) {
+    const rng = new Uint8Array(gw * gh), W = fm.imgW, H = fm.imgH;
+    if (!fm._rgNormals) return rng;
+    const inside = (q, x, y) => { let c = false; for (let i = 0, j = q.length - 1; i < q.length; j = i++) if ((q[i][1] > y) !== (q[j][1] > y) && x < (q[j][0] - q[i][0]) * (y - q[i][1]) / (q[j][1] - q[i][1]) + q[i][0]) c = !c; return c; };
+    for (const r of fm.ranges || []) {
+      const pts = r.points;
+      if (!pts || pts.length < 2) continue;
+      const nm = fm._rgNormals(r), wl = fm._rgWidths(r, "l"), wr = fm._rgWidths(r, "r");
+      const P = pts.map((p, i) => {
+        const a = wl ? wl[i] : 0, b = wr ? wr[i] : 0, x = p.x * W, y = p.y * H;
+        return { x, y, L: [x + nm[i][0] * a, y + nm[i][1] * a], R: [x - nm[i][0] * b, y - nm[i][1] * b] };
+      });
+      for (let i = 0; i + 1 < P.length; i++) {
+        const q = [P[i].L, P[i + 1].L, P[i + 1].R, P[i].R];
+        const x0 = Math.max(0, Math.floor(Math.min(...q.map((v) => v[0])) / CELL)), x1 = Math.min(gw - 1, Math.floor(Math.max(...q.map((v) => v[0])) / CELL));
+        const y0 = Math.max(0, Math.floor(Math.min(...q.map((v) => v[1])) / CELL)), y1 = Math.min(gh - 1, Math.floor(Math.max(...q.map((v) => v[1])) / CELL));
+        for (let j = y0; j <= y1; j++) for (let k = x0; k <= x1; k++) if (rng[j * gw + k] < 1 && inside(q, (k + 0.5) * CELL, (j + 0.5) * CELL)) rng[j * gw + k] = 1;
+      }
+      for (let i = 0; i + 1 < P.length; i++) {
+        const len = Math.hypot(P[i + 1].x - P[i].x, P[i + 1].y - P[i].y), steps = Math.max(1, Math.ceil(len / (CELL * 0.4)));
+        for (let t = 0; t <= steps; t++) {
+          const x = P[i].x + (P[i + 1].x - P[i].x) * t / steps, y = P[i].y + (P[i + 1].y - P[i].y) * t / steps;
+          const k = Math.floor(x / CELL), j = Math.floor(y / CELL);
+          if (k >= 0 && k < gw && j >= 0 && j < gh) rng[j * gw + k] = 2;
+        }
+      }
+    }
+    return rng;
   }
   function cellSteepness(fm, HG, gw, gh, steep, water) {
     // half the steepest spot and half the average over the cell: a narrow ridge or cliff still shows, but
@@ -626,15 +660,17 @@
       if (mode === "short") return kind === 0 && sp < 0.5 ? km * 20 : km;
       // fording a river off the roads: hours per size of the river there (a road or path has its bridge)
       const ford = kind === 0 ? fordsOn(u, v) : 0;
+      // the easiest and the safest ways keep out of the mountain ranges: more cost in the range (rangeArea), more still on its crest (rangeCrest); roads and paths have their passes
+      const rgIn = kind === 0 && G.rng ? Math.max(u < n ? G.rng[u] : 0, v < n ? G.rng[v] : 0) : 0, mf = rgIn === 2 ? 1 + cfg.rangeCrest : rgIn === 1 ? 1 + cfg.rangeArea : 1;
       if (safe) {
         rc = km / sp + ford;
-        return (km / sp) * risk(u, v, kind, (fu + fv + mu + mv) / 2) + ford;
+        return (km / sp) * risk(u, v, kind, (fu + fv + mu + mv) / 2) * mf + ford;
       }
       if (mode === "easy") {
         // the easiest way: roads count as shorter than they are, open ground as longer (a path between),
         // and every 250 m up costs an hour more, so it keeps to roads and low ground even if that is slower
         const climb = Math.max(0, Math.max(0, hv) - Math.max(0, hu));
-        return km / sp * (kind >= 2 ? 1 : kind === 1 ? 1.25 : 1.6) + climb / 250 + ford;
+        return km / sp * (kind >= 2 ? 1 : kind === 1 ? 1.25 : 1.6) * mf + climb / 250 + ford;
       }
       return km / sp + ford;
     };
@@ -730,13 +766,27 @@
     });
     pts = [{ x: a.x, y: a.y, k: 0 }, ...pts, { x: b.x, y: b.y, k: 0 }];
     // rounded off, unless that makes it ford rivers more (a way along a river would weave across it)
+    // (nor that it cuts a corner of a mountain range that the easiest and the safest ways went round)
+    const rgHits = (q) => {
+      if (!G.rng || (mode !== "easy" && mode !== "safe")) return 0;
+      let c = 0;
+      for (let i = 0; i + 1 < q.length; i++) {
+        if (q[i].k !== 0) continue;
+        const len = Math.hypot((q[i + 1].x - q[i].x) * W, (q[i + 1].y - q[i].y) * H), st = Math.max(1, Math.ceil(len / (CELL * 0.5)));
+        for (let t2 = 0; t2 <= st; t2++) {
+          const x = (q[i].x + (q[i + 1].x - q[i].x) * t2 / st) * W, y = (q[i].y + (q[i + 1].y - q[i].y) * t2 / st) * H, ci = Math.floor(x / CELL), cj = Math.floor(y / CELL);
+          if (ci >= 0 && ci < gw && cj >= 0 && cj < gh && G.rng[cj * gw + ci] > 0) c++;
+        }
+      }
+      return c;
+    };
     const sm = smoothOffRoad(pts);
     if (G.rivers && G.rivers.seg.length) {
       const fordH = (q) => routeCrossings(fm, q, G.rivers).reduce((t, c) => t + fordHours(cfg, c.flow, BT != null), 0);
-      if (fordH(sm) <= fordH(pts)) pts = sm;
-    } else pts = sm;
+      if (fordH(sm) <= fordH(pts) && rgHits(sm) <= rgHits(pts)) pts = sm;
+    } else if (rgHits(sm) <= rgHits(pts)) pts = sm;
     // nobody walks (or sails) in a straight line: a meander off the roads and rivers
-    pts = wiggle(fm, G, pts, cfg.wiggle, (q) => (G.rivers && G.rivers.seg.length ? routeCrossings(fm, q, G.rivers).reduce((t, c) => t + fordHours(cfg, c.flow, BT != null), 0) : 0));
+    pts = wiggle(fm, G, pts, cfg.wiggle, (q) => (G.rivers && G.rivers.seg.length ? routeCrossings(fm, q, G.rivers).reduce((t, c) => t + fordHours(cfg, c.flow, BT != null), 0) : 0) + rgHits(q) * 1000);   // (and not into a range that was gone round)
     let km = 0;
     for (let i = 1; i < pts.length; i++) km += Math.hypot((pts[i].x - pts[i - 1].x) * W, (pts[i].y - pts[i - 1].y) * H) * kmpx;
     return { pts, km, hours: tm[t] };
@@ -1209,7 +1259,7 @@
     // planning: pick the start and the end on the map
     startPlanning() {
       const tv = this.tv;
-      tv.editTrip = null; tv.keep = null;
+      tv.editTrip = null; tv.keep = null; this.depart = null;
       tv.candidates = null; tv.start = tv.end = null; tv.via = []; tv.chosen = null;
       this.picking = "start";
       this.fm.mapTool = {
@@ -1389,12 +1439,12 @@
       if (this.terrainOn && !tv.terrain) this.showTerrain(true);
       if (!this._grid) { this.msg(this.T("trNoHeight")); this._stopPicking(true); return; }
       const pace = cfg.pace.normal;
-      planMonth = fm.monthOf ? fm.monthOf(Math.floor(fm.T || 0)) : null;
+      planMonth = fm.monthOf ? fm.monthOf(Math.floor(this._departT())) : null;
       const out = [], opt = { mount: mountOf(cfg, this.mount, this.wagonOff), ferry: !!this.ferry, sea: !!this.sea, landAnywhere: !!this.sea && !!this.landAny, boats: this.ferry ? this._ensureBoats() : null,
         hours: clamp(+String(this._lastHours || cfg.hoursPerDay).replace(",", ".") || cfg.hoursPerDay, 0.5, 24) };
       if (opt.sea) {
         // the wind at planning time bends a ship's course out at sea
-        const serial = Math.floor(fm.T || 0), hg = ((fm.T || 0) - serial) * 24;
+        const dT = this._departT(), serial = Math.floor(dT), hg = (dT - serial) * 24;
         let F = this.fieldCache.get(serial);
         if (F === undefined) { try { F = await this.ctx.fetchField(serial); } catch (e) { F = null; } this.fieldCache.set(serial, F); }
         opt.windAt = (x, y) => { const w = weatherAt(fm, x, y, F, hg); return w ? w.wind : null; };
@@ -1457,7 +1507,7 @@
       for (const c of tv.candidates || []) c.eta = null;
       if (this.$("trCands")) this.renderCands(); else this.render();
       for (const c of tv.candidates || []) {
-        const trip = this._tripFrom(c, { pace: cfg.pace.normal, startT: this.fm.T || 0 });
+        const trip = this._tripFrom(c, { pace: cfg.pace.normal, startT: this._departT() });
         trip.hoursPerDay = hours;
         const tl = await this._timeline(trip);
         if (run !== this._etaRun) return;                         // the hours were changed meanwhile
@@ -1556,7 +1606,7 @@
       const paceSel = this.$("trPace").value, pace = paceSel === "custom" ? Math.max(0.5, +this.$("trPaceNum").value || cfg.pace.normal) : cfg.pace[paceSel] || cfg.pace.normal;
       const dayStart = clamp(+this.$("trDayStart").value || cfg.dayStart, 0, 23.99);
       const hoursPerDay = clamp(+String(this.$("trHours").value).replace(",", ".") || cfg.hoursPerDay, 0.5, 24);
-      const trip = this._tripFrom(c, { pace, startT: this.fm.T || 0, dayStart });
+      const trip = this._tripFrom(c, { pace, startT: this._departT(), dayStart });
       trip.hoursPerDay = hoursPerDay;
       trip.name = name; trip.shared = this.$("trShared").checked; trip.mode = c.mode;
       if ((tv.via || []).length) trip.via = JSON.parse(JSON.stringify(tv.via));
@@ -1573,7 +1623,7 @@
         tv.trips.push(trip);
         tv.selId = trip.id;
       } catch (e) { this.msg(this.T("saveFailed") + e.message); return; }
-      tv.candidates = null; tv.start = tv.end = null; tv.via = []; tv.chosen = null;
+      tv.candidates = null; tv.start = tv.end = null; tv.via = []; tv.chosen = null; this.depart = null;
       this.fm.mapTool = null; this.$("stage").classList.remove("picking");
       this.msg(this.T("trStarted", name, this.ctx.fmtT(trip.timeline.arriveT)));
       this.render(); this.fm.draw();
@@ -1795,7 +1845,7 @@
       const rows = [
         ["pace.slow", T("trSetSlow")], ["pace.normal", T("trSetNormal")], ["pace.fast", T("trSetFast")],
         ["road.path", T("trSetPath")], ["road.road", T("trSetRoad")], ["road.highway", T("trSetHighway")],
-        ["offRoad", T("trSetOffRoad")], ["riverHoursPerSize", T("trSetRiver")], ["forestPer25", T("trSetForest")], ["marshPer25", T("trSetMarsh")], ["bad", T("trSetBad")], ["veryBad", T("trSetVeryBad")], ["snow", T("trSetSnow")],
+        ["offRoad", T("trSetOffRoad")], ["riverHoursPerSize", T("trSetRiver")], ["rangeArea", T("trSetRangeArea")], ["rangeCrest", T("trSetRangeCrest")], ["forestPer25", T("trSetForest")], ["marshPer25", T("trSetMarsh")], ["bad", T("trSetBad")], ["veryBad", T("trSetVeryBad")], ["snow", T("trSetSnow")],
         ["slopeUp", T("trSetUp")], ["slopeDown", T("trSetDown")], ["minSpeed", T("trSetMin")],
         ["badRain", T("trSetBadRain")], ["badWind", T("trSetBadWind")], ["veryBadRain", T("trSetVeryBadRain")], ["veryBadWind", T("trSetVeryBadWind")],
         ["hoursPerDay", T("trSetHours")], ["dayStart", T("trSetStart")], ["keepDays", T("trSetKeep")],
@@ -1850,12 +1900,20 @@
       this.fm.draw(); this.render();
     },
 
+    /** When the journey being planned leaves: the date typed in the form (at the day's start hour), else the calendar's time now. */
+    _departT() {
+      const fm = this.fm, d = this.depart;
+      if (!d || !this.ctx.serialOf) return fm.T || 0;
+      const ds = this.$("trDayStart"), h = ds ? clamp(+ds.value || 0, 0, 23.99) : this.cfg().dayStart;
+      return this.ctx.serialOf(d.y, d.m, d.d) + h / 24;
+    },
     msg(t) { const el = this.$("trMsg"); if (el) el.textContent = t || ""; },
     /** The grid the routes are found on, for the date shown (made again when the date or the heights change). */
     _ensureGrid() {
-      const fm = this.fm, serial = Math.floor(fm.T || 0);
+      const fm = this.fm, serial = Math.floor(this._departT());
       const rivSig = (fm.rivers || []).length + ":" + (fm.rivers || []).reduce((a, r) => a + r.points.length + r.size, 0);
-      const key = serial + ":" + (fm.heightGrid() || {}).key + ":" + JSON.stringify(this.cfg().steep) + ":" + (fm._lyrRev || 0);
+      const rgSig = (fm.ranges || []).map((r) => r.id + ":" + r.points.map((q) => Math.round(q.x * 1e5) + "," + Math.round(q.y * 1e5) + "," + (q.l || 0) + "," + (q.r || 0)).join(";")).join("|");
+      const key = rgSig + "#" + serial + ":" + (fm.heightGrid() || {}).key + ":" + JSON.stringify(this.cfg().steep) + ":" + (fm._lyrRev || 0);
       if (!this._grid || this._gridKey !== key) {
         const climate = this.ctx.climateFor(serial);
         this._grid = buildGrid(fm, climate);
@@ -1946,6 +2004,7 @@
           <label class="field slim"><span></span><input type="text" id="trName" maxlength="80"></label>
           <label class="field slim"><span></span><select id="trPace"></select><input type="number" id="trPaceNum" class="num-small" step="0.5" min="0.5" hidden></label>
           <label class="field slim"><span></span><input type="number" id="trDayStart" class="num-small" min="0" max="23" step="0.5"></label>
+          <div class="field slim tr-date"><span></span><span class="tr-date-in"><input type="number" id="trDD" class="num-small" min="1" max="28" step="1" aria-label="d">/<input type="number" id="trDM" class="num-small" min="1" max="12" step="1" aria-label="m"> <input type="number" id="trDY" class="num-small tr-year" min="1" step="1" aria-label="y"> <button type="button" id="trDNow"></button></span></div>
           <label class="field slim"><span></span><input type="number" id="trHours" class="num-small" min="1" max="24" step="0.5"></label>
           <label class="check"><input type="checkbox" id="trShared"><span></span></label>
           <label class="check"><input type="checkbox" id="trEvents"><span></span></label>`;
@@ -1953,7 +2012,24 @@
         sp[0].textContent = T("trName"); sp[1].textContent = T("trPace"); sp[2].textContent = T("trDayStart"); sp[3].textContent = T("trHours"); sp[4].textContent = T("trShared"); sp[5].textContent = T("evSwitch");
         sp[5].parentElement.title = T("evSwitchTip");
         sp[3].parentElement.title = T("trHoursTip");
+        form.querySelector(".tr-date > span").textContent = T("trStartDate");
+        form.querySelector("#trDNow").textContent = T("trNow");
         plan.append(form);
+        {
+          // the date the journey starts: the calendar's date until another is typed
+          const { S } = this.ctx, shown = () => this.depart ? { y: this.depart.y, m: this.depart.m, d: this.depart.d } : { y: S.year, m: S.month, d: S.day };
+          const put = () => { const v = shown(); this.$("trDD").value = v.d; this.$("trDM").value = v.m; this.$("trDY").value = v.y; };
+          put();
+          const read = () => {
+            const d = Math.round(+this.$("trDD").value), m = Math.round(+this.$("trDM").value), y = Math.round(+this.$("trDY").value);
+            if (!(d >= 1 && d <= 28 && m >= 1 && m <= 12 && y >= 1)) { put(); this.msg(T("trDateBad")); return; }
+            this.depart = { y, m, d };
+            this.msg("");
+            if (tv.candidates && tv.start && tv.end) this._plan(); else this.render();
+          };
+          for (const id of ["trDD", "trDM", "trDY"]) this.$(id).onchange = read;
+          this.$("trDNow").onclick = () => { this.depart = null; this.msg(""); if (tv.candidates && tv.start && tv.end) this._plan(); else this.render(); };
+        }
         const sel = this.$("trPace");
         for (const [v, k] of [["slow", "trSlow"], ["normal", "trNormal"], ["fast", "trFastPace"], ["custom", "trCustom"]])
           sel.add(new Option(v === "custom" ? T(k) : T(k, cfg.pace[v]), v));
@@ -1971,7 +2047,7 @@
         const row = document.createElement("div"); row.className = "tr-row";
         row.append(btn(T("trStart"), () => this.startTrip(), true), btn(T("trAgain"), () => this.startPlanning()), btn(T("cancel"), () => this._stopPicking(true)));
         plan.append(row);
-        plan.append(p(T("trDeparts", this.ctx.fmtT(this.fm.T || 0))));
+        plan.append(p(this.depart ? T("trDepartsOn", this.ctx.fmtT(this._departT())) : T("trDeparts", this.ctx.fmtT(this.fm.T || 0))));
         }
       } else {
         plan.append(btn(T("trNew"), () => this.startPlanning(), true));
@@ -2028,7 +2104,7 @@
       list.append(sel);
       const b = document.createElement("div"); b.className = "tr-cand on";
       const roadKm = c.sum.byKind[1] + c.sum.byKind[2] + c.sum.byKind[3];
-      const eta = c.eta ? T("trEta", this.ctx.fmtDur(c.eta.arriveT - (this.fm.T || 0))) : T("trEtaWorking");
+      const eta = c.eta ? T("trEta", this.ctx.fmtDur(c.eta.arriveT - this._departT())) : T("trEtaWorking");
       b.innerHTML = `<b></b><span></span><span></span>`;
       b.children[0].textContent = name(c);
       const by = c.sum.byKind, riverKm = by[4] + by[6] + by[7], seaKm = by[5];

@@ -453,7 +453,7 @@
     Travel.init({ fieldMap, api, T, S, ask, saveState, fetchField,
       // the clock: pause (returns whether it was running) and start again
       pause: () => { const was = playing; if (playing) togglePlay(); return was; }, play: () => { if (!playing) togglePlay(); },
-      fmtT: fmtTime, fmtDur: fmtDuration,
+      fmtT: fmtTime, fmtDur: fmtDuration, serialOf, dateOfSerial,
       climateFor: (serial) => { const d = dateOfSerial(serial); return climateOn(d.month, d.day); } });
     fieldMap.monthOf = (serial) => dateOfSerial(serial).month;
     if (S.map) Travel.load();
