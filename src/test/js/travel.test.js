@@ -103,3 +103,18 @@ test("the daily hours are local time at the start: a start place two hours east 
   const first = sim({ offset: 2, startT: 1000 + 13 / 24, firstStart: 15 });                                       // 15:00 local on the first day
   assert.ok(first.km[3] > 8 && Math.abs(first.km[10] - first.km[3]) < 0.5, "three hours the first day, to 18:00 local");
 });
+
+test("rivers rise in the spring of their region", () => {
+  const Travel = T;
+  const fm = { ctFloodDefault: (y) => (y > 0.5 ? [9, 10] : [3, 4]) }, cfg = { springRise: 0.5 };
+  assert.equal(Travel._springMul(fm, cfg, 0.2, 3), 1.5);
+  assert.equal(Travel._springMul(fm, cfg, 0.2, 9), 1);
+  assert.equal(Travel._springMul(fm, cfg, 0.8, 10), 1.5);
+  assert.equal(Travel._springMul(fm, cfg, 0.8, null), 1);
+});
+
+test("rak väg: no wiggle, and a straight route is never longer", () => {
+  const w = world(map({})), a = { x: 0.1, y: 0.2 }, b = { x: 0.9, y: 0.4 }, c = cfg(); c.wiggle = 3;
+  const st = route(w, a, b, "fast", { straight: true }, c), wg = route(w, a, b, "fast", {}, c);
+  assert.ok(st.km <= wg.km + 1e-6);
+});

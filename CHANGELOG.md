@@ -2,6 +2,15 @@
 
 Newest first. Versions from 1.x on are the combined app (Root and Rune + Weather generator).
 
+## v1.55.0 (combined app)
+Weather generator:
+- **Rak väg.** A journey option that turns off the wiggle: the route follows the best path without the small bends and meanders. Saved with the journey.
+- **Waypoints as a list you can sort.** Each waypoint has ▲ ▼ buttons; moving one plans the route again.
+- **Rename a journey** (*Byt namn…* on your own journeys).
+- **Stops and delays on the journey.** A saved journey has a list of its stops (start, waypoints, end) with km, and every försening is marked in it at the place along the route where it happens.
+- **Flytta floder m.m.…** moved from the map-layer list to the river tools bar (admins, standard map).
+- **Spring flood.** Rivers carry more water in their region's spring months (3–4 north, 9–10 south of the middle of the map): fords there cost more time. The rise is a travel rule (*Vårflod*, default +50 %).
+
 ## v1.54.1 (combined app)
 Weather generator:
 - **Journey hours are local time at the start.** The daily travel hours (and the first day's start) are the local time at the place the journey starts, kept for the whole journey (the party doesn't change time zone on the way). The departure moment typed in the form is now turned from local time into the app's clock the same way, so *Resa varje dag från kl 08:00* leaves at 08:00 local time, however far east or west the start lies.
