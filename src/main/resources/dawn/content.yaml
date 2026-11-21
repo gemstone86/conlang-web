@@ -35,7 +35,7 @@ rules:
   eraDeckSize: {base: 20, perPlayer: 12}
   eraTriggerBottomPercent: 30             # era-trigger events are placed in the bottom 30% of the era deck
   # fights: troops spent (up to the enemy's strength) must reach that strength (response cards add to it);
-  # half of the troops spent, rounded up, are lost
+  # the troops spent settling a land are all lost; in invasions half of them, rounded up
 
 # A player has one building of each type. Building it again adds a level: 2 more worker slots.
 buildings:
@@ -543,7 +543,7 @@ cards:
     name: Settle
     type: action
     effects: [{settle: true}]
-    text: "Open a face-up land for settling (you may pay toward it at once). From then on anyone can send it resources, troops against its enemy strength (half of them are lost) and settlers, free on their turn, until its whole cost is paid."
+    text: "Open a face-up land for settling (you may pay toward it at once). From then on anyone can send it resources, troops against its enemy strength (all of them are lost) and settlers, free on their turn, until its whole cost is paid."
   core_territory:
     name: Fortify the Heartland
     type: action

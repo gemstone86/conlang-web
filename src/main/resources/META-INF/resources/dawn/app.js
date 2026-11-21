@@ -351,7 +351,7 @@ function renderRealm() {
     World deck: ${s.worldDeck} lands · colonization value ${s.colonizationValue}.</p>
     <div class="cards">${lands}</div>
     ${colonies ? `<h3 style="margin-top:.6rem">Colonies</h3><p class="muted small">Lands being settled. Anyone can send to them (free, on their turn) until the whole cost is paid; then they join the realm.</p><div class="cards">${colonies}</div>` : ''}
-    <h3 style="margin-top:.6rem">Lands to settle</h3><p class="muted small">Pay toward a land until its whole cost is met: resources, troops against its enemy strength (half of the troops sent are lost), settlers. Play a Settle card on a face-up land to make it a colony (a new land is turned up in its place). A land found by an event must be paid for at once, before the event resolves (anyone, free), or it is lost with everything sent.</p>
+    <h3 style="margin-top:.6rem">Lands to settle</h3><p class="muted small">Pay toward a land until its whole cost is met: resources, troops against its enemy strength (all the troops sent are lost), settlers. Play a Settle card on a face-up land to make it a colony (a new land is turned up in its place). A land found by an event must be paid for at once, before the event resolves (anyone, free), or it is lost with everything sent.</p>
     <div class="cards">${front || '<p class="muted">None face up.</p>'}</div>`;
 }
 

@@ -10,6 +10,7 @@ Newest first. Versions from 1.x on are the combined app (Root and Rune + Weather
 - **Round start pop-up:** at the start of every round a box says it is your turn (round number) and shows the card you drew.
 - **Temples make 2 culture per worker** (was 1).
 - **Strength in the tribe panel:** *Army Y (strength X)* for each player (when technologies add strength), and a line for the whole tribe: total army and total strength against an invasion (everyone sending all their troops, plus any invasion defense).
+- **Settling a land costs the troops sent:** all troops sent against a land's enemy strength are lost (was half, rounded up). Invasions are unchanged.
 - Away players are marked done automatically; AI players pick from the open slots. Changed in the combined app's copy only.
 
 ## v1.57.12 (combined app)

@@ -421,7 +421,7 @@ class GameTest {
         assertTrue(f.opened);
         assertEquals(2, g.frontier.stream().filter(x -> !x.fromEvent && !x.opened).count(), "a new face-up land replaces the colony");
         assertEquals(2, f.troopsPaid);
-        assertEquals(1, p.army, "half of the 2 troops sent are lost");
+        assertEquals(0, p.army, "all of the 2 troops sent are lost");
         // later payments need no card and no action
         p.res.put(Res.FOOD, 50);
         p.res.put(Res.PRODUCTION, 50);
@@ -433,7 +433,7 @@ class GameTest {
         g.act(p.seat, Map.of("type", "colonize", "land", f.land.id, "resources", all, "army", 5, "population", 5));
         assertEquals(actions, g.players.get(0).actions, "paying toward a colony is free");
         assertEquals(3, g.realm.size());
-        assertEquals(4, p.army, "only the missing 2 troops were sent, 1 lost");
+        assertEquals(3, p.army, "only the missing 2 troops were sent, and lost");
         assertEquals(2, g.frontier.size(), "the colony is settled; two face-up lands remain");
     }
 

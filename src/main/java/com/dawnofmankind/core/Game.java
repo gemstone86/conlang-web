@@ -1029,8 +1029,8 @@ public final class Game {
         lp.res().forEach((r, v) -> f.paid.merge(r, v, Integer::sum));
         EnumMap<Res, Integer> mine = f.bySeat.computeIfAbsent(p.seat, x -> Res.empty());
         lp.res().forEach((r, v) -> mine.merge(r, v, Integer::sum));
-        // troops sent count fully against the land's enemy strength; half of them (rounded up) are lost, the rest return
-        int troopsLost = (lp.troops() + 1) / 2;
+        // troops sent count fully against the land's enemy strength, and all of them are lost in the fighting
+        int troopsLost = lp.troops();
         p.army -= troopsLost;
         f.troopsPaid += strength(lp.troops());
         f.settlersPaid += lp.settlers();
