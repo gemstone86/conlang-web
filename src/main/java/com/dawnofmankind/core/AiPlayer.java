@@ -106,12 +106,12 @@ public final class AiPlayer {
         // put idle people to work
         if (p.idle > 0) {
             for (Player.Building b : p.buildings) {
-                if (b.workers < b.slots && tryAct(g, p, Map.of("type", "move", "from", "idle", "to", b.id))) return true;
+                if (b.workers < g.activeSlots(p, b) && tryAct(g, p, Map.of("type", "move", "from", "idle", "to", b.id))) return true;
             }
         }
         int food = p.res.get(Res.FOOD), pop = p.population();
-        if (food >= 3 + pop && p.freeSlots() > 0 && tryAct(g, p, Map.of("type", "grow"))) return true;
-        if (p.freeSlots() == 0) {
+        if (food >= 3 + pop && g.freeSlots(p) > 0 && tryAct(g, p, Map.of("type", "grow"))) return true;
+        if (g.freeSlots(p) == 0) {
             String b = countFarms(p) * 2 * 2 < pop + 3 ? "farm" : pick("village", "temple", "mine", "farm");
             if (tryAct(g, p, Map.of("type", "build", "building", b))) return true;
         }

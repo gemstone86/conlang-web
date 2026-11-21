@@ -2,6 +2,11 @@
 
 Newest first. Versions from 1.x on are the combined app (Root and Rune + Weather generator).
 
+## v1.62.0 (combined app)
+
+- Dawn leaders reworked. Prehistoric: The First Shaman (+1 culture/turn, temples cost 1 production), The Great Hunter (+1 food/turn, +1 max farm slot), The Storyteller (an event leaving the queue gives you the face-down card under it), The Great Mother (hand size -2, action cards leaving the queue go to your hand). Ancient: Julius Caesar (+1 military strength per 2 troops, for you), Gilgamesh (first troop each round takes no action, +2 military strength), Hammurabi (+1 research/turn, +1 hand size), Ramses (every unfinished great wonder gains 1 of each resource it needs, every round).
+- Buildings above what the land allows (a lost territory, a leader leaving) now stay but are inactive: their workers produce nothing and no one can be moved in until there is room again. Before, they shrank.
+
 ## v1.61.0 (combined app)
 
 - Dawn: a new card type, leaders. A drawn or picked leader plays itself at once, replaces your current leader and leaves when its era ends. Shown beside your realm and in the "All cards" list.

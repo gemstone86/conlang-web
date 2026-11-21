@@ -105,7 +105,7 @@ public final class View {
         }
         v.put("builtWonders", built);
         v.put("strengthPerTwoTroops", g.civMods().strengthPerTwoTroops);
-        v.put("tribeStrength", g.players.stream().mapToInt(x -> g.strength(x.army)).sum() + g.civMods().invasionDefense);
+        v.put("tribeStrength", g.players.stream().mapToInt(x -> g.fighting(x, x.army)).sum() + g.civMods().invasionDefense);
         v.put("freeSettlers", g.civMods().freeSettlers);
 
         List<Object> realm = new ArrayList<>();
@@ -154,7 +154,7 @@ public final class View {
             pm.put("army", p.army);
             pm.put("committed", p.committed);
             pm.put("raidDefense", m.raidDefense);
-            pm.put("strength", g.strength(p.army));
+            pm.put("strength", g.fighting(p, p.army));
             pm.put("handSize", p.hand.size());
             pm.put("handLimit", g.handLimit(p));
             pm.put("giveCards", m.giveCards);
@@ -168,14 +168,15 @@ public final class View {
                 bm.put("type", b.def.id);
                 bm.put("name", b.def.name);
                 bm.put("workers", b.workers);
-                bm.put("slots", b.slots);
+                bm.put("slots", g.activeSlots(p, b));          // slots above what the land allows are inactive
+                bm.put("inactive", b.slots - g.activeSlots(p, b));
                 bm.put("level", b.level());
                 // what the building makes each round as things stand (its workers, technologies and wonders included)
                 Map<String, Integer> makes = new LinkedHashMap<>(), each = new LinkedHashMap<>();
                 b.def.perWorker.forEach((r, n) -> each.merge(r.key(), n, Integer::sum));
                 var bonus = m.perWorker.get(b.def.id);
                 if (bonus != null) bonus.forEach((r, n) -> each.merge(r.key(), n, Integer::sum));
-                each.forEach((r, n) -> { if (n * b.workers != 0) makes.put(r, n * b.workers); });
+                each.forEach((r, n) -> { if (n * g.working(p, b) != 0) makes.put(r, n * g.working(p, b)); });
                 bm.put("makes", makes);
                 bm.put("each", each);
                 bs.add(bm);
@@ -248,12 +249,12 @@ public final class View {
         return switch (d.kind) {
             case "raid" -> {
                 Player t = g.players.get(pe.target);
-                int def = g.strength(Math.max(0, t.army - t.committed)) + g.mods(t).raidDefense + pe.defenseBonus;
+                int def = g.fighting(t, Math.max(0, t.army - t.committed)) + g.mods(t).raidDefense + pe.defenseBonus;
                 yield def >= pe.strength ? t.name + " will drive it off (defense " + def + " vs " + pe.strength + ")."
                         : t.name + " is " + (pe.strength - def) + " short (defense " + def + " vs " + pe.strength + ")" + half + ".";
             }
             case "invasion" -> {
-                int sent = pe.troops.values().stream().mapToInt(g::strength).sum() + pe.defenseBonus + g.civMods().invasionDefense;
+                int sent = pe.troops.entrySet().stream().mapToInt(en -> g.fighting(g.players.get(en.getKey()), en.getValue())).sum() + pe.defenseBonus + g.civMods().invasionDefense;
                 yield sent >= pe.strength ? "The defenders (" + sent + ") will hold against " + pe.strength + "."
                         : "Defenders " + sent + " vs strength " + pe.strength + ": " + (pe.strength - sent) + " short" + half + ".";
             }
@@ -271,9 +272,10 @@ public final class View {
         Map<String, Integer> out = new LinkedHashMap<>();
         for (Res r : Res.values()) out.put(r.key(), m.income.get(r));
         for (Player.Building b : p.buildings) {
-            b.def.perWorker.forEach((r, n) -> out.merge(r.key(), n * b.workers, Integer::sum));
+            int w = g.working(p, b);
+            b.def.perWorker.forEach((r, n) -> out.merge(r.key(), n * w, Integer::sum));
             var bonus = m.perWorker.get(b.def.id);
-            if (bonus != null) bonus.forEach((r, n) -> out.merge(r.key(), n * b.workers, Integer::sum));
+            if (bonus != null) bonus.forEach((r, n) -> out.merge(r.key(), n * w, Integer::sum));
         }
         out.merge(Res.FOOD.key(), -p.population() * g.content.rules.foodUpkeepPerPop, Integer::sum);
         return out;

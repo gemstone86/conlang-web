@@ -195,8 +195,10 @@ eras:
       stonehenge: 1
       nomadic_living: 1
       # leaders (play themselves; replace the current leader; leave with the era)
-      gilgamesh: 1
-      hammurabi: 1
+      first_shaman: 1
+      great_hunter: 1
+      storyteller: 1
+      great_mother: 1
       # hostility: triggers when revealed, adding enemies to the next invasion
       hostility_1: 3
       hostility_2: 3
@@ -258,6 +260,9 @@ eras:
       colossus: 1
       roman_roads: 1
       julius_caesar: 1
+      gilgamesh: 1
+      hammurabi: 1
+      ramses: 1
       hostility_2: 2
       hostility_3: 2
       hostility_5: 1
@@ -337,21 +342,48 @@ crisisCards: [black_plague, supervolcano, meteor_impact, climate_change]
 
 cards:
   # ---- leaders: drawn leaders play themselves at once, replace your current leader, and leave when the era ends
-  gilgamesh:
-    name: Gilgamesh
+  # Prehistoric leaders
+  first_shaman:
+    name: The First Shaman
     type: leader
-    effects: [{freeRecruit: 1}]
-    text: The first troop you train each round takes no action (it still costs resources).
-  hammurabi:
-    name: Hammurabi
+    effects: [{income: {culture: 1}}, {buildCost: {building: temple, production: 1}}]
+    text: +1 culture per turn. Temples cost only 1 production to build.
+  great_hunter:
+    name: The Great Hunter
     type: leader
-    effects: [{income: {research: 1}}]
-    text: +1 research per turn.
+    effects: [{income: {food: 1}}, {maxSlots: {farm: 1}}]
+    text: +1 food per turn and +1 max farm slot.
+  storyteller:
+    name: The Storyteller
+    type: leader
+    effects: [{eventUnder: 1}]
+    text: When an event leaves the queue unpicked, you get the face-down card under it.
+  great_mother:
+    name: The Great Mother
+    type: leader
+    effects: [{handLimit: -2}, {actionsToHand: 1}]
+    text: Hand size -2. Action cards that leave the queue go into your hand instead.
+  # Ancient leaders
   julius_caesar:
     name: Julius Caesar
     type: leader
-    effects: [{defensePerTwoTroops: 1}]
-    text: Every 2 troops you have at home give +1 defense against raids.
+    effects: [{ownStrengthPerTwoTroops: 1}]
+    text: Your military strength is +1 for every 2 troops.
+  gilgamesh:
+    name: Gilgamesh
+    type: leader
+    effects: [{freeRecruit: 1}, {strengthBonus: 2}]
+    text: The first troop you train each round takes no action (it still costs resources). +2 military strength.
+  hammurabi:
+    name: Hammurabi
+    type: leader
+    effects: [{income: {research: 1}}, {handLimit: 1}]
+    text: +1 research per turn and +1 hand size.
+  ramses:
+    name: Ramses
+    type: leader
+    effects: [{wonderGrowth: 1}]
+    text: Every great wonder under construction gains 1 of each resource it needs, every round.
   # ------------------------------------------------------------------ technologies (cost research + resources)
   fire:
     name: Fire

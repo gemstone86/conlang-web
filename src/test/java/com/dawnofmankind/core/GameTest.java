@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.dawnofmankind.core.Content.BuildingDef;
 import com.dawnofmankind.core.Game.CardInst;
 import com.dawnofmankind.core.Game.Slot;
 import java.util.ArrayList;
@@ -414,14 +415,76 @@ class GameTest {
     }
 
     @Test
-    void hammurabiGivesResearchAndCaesarDefenseFromTroops() {
+    void leaderBonusesAddUp() {
         Game g = game(1, 63);
         Player p = g.players.get(0);
-        assertEquals(0, g.mods(p).income.get(Res.RESEARCH));
+        int limit = g.handLimit(p);
         p.leader = C.cards.get("hammurabi");
         assertEquals(1, g.mods(p).income.get(Res.RESEARCH));
+        assertEquals(limit + 1, g.handLimit(p));
         p.leader = C.cards.get("julius_caesar");
-        assertEquals(1, g.mods(p).defensePerTwoTroops);
+        assertEquals(6, g.strength(p, 4), "every 2 troops add 1 strength");
+        p.leader = C.cards.get("gilgamesh");
+        assertEquals(g.strength(p, 3) + 2, g.fighting(p, 3), "+2 military strength");
+        p.leader = C.cards.get("great_mother");
+        assertEquals(limit - 2, g.handLimit(p));
+    }
+
+    @Test
+    void theFirstShamansTemplesCostOneProduction() {
+        Game g = game(1, 64);
+        Player p = g.players.get(0);
+        BuildingDef temple = C.buildings.get("temple");
+        assertEquals(3, g.buildCost(p, temple).get(Res.PRODUCTION));
+        p.leader = C.cards.get("first_shaman");
+        assertEquals(1, g.buildCost(p, temple).get(Res.PRODUCTION));
+        assertEquals(1, g.mods(p).income.get(Res.CULTURE));
+    }
+
+    @Test
+    void theGreatHuntersFarmsAndInactiveBuildings() {
+        Game g = game(1, 65);
+        Player p = g.players.get(0);
+        int cap = g.capacity(p, "farm");
+        p.leader = C.cards.get("great_hunter");
+        assertEquals(cap + 1, g.capacity(p, "farm"));
+        Player.Building farm = p.ofType("farm");
+        farm.slots = cap + 1;
+        farm.workers = cap + 1;
+        assertEquals(cap + 1, g.working(p, farm));
+        p.leader = null;                                  // the era ends: the extra slot is inactive, not gone
+        assertEquals(cap, g.working(p, farm));
+        assertEquals(cap + 1, farm.slots);
+        assertThrows(GameException.class, () -> g.act(p.seat, Map.of("type", "build", "building", "farm")), "can't build while above the limit");
+    }
+
+    @Test
+    void ramsesGrowsUnfinishedWonders() {
+        Game g = game(1, 66);
+        Player p = g.players.get(0);
+        p.leader = C.cards.get("ramses");
+        Game.WonderProgress w = new Game.WonderProgress(C.greatWonders.get("pyramids"));
+        g.greatWonders.add(w);
+        int before = w.paid.values().stream().mapToInt(Integer::intValue).sum();
+        g.act(p.seat, Map.of("type", "endTurn"));
+        int after = w.paid.values().stream().mapToInt(Integer::intValue).sum();
+        assertTrue(after > before, "the wonder grew by itself");
+    }
+
+    @Test
+    void theGreatMotherTakesActionCardsLeavingTheQueue() {
+        Game g = game(1, 67);
+        Player p = g.players.get(0);
+        p.leader = C.cards.get("great_mother");
+        Game.CardInst action = card(g, "foraging");
+        g.queue.add(new Game.Slot(action, null));          // the bottom slot
+        while (g.queue.size() > 1 && g.queue.get(g.queue.size() - 2).card == action) break;
+        p.hand.clear();
+        g.act(p.seat, Map.of("type", "endTurn"));
+        for (int i = 0; i < 10 && g.phase == Game.Phase.EVENTS; i++) {
+            try { g.act(p.seat, Map.of("type", "ready")); } catch (GameException e) { break; }
+        }
+        assertTrue(p.hand.contains(action), "the action card went to her hand; phase " + g.phase + "; " + last(g));
     }
 
     @Test

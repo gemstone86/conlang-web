@@ -503,6 +503,7 @@ function renderCiv() {
     const cap = capOf(b.type);
     const room = cap != null ? Math.max(0, cap - b.slots) : 0;
     const dots = Array.from({ length: b.slots }, (_, i) => `<span class="slot ${i < b.workers ? 'full' : ''}" title="${i < b.workers ? 'worker' : 'empty slot'}"></span>`).join('')
+      + Array.from({ length: b.inactive || 0 }, (_, i) => `<span class="slot off ${b.slots + i < b.workers ? 'full' : ''}" title="inactive: above what your land allows"></span>`).join('')
       + Array.from({ length: room }, () => '<span class="slot room" title="room on your land: build to use it"></span>').join('');
     const controls = b.id == null ? '<span class="small muted">not built</span>' : `
       <button class="tiny" ${act && p.idle > 0 && b.workers < b.slots ? '' : 'disabled'} data-move-in="${b.id}" title="Move an idle worker here (1 action)">+ worker</button>
@@ -510,7 +511,7 @@ function renderCiv() {
     return `<div class="bld"><span class="bname">${esc(b.name)}${b.level > 1 ? ` <span class="chip">level ${b.level}</span>` : ''}</span>
       <span class="slots">${dots}</span>${controls}
       ${b.id != null ? `<span class="makes" title="${esc(Object.entries(b.each || {}).map(([r, n]) => `${n} ${r} per worker`).join(', ') || 'makes nothing')} (technologies included)">${Object.keys(b.makes || {}).length ? resList(b.makes, { signed: true }) : '<span class="muted">—</span>'}</span>` : ''}
-      ${cap != null ? `<span class="small muted">${b.slots}/${cap} slots built</span>` : ''}</div>`;
+      ${cap != null ? `<span class="small muted">${b.slots}/${cap} slots built</span>` : ''}${b.inactive ? `<span class="small bad">${b.inactive} inactive (over the land limit)</span>` : ''}</div>`;
   }).join('');
   const moveOpts = [['idle', `Idle (${p.idle})`], ...p.buildings.map(b => [b.id, `${b.name} #${b.id} (${b.workers}/${b.slots})`])]
     .map(([v, t]) => `<option value="${v}">${esc(t)}</option>`).join('');
