@@ -172,6 +172,27 @@ class GameTest {
     }
 
     @Test
+    void aCardsNewPersonGoesWhereChosen() {
+        Game g = game(1, 37);
+        Player p = g.players.get(0);
+        p.res.put(Res.FOOD, 10);
+        Player.Building mine = p.ofType("mine");
+        int before = mine.workers;
+        Game.CardInst c = card(g, "gather_the_tribe");
+        p.hand.add(c);
+        g.act(0, Map.of("type", "play", "card", c.id, "building", mine.id));
+        assertEquals(before + 1, mine.workers);
+    }
+
+    @Test
+    void theTurnStartDrawIsShownToThePlayer() {
+        Game g = game(1, 38);
+        Map<String, Object> me = (Map<String, Object>) ((java.util.List<?>) View.of(g, 0).get("players")).get(0);
+        assertNotNull(me.get("turnSeq"));
+        assertTrue(me.containsKey("turnDraw") || g.turnDraw == null);
+    }
+
+    @Test
     void techsAreGlobal() {
         Game g = game(2, 18);
         Player a = g.players.get(g.currentPlayer), b = g.players.get(1 - g.currentPlayer);

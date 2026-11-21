@@ -122,6 +122,7 @@ function render(m) {
   renderEvents();
   renderCiv();
   checkPickReveal();
+  checkTurnDraw();
   renderTechs();
   renderHand();
   renderTeam();
@@ -208,6 +209,22 @@ $('queuePanel').onclick = e => {
   }
   send({ type: 'pick', slot: +b.dataset.pick });
 };
+// The card drawn blind at the start of your turn is shown in a pop-up (once per turn, also after a reload).
+function checkTurnDraw() {
+  const m = me();
+  if (!m || m.turnSeq == null || !room) return;
+  const key = 'dawnDraw-' + room.code;
+  let seen = null;
+  try { seen = sessionStorage.getItem(key); } catch (e) {}
+  if (seen === String(m.turnSeq)) return;
+  try { sessionStorage.setItem(key, String(m.turnSeq)); } catch (e) {}
+  const ev = m.turnEvents ? `<p class="muted small">${m.turnEvents} event${m.turnEvents > 1 ? 's' : ''} came up first and went face down into the future deck.</p>` : '';
+  const body = m.turnDraw
+    ? `<div class="cards">${cardHtml(m.turnDraw)}</div>${m.turnDraw.type === 'great_wonder' ? '<p class="muted small">A great wonder: it goes on the board for the whole tribe to build.</p>' : ''}`
+    : '<p class="muted">The era deck is empty: nothing to draw.</p>';
+  $('gotBox').innerHTML = `<h2>Your turn: you drew</h2>${ev}${body}<div class="row"><button class="primary" data-gotok>OK</button></div>`;
+  $('gotModal').hidden = false;
+}
 function checkPickReveal() {
   if (!pickWatch) return;
   if (Date.now() - pickWatch.at > 5000) { pickWatch = null; return; }
@@ -376,7 +393,9 @@ function renderTechs() {
     ? list.map(({ t, by }) => `<div class="techrow"><b>${esc(t.name)}</b> <span class="muted small">by ${esc(by)}</span><div class="small">${esc(t.text)}</div></div>`).join('')
     : '<p class="muted small">None yet. Technologies help every player once anyone has researched them.</p>');
 }
-function openGrowChoice(free) {
+let growCb = null;
+function openGrowChoice(free, cb) {
+  growCb = cb || (id => send({ type: 'grow', building: id }));
   const box = $('growBox');
   box.innerHTML = `<h2>Where does the new person work?</h2><div class="column">${free.map(b =>
     `<button data-gb="${b.id}">${esc(b.name)} <span class="muted small">(${b.workers}/${b.slots} workers)</span></button>`).join('')}</div>
@@ -385,7 +404,7 @@ function openGrowChoice(free) {
 }
 $('growModal').onclick = e => {
   const t = e.target.closest('button');
-  if (t && t.dataset.gb) send({ type: 'grow', building: +t.dataset.gb });
+  if (t && t.dataset.gb && growCb) growCb(+t.dataset.gb);
   if (t || e.target === $('growModal')) $('growModal').hidden = true;
 };
 
@@ -496,7 +515,10 @@ $('handPanel').onclick = e => {
       msg.resources = {};
       document.querySelectorAll(`[data-tcard="${t.dataset.play}"]`).forEach(i => { msg.resources[i.dataset.tres] = Math.max(0, +i.value || 0); i.value = 0; });
     }
-    send(msg);
+    // a card that brings a person, with more than one building with a free slot: choose where they work
+    const card = (me().hand || []).find(c => c.id === msg.card), free = (me().buildings || []).filter(b => b.workers < b.slots);
+    if (card && card.population && free.length > 1) openGrowChoice(free, id => send({ ...msg, building: id }));
+    else send(msg);
   }
   else if (t.dataset.discard) send({ type: 'discard', card: +t.dataset.discard });
   else if ('givecards' in t.dataset) {

@@ -341,10 +341,17 @@ public final class Game {
         }
     }
 
+    /** What the player whose turn it is drew blind at its start (null: nothing), the events that went face down on the way, and a counter so clients show each draw once. */
+    public CardInst turnDraw;
+    public int turnEvents, turnSeq;
+
     private void beginTurn() {
         Player p = players.get(currentPlayer);
         actionsLeft = content.rules.actionsPerTurn + mods(p).actionsPerTurn;
+        turnEvents = 0;
         CardInst c = drawFromEraDeck(p);
+        turnDraw = c;
+        turnSeq++;
         log(p.name + "'s turn." + (c == null ? " (The era deck is empty.)" : ""));
         if (p.away) endTurnInternal();
     }
@@ -355,6 +362,7 @@ public final class Game {
         while ((c = nextFromEraDeck()) != null) {
             if (c.def.isEvent()) {
                 futureEvents.add(c);
+                turnEvents++;
                 log(p.name + " drew an event; it goes face down into the future deck.");
                 continue;
             }
@@ -718,7 +726,17 @@ public final class Game {
         if (d.type == CardType.TECH) p.techs.add(d);
         if (d.type == CardType.MINOR_WONDER) p.minorWonders.add(d);
         log(p.name + " plays " + d.name + ".");
-        applyImmediate(d.effects, List.of(p), p, 1.0, false);
+        if (a.get("building") != null) {
+            int bid = Y.toInt(a.get("building"));
+            popInto = p.buildings.stream().filter(b -> b.id == bid).findFirst().orElse(null);
+            popFor = p;
+        }
+        try {
+            applyImmediate(d.effects, List.of(p), p, 1.0, false);
+        } finally {
+            popInto = null;
+            popFor = null;
+        }
         if (land != null) {
             land.opened = true;
             log("The " + land.land.def.name + " becomes a colony: anyone can now send resources, troops and settlers to it (1 action each).");
@@ -1524,9 +1542,15 @@ public final class Game {
     }
 
     /** New Population fills free worker slots (first building first), the rest is idle. */
+    /** The building a player chose for the person a card brings (set while that card is played). */
+    private Building popInto;
+    private Player popFor;
+
     private void addPopulation(Player p, int n) {
         for (int i = 0; i < n; i++) {
-            Building free = p.buildings.stream().filter(b -> b.workers < b.slots).findFirst().orElse(null);
+            Building free = null;
+            if (popInto != null && popFor == p && popInto.workers < popInto.slots) free = popInto;     // the building the player chose
+            if (free == null) free = p.buildings.stream().filter(b -> b.workers < b.slots).findFirst().orElse(null);
             if (free != null) free.workers++; else p.idle++;
         }
     }

@@ -169,6 +169,11 @@ public final class View {
             pm.put("techs", p.techs.stream().map(View::def).toList());
             pm.put("minorWonders", p.minorWonders.stream().map(View::def).toList());
             if (p.seat == seat) pm.put("hand", p.hand.stream().map(View::card).toList());
+            if (p.seat == seat && seat == g.currentPlayer && g.phase == Game.Phase.TURNS) {
+                pm.put("turnSeq", g.turnSeq);
+                pm.put("turnEvents", g.turnEvents);
+                if (g.turnDraw != null) pm.put("turnDraw", card(g.turnDraw));
+            }
             players.add(pm);
         }
         v.put("players", players);
@@ -295,6 +300,7 @@ public final class View {
         }
         if (!d.respondsTo.isEmpty()) m.put("respondsTo", d.respondsTo);
         for (Map<String, Object> e : d.effects) {
+            if (e.get("population") instanceof Number n && n.intValue() > 0) m.put("population", true);
             if (e.containsKey("settle")) m.put("target", "land");
             if (e.containsKey("core")) m.put("target", "territory");
             if (e.containsKey("trade")) {

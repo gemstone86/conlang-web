@@ -2,6 +2,10 @@
 
 Newest first. Versions from 1.x on are the combined app (Root and Rune + Weather generator).
 
+## v1.57.10 (combined app)
+- **Dawn of Mankind: the card you draw at the start of your turn pops up** (with a note if events came up first and went face down). Shown once per turn, also after a reload.
+- **Cards that bring a person ask where they work** too (e.g. Gather the Tribe), when more than one building has a free slot, like *Grow*.
+
 ## v1.57.9 (combined app)
 - **Dawn of Mankind: paying toward colonies and great wonders is free** (no action; it must still be your turn). Choosing a wonder from the queue and playing a Settle card to open a face-up land as a colony still cost actions. AI players pay toward each wonder and colony at most once a round. Changed in the combined app's copy only.
 
