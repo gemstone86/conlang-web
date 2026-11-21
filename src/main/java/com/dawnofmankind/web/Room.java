@@ -1,5 +1,6 @@
 package com.dawnofmankind.web;
 
+import com.dawnofmankind.core.AiPlayer;
 import com.dawnofmankind.core.Content;
 import com.dawnofmankind.core.Game;
 import com.dawnofmankind.core.GameException;
@@ -13,6 +14,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CopyOnWriteArraySet;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
@@ -28,6 +31,8 @@ public final class Room {
         String name;
         final Set<WebSocketSession> sessions = new CopyOnWriteArraySet<>();
         long disconnectedAt;
+        /** A computer player: always "connected", moves on its own. */
+        boolean ai;
 
         Seat(String name) {
             this.name = name;
@@ -41,7 +46,7 @@ public final class Room {
         }
 
         boolean connected() {
-            return !sessions.isEmpty();
+            return ai || !sessions.isEmpty();
         }
     }
 
@@ -53,11 +58,17 @@ public final class Room {
     private int host;
     private Game game;
     private long lastActivity = System.currentTimeMillis();
+    private final ScheduledExecutorService timer;
+    private final long aiDelayMillis;
+    private final AiPlayer ai = new AiPlayer(RANDOM.nextLong());
+    private boolean aiScheduled;
 
-    Room(String code, Content content, Function<Object, String> json) {
+    Room(String code, Content content, Function<Object, String> json, ScheduledExecutorService timer, long aiDelayMillis) {
         this.code = code;
         this.content = content;
         this.json = json;
+        this.timer = timer;
+        this.aiDelayMillis = aiDelayMillis;
     }
 
     synchronized Seat join(String requestedName) {
@@ -126,11 +137,26 @@ public final class Room {
                 game = new Game(content, seats.stream().map(s -> s.name).toList(), RANDOM.nextLong());
                 for (int i = 0; i < seats.size(); i++) if (!seats.get(i).connected()) game.setAway(i, true);
             }
+            case "addAi" -> {
+                if (seat != host) throw new GameException("Only the host can add AI players.");
+                if (game != null) throw new GameException("AI players can only be added in the lobby.");
+                if (seats.size() >= MAX_PLAYERS) throw new GameException("The room is full.");
+                int n = 1;
+                while (nameTaken("AI " + n)) n++;
+                Seat s = new Seat("AI " + n);
+                s.ai = true;
+                seats.add(s);
+            }
             case "kick" -> {
                 if (seat != host) throw new GameException("Only the host can remove players.");
                 if (game != null) throw new GameException("Players can only be removed in the lobby.");
                 int who = ((Number) msg.getOrDefault("seat", -1)).intValue();
                 if (who < 0 || who >= seats.size() || who == host) throw new GameException("Pick another player.");
+                if (seats.get(who).ai) {
+                    seats.remove(who);
+                    if (who < host) host--;
+                    break;
+                }
                 Seat gone = seats.remove(who);
                 if (who < host) host--;
                 for (WebSocketSession ws : gone.sessions) send(ws, Map.of("kind", "kicked"));
@@ -149,6 +175,33 @@ public final class Room {
             }
         }
         broadcast();
+        scheduleAi();
+    }
+
+    /** If an AI seat has something to do, it moves after a short pause, one move at a time, so people can follow. */
+    private void scheduleAi() {
+        if (aiScheduled || game == null || game.result != null) return;
+        boolean anyone = false;
+        for (int i = 0; i < seats.size(); i++) if (seats.get(i).ai && AiPlayer.needsToAct(game, i)) anyone = true;
+        if (!anyone) return;
+        aiScheduled = true;
+        timer.schedule(this::aiStep, aiDelayMillis, TimeUnit.MILLISECONDS);
+    }
+
+    private synchronized void aiStep() {
+        aiScheduled = false;
+        if (game == null || game.result != null) return;
+        for (int i = 0; i < seats.size(); i++) {
+            if (!seats.get(i).ai || !AiPlayer.needsToAct(game, i)) continue;
+            try {
+                if (!ai.stepFor(game, i)) game.setAway(i, true);
+            } catch (RuntimeException e) {
+                game.setAway(i, true); // never let a stuck AI block the game
+            }
+            break;
+        }
+        broadcast();
+        scheduleAi();
     }
 
     /** Called every few seconds: players gone longer than the grace period have their turns passed for them. */
@@ -157,21 +210,22 @@ public final class Room {
         boolean changed = false;
         for (int i = 0; i < seats.size(); i++) {
             Seat s = seats.get(i);
-            if (!s.connected() && now - s.disconnectedAt > graceMillis && !game.players.get(i).away) {
+            if (!s.ai && !s.connected() && now - s.disconnectedAt > graceMillis && !game.players.get(i).away) {
                 game.setAway(i, true);
                 changed = true;
             }
         }
+        scheduleAi();
         if (!changed) return;
         // host passes to a connected player
         if (!seats.get(host).connected()) {
-            for (int i = 0; i < seats.size(); i++) if (seats.get(i).connected()) { host = i; break; }
+            for (int i = 0; i < seats.size(); i++) if (!seats.get(i).ai && seats.get(i).connected()) { host = i; break; }
         }
         broadcast();
     }
 
     synchronized boolean idleSince(long cutoff) {
-        boolean anyone = seats.stream().anyMatch(Seat::connected);
+        boolean anyone = seats.stream().anyMatch(x -> !x.ai && x.connected());
         return !anyone && lastActivity < cutoff;
     }
 
@@ -217,6 +271,7 @@ public final class Room {
             p.put("seat", i);
             p.put("name", seats.get(i).name);
             p.put("connected", seats.get(i).connected());
+            p.put("ai", seats.get(i).ai);
             ps.add(p);
         }
         room.put("players", ps);

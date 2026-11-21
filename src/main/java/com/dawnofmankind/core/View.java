@@ -33,6 +33,8 @@ public final class View {
         v.put("actionsLeft", g.actionsLeft);
         v.put("stability", g.stability);
         v.put("health", g.health);
+        v.put("threat", g.threat);
+        v.put("territoryPoints", g.realm.size());
         v.put("you", seat);
         v.put("result", g.result);
         v.put("endReason", g.endReason);
@@ -44,6 +46,11 @@ public final class View {
         for (int i = 0; i < g.queue.size(); i++) {
             Slot s = g.queue.get(i);
             Map<String, Object> m = card(s.card);
+            if (s.card.def.type == Content.CardType.GREAT_WONDER) {
+                WonderDef w = g.content.greatWonders.get(s.card.def.wonder);
+                m.put("cost", res(w.cost(g.players.size())));
+                m.put("victoryPoints", w.victoryPoints);
+            }
             m.put("slot", i);
             m.put("faceDown", s.under != null);
             queue.add(m);
@@ -52,9 +59,17 @@ public final class View {
 
         v.put("eventDeck", g.currentEvents.size());
         v.put("eventDeckContents", countByName(g.currentEvents));
-        v.put("futureEvents", g.futureEvents.stream().map(View::card).toList());
+        v.put("futureEvents", g.futureEvents.size()); // face down: only how many
         v.put("pastEvents", g.pastEvents.stream().map(View::card).toList().reversed());
         v.put("persistentEvents", g.persistentEvents.stream().map(View::card).toList());
+        List<Object> crises = new ArrayList<>();
+        for (Game.ActiveCrisis c : g.crises) {
+            Map<String, Object> m = card(c.card);
+            m.put("round", c.roundsDone);
+            m.put("rounds", c.card.def.lastsRounds);
+            crises.add(m);
+        }
+        v.put("crises", crises);
         v.put("crisisPile", g.crisisPile.size());
 
         List<Object> wonders = new ArrayList<>();
@@ -69,7 +84,46 @@ public final class View {
             wonders.add(m);
         }
         v.put("greatWonders", wonders);
-        v.put("builtWonders", g.builtWonders.stream().map(View::wonder).toList());
+        List<Object> built = new ArrayList<>();
+        for (WonderDef w : g.builtWonders) {
+            Map<String, Object> m = wonder(w);
+            m.put("obsolete", g.obsolete(w));
+            built.add(m);
+        }
+        v.put("builtWonders", built);
+        v.put("strengthPerTwoTroops", g.civMods().strengthPerTwoTroops);
+        v.put("freeSettlers", g.civMods().freeSettlers);
+
+        List<Object> realm = new ArrayList<>();
+        for (Game.Territory t : g.realm) {
+            Map<String, Object> m = territory(t);
+            m.put("wonders", t.wonders.stream().map(w -> w.name).toList());
+            m.put("cored", t.cored);
+            realm.add(m);
+        }
+        v.put("realm", realm);
+        List<Object> frontier = new ArrayList<>();
+        for (Game.Frontier f : g.frontier) {
+            Map<String, Object> m = territory(f.land);
+            m.put("enemy", f.enemy);
+            m.put("cost", res(g.settleCost(f)));
+            m.put("paid", res(f.paid));
+            m.put("left", res(g.settleLeft(f)));
+            m.put("troops", g.settleTroops(f));
+            m.put("troopsPaid", f.troopsPaid);
+            m.put("settlers", g.settleSettlers(f));
+            m.put("settlersPaid", f.settlersPaid);
+            m.put("fromEvent", f.fromEvent);
+            m.put("duringEvent", f.fromEvent);
+            m.put("opened", f.opened);
+            Map<String, Object> by = new LinkedHashMap<>();
+            f.bySeat.forEach((s2, r) -> by.put(g.players.get(s2).name, res(r)));
+            m.put("bySeat", by);
+            frontier.add(m);
+        }
+        v.put("frontier", frontier);
+        v.put("worldDeck", g.worldDeck.size());
+        v.put("colonizationValue", g.colonizationValue());
 
         Mods civ = g.civMods();
         v.put("sharedPool", civ.sharedPool ? res(g.pool) : null);
@@ -88,6 +142,7 @@ public final class View {
             pm.put("raidDefense", m.raidDefense);
             pm.put("handSize", p.hand.size());
             pm.put("handLimit", g.handLimit(p));
+            pm.put("giveCards", m.giveCards);
             pm.put("actionsPerTurn", g.content.rules.actionsPerTurn + m.actionsPerTurn);
             pm.put("away", p.away);
             pm.put("income", income(g, p, m));
@@ -98,7 +153,8 @@ public final class View {
                 bm.put("type", b.def.id);
                 bm.put("name", b.def.name);
                 bm.put("workers", b.workers);
-                bm.put("slots", b.def.slots);
+                bm.put("slots", b.slots);
+                bm.put("level", b.level());
                 bs.add(bm);
             }
             pm.put("buildings", bs);
@@ -118,6 +174,11 @@ public final class View {
                 bm.put("id", b.id);
                 bm.put("name", b.name);
                 bm.put("cost", res(g.buildCost(me, b)));
+                bm.put("owned", me.ofType(b.id) != null);
+                int cap = g.capacity(me, b.id);
+                bm.put("capacity", cap == Integer.MAX_VALUE ? null : cap);
+                bm.put("slots", me.ofType(b.id) == null ? 0 : me.ofType(b.id).slots);
+                bm.put("slotsAdded", b.slots);
                 bm.put("perWorker", res(b.perWorker));
                 bm.put("text", b.text);
                 build.add(bm);
@@ -125,7 +186,7 @@ public final class View {
             v.put("buildable", build);
         }
         Map<String, Object> rules = new LinkedHashMap<>();
-        rules.put("growthCost", res(g.content.rules.growthCost));
+        rules.put("growthCost", res(seat >= 0 && seat < g.players.size() ? g.growthCost(g.players.get(seat)) : g.content.rules.growthCost));
         rules.put("recruitCost", res(g.content.rules.recruitCost));
         v.put("rules", rules);
 
@@ -157,12 +218,12 @@ public final class View {
         return switch (d.kind) {
             case "raid" -> {
                 Player t = g.players.get(pe.target);
-                int def = Math.max(0, t.army - t.committed) + g.mods(t).raidDefense + pe.defenseBonus;
+                int def = g.strength(Math.max(0, t.army - t.committed)) + g.mods(t).raidDefense + pe.defenseBonus;
                 yield def >= pe.strength ? t.name + " will drive it off (defense " + def + " vs " + pe.strength + ")."
                         : t.name + " is " + (pe.strength - def) + " short (defense " + def + " vs " + pe.strength + ")" + half + ".";
             }
             case "invasion" -> {
-                int sent = pe.troops.values().stream().mapToInt(Integer::intValue).sum() + pe.defenseBonus;
+                int sent = pe.troops.values().stream().mapToInt(g::strength).sum() + pe.defenseBonus + g.civMods().invasionDefense;
                 yield sent >= pe.strength ? "The defenders (" + sent + ") will hold against " + pe.strength + "."
                         : "Defenders " + sent + " vs strength " + pe.strength + ": " + (pe.strength - sent) + " short" + half + ".";
             }
@@ -194,6 +255,17 @@ public final class View {
         return m;
     }
 
+    static Map<String, Object> territory(Game.Territory t) {
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("id", t.id);
+        m.put("key", t.def.id);
+        m.put("name", t.def.name);
+        m.put("text", t.def.text);
+        m.put("slots", t.def.slots);
+        m.put("colonization", t.def.colonization);
+        return m;
+    }
+
     static Map<String, Object> card(CardInst c) {
         Map<String, Object> m = def(c.def);
         m.put("id", c.id);
@@ -214,6 +286,14 @@ public final class View {
             if (d.persistent) m.put("cleanse", res(d.cleanseCost));
         }
         if (!d.respondsTo.isEmpty()) m.put("respondsTo", d.respondsTo);
+        for (Map<String, Object> e : d.effects) {
+            if (e.containsKey("settle")) m.put("target", "land");
+            if (e.containsKey("core")) m.put("target", "territory");
+            if (e.containsKey("trade")) {
+                m.put("target", "player");
+                m.put("trade", e.get("trade"));
+            }
+        }
         return m;
     }
 

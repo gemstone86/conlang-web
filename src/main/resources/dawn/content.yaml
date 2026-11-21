@@ -1,5 +1,6 @@
 # Dawn of Mankind — game content and rule numbers.
 #
+# Technologies are global: once anyone researches one, its lasting effects help every player.
 # Effects are one-key maps. See com.dawnofmankind.core.Effects for the full list:
 #   immediate: gain, lose, population, army, stability, health, draw, extraActions, addCrisis, destroyBuilding, freeBuilding
 #   lasting:   income, perWorker, handLimit, actionsPerTurn, raidDefense, mitigate, buildDiscount, sharedPool
@@ -11,19 +12,32 @@ rules:
   handLimit: 7
   startWorkers: {farm: 2, mine: 1}        # start with a Farm and a Mine; 3 Population: 2 farmers, 1 miner
   startResources: {food: 3, production: 2}
-  growthCost: {food: 3}                   # action "grow": +1 Population
+  growthCost: {food: 3}                   # action "grow": +1 Population ...
+  growthStep: 4                           # ... +1 food for every 4 people beyond the first
+  buildingEscalation: 1                   # each level a building already has adds 1 production to the next
+  homeSlots: {farm: 2, mine: 2}           # farm and mine worker slots each player has before any territory
+  startTerritories: 2                     # territories drawn from the world deck at the start
+  faceUpLands: 2                          # face-up lands, paid off over time with Settle cards; replaced when settled
+  # lands found by events must be settled at once, during the event (anyone, free), or they are discarded
+  colonize:                               # the resource cost of an ordinary land
+    costPerPlayer: {food: 2, production: 2}
+    extraPerTerritoryPerPlayer: {production: 1}   # for each territory beyond the first 2
+    territoriesBeforeExtra: 2
+    settlersPerPlayer: 1                          # people who move to the new land (idle people first, then workers)
+    # each point of colonization value (coasts, oceans) takes 1 per player off: production first, then food
   recruitCost: {production: 2}            # action "recruit": +1 troop
   foodUpkeepPerPop: 1
   startStability: 10
   startHealth: 2
-  queueExtra: 2                           # queue size = players + 2
+  queueExtra: 4                           # queue size = players + 4
   removedPerRound: {1: 1, 2: 1, 3: 2, 4: 2, 5: 3, 6: 3}
   startingEventsPerPlayer: 2
   eraDeckSize: {base: 20, perPlayer: 12}
   eraTriggerBottomPercent: 30             # era-trigger events are placed in the bottom 30% of the era deck
-  raidCasualtyDivisor: 3                  # a repelled raid of strength S costs S/3 troops
-  invasionCasualtyDivisor: 2              # a repelled invasion of strength S costs S/2 troops, split between senders
+  # fights: troops spent (up to the enemy's strength) must reach that strength (response cards add to it);
+  # half of the troops spent, rounded up, are lost
 
+# A player has one building of each type. Building it again adds a level: 2 more worker slots.
 buildings:
   farm:
     name: Farm
@@ -50,41 +64,125 @@ buildings:
     perWorker: {research: 1, culture: 1}
     text: Each worker produces 1 research and 1 culture.
 
-# Great wonders are the measure of a game: the final score is the sum of their victory points.
+# Great wonders are the measure of a game: the final score is the sum of their victory points, +1 per territory held.
+# Each is also a card (same id) listed in an era below: when a player picks or draws it, it goes on the board.
 # Bonuses and points are placeholders, to be reworked.
+# Cost is per player, sized so a wonder takes the whole team 4-5 rounds of its output (a player makes roughly
+# 3-4 production and some culture per round in the Prehistoric era, a little more in the Ancient era).
+# The world deck: the shared realm's land. "slots" are extra worker slots for every player's buildings of that type;
+# lose the territory and the slots (and any great wonder standing there) are lost. Effects apply to every player.
+territories:
+  plains:
+    name: Plains
+    copies: 3
+    slots: {farm: 2}
+    text: +2 farm worker slots.
+  mountains:
+    name: Mountains
+    copies: 3
+    slots: {mine: 2}
+    text: +2 mine worker slots.
+  steppe:
+    name: Steppe
+    copies: 2
+    slots: {farm: 1}
+    effects: [{raidDefense: 2}, {invasionDefense: 2}]
+    text: +1 farm worker slot. +2 military strength (against raids and invasions).
+  jungle:
+    name: Jungle
+    copies: 2
+    slots: {farm: 1}
+    effects: [{income: {research: 1}}]
+    text: +1 farm worker slot. +1 research per turn.
+  coast:
+    name: Coast
+    copies: 3
+    slots: {farm: 1}
+    colonization: 1
+    text: +1 farm worker slot. +1 colonization value.
+  forest:
+    name: Forest
+    copies: 3
+    slots: {mine: 1}
+    effects: [{income: {production: 1}}]
+    text: +1 mine worker slot (lumber). +1 production per turn.
+  ocean:
+    name: Ocean
+    copies: 2
+    colonization: 1
+    effects: [{income: {food: 1}}]
+    text: +1 food per turn (fishing). +1 colonization value.
+  # special lands: not in the world deck, found by events, with their own (higher) cost per player
+  rich_land:
+    name: Rich Land
+    special: true
+    slots: {farm: 2, mine: 2}
+    effects: [{income: {culture: 1}}]
+    costPerPlayer: {population: 2, army: 2}
+    text: +2 farm and +2 mine worker slots, +1 culture per turn.
+  fortified_land:
+    name: Fortified Land
+    special: true
+    slots: {mine: 2}
+    effects: [{raidDefense: 1}, {invasionDefense: 3}]
+    costPerPlayer: {production: 3, army: 4}
+    text: +2 mine worker slots. +1 raid defense for every player, +3 against invasions.
+  fertile_delta:
+    name: Fertile Delta
+    special: true
+    slots: {farm: 4}
+    effects: [{income: {food: 1}}]
+    costPerPlayer: {food: 4, production: 2, population: 1}
+    text: +4 farm worker slots, +1 food per turn.
+
 greatWonders:
   stonehenge:
     name: Stonehenge
     era: prehistoric
-    costPerPlayer: {production: 5, culture: 2}
+    costPerPlayer: {production: 12, culture: 4}
     effects: [{actionsPerTurn: 1}]
     victoryPoints: 2
     text: Every player gets +1 action per turn.
   pyramids:
     name: The Pyramids
     era: ancient
-    costPerPlayer: {production: 5, culture: 3}
-    effects: [{stability: 2}, {income: {culture: 2}}]
+    costPerPlayer: {production: 15, culture: 5}
+    effects: [{stability: 2}, {income: {culture: 2}}, {coreTerritory: 1}]
     victoryPoints: 2
-    text: +2 Stability, every player +2 culture per turn, +2 victory points.
+    text: +2 Stability, every player +2 culture per turn, +2 victory points. Cores a territory (the one it stands in).
   hanging_gardens:
     name: The Hanging Gardens
     era: ancient
-    costPerPlayer: {production: 4, food: 3}
+    costPerPlayer: {production: 11, food: 10}
     effects: [{perWorker: {building: farm, food: 1}}, {income: {culture: 1}}]
     victoryPoints: 2
     text: Every farmer +1 food, every player +1 culture per turn.
   great_library:
     name: The Great Library
     era: ancient
-    costPerPlayer: {production: 3, culture: 2, research: 2}
+    costPerPlayer: {production: 10, culture: 5, research: 4}
     effects: [{income: {research: 4}}, {handLimit: 1}]
     victoryPoints: 2
     text: Every player +4 research per turn and +1 max hand size.
+  nomadic_living:
+    name: Nomadic Living
+    era: prehistoric
+    costPerPlayer: {production: 6, food: 3}       # cheap: about 2.5 rounds of the team's output
+    effects: [{freeSettlers: 1}]
+    victoryPoints: 1
+    obsoleteAfter: prehistoric
+    text: Settling any land takes 1 settler less. Obsolete once the Prehistoric era is over.
+  great_lighthouse:
+    name: The Great Lighthouse
+    era: ancient
+    costPerPlayer: {production: 12, food: 4}
+    effects: [{faceUpLands: 1}, {settleDiscount: {production: 2}}, {freeSettlers: 1}, {coreTerritory: 1}]
+    victoryPoints: 2
+    text: One more land lies face up. Settling any land costs 2 production and 1 settler less. Cores a territory (the one it stands in).
   colossus:
     name: The Colossus
     era: ancient
-    costPerPlayer: {production: 5, influence: 2}
+    costPerPlayer: {production: 15, influence: 3}
     effects: [{perWorker: {building: mine, production: 1}}]
     victoryPoints: 2
     text: Every miner +1 production.
@@ -92,8 +190,13 @@ greatWonders:
 eras:
   - id: prehistoric
     name: Prehistoric
-    greatWonders: [stonehenge]
     cards:
+      # great wonders (taking one puts it on the board for the team to build)
+      stonehenge: 1
+      nomadic_living: 1
+      # hostility: triggers when revealed, adding enemies to the next invasion
+      hostility_1: 3
+      hostility_2: 3
       # technologies
       fire: 1
       stone_tools: 1
@@ -114,13 +217,15 @@ eras:
       shell_trading: 2
       gather_the_tribe: 2
       long_day: 1
+      send_scouts: 1
+      settle_land: 4
+      core_territory: 1
+      new_trading_route: 2
       # responses
       rally_the_hunters: 2
       hide_in_the_caves: 1
       tribal_healer: 1
       offering_to_the_spirits: 1
-      # minor wonder
-      epic: 1
       # events
       wolf_pack: 2
       rival_tribe: 2
@@ -133,11 +238,24 @@ eras:
       bountiful_season: 2
       wandering_sage: 1
       strangers_at_the_fire: 1
+      scouts_return: 1
+      rich_land_found: 1
+      fertile_delta_found: 1
+      hostile_tribes: 2
+      rivals_claim: 1
       dawn_of_agriculture: 1
   - id: ancient
     name: Ancient
-    greatWonders: [pyramids, hanging_gardens, great_library, colossus]
     cards:
+      pyramids: 1
+      hanging_gardens: 1
+      great_library: 1
+      great_lighthouse: 1
+      colossus: 1
+      roman_roads: 1
+      hostility_2: 2
+      hostility_3: 2
+      hostility_5: 1
       agriculture: 1
       bronze_working: 1
       writing: 1
@@ -157,6 +275,10 @@ eras:
       festival: 1
       long_day: 1
       foraging: 1
+      send_scouts: 1
+      settle_land: 3
+      core_territory: 2
+      new_trading_route: 3
       city_walls: 2
       bronze_levy: 1
       quarantine: 1
@@ -165,6 +287,8 @@ eras:
       epic: 1
       barbarian_raid: 2
       chariot_raiders: 1
+      hill_tribes: 1
+      nomad_empire: 1
       sea_peoples: 1
       drought: 1
       earthquake: 1
@@ -177,6 +301,14 @@ eras:
       rumbling_mountain: 1
       comet_sighted: 1
       failing_rains: 1
+      explorers: 1
+      great_expedition: 1
+      rich_land_found: 1
+      fortified_land_found: 1
+      fertile_delta_found: 1
+      hostile_tribes: 1
+      warlord: 2
+      rivals_claim: 1
       rise_of_empires: 1
 
 # The starting event deck: 2 per player, drawn from these (number = copies in the pool).
@@ -190,9 +322,11 @@ startingEvents:
   rival_tribe: 1
   small_fire: 1
   wandering_sage: 1
+  scouts_return: 1
 
 # Crisis cards: kept apart, added to the future deck only by other events or when a player's Population hits 0.
 crisisCards: [black_plague, supervolcano, meteor_impact, climate_change]
+# (Rise of a Nomad Empire and the Sea Peoples are crisis cards in the Ancient era deck.)
 
 cards:
   # ------------------------------------------------------------------ technologies (cost research + resources)
@@ -254,8 +388,8 @@ cards:
     name: Bronze Working
     type: tech
     cost: {research: 4, production: 3}
-    effects: [{raidDefense: 2}, {army: 1}]
-    text: +2 defense against raids and 1 troop.
+    effects: [{strengthPerTwoTroops: 1}]
+    text: Every player's military strength is +1 for every 2 troops (raids, invasions and enemy strength on lands).
   writing:
     name: Writing
     type: tech
@@ -396,6 +530,24 @@ cards:
     effects: [{stability: 2}, {gain: {culture: 1}}]
     text: Pay 2 food for +2 Stability and +1 culture.
 
+  send_scouts:
+    name: Send Scouts
+    type: action
+    cost: {food: 1}
+    effects: [{discover: 1}]
+    text: Pay 1 food. Turn another land from the world deck face up; it stays until settled (with Settle cards).
+  settle_land:
+    name: Settle
+    type: action
+    effects: [{settle: true}]
+    text: "Open a face-up land for settling (you may pay toward it at once). From then on anyone can send it resources, troops against its enemy strength (half of them are lost) and settlers, 1 action each, until its whole cost is paid."
+  core_territory:
+    name: Fortify the Heartland
+    type: action
+    cost: {production: 2, culture: 1}
+    effects: [{core: true}]
+    text: Make a territory of the realm a core territory. If an invasion would take it, it loses its core status instead.
+
   # ------------------------------------------------------------------ responses (played when an event resolves)
   rally_the_hunters:
     name: Rally the Hunters
@@ -463,6 +615,18 @@ cards:
     effects: [{income: {culture: 1}}, {handLimit: 1}]
     text: +1 culture per turn, +1 max hand size.
 
+  new_trading_route:
+    name: New Trading Route
+    type: action
+    effects: [{trade: [food, production, research]}]
+    text: Send any amount of food, production and research to one teammate. (Resources can't be given otherwise.)
+  roman_roads:
+    name: Roman Roads
+    type: minor_wonder
+    cost: {production: 4, culture: 2, influence: 1}
+    effects: [{giveCards: 2}]
+    text: You may give up to 2 cards to a teammate for 1 action. (Without roads, cards can't be given.)
+
   # ------------------------------------------------------------------ events
   # kind: raid (one player defends alone), invasion (everyone may send troops), test (a stat against a threshold),
   #       opportunity (the target may pay for a benefit), effects (just happens). target: one | each | civ.
@@ -487,9 +651,9 @@ cards:
     type: event
     category: invasion
     kind: invasion
-    strength: {base: 1, perPlayer: 2}
+    strength: {perPlayerPerTerritory: 1}
     perShortfall: [{lose: {food: 1}}]
-    text: Invasion, strength 1 + 2 per player. Each point short costs every player 1 food.
+    text: Invasion, strength = players × territories + the massed enemies. If it breaks through, a territory is lost and each point short costs every player 1 food.
   harsh_winter:
     name: Harsh Winter
     type: event
@@ -510,7 +674,7 @@ cards:
     category: catastrophe
     target: one
     effects: [{destroyBuilding: 1}, {lose: {food: 1}}]
-    text: One player loses a building (the one with fewest workers) and 1 food.
+    text: One player's building with the fewest workers loses a level (2 worker slots), and they lose 1 food.
   small_fire:
     name: Camp Fire Spreads
     type: event
@@ -596,14 +760,14 @@ cards:
     strength: 5
     perShortfall: [{lose: {food: 1, production: 1, culture: 1}}]
     text: Raid, strength 5. Each point short costs 1 food, 1 production and 1 culture.
-  sea_peoples:
-    name: The Sea Peoples
+  hill_tribes:
+    name: The Hill Tribes Invade
     type: event
     category: invasion
     kind: invasion
-    strength: {base: 2, perPlayer: 3}
+    strength: {perPlayerPerTerritory: 1}
     perShortfall: [{lose: {food: 1, production: 1}}]
-    text: Invasion, strength 2 + 3 per player. Each point short costs every player 1 food and 1 production.
+    text: Invasion, strength = players × territories + the massed enemies. If it breaks through, a territory is lost and each point short costs every player 1 food and 1 production.
   drought:
     name: Drought
     type: event
@@ -617,7 +781,7 @@ cards:
     category: catastrophe
     target: one
     effects: [{destroyBuilding: 1}, {lose: {production: 2}}]
-    text: One player loses a building and 2 production.
+    text: One player's building with the fewest workers loses a level (2 worker slots), and they lose 2 production.
   plague:
     name: Plague
     type: event
@@ -694,34 +858,170 @@ cards:
     effects: [{gain: {culture: 2}}]
     text: Every player gains 2 culture. The Ancient era ends at the end of this round.
 
+  scouts_return:
+    name: Scouts Return
+    type: event
+    category: discovery
+    effects: [{discover: 1}]
+    text: A land is found; settle it at once (anyone can pay, free) or lose it.
+  explorers:
+    name: Explorers
+    type: event
+    category: discovery
+    effects: [{discover: 1}]
+    text: A land is found; settle it at once (anyone can pay, free) or lose it.
+  great_expedition:
+    name: Great Expedition
+    type: event
+    category: discovery
+    effects: [{discover: 2}]
+    text: Two lands are found; settle them at once (anyone can pay, free) or lose them.
+  hostile_tribes:
+    name: Hostile Tribes
+    type: event
+    category: frontier
+    effects: [{enemy: {each: 2}}]
+    text: Every land waiting to be settled gains 2 enemy strength.
+  rivals_claim:
+    name: Rivals Claim the Land
+    type: event
+    category: frontier
+    effects: [{removeLand: 1}]
+    text: A random face-up land is taken by others, with everything sent toward it. A new one is turned up.
+  warlord:
+    name: A Warlord Rises
+    type: event
+    category: frontier
+    effects: [{enemy: {one: 4}}]
+    text: A random land waiting to be settled gains 4 enemy strength.
+  rich_land_found:
+    name: Rich Land
+    type: event
+    category: discovery
+    effects: [{discover: rich_land}]
+    text: "A Rich Land is found: settling it takes 2 settlers and 2 troops per player, at once."
+  fortified_land_found:
+    name: Fortified Land
+    type: event
+    category: discovery
+    effects: [{discover: fortified_land}]
+    text: "A Fortified Land is found: settling it takes 3 production and 4 troops per player, at once."
+  fertile_delta_found:
+    name: Fertile Delta
+    type: event
+    category: discovery
+    effects: [{discover: fertile_delta}]
+    text: "A Fertile Delta is found: settling it takes 4 food, 2 production and 1 settler per player, at once."
+
+  # ------------------------------------------------------------------ hostility (trigger at once when revealed)
+  hostility_1:
+    name: Raiding Parties Gather
+    type: hostility
+    effects: [{hostility: 1}]
+    text: +1 enemy massing. The next invasion brings them.
+  hostility_2:
+    name: Warbands Gather
+    type: hostility
+    effects: [{hostility: 2}]
+    text: +2 enemies massing. The next invasion brings them.
+  hostility_3:
+    name: An Army Masses
+    type: hostility
+    effects: [{hostility: 3}]
+    text: +3 enemies massing. The next invasion brings them.
+  hostility_5:
+    name: A Great Horde Gathers
+    type: hostility
+    effects: [{hostility: 5}]
+    text: +5 enemies massing. The next invasion brings them.
+
   # ------------------------------------------------------------------ crisis cards
+  # Crises last: they act when they resolve and again in each following events phase ("lasts"), until their rounds
+  # run out or their end condition is met.
   black_plague:
     name: Black Plague
     type: event
     crisis: true
     category: plague
-    kind: test
-    stat: health
-    threshold: 8
     target: civ
-    perShortfall: [{population: -1}]
-    text: "CRISIS. Health test 8: each point short costs the civilization 1 Population. Medicine halves it."
+    lasts:
+      rounds: 3
+      endWhen: {health: 8}
+      everyRound: [{healthTest: {threshold: 8, populationLoss: 1}}]
+    text: "CRISIS, up to 3 rounds. Each round: health test 8, each point short costs the civilization 1 Population. Ends early once Health reaches 8. Medicine halves it."
   supervolcano:
     name: Supervolcano Eruption
     type: event
     crisis: true
     category: catastrophe
     target: each
-    effects: [{lose: {food: 4, production: 4}}, {destroyBuilding: 1}, {stability: -2}]
-    text: CRISIS. Every player loses 4 food, 4 production and a building. -2 Stability.
+    lasts:
+      rounds: 3
+      stages:
+        - [{lose: {food: 4, production: 4}}, {destroyBuilding: 1}, {stability: -2}]
+        - [{lose: {food: 2}}]
+        - [{lose: {food: 2}}]
+    text: "CRISIS, 3 rounds. First: every player loses 4 food, 4 production and a building level, -2 Stability. Then two rounds of ash winter: every player loses 2 food."
   meteor_impact:
     name: Meteor Impact
     type: event
     crisis: true
     category: catastrophe
     target: civ
-    effects: [{population: -4}, {lose: {production: 3}}, {stability: -2}]
-    text: CRISIS. The civilization loses 4 Population; every player loses 3 production. -2 Stability.
+    lasts:
+      rounds: 2
+      stages:
+        - [{population: -4}, {lose: {production: 3}}, {stability: -2}]
+        - [{stability: -1}, {lose: {food: 1}}]
+    text: "CRISIS, 2 rounds. First: the civilization loses 4 Population, every player 3 production, -2 Stability. Then: -1 Stability, every player loses 1 food."
+  nomad_empire:
+    name: Rise of a Nomad Empire
+    type: event
+    crisis: true
+    category: invasion
+    lasts:
+      rounds: 10
+      everyRound: [{threat: 2}, {invadeIfStronger: nomad_invasion}]
+    text: "CRISIS, 10 rounds. Each round +2 enemies mass. Whenever they outnumber the tribe's military strength, they invade at once."
+  sea_peoples:
+    name: The Sea Peoples
+    type: event
+    crisis: true
+    category: invasion
+    lasts:
+      rounds: 2
+      stages:
+        - [{raidAll: {card: sea_peoples_raid, strength: 8}}]
+        - [{invasion: sea_peoples_invasion}]
+    text: "CRISIS, 2 rounds. First a double-strength raid (8) on every player, then an invasion."
+  # the raids and invasions crises send (not in any deck)
+  nomad_invasion:
+    name: Nomad Horde
+    type: event
+    helper: true
+    category: invasion
+    kind: invasion
+    strength: {perPlayerPerTerritory: 1}
+    perShortfall: [{lose: {food: 1, production: 1}}]
+    text: Invasion by the nomad empire, strength = players × territories + the massed enemies.
+  sea_peoples_raid:
+    name: Sea Peoples' Raid
+    type: event
+    helper: true
+    category: raid
+    kind: raid
+    strength: 8
+    perShortfall: [{lose: {food: 1, production: 1}}]
+    text: Raid, strength 8. Each point short costs 1 food and 1 production.
+  sea_peoples_invasion:
+    name: Sea Peoples' Landing
+    type: event
+    helper: true
+    category: invasion
+    kind: invasion
+    strength: {perPlayerPerTerritory: 1}
+    perShortfall: [{lose: {food: 1, production: 1}}]
+    text: Invasion by the Sea Peoples, strength = players × territories + the massed enemies.
   climate_change:
     name: Climate Change
     type: event

@@ -16,16 +16,23 @@ import org.yaml.snakeyaml.Yaml;
  */
 public final class Content {
 
-    public enum CardType { TECH, ACTION, RESPONSE, MINOR_WONDER, EVENT }
+    public enum CardType { TECH, ACTION, RESPONSE, MINOR_WONDER, GREAT_WONDER, EVENT, HOSTILITY }
 
     /** Rule numbers from the {@code rules:} block. */
     public static final class Rules {
         public int actionsPerTurn, handLimit, foodUpkeepPerPop, startStability, startHealth, queueExtra,
-                startingEventsPerPlayer, raidCasualtyDivisor, invasionCasualtyDivisor, eraTriggerBottomShare;
+                startingEventsPerPlayer, eraTriggerBottomShare;
         public EnumMap<Res, Integer> startResources, growthCost, recruitCost;
         public Map<String, Integer> startWorkers = new LinkedHashMap<>();
         public Map<Integer, Integer> removedPerRound = new LinkedHashMap<>();
         public int deckBase, deckPerPlayer;
+        /** Worker slots every player has for land-bound buildings (farm, mine) before any territory. */
+        public Map<String, Integer> homeSlots = new LinkedHashMap<>();
+        public int startTerritories, growthStep;
+        /** Extra production for each level a building already has. */
+        public int buildingEscalation;
+        public EnumMap<Res, Integer> colonizeCostPerPlayer, colonizeEscalationPerPlayer;
+        public int colonizeFreeTerritories, faceUpLands, colonizeSettlersPerPlayer;
 
         public int removedPerRound(int players) {
             return removedPerRound.getOrDefault(players, players <= 2 ? 1 : players <= 4 ? 2 : 3);
@@ -43,6 +50,8 @@ public final class Content {
     public static final class CardDef {
         public String id, name, text, flavor, era;
         public CardType type;
+        /** For great wonder cards: the wonder it starts. */
+        public String wonder;
         public EnumMap<Res, Integer> cost;
         /** What playing the card does (tech, action, wonder) or, for events, what happens on resolution. */
         public List<Map<String, Object>> effects = new ArrayList<>();
@@ -51,19 +60,36 @@ public final class Content {
         // events
         public String category, kind, target;
         public int strengthBase, strengthPerPlayer, threshold;
+        /** Invasions grow with the realm: strength += this × players × territories. */
+        public double strengthPerPlayerPerTerritory;
         public String stat;
         public List<Map<String, Object>> perShortfall = new ArrayList<>();
         public EnumMap<Res, Integer> offerCost;
         public List<Map<String, Object>> ongoing = new ArrayList<>();
         public EnumMap<Res, Integer> cleanseCost;
         public boolean eraTrigger, crisis, persistent;
+        /** Only used inside a crisis (its raids and invasions); never in a deck or the past events. */
+        public boolean helper;
+        /**
+         * A crisis that lasts: it acts when it resolves and again in every following events phase, for up to
+         * {@code lastsRounds} rounds or until {@code endWhen} is met. Round i uses {@code stages[i]} (if any) plus
+         * {@code everyRound}.
+         */
+        public int lastsRounds;
+        public List<List<Map<String, Object>>> stages = new ArrayList<>();
+        public List<Map<String, Object>> everyRound = new ArrayList<>();
+        public Map<String, Object> endWhen = Map.of();
+
+        public boolean lasts() {
+            return lastsRounds > 0;
+        }
 
         public boolean isEvent() {
             return type == CardType.EVENT;
         }
 
-        public int strength(int players) {
-            return strengthBase + strengthPerPlayer * players;
+        public int strength(int players, int territories) {
+            return strengthBase + strengthPerPlayer * players + (int) Math.round(strengthPerPlayerPerTerritory * players * territories);
         }
     }
 
@@ -73,6 +99,8 @@ public final class Content {
         public EnumMap<Res, Integer> costPerPlayer;
         public List<Map<String, Object>> effects = new ArrayList<>();
         public int victoryPoints;
+        /** The era after which the wonder's bonuses stop (e.g. Nomadic Living after the Prehistoric era). */
+        public String obsoleteAfter;
 
         public EnumMap<Res, Integer> cost(int players) {
             EnumMap<Res, Integer> m = Res.empty();
@@ -81,11 +109,23 @@ public final class Content {
         }
     }
 
+    /** A territory in the world deck: room for land-bound buildings and lasting bonuses for every player. */
+    public static final class TerritoryDef {
+        public String id, name, text;
+        public int copies, colonization;
+        /** Extra worker slots per player, by building type, e.g. plains: {farm: 2}. */
+        public Map<String, Integer> slots = new LinkedHashMap<>();
+        public List<Map<String, Object>> effects = new ArrayList<>();
+        /** Special lands found by events have their own cost (per player); population and army are paid in people and troops. */
+        public boolean special;
+        public EnumMap<Res, Integer> costPerPlayer;
+        public int populationPerPlayer, armyPerPlayer;
+    }
+
     public static final class EraDef {
         public String id, name;
         public int order;
         public Map<String, Integer> cards = new LinkedHashMap<>();
-        public List<String> greatWonders = new ArrayList<>();
     }
 
     public final Rules rules = new Rules();
@@ -93,6 +133,7 @@ public final class Content {
     public final Map<String, CardDef> cards = new LinkedHashMap<>();
     public final Map<String, WonderDef> greatWonders = new LinkedHashMap<>();
     public final List<EraDef> eras = new ArrayList<>();
+    public final Map<String, TerritoryDef> territories = new LinkedHashMap<>();
     public final Map<String, Integer> startingEvents = new LinkedHashMap<>();
     public final List<String> crisisCards = new ArrayList<>();
 
@@ -113,6 +154,22 @@ public final class Content {
         Y.map(root.get("buildings")).forEach((id, v) -> c.buildings.put(id, building(id, Y.map(v))));
         Y.map(root.get("cards")).forEach((id, v) -> c.cards.put(id, card(id, Y.map(v))));
         Y.map(root.get("greatWonders")).forEach((id, v) -> c.greatWonders.put(id, wonder(id, Y.map(v))));
+        // every great wonder is also a card that can turn up in the queue
+        for (WonderDef w : c.greatWonders.values()) {
+            if (c.cards.containsKey(w.id)) throw new IllegalStateException("A card and a great wonder share the id " + w.id);
+            CardDef d = new CardDef();
+            d.id = w.id;
+            d.name = w.name;
+            d.text = w.text;
+            d.flavor = "";
+            d.type = CardType.GREAT_WONDER;
+            d.cost = Res.empty();
+            d.offerCost = Res.empty();
+            d.cleanseCost = Res.empty();
+            d.wonder = w.id;
+            c.cards.put(w.id, d);
+        }
+        Y.map(root.get("territories")).forEach((id, v) -> c.territories.put(id, territory(id, Y.map(v))));
         int order = 0;
         for (Object o : Y.list(root.get("eras"))) {
             Map<String, Object> m = Y.map(o);
@@ -121,7 +178,6 @@ public final class Content {
             e.name = Y.s(m, "name", e.id);
             e.order = order++;
             Y.map(m.get("cards")).forEach((k, v) -> e.cards.put(k, Y.toInt(v)));
-            e.greatWonders.addAll(Y.strings(m.get("greatWonders")));
             c.eras.add(e);
         }
         Y.map(root.get("startingEvents")).forEach((k, v) -> c.startingEvents.put(k, Y.toInt(v)));
@@ -138,8 +194,6 @@ public final class Content {
         rules.startHealth = Y.i(m, "startHealth", 0);
         rules.queueExtra = Y.i(m, "queueExtra", 2);
         rules.startingEventsPerPlayer = Y.i(m, "startingEventsPerPlayer", 2);
-        rules.raidCasualtyDivisor = Y.i(m, "raidCasualtyDivisor", 3);
-        rules.invasionCasualtyDivisor = Y.i(m, "invasionCasualtyDivisor", 2);
         rules.eraTriggerBottomShare = Y.i(m, "eraTriggerBottomPercent", 40);
         rules.startResources = Res.parse(m.get("startResources"));
         rules.growthCost = Res.parse(m.get("growthCost"));
@@ -148,6 +202,16 @@ public final class Content {
         if (m.get("removedPerRound") instanceof Map<?, ?> rp) {
             rp.forEach((k, v) -> rules.removedPerRound.put(Y.toInt(k), Y.toInt(v)));
         }
+        Y.map(m.get("homeSlots")).forEach((k, v) -> rules.homeSlots.put(k, Y.toInt(v)));
+        rules.startTerritories = Y.i(m, "startTerritories", 2);
+        rules.faceUpLands = Y.i(m, "faceUpLands", 2);
+        rules.growthStep = Y.i(m, "growthStep", 4);
+        rules.buildingEscalation = Y.i(m, "buildingEscalation", 1);
+        Map<String, Object> col = Y.map(m.get("colonize"));
+        rules.colonizeCostPerPlayer = Res.parse(col.get("costPerPlayer"));
+        rules.colonizeEscalationPerPlayer = Res.parse(col.get("extraPerTerritoryPerPlayer"));
+        rules.colonizeFreeTerritories = Y.i(col, "territoriesBeforeExtra", 2);
+        rules.colonizeSettlersPerPlayer = Y.i(col, "settlersPerPlayer", 0);
         Map<String, Object> deck = Y.map(m.get("eraDeckSize"));
         rules.deckBase = Y.i(deck, "base", 16);
         rules.deckPerPlayer = Y.i(deck, "perPlayer", 10);
@@ -193,6 +257,8 @@ public final class Content {
             Map<String, Object> sm = Y.map(st);
             c.strengthBase = Y.i(sm, "base", 0);
             c.strengthPerPlayer = Y.i(sm, "perPlayer", 0);
+            Object ppt = sm.get("perPlayerPerTerritory");
+            c.strengthPerPlayerPerTerritory = ppt == null ? 0 : ((Number) ppt).doubleValue();
         } else {
             c.strengthBase = Y.toInt(st);
         }
@@ -207,8 +273,31 @@ public final class Content {
         c.ongoing = effects(pers.get("ongoing"));
         c.cleanseCost = Res.parse(pers.get("cleanse"));
         c.eraTrigger = Y.b(m, "eraTrigger");
+        c.helper = Y.b(m, "helper");
+        Map<String, Object> lasts = Y.map(m.get("lasts"));
+        c.lastsRounds = Y.i(lasts, "rounds", 0);
+        for (Object stage : Y.list(lasts.get("stages"))) c.stages.add(effects(stage));
+        c.everyRound = effects(lasts.get("everyRound"));
+        c.endWhen = Y.map(lasts.get("endWhen"));
         c.crisis = Y.b(m, "crisis");
         return c;
+    }
+
+    private static TerritoryDef territory(String id, Map<String, Object> m) {
+        TerritoryDef t = new TerritoryDef();
+        t.id = id;
+        t.name = Y.s(m, "name", id);
+        t.text = Y.s(m, "text", "");
+        t.copies = Y.i(m, "copies", 1);
+        t.colonization = Y.i(m, "colonization", 0);
+        Y.map(m.get("slots")).forEach((k, v) -> t.slots.put(k, Y.toInt(v)));
+        t.effects = effects(m.get("effects"));
+        t.special = Y.b(m, "special");
+        Map<String, Object> cost = new LinkedHashMap<>(Y.map(m.get("costPerPlayer")));
+        t.populationPerPlayer = Y.toInt(cost.remove("population"));
+        t.armyPerPlayer = Y.toInt(cost.remove("army"));
+        t.costPerPlayer = Res.parse(cost);
+        return t;
     }
 
     private static WonderDef wonder(String id, Map<String, Object> m) {
@@ -220,13 +309,13 @@ public final class Content {
         w.costPerPlayer = Res.parse(m.get("costPerPlayer"));
         w.effects = effects(m.get("effects"));
         w.victoryPoints = Y.i(m, "victoryPoints", 0);
+        w.obsoleteAfter = Y.s(m, "obsoleteAfter", null);
         return w;
     }
 
     private void validate() {
         for (EraDef e : eras) {
             for (String id : e.cards.keySet()) if (!cards.containsKey(id)) throw new IllegalStateException("Era " + e.id + " lists unknown card " + id);
-            for (String id : e.greatWonders) if (!greatWonders.containsKey(id)) throw new IllegalStateException("Era " + e.id + " lists unknown wonder " + id);
         }
         for (String id : startingEvents.keySet()) if (!cards.containsKey(id) || !cards.get(id).isEvent()) throw new IllegalStateException("Starting event " + id + " is not an event card");
         for (String id : crisisCards) if (!cards.containsKey(id) || !cards.get(id).isEvent()) throw new IllegalStateException("Crisis " + id + " is not an event card");
@@ -236,8 +325,15 @@ public final class Content {
             for (Map<String, Object> e : c.effects) Effects.check(e, c.id);
             for (Map<String, Object> e : c.perShortfall) Effects.check(e, c.id);
             for (Map<String, Object> e : c.ongoing) Effects.check(e, c.id);
+            for (Map<String, Object> e : c.everyRound) Effects.check(e, c.id);
+            for (List<Map<String, Object>> st : c.stages) for (Map<String, Object> e : st) Effects.check(e, c.id);
         }
         for (WonderDef w : greatWonders.values()) for (Map<String, Object> e : w.effects) Effects.check(e, w.id);
+        for (TerritoryDef t : territories.values()) {
+            for (Map<String, Object> e : t.effects) Effects.check(e, t.id);
+            for (String b : t.slots.keySet()) if (!buildings.containsKey(b)) throw new IllegalStateException("Territory " + t.id + " gives slots to unknown building " + b);
+        }
+        if (territories.values().stream().noneMatch(t -> !t.special)) throw new IllegalStateException("The world deck is empty");
         if (eras.isEmpty()) throw new IllegalStateException("No eras defined");
     }
 }

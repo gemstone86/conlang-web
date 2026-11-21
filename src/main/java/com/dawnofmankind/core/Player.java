@@ -9,14 +9,24 @@ import java.util.List;
 /** One seat: own resources, Population (workers), army, buildings, hand, techs and minor wonders. */
 public final class Player {
 
+    /**
+     * One building of a type. A player has at most one of each type: building it again adds worker slots
+     * (another level) instead of a second building.
+     */
     public static final class Building {
         public final int id;
         public final BuildingDef def;
         public int workers;
+        public int slots;
 
         Building(int id, BuildingDef def) {
             this.id = id;
             this.def = def;
+            this.slots = def.slots;
+        }
+
+        public int level() {
+            return Math.max(1, (slots + def.slots - 1) / Math.max(1, def.slots));
         }
     }
 
@@ -48,12 +58,17 @@ public final class Player {
 
     public int freeSlots() {
         int n = 0;
-        for (Building b : buildings) n += b.def.slots - b.workers;
+        for (Building b : buildings) n += b.slots - b.workers;
         return n;
     }
 
     public boolean owns(CardDef c) {
         return techs.contains(c) || minorWonders.contains(c);
+    }
+
+    public Building ofType(String type) {
+        for (Building b : buildings) if (b.def.id.equals(type)) return b;
+        return null;
     }
 
     Building building(int id) {

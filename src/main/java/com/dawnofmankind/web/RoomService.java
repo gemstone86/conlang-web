@@ -28,11 +28,13 @@ public class RoomService {
         t.setDaemon(true);
         return t;
     });
-    private final long graceMillis, idleMillis, finishedMillis;
+    private final long graceMillis, idleMillis, finishedMillis, aiDelayMillis;
 
     public RoomService(@Value("${dawn.away-grace-seconds:60}") long graceSeconds,
                        @Value("${dawn.idle-room-minutes:30}") long idleMinutes,
-                       @Value("${dawn.finished-room-minutes:10}") long finishedMinutes) {
+                       @Value("${dawn.finished-room-minutes:10}") long finishedMinutes,
+                       @Value("${dawn.ai-move-millis:900}") long aiMoveMillis) {
+        aiDelayMillis = aiMoveMillis;
         graceMillis = graceSeconds * 1000;
         idleMillis = idleMinutes * 60_000;
         finishedMillis = finishedMinutes * 60_000;
@@ -47,7 +49,7 @@ public class RoomService {
         Room room;
         do {
             code = newCode();
-            room = new Room(code, content, json::writeValueAsString);
+            room = new Room(code, content, json::writeValueAsString, timer, aiDelayMillis);
         } while (rooms.putIfAbsent(code, room) != null);
         Room.Seat s = room.join(name);
         return new Joined(code, s.token, 0);

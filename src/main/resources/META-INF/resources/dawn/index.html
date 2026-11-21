@@ -45,6 +45,7 @@
     <ul id="lobbyPlayers" class="plist"></ul>
     <div class="row">
       <button id="startGame" class="primary">Start the game</button>
+      <button id="addAi">Add AI player</button>
       <button id="leave">Leave</button>
     </div>
     <p id="lobbyNote" class="muted small"></p>
@@ -53,9 +54,10 @@
 
 <!-- the game -->
 <main id="game" hidden>
+  <div class="panel queue-strip" id="queuePanel"></div>
   <div class="board">
     <section class="col-left">
-      <div class="panel" id="queuePanel"></div>
+      <div class="panel" id="realmPanel"></div>
       <div class="panel" id="wonderPanel"></div>
     </section>
     <section class="col-mid">

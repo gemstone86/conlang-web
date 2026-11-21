@@ -31,6 +31,8 @@ label { display: block; font-size: .85rem; color: var(--bone-dim); margin: .6rem
 .status b { color: var(--brass); font-weight: 500; }
 .status .turn { color: var(--moss); font-weight: 700; }
 .status .bad { color: var(--err); }
+.status .threat b { color: var(--err); }
+.threat-note { color: var(--err); font-size: .9rem; margin: .3rem 0; }
 
 .start .lead { text-align: center; font: italic 1.1rem var(--serif); color: var(--bone-dim); margin: 2.5rem 1rem 0; }
 .card { border: 1px solid var(--line); border-radius: 14px; background: rgba(38,49,63,.85); padding: 1rem 1.3rem; }
@@ -67,6 +69,17 @@ label { display: block; font-size: .85rem; color: var(--bone-dim); margin: .6rem
 .cardx.action { border-left: 3px solid var(--production); }
 .cardx.response { border-left: 3px solid var(--moss); }
 .cardx.minor_wonder { border-left: 3px solid var(--brass); }
+.cardx.territory { border-left: 3px solid var(--moss); padding: .3rem .55rem; }
+.cardx.frontier { border: 1px dashed var(--moss); }
+.cardx.frontier.eventland { border-color: var(--brass); }
+.cardx.territory.cored { border-left-width: 5px; border-left-color: var(--brass); }
+.cardx.great_wonder { border: 1px solid var(--brass); background: #2f2c22; }
+.queue-strip { margin: .8rem .8rem 0; }
+.queue-head { display: flex; justify-content: space-between; align-items: baseline; gap: 1rem; flex-wrap: wrap; }
+.queue-row { display: flex; gap: .5rem; overflow-x: auto; padding-bottom: .3rem; align-items: stretch; }
+.queue-row .cardx { flex: 0 0 210px; display: flex; flex-direction: column; }
+.queue-row .cardx .actions { margin-top: auto; padding-top: .3rem; }
+.queue-ends { display: flex; justify-content: space-between; font-size: .8rem; color: var(--bone-dim); margin-top: .2rem; }
 .facedown { font-size: .75rem; color: var(--brass); }
 .slotno { position: absolute; right: .5rem; top: .35rem; font-size: .75rem; color: var(--bone-dim); }
 .leaving { outline: 1px dashed var(--err); }
@@ -80,6 +93,7 @@ label { display: block; font-size: .85rem; color: var(--bone-dim); margin: .6rem
 .slots { display: inline-flex; gap: .2rem; }
 .slot { width: 1rem; height: 1rem; border-radius: 50%; border: 1px solid var(--bone-dim); display: inline-block; }
 .slot.full { background: var(--bone); }
+.slot.room { background: #556070; border-color: #556070; opacity: .55; }
 .prog { height: .45rem; background: var(--ink); border-radius: 4px; overflow: hidden; margin: .15rem 0 .3rem; }
 .prog > div { height: 100%; background: var(--brass); }
 .wonder.done { border-color: var(--brass); }
