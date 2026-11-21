@@ -142,3 +142,4 @@ details summary { cursor: pointer; color: var(--bone-dim); font-size: .88rem; }
 .catalog > div { border: 1px solid var(--line); border-radius: 7px; padding: .4rem .6rem; }
 .catalog .nm { font-weight: 700; color: var(--brass); }
 .catalog .meta { font-size: .8rem; opacity: .7; }
+.cardx.leader { border-left: 3px solid var(--brass); background: rgba(200,160,60,.08); }

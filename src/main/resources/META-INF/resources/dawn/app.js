@@ -226,7 +226,7 @@ $('queuePanel').onclick = e => {
   const b = e.target.closest('[data-pick]'); if (!b) return;
   const card = state.queue[+b.dataset.pick];
   if (card && card.type === 'event') {
-    pickWatch = { ids: new Set((me().hand || []).map(c => c.id)), event: card.name, at: Date.now() };
+    pickWatch = { ids: new Set((me().hand || []).map(c => c.id)), event: card.name, at: Date.now() , leader: me().leader && me().leader.name};
   }
   send({ type: 'pick', slot: +b.dataset.pick });
 };
@@ -241,7 +241,7 @@ function checkTurnDraw() {
   try { sessionStorage.setItem(key, String(m.turnSeq)); } catch (e) {}
   const ev = m.turnEvents ? `<p class="muted small">${m.turnEvents} event${m.turnEvents > 1 ? 's' : ''} came up first and went face down into the future deck.</p>` : '';
   const body = m.turnDraw
-    ? `<div class="cards">${cardHtml(m.turnDraw)}</div>${m.turnDraw.type === 'great_wonder' ? '<p class="muted small">A great wonder: it goes on the board for the whole tribe to build.</p>' : ''}`
+    ? `<div class="cards">${cardHtml(m.turnDraw)}</div>${m.turnDraw.type === 'great_wonder' ? '<p class="muted small">A great wonder: it goes on the board for the whole tribe to build.</p>' : ''}${m.turnDraw.type === 'leader' ? '<p class="muted small">A leader: they take over at once and leave when the era ends.</p>' : ''}`
     : '<p class="muted">The era deck is empty: nothing to draw.</p>';
   $('gotBox').innerHTML = `<h2>Round ${state.round}: your turn. You drew</h2>${ev}${body}<div class="row"><button class="primary" data-gotok>OK</button></div>`;
   $('gotModal').hidden = false;
@@ -306,6 +306,7 @@ function checkPickReveal() {
   if (!pickWatch) return;
   if (Date.now() - pickWatch.at > 5000) { pickWatch = null; return; }
   const got = (me().hand || []).filter(c => !pickWatch.ids.has(c.id));
+  if (me().leader && me().leader.name !== pickWatch.leader) got.push(me().leader);      // a leader plays at once
   if (!got.length) return;
   const ev = pickWatch.event;
   pickWatch = null;
@@ -525,6 +526,7 @@ function renderCiv() {
     <div class="row small muted">Per round: ${resList(p.income, { signed: true })} (food after feeding your people)</div>
     <div class="row small">Population <b>${p.population}</b> · idle ${p.idle} · Army <b>${p.army}</b>${p.strength !== p.army ? ` (strength ${p.strength})` : ''}${p.committed ? ` (${p.committed} away at war)` : ''} · raid defense +${p.raidDefense} · hand ${p.handSize}/${p.handLimit}</div>
     ${(() => { const techs = s.players.flatMap(o => o.techs); return techs.length ? `<div class="small">Technologies (they help everyone): ${techs.map(t => `<span class="chip" title="${esc(t.text)}">${esc(t.name)}</span>`).join('')}</div>` : ''; })()}
+    ${p.leader ? `<div class="small">Leader: <span class="chip" title="${esc(p.leader.text)}">♛ ${esc(p.leader.name)}</span> <span class="muted">${esc(p.leader.text)} Leaves when the era ends.</span></div>` : ''}
     ${p.minorWonders.length ? `<div class="small">${p.minorWonders.map(t => `<span class="chip" title="${esc(t.text)}">★ ${esc(t.name)}</span>`).join('')}</div>` : ''}
     ${s.strengthPerTwoTroops || s.freeSettlers ? `<div class="small muted">${s.strengthPerTwoTroops ? `Military strength +${s.strengthPerTwoTroops} per 2 troops. ` : ''}${s.freeSettlers ? `Settling takes ${s.freeSettlers} settler${s.freeSettlers > 1 ? 's' : ''} less.` : ''}</div>` : ''}
     <h3 style="margin-top:.5rem">Buildings</h3><p class="small muted" style="margin:0">● worker · ○ empty slot · <span style="opacity:.5">●</span> room on your land, not built yet</p>${blds}
@@ -618,6 +620,7 @@ function renderTeam() {
       <div class="small">${resList(o.resources)}</div>
       <div class="small muted">Pop ${o.population} · Army ${o.army}${o.strength !== o.army ? ` (strength ${o.strength})` : ''} · Hand ${o.handSize} · ${o.buildings.map(b => esc(b.name) + ' ' + b.workers + '/' + b.slots).join(', ')}</div>
       ${o.techs.length || o.minorWonders.length ? `<div>${o.techs.map(t => `<span class="chip" title="${esc(t.text)}">${esc(t.name)}</span>`).join('')}${o.minorWonders.map(t => `<span class="chip">★ ${esc(t.name)}</span>`).join('')}</div>` : ''}
+      ${o.leader ? `<div class="small"><span class="chip" title="${esc(o.leader.text)}">♛ ${esc(o.leader.name)}</span></div>` : ''}
     </div>`).join('');
   $('teamPanel').innerHTML = `<h2>The tribe</h2><p class="small" style="margin:0 0 .3rem">Army ${s.players.reduce((t, o) => t + o.army, 0)} (total strength against an invasion: <b>${s.tribeStrength}</b>)</p>${list}`;
 }

@@ -16,7 +16,7 @@ import org.yaml.snakeyaml.Yaml;
  */
 public final class Content {
 
-    public enum CardType { TECH, ACTION, RESPONSE, MINOR_WONDER, GREAT_WONDER, EVENT, HOSTILITY }
+    public enum CardType { TECH, ACTION, RESPONSE, MINOR_WONDER, GREAT_WONDER, EVENT, HOSTILITY, LEADER }
 
     /** Rule numbers from the {@code rules:} block. */
     public static final class Rules {

@@ -19,7 +19,8 @@ import java.util.Set;
  * income, perWorker, handLimit, actionsPerTurn, raidDefense, invasionDefense, mitigate, buildDiscount, sharedPool,
  * victoryPoints, faceUpLands (more lands face up), settleDiscount (off every land's settling cost), freeSettlers
  * (fewer settlers needed per land), strengthPerTwoTroops (military strength +n for every 2 troops), giveCards (the
- * owner may give up to n cards to teammates for 1 action). trade ([resources]: the card sends any amount of those
+ * owner may give up to n cards to teammates for 1 action), freeRecruit (leader: the first troop trained each round takes no action),
+ * defensePerTwoTroops (leader: +n raid defense for every 2 free troops). trade ([resources]: the card sends any amount of those
  * resources to a chosen teammate; giving is otherwise not possible).
  * <p><b>Crisis</b> (in a lasting crisis's stages / everyRound): threat (+n enemies massing), invadeIfStronger (an
  * invasion card strikes if the massing enemies outnumber the players' military strength), raidAll ({card, strength}:
@@ -35,7 +36,7 @@ public final class Effects {
             "extraActions", "addCrisis", "destroyBuilding", "freeBuilding", "discover", "colony", "civilWar", "enemy", "settle", "core", "removeLand", "coreTerritory", "hostility",
             "threat", "invadeIfStronger", "raidAll", "invasion", "healthTest", "trade");
     static final Set<String> LASTING = Set.of("income", "perWorker", "handLimit", "actionsPerTurn", "raidDefense",
-            "mitigate", "buildDiscount", "sharedPool", "victoryPoints", "invasionDefense", "faceUpLands", "settleDiscount", "freeSettlers", "strengthPerTwoTroops", "giveCards");
+            "mitigate", "buildDiscount", "sharedPool", "victoryPoints", "invasionDefense", "faceUpLands", "settleDiscount", "freeSettlers", "strengthPerTwoTroops", "giveCards", "freeRecruit", "defensePerTwoTroops");
     static final Set<String> RESPONSE = Set.of("defense", "halve", "cancel", "healthBonus");
 
     static String key(Map<String, Object> e) {
@@ -56,7 +57,7 @@ public final class Effects {
         public final EnumMap<Res, Integer> buildDiscount = Res.empty();
         public final EnumMap<Res, Integer> poolIncome = Res.empty();
         public final Set<String> mitigate = new HashSet<>();
-        public int handLimit, actionsPerTurn, raidDefense, victoryPoints, invasionDefense, faceUpLands, freeSettlers, strengthPerTwoTroops, giveCards;
+        public int handLimit, actionsPerTurn, raidDefense, victoryPoints, invasionDefense, faceUpLands, freeSettlers, strengthPerTwoTroops, giveCards, freeRecruit, defensePerTwoTroops;
         public final EnumMap<Res, Integer> settleDiscount = Res.empty();
         public boolean sharedPool;
 
@@ -85,6 +86,8 @@ public final class Effects {
                 case "freeSettlers" -> freeSettlers += Y.toInt(v);
                 case "strengthPerTwoTroops" -> strengthPerTwoTroops += Y.toInt(v);
                 case "giveCards" -> giveCards += Y.toInt(v);
+                case "freeRecruit" -> freeRecruit += Y.toInt(v);
+                case "defensePerTwoTroops" -> defensePerTwoTroops += Y.toInt(v);
                 case "settleDiscount" -> Res.parse(v).forEach((r, n) -> settleDiscount.merge(r, n, Integer::sum));
                 case "victoryPoints" -> victoryPoints += Y.toInt(v);
                 case "mitigate" -> mitigate.addAll(Y.strings(v));

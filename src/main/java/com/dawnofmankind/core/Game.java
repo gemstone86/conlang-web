@@ -284,6 +284,10 @@ public final class Game {
             return;
         }
         log("The " + era().name + " era ends.");
+        for (Player p : players) {
+            if (p.leader != null) log(p.leader.name + " leaves with the era.");
+            p.leader = null;
+        }
         // an era's trigger event only ends its own era: leftovers are retired
         for (List<CardInst> deck : List.of(currentEvents, futureEvents)) {
             for (CardInst c : List.copyOf(deck)) {
@@ -404,6 +408,7 @@ public final class Game {
         for (Player p : players) {
             p.actions = content.rules.actionsPerTurn + mods(p).actionsPerTurn;
             p.done = false;
+            p.freeRecruitUsed = false;
             p.turnEvents = 0;
             CardInst c = drawFromEraDeck(p);
             p.turnDraw = c;
@@ -631,7 +636,8 @@ public final class Game {
             case "pickTime" -> pickTime(a);
             default -> {
                 myTurn(p);
-                if (p.actions <= 0) throw new GameException("No actions left. You can be done for the round.");
+                boolean free = type.equals("recruit") && !p.freeRecruitUsed && mods(p).freeRecruit > 0;   // a leader's free troop
+                if (!free && p.actions <= 0) throw new GameException("No actions left. You can be done for the round.");
                 switch (type) {
                     case "move" -> move(p, a);
                     case "build" -> build(p, a);
@@ -643,7 +649,7 @@ public final class Game {
                     case "cleanse" -> cleanse(p, a);
                     default -> throw new GameException("Unknown action: " + type);
                 }
-                p.actions--;
+                if (!free) p.actions--;
             }
         }
         version++;
@@ -770,6 +776,13 @@ public final class Game {
 
     /** A card a player gets: into their hand, except great wonders, which go on the board for the whole team to build. */
     private void take(Player p, CardInst c) {
+        if (c.def.type == CardType.LEADER) {
+            // a leader plays at once and replaces the one before
+            if (p.leader != null) log(p.leader.name + " steps down.");
+            p.leader = c.def;
+            log(p.name + " is now led by " + c.def.name + ": " + c.def.text);
+            return;
+        }
         if (c.def.type != CardType.GREAT_WONDER) {
             p.hand.add(c);
             return;
@@ -880,7 +893,9 @@ public final class Game {
     private void recruit(Player p) {
         pay(p, content.rules.recruitCost);
         p.army++;
-        log(p.name + " trains 1 troop (army " + p.army + ").");
+        boolean free = !p.freeRecruitUsed && mods(p).freeRecruit > 0;
+        if (free) p.freeRecruitUsed = true;
+        log(p.name + " trains 1 troop (army " + p.army + ")" + (free ? ", which takes no action (" + p.leader.name + ")." : "."));
     }
 
     private void contribute(Player p, Map<String, Object> a) {
@@ -1371,7 +1386,8 @@ public final class Game {
 
     private void raid(Pending pe, Player t, double factor) {
         CardDef d = pe.event.def;
-        int defense = strength(Math.max(0, t.army - t.committed)) + mods(t).raidDefense + pe.defenseBonus;
+        int defense = strength(Math.max(0, t.army - t.committed)) + mods(t).raidDefense + pe.defenseBonus
+                + (Math.max(0, t.army - t.committed) / 2) * mods(t).defensePerTwoTroops;
         int s = pe.strength;
         // the troops that fight (up to the raid's strength) are spent; half of them, rounded up, are lost
         int spent = Math.min(Math.max(0, t.army - t.committed), s);
@@ -1690,6 +1706,7 @@ public final class Game {
         Mods m = new Mods();
         for (Player o : players) for (CardDef t : o.techs) m.add(t.effects);
         for (CardDef w : p.minorWonders) m.add(w.effects);
+        if (p.leader != null) m.add(p.leader.effects);
         for (WonderDef w : builtWonders) if (!obsolete(w)) m.add(w.effects);
         for (CardInst e : persistentEvents) m.add(e.def.ongoing);
         for (Territory t : realm) m.add(t.def.effects);

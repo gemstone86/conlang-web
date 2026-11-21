@@ -385,6 +385,46 @@ class GameTest {
     }
 
     @Test
+    void aLeaderPlaysItselfReplacesTheOldOneAndLeavesWithTheEra() {
+        Game g = game(2, 61);
+        Player p = g.players.get(0);
+        Game.CardInst a = card(g, "hammurabi"), b = card(g, "gilgamesh");
+        g.queue.add(0, new Game.Slot(a, null));
+        g.queue.add(1, new Game.Slot(b, null));
+        g.act(p.seat, Map.of("type", "pick", "slot", 0));
+        assertEquals("Hammurabi", p.leader.name);
+        assertFalse(p.hand.contains(a), "a leader never sits in the hand");
+        g.act(p.seat, Map.of("type", "pick", "slot", 1));
+        assertEquals("Gilgamesh", p.leader.name, "the new leader replaces the old");
+    }
+
+    @Test
+    void gilgameshsFirstTroopEachRoundTakesNoAction() {
+        Game g = game(1, 62);
+        Player p = g.players.get(0);
+        p.leader = C.cards.get("gilgamesh");
+        p.res.put(Res.PRODUCTION, 20);
+        int actions = p.actions, army = p.army;
+        g.act(p.seat, Map.of("type", "recruit"));
+        assertEquals(actions, p.actions, "the first troop is free of actions");
+        g.act(p.seat, Map.of("type", "recruit"));
+        assertEquals(actions - 1, p.actions, "the second one costs an action");
+        assertEquals(army + 2, p.army);
+        assertEquals(16, p.res.get(Res.PRODUCTION), "both still cost resources");
+    }
+
+    @Test
+    void hammurabiGivesResearchAndCaesarDefenseFromTroops() {
+        Game g = game(1, 63);
+        Player p = g.players.get(0);
+        assertEquals(0, g.mods(p).income.get(Res.RESEARCH));
+        p.leader = C.cards.get("hammurabi");
+        assertEquals(1, g.mods(p).income.get(Res.RESEARCH));
+        p.leader = C.cards.get("julius_caesar");
+        assertEquals(1, g.mods(p).defensePerTwoTroops);
+    }
+
+    @Test
     void theTradingRouteIsOnlyInTheDeckWithTeammates() {
         for (int players : new int[]{1, 2}) {
             Game g = game(players, 50 + players);

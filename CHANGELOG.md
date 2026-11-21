@@ -2,6 +2,11 @@
 
 Newest first. Versions from 1.x on are the combined app (Root and Rune + Weather generator).
 
+## v1.61.0 (combined app)
+
+- Dawn: a new card type, leaders. A drawn or picked leader plays itself at once, replaces your current leader and leaves when its era ends. Shown beside your realm and in the "All cards" list.
+- Prehistoric: Gilgamesh (the first troop you train each round takes no action) and Hammurabi (+1 research per turn). Ancient: Julius Caesar (every 2 troops at home give +1 raid defense).
+
 ## v1.60.0 (combined app)
 
 - Dawn: an "All cards" button at the far right of the header lists every card, land and great wonder with what it does.

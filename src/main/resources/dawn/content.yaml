@@ -194,6 +194,9 @@ eras:
       # great wonders (taking one puts it on the board for the team to build)
       stonehenge: 1
       nomadic_living: 1
+      # leaders (play themselves; replace the current leader; leave with the era)
+      gilgamesh: 1
+      hammurabi: 1
       # hostility: triggers when revealed, adding enemies to the next invasion
       hostility_1: 3
       hostility_2: 3
@@ -254,6 +257,7 @@ eras:
       great_lighthouse: 1
       colossus: 1
       roman_roads: 1
+      julius_caesar: 1
       hostility_2: 2
       hostility_3: 2
       hostility_5: 1
@@ -332,6 +336,22 @@ crisisCards: [black_plague, supervolcano, meteor_impact, climate_change]
 # (Rise of a Nomad Empire and the Sea Peoples are crisis cards in the Ancient era deck.)
 
 cards:
+  # ---- leaders: drawn leaders play themselves at once, replace your current leader, and leave when the era ends
+  gilgamesh:
+    name: Gilgamesh
+    type: leader
+    effects: [{freeRecruit: 1}]
+    text: The first troop you train each round takes no action (it still costs resources).
+  hammurabi:
+    name: Hammurabi
+    type: leader
+    effects: [{income: {research: 1}}]
+    text: +1 research per turn.
+  julius_caesar:
+    name: Julius Caesar
+    type: leader
+    effects: [{defensePerTwoTroops: 1}]
+    text: Every 2 troops you have at home give +1 defense against raids.
   # ------------------------------------------------------------------ technologies (cost research + resources)
   fire:
     name: Fire
