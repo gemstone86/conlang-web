@@ -2,6 +2,9 @@
 
 Newest first. Versions from 1.x on are the combined app (Root and Rune + Weather generator).
 
+## v1.57.4 (combined app)
+- **Dawn of Mankind: choose where the new person works.** *Grow* asks which building gets the new worker when more than one has a free slot (with one, it goes there as before). The game accepts an optional `building` on the grow action. Changed in the combined app's copy only.
+
 ## v1.57.3 (combined app)
 - **Dawn of Mankind: A Long Day is now +3 actions** (it costs 1 to play, so +2 in all; it was +2, a net +1).
 - **New event "Free Colony".** A land from the territory deck becomes a colony at once, with nothing paid; anyone can then settle it (1 action each), like a Settle-card colony. One in each era's event deck. New effect `colony: n` in the card file. Changed in the combined app's copy only (the same changes are needed in the dawn-of-mankind repository).

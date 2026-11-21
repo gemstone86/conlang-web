@@ -533,7 +533,7 @@ public final class Game {
                     case "build" -> build(p, a);
                     case "pick" -> pick(p, a);
                     case "play" -> play(p, a);
-                    case "grow" -> grow(p);
+                    case "grow" -> grow(p, a);
                     case "recruit" -> recruit(p);
                     case "contribute" -> contribute(p, a);
                     case "giveCards" -> giveCards(p, a);
@@ -740,10 +740,17 @@ public final class Game {
         }
     }
 
-    private void grow(Player p) {
+    private void grow(Player p, Map<String, Object> a) {
+        // the new person may be put in a chosen building with a free slot (else the first free one, or idle)
+        Building into = null;
+        if (a.get("building") != null) {
+            int id = Y.toInt(a.get("building"));
+            into = p.buildings.stream().filter(b -> b.id == id).findFirst().orElseThrow(() -> new GameException("You have no such building."));
+            if (into.workers >= into.slots) throw new GameException("The " + into.def.name + " has no free slot.");
+        }
         pay(p, growthCost(p));
-        addPopulation(p, 1);
-        log(p.name + " grows by 1 Population.");
+        if (into != null) into.workers++; else addPopulation(p, 1);
+        log(p.name + " grows by 1 Population" + (into != null ? ", who goes to the " + into.def.name : "") + ".");
     }
 
     private void recruit(Player p) {

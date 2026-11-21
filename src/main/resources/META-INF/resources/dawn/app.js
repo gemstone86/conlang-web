@@ -346,6 +346,19 @@ $('eventPanel').onclick = e => {
   } else if (t.dataset.cleanse) send({ type: 'cleanse', event: +t.dataset.cleanse });
 };
 
+function openGrowChoice(free) {
+  const box = $('growBox');
+  box.innerHTML = `<h2>Where does the new person work?</h2><div class="column">${free.map(b =>
+    `<button data-gb="${b.id}">${esc(b.name)} <span class="muted small">(${b.workers}/${b.slots} workers)</span></button>`).join('')}</div>
+    <div class="row"><button data-gcancel>Cancel</button></div>`;
+  $('growModal').hidden = false;
+}
+$('growModal').onclick = e => {
+  const t = e.target.closest('button');
+  if (t && t.dataset.gb) send({ type: 'grow', building: +t.dataset.gb });
+  if (t || e.target === $('growModal')) $('growModal').hidden = true;
+};
+
 function renderCiv() {
   const s = state, p = me(), act = canAct();
   const capOf = id => (s.buildable || []).find(x => x.id === id)?.capacity;
@@ -404,7 +417,11 @@ $('civPanel').onclick = e => {
     const f = $('mvFrom').value, to = $('mvTo').value;
     send({ type: 'move', from: f === 'idle' ? 'idle' : +f, to: to === 'idle' ? 'idle' : +to });
   } else if (d.build) send({ type: 'build', building: d.build });
-  else if ('grow' in d) send({ type: 'grow' });
+  else if ('grow' in d) {
+    // more than one building with a free slot: choose where the new person works
+    const free = (me().buildings || []).filter(b => b.workers < b.slots);
+    if (free.length > 1) openGrowChoice(free); else send({ type: 'grow' });
+  }
   else if ('recruit' in d) send({ type: 'recruit' });
   else if ('end' in d) send({ type: 'endTurn' });
   else if ('deposit' in d || 'withdraw' in d) {

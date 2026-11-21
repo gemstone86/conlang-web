@@ -123,6 +123,21 @@ class GameTest {
     }
 
     @Test
+    void growWithAChosenBuilding() {
+        Game g = game(1, 33);
+        Player p = g.players.get(0);
+        p.res.put(Res.FOOD, 20);
+        Player.Building mine = p.ofType("mine");
+        assertTrue(mine.workers < mine.slots);
+        int before = mine.workers;
+        g.act(0, Map.of("type", "grow", "building", mine.id));
+        assertEquals(before + 1, mine.workers);
+        Player.Building farm = p.ofType("farm");
+        assertTrue(farm.workers >= farm.slots, "the farm was full");
+        assertThrows(GameException.class, () -> g.act(0, Map.of("type", "grow", "building", farm.id)));
+    }
+
+    @Test
     void techsAreGlobal() {
         Game g = game(2, 18);
         Player a = g.players.get(g.currentPlayer), b = g.players.get(1 - g.currentPlayer);
