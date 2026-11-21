@@ -543,7 +543,7 @@ cards:
     name: Settle
     type: action
     effects: [{settle: true}]
-    text: "Open a face-up land for settling (you may pay toward it at once). From then on anyone can send it resources, troops against its enemy strength (half of them are lost) and settlers, 1 action each, until its whole cost is paid."
+    text: "Open a face-up land for settling (you may pay toward it at once). From then on anyone can send it resources, troops against its enemy strength (half of them are lost) and settlers, free on their turn, until its whole cost is paid."
   core_territory:
     name: Fortify the Heartland
     type: action
@@ -878,7 +878,7 @@ cards:
     type: event
     category: discovery
     effects: [{colony: 1}]
-    text: A land from the territory deck becomes a colony at once, with nothing paid yet; anyone can settle it (1 action each) as usual.
+    text: A land from the territory deck becomes a colony at once, with nothing paid yet; anyone can settle it (free, on their turn) as usual.
   explorers:
     name: Explorers
     type: event

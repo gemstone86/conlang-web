@@ -240,7 +240,7 @@ function renderRealm() {
     const button = f.fromEvent
       ? `<button ${canSendNow ? '' : 'disabled'} data-colonize="${f.id}">Send (free)</button>`
       : f.opened
-        ? `<button ${canAct() ? '' : 'disabled'} data-colonize="${f.id}">Send (1 action)</button>`
+        ? `<button ${myTurn() ? '' : 'disabled'} data-colonize="${f.id}">Send (free)</button>`
         : `<button ${canAct() && settleCard ? '' : 'disabled'} data-settle="${f.id}" title="${settleCard ? '' : 'You need a Settle card'}">Play Settle: make it a colony (1 action)</button>${settleCard ? '' : ' <span class="small muted">needs a Settle card</span>'}`;
     const by = Object.entries(f.bySeat).map(([n, r]) => `<div class="small muted">${esc(n)}: ${resList(r)}</div>`).join('');
     return `<div class="cardx frontier ${f.fromEvent ? 'eventland' : ''}" data-f="${f.id}">
@@ -256,7 +256,7 @@ function renderRealm() {
     <p class="muted small">Shared land. Each territory gives every player room for buildings and its bonus. A broken invasion takes a territory (a core territory only loses its core status); with none left, the game is lost.
     World deck: ${s.worldDeck} lands · colonization value ${s.colonizationValue}.</p>
     <div class="cards">${lands}</div>
-    ${colonies ? `<h3 style="margin-top:.6rem">Colonies</h3><p class="muted small">Lands being settled. Anyone can send to them (1 action each) until the whole cost is paid; then they join the realm.</p><div class="cards">${colonies}</div>` : ''}
+    ${colonies ? `<h3 style="margin-top:.6rem">Colonies</h3><p class="muted small">Lands being settled. Anyone can send to them (free, on their turn) until the whole cost is paid; then they join the realm.</p><div class="cards">${colonies}</div>` : ''}
     <h3 style="margin-top:.6rem">Lands to settle</h3><p class="muted small">Pay toward a land until its whole cost is met: resources, troops against its enemy strength (half of the troops sent are lost), settlers. Play a Settle card on a face-up land to make it a colony (a new land is turned up in its place). A land found by an event must be paid for at once, before the event resolves (anyone, free), or it is lost with everything sent.</p>
     <div class="cards">${front || '<p class="muted">None face up.</p>'}</div>`;
 }
@@ -281,7 +281,7 @@ function renderWonders() {
     const form = w.done ? '' : `<div class="row small">${need.map(k => `<label class="res r-${k}" style="margin:0">${RES_SHORT[k]} <input type="number" min="0" value="0" data-keep="w-${w.key}-${k}" data-wres="${k}"></label>`).join('')}</div>
       <div class="row small">If this finishes it, place it in <select data-keep="w-${w.key}-where" data-wwhere>${s.realm.map(t => `<option value="${t.id}">${esc(t.name)}${t.wonders.length ? ' (' + t.wonders.length + ' wonder' + (t.wonders.length > 1 ? 's' : '') + ')' : ''}</option>`).join('')}</select></div>
       <div class="row">${s.sharedPool ? `<label class="small" style="margin:0"><input type="checkbox" data-keep="w-${w.key}-pool" data-wpool> from shared pool</label>` : ''}
-      <button ${canAct() ? '' : 'disabled'} data-wonder="${w.key}">Contribute (1 action)</button></div>`;
+      <button ${myTurn() ? '' : 'disabled'} data-wonder="${w.key}">Contribute (free)</button></div>`;
     const by = Object.entries(w.bySeat).map(([n, r]) => `<div class="small muted">${esc(n)}: ${resList(r)}</div>`).join('');
     return `<div class="cardx wonder ${w.done ? 'done' : ''}" data-w="${w.key}"><div class="type">Great wonder · ${w.victoryPoints} points</div>
       <div class="name">${esc(w.name)}${w.done ? ' ✓' : ''}</div><div class="text">${esc(w.text)}</div>

@@ -2,6 +2,9 @@
 
 Newest first. Versions from 1.x on are the combined app (Root and Rune + Weather generator).
 
+## v1.57.9 (combined app)
+- **Dawn of Mankind: paying toward colonies and great wonders is free** (no action; it must still be your turn). Choosing a wonder from the queue and playing a Settle card to open a face-up land as a colony still cost actions. AI players pay toward each wonder and colony at most once a round. Changed in the combined app's copy only.
+
 ## v1.57.8 (combined app)
 - **Dawn of Mankind: what each building makes.** Every building in *Your people* shows, at its right, what it produces each round as things stand (its workers times the per-worker amount, technologies and wonders included); hover for the per-worker numbers. Changed in the combined app's copy only.
 

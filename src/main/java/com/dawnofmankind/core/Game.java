@@ -518,6 +518,7 @@ public final class Game {
             case "decide" -> decide(p, a);
             case "ready" -> ready(p);
             case "colonize" -> colonize(p, a);
+            case "contribute" -> { myTurn(p); contribute(p, a); }          // paying toward a great wonder is free
             // turn
             case "endTurn" -> {
                 myTurn(p);
@@ -535,7 +536,6 @@ public final class Game {
                     case "play" -> play(p, a);
                     case "grow" -> grow(p, a);
                     case "recruit" -> recruit(p);
-                    case "contribute" -> contribute(p, a);
                     case "giveCards" -> giveCards(p, a);
                     case "cleanse" -> cleanse(p, a);
                     default -> throw new GameException("Unknown action: " + type);
@@ -546,17 +546,15 @@ public final class Game {
         version++;
     }
 
-    /** Paying toward a land found by an event: free during its event, 1 action during a turn. */
+    /** Paying toward a land found by an event (free during its event) or toward a colony (free during a turn). */
     private void colonize(Player p, Map<String, Object> a) {
         LandPayment lp = landPayment(p, a, Res.empty());
         Frontier f = lp.land();
         if (!f.fromEvent) {
-            // an opened face-up land: anyone, on their turn, 1 action per payment
+            // an opened face-up land (a colony): anyone, on their turn, free
             if (!f.opened) throw new GameException("Play a Settle card on the " + f.land.def.name + " first to open it for settling.");
             myTurn(p);
-            if (actionsLeft <= 0) throw new GameException("No actions left. End your turn.");
             payLand(p, lp);
-            actionsLeft--;
             version++;
             return;
         }

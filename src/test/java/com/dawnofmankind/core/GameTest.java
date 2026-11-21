@@ -160,6 +160,18 @@ class GameTest {
     }
 
     @Test
+    void payingTowardAWonderCostsNoAction() {
+        Game g = game(1, 36);
+        Player p = g.players.get(0);
+        p.res.put(Res.PRODUCTION, 5);
+        Game.WonderProgress w = g.greatWonders.isEmpty() ? null : g.greatWonders.get(0);
+        if (w == null) return;                      // none on the board in this seed
+        int before = g.actionsLeft;
+        g.act(0, Map.of("type", "contribute", "wonder", w.def.id, "resources", Map.of("production", 1)));
+        assertEquals(before, g.actionsLeft);
+    }
+
+    @Test
     void techsAreGlobal() {
         Game g = game(2, 18);
         Player a = g.players.get(g.currentPlayer), b = g.players.get(1 - g.currentPlayer);
@@ -313,7 +325,7 @@ class GameTest {
         assertEquals(2, g.frontier.stream().filter(x -> !x.fromEvent && !x.opened).count(), "a new face-up land replaces the colony");
         assertEquals(2, f.troopsPaid);
         assertEquals(1, p.army, "half of the 2 troops sent are lost");
-        // later payments need no card, 1 action each
+        // later payments need no card and no action
         p.res.put(Res.FOOD, 50);
         p.res.put(Res.PRODUCTION, 50);
         p.army = 5;
@@ -322,7 +334,7 @@ class GameTest {
         Map<String, Object> all = new java.util.HashMap<>();
         for (Res r : Res.values()) all.put(r.key(), 50);
         g.act(p.seat, Map.of("type", "colonize", "land", f.land.id, "resources", all, "army", 5, "population", 5));
-        assertEquals(actions - 1, g.actionsLeft);
+        assertEquals(actions, g.actionsLeft, "paying toward a colony is free");
         assertEquals(3, g.realm.size());
         assertEquals(4, p.army, "only the missing 2 troops were sent, 1 lost");
         assertEquals(2, g.frontier.size(), "the colony is settled; two face-up lands remain");
