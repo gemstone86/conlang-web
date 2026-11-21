@@ -44,6 +44,11 @@ public final class Player {
     public int committed;
     /** Disconnected: their turn and responses are passed automatically. */
     public boolean away;
+    /** Parallel rounds: this player's actions left this round, whether they have ended their round, and what they drew blind at its start. */
+    public int actions;
+    public boolean done;
+    public Game.CardInst turnDraw;
+    public int turnEvents, turnSeq;
 
     Player(int seat, String name) {
         this.seat = seat;

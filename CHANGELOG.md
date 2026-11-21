@@ -2,6 +2,16 @@
 
 Newest first. Versions from 1.x on are the combined app (Root and Rune + Weather generator).
 
+## v1.58.0 (combined app)
+- **Dawn of Mankind: parallel rounds.** There are no turns now: every player has their own 4 actions each round and acts at the same time, in any order. Everyone draws their blind card as the round starts. A player presses *Done for the round* (hand within its limit); when everyone is done, the events come, as before. First click wins when two players take the same card.
+- **The card queue keeps its gaps.** A taken card leaves an empty (dotted) slot; nothing slides down during the round. At the end of the round the last slots leave (an empty one loses nothing, and the red ✕ cards are exactly those about to go), the gaps close and the queue is refilled.
+- **Pick time.** The queue can be picked from for 90 seconds after the round starts, then it is closed until the next round (a countdown shows it). Anyone can change the time during play (0 = no limit); setting it to less than has already passed closes the queue at once.
+- **Every drawn event shows.** An event that resolves at once (no response cards, nothing to decide, e.g. Flash Flood) now pops up for every player with what it did, instead of passing by unseen in the log.
+- **Round start pop-up:** at the start of every round a box says it is your turn (round number) and shows the card you drew.
+- **Temples make 2 culture per worker** (was 1).
+- **Strength in the tribe panel:** *Army Y (strength X)* for each player (when technologies add strength), and a line for the whole tribe: total army and total strength against an invasion (everyone sending all their troops, plus any invasion defense).
+- Away players are marked done automatically; AI players pick from the open slots. Changed in the combined app's copy only.
+
 ## v1.57.12 (combined app)
 - **Dawn of Mankind: cards that leave the queue are marked with a red ✕** (besides the dashed border).
 

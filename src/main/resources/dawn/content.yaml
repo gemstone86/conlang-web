@@ -55,8 +55,8 @@ buildings:
     name: Temple
     cost: {production: 3}
     slots: 2
-    perWorker: {culture: 1}
-    text: Each worker produces 1 culture (and 1 happiness, coming later).
+    perWorker: {culture: 2}
+    text: Each worker produces 2 culture (and 1 happiness, coming later).
   village:
     name: Village
     cost: {production: 3}

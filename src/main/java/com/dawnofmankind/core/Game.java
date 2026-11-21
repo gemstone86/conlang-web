@@ -43,6 +43,8 @@ public final class Game {
     public static final class Slot {
         public final CardInst card;
         public CardInst under;
+        /** Taken during the round: the slot stays empty (nothing slides down) until the end of the round. */
+        public boolean taken;
 
         Slot(CardInst card, CardInst under) {
             this.card = card;
@@ -147,8 +149,10 @@ public final class Game {
     public int round = 1;
     public int eraIndex = 0;
     public int firstPlayer = 0;
-    public int currentPlayer = 0;
-    public int actionsLeft;
+    /** Seconds the queue can be picked from after a round starts (0 = no limit); changeable during play. */
+    public int pickSeconds = 90;
+    public long roundStartedAt;
+    public boolean picksLocked;
     public int stability, health;
     /** Enemies massing from hostility cards; the next invasion adds them to its strength. */
     public int threat;
@@ -307,12 +311,6 @@ public final class Game {
         beginTurns();
     }
 
-    private void beginTurns() {
-        phase = Phase.TURNS;
-        currentPlayer = firstPlayer;
-        beginTurn();
-    }
-
     /** Whether a player has a real choice of who starves: people in more than one place (idle, or in different buildings). */
     private boolean canChooseWhoStarves(Player p, int n) {
         long places = (p.idle > 0 ? 1 : 0) + p.buildings.stream().filter(b -> b.workers > 0).count();
@@ -397,19 +395,47 @@ public final class Game {
         }
     }
 
-    /** What the player whose turn it is drew blind at its start (null: nothing), the events that went face down on the way, and a counter so clients show each draw once. */
-    public CardInst turnDraw;
-    public int turnEvents, turnSeq;
+    /** Every player starts the round at once: their actions, and one blind card each from the era deck. */
+    private void beginTurns() {
+        phase = Phase.TURNS;
+        picksLocked = false;
+        roundStartedAt = System.currentTimeMillis();
+        for (Player p : players) {
+            p.actions = content.rules.actionsPerTurn + mods(p).actionsPerTurn;
+            p.done = false;
+            p.turnEvents = 0;
+            CardInst c = drawFromEraDeck(p);
+            p.turnDraw = c;
+            p.turnSeq++;
+            log(p.name + " draws" + (c == null ? " nothing (the era deck is empty)." : " a card."));
+        }
+        for (Player p : players) if (p.away) endRoundFor(p);
+    }
 
-    private void beginTurn() {
-        Player p = players.get(currentPlayer);
-        actionsLeft = content.rules.actionsPerTurn + mods(p).actionsPerTurn;
-        turnEvents = 0;
-        CardInst c = drawFromEraDeck(p);
-        turnDraw = c;
-        turnSeq++;
-        log(p.name + "'s turn." + (c == null ? " (The era deck is empty.)" : ""));
-        if (p.away) endTurnInternal();
+    /** Milliseconds left to pick cards (-1: no limit, 0: closed). */
+    public long pickLeftMillis() {
+        if (picksLocked) return 0;
+        if (pickSeconds <= 0) return -1;
+        return Math.max(0, roundStartedAt + pickSeconds * 1000L - System.currentTimeMillis());
+    }
+
+    /** Called every few seconds: closes the queue when the pick time is over. Returns true if something changed. */
+    public boolean tick() {
+        if (result != null || phase != Phase.TURNS || picksLocked || pickSeconds <= 0) return false;
+        if (pickLeftMillis() > 0) return false;
+        picksLocked = true;
+        log("The time to pick cards is over: the queue is closed until the next round.");
+        version++;
+        return true;
+    }
+
+    /** {"type":"pickTime","seconds":n}: the time to pick cards each round (0 = no limit). */
+    private void pickTime(Map<String, Object> a) {
+        int sec = Y.i(a, "seconds", pickSeconds);
+        if (sec < 0 || sec > 3600) throw new GameException("Pick time is 0 (no limit) to 3600 seconds.");
+        pickSeconds = sec;
+        picksLocked = sec > 0 && pickLeftMillis() <= 0;
+        log("Time to pick cards: " + (sec == 0 ? "no limit" : sec + " seconds") + " each round" + (picksLocked ? " (already over this round)." : "."));
     }
 
     /** Draws for a player: events go to the future deck and the player draws again. Returns the card kept, or null. */
@@ -418,7 +444,7 @@ public final class Game {
         while ((c = nextFromEraDeck()) != null) {
             if (c.def.isEvent()) {
                 futureEvents.add(c);
-                turnEvents++;
+                p.turnEvents++;
                 log(p.name + " drew an event; it goes face down into the future deck.");
                 continue;
             }
@@ -428,14 +454,12 @@ public final class Game {
         return null;
     }
 
-    private void endTurnInternal() {
-        int next = (currentPlayer + 1) % players.size();
-        if (next == firstPlayer) {
-            startEvents();
-        } else {
-            currentPlayer = next;
-            beginTurn();
-        }
+    /** A player is done with the round (the hand is kept to its limit); when everyone is, the events come. */
+    private void endRoundFor(Player p) {
+        if (p.away) while (p.hand.size() > handLimit(p)) p.hand.remove(p.hand.size() - 1);
+        p.done = true;
+        log(p.name + " is done for the round.");
+        if (phase == Phase.TURNS && players.stream().allMatch(x -> x.done)) startEvents();
     }
 
     private void startEvents() {
@@ -474,7 +498,15 @@ public final class Game {
             // a land found by this event is shown now, so the team can pay for it before the event resolves
             applyImmediate(d.effects.stream().filter(x -> x.containsKey("discover")).toList(), players, null, 1.0, false);
             if (!needsResponses()) {
+                // nobody can respond: it resolves at once, but every player is shown what happened
+                CardInst shown = pending.event;
+                int tg = pending.target;
+                collect = new ArrayList<>();
                 resolvePending();
+                Notice n = new Notice(++noticeSeq, shown, tg, collect);
+                collect = null;
+                notices.add(n);
+                while (notices.size() > 30) notices.remove(0);
                 continue;
             }
             return;
@@ -516,9 +548,11 @@ public final class Game {
     }
 
     private void endRound() {
+        // the last k slots leave (an empty one costs nothing); then the gaps close up and the queue is refilled
         int k = Math.min(queue.size(), content.rules.removedPerRound(players.size()));
         for (int i = 0; i < k; i++) {
             Slot s = queue.remove(queue.size() - 1);
+            if (s.taken) continue;
             if (s.card.def.isEvent()) {
                 futureEvents.add(s.card);
                 log(s.card.def.name + " leaves the bottom of the queue and goes to the future deck.");
@@ -526,6 +560,7 @@ public final class Game {
                 log(s.card.def.name + " leaves the bottom of the queue.");
             }
         }
+        queue.removeIf(sl -> sl.taken);
         refillQueue();
         for (Player p : players) p.committed = 0;
         if (eraEnding || eraDeck.isEmpty()) {
@@ -533,7 +568,6 @@ public final class Game {
             advanceEra();
             if (result != null) return;
         }
-        firstPlayer = (firstPlayer + 1) % players.size();
         round++;
         startRound();
     }
@@ -588,12 +622,13 @@ public final class Game {
             case "endTurn" -> {
                 myTurn(p);
                 int limit = handLimit(p);
-                if (p.hand.size() > limit) throw new GameException("Discard down to " + limit + " cards before ending your turn.");
-                endTurnInternal();
+                if (p.hand.size() > limit) throw new GameException("Discard down to " + limit + " cards before you are done.");
+                endRoundFor(p);
             }
+            case "pickTime" -> pickTime(a);
             default -> {
                 myTurn(p);
-                if (actionsLeft <= 0) throw new GameException("No actions left. End your turn.");
+                if (p.actions <= 0) throw new GameException("No actions left. You can be done for the round.");
                 switch (type) {
                     case "move" -> move(p, a);
                     case "build" -> build(p, a);
@@ -605,7 +640,7 @@ public final class Game {
                     case "cleanse" -> cleanse(p, a);
                     default -> throw new GameException("Unknown action: " + type);
                 }
-                actionsLeft--;
+                p.actions--;
             }
         }
         version++;
@@ -630,7 +665,7 @@ public final class Game {
 
     private void myTurn(Player p) {
         if (phase != Phase.TURNS) throw new GameException("Wait for the events to be resolved.");
-        if (p.seat != currentPlayer) throw new GameException("It is " + players.get(currentPlayer).name + "'s turn.");
+        if (p.done) throw new GameException("You are done for this round.");
     }
 
     private void move(Player p, Map<String, Object> a) {
@@ -706,7 +741,14 @@ public final class Game {
     private void pick(Player p, Map<String, Object> a) {
         int i = Y.i(a, "slot", -1);
         if (i < 0 || i >= queue.size()) throw new GameException("No card in that queue slot.");
-        Slot s = queue.remove(i);
+        Slot s = queue.get(i);
+        if (!picksLocked && pickSeconds > 0 && pickLeftMillis() <= 0) {
+            picksLocked = true;
+            log("The time to pick cards is over: the queue is closed until the next round.");
+        }
+        if (picksLocked) throw new GameException("The time to pick cards is over for this round.");
+        if (s.taken) throw new GameException("That card was just taken.");
+        s.taken = true;
         if (!s.card.def.isEvent()) {
             log(p.name + " takes " + s.card.def.name + " from the queue.");
             take(p, s.card);
@@ -1196,9 +1238,8 @@ public final class Game {
         if (p.away == away) return;
         p.away = away;
         if (result == null && away) {
-            if (phase == Phase.TURNS && currentPlayer == seat) {
-                while (p.hand.size() > handLimit(p)) p.hand.remove(p.hand.size() - 1);
-                endTurnInternal();
+            if (phase == Phase.TURNS && !p.done) {
+                endRoundFor(p);
             } else if (phase == Phase.EVENTS && pending != null) {
                 pending.ready.put(seat, true);
                 maybeResolve();
@@ -1458,7 +1499,7 @@ public final class Game {
                     for (Player p : actor == null ? targets : List.of(actor)) for (int i = 0; i < Y.toInt(v); i++) drawFromEraDeck(p);
                 }
                 case "extraActions" -> {
-                    if (actor != null && phase == Phase.TURNS && actor.seat == currentPlayer) actionsLeft += Y.toInt(v);
+                    if (actor != null && phase == Phase.TURNS) actor.actions += Y.toInt(v);
                 }
                 case "addCrisis" -> addCrisis(String.valueOf(v));
                 case "threat" -> {
@@ -1705,7 +1746,26 @@ public final class Game {
         return n + " " + word + (n == 1 ? "" : "s");
     }
 
+    /** An event that resolved at once (no one could respond): shown to everyone as a pop-up. */
+    public static final class Notice {
+        public final int seq, target;
+        public final CardInst card;
+        public final List<String> lines;
+
+        Notice(int seq, CardInst card, int target, List<String> lines) {
+            this.seq = seq;
+            this.card = card;
+            this.target = target;
+            this.lines = lines;
+        }
+    }
+
+    public final List<Notice> notices = new ArrayList<>();
+    private int noticeSeq;
+    private List<String> collect;
+
     void log(String s) {
+        if (collect != null) collect.add(s);
         log.add(s);
         if (log.size() > 400) log.remove(0);
     }

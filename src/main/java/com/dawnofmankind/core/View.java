@@ -25,13 +25,24 @@ public final class View {
         v.put("version", g.version);
         v.put("phase", g.phase.name().toLowerCase());
         v.put("starving", g.starving);
+        List<Object> notices = new ArrayList<>();
+        for (Game.Notice n : g.notices) {
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("seq", n.seq);
+            m.put("card", card(n.card));
+            if (n.target >= 0) m.put("target", g.players.get(n.target).name);
+            m.put("lines", n.lines);
+            notices.add(m);
+        }
+        v.put("notices", notices);
         v.put("round", g.round);
         v.put("era", g.era().name);
         v.put("eraIndex", g.eraIndex);
         v.put("eraCount", g.content.eras.size());
         v.put("firstPlayer", g.firstPlayer);
-        v.put("currentPlayer", g.currentPlayer);
-        v.put("actionsLeft", g.actionsLeft);
+        v.put("actionsLeft", g.players.get(seat).actions);
+        v.put("pickSeconds", g.pickSeconds);
+        v.put("pickLeftMs", g.pickLeftMillis());
         v.put("stability", g.stability);
         v.put("health", g.health);
         v.put("threat", g.threat);
@@ -53,6 +64,7 @@ public final class View {
                 m.put("victoryPoints", w.victoryPoints);
             }
             m.put("slot", i);
+            m.put("taken", s.taken);
             m.put("faceDown", s.under != null);
             queue.add(m);
         }
@@ -93,6 +105,7 @@ public final class View {
         }
         v.put("builtWonders", built);
         v.put("strengthPerTwoTroops", g.civMods().strengthPerTwoTroops);
+        v.put("tribeStrength", g.players.stream().mapToInt(x -> g.strength(x.army)).sum() + g.civMods().invasionDefense);
         v.put("freeSettlers", g.civMods().freeSettlers);
 
         List<Object> realm = new ArrayList<>();
@@ -141,6 +154,7 @@ public final class View {
             pm.put("army", p.army);
             pm.put("committed", p.committed);
             pm.put("raidDefense", m.raidDefense);
+            pm.put("strength", g.strength(p.army));
             pm.put("handSize", p.hand.size());
             pm.put("handLimit", g.handLimit(p));
             pm.put("giveCards", m.giveCards);
@@ -170,10 +184,11 @@ public final class View {
             pm.put("techs", p.techs.stream().map(View::def).toList());
             pm.put("minorWonders", p.minorWonders.stream().map(View::def).toList());
             if (p.seat == seat) pm.put("hand", p.hand.stream().map(View::card).toList());
-            if (p.seat == seat && seat == g.currentPlayer && g.phase == Game.Phase.TURNS) {
-                pm.put("turnSeq", g.turnSeq);
-                pm.put("turnEvents", g.turnEvents);
-                if (g.turnDraw != null) pm.put("turnDraw", card(g.turnDraw));
+            pm.put("done", p.done);
+            if (p.seat == seat && g.phase == Game.Phase.TURNS) {
+                pm.put("turnSeq", p.turnSeq);
+                pm.put("turnEvents", p.turnEvents);
+                if (p.turnDraw != null) pm.put("turnDraw", card(p.turnDraw));
             }
             players.add(pm);
         }

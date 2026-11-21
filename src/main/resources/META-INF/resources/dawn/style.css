@@ -132,3 +132,6 @@ details summary { cursor: pointer; color: var(--bone-dim); font-size: .88rem; }
 
 .cardx.leaving { position: relative; }
 .leave-x { position: absolute; top: .15rem; right: .35rem; color: #e5484d; font-size: 1.6rem; font-weight: 700; line-height: 1; text-shadow: 0 0 3px #000; pointer-events: none; }
+
+.cardx.gap { opacity: .35; border-style: dotted; display: flex; align-items: center; justify-content: center; min-height: 6rem; }
+#pickBar { gap: .6rem; align-items: center; margin: .3rem 0; }

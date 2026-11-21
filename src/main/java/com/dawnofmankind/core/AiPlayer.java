@@ -28,7 +28,8 @@ public final class AiPlayer {
             for (Player p : g.players) if (respond(g, p)) return true;
             return false;
         }
-        return stepFor(g, g.currentPlayer);
+        for (int seat = 0; seat < g.players.size(); seat++) if (needsToAct(g, seat)) return stepFor(g, seat);
+        return false;
     }
 
     /** True if this seat has something to do now (its turn, or an event waiting for its response). */
@@ -36,7 +37,7 @@ public final class AiPlayer {
         if (g.result != null) return false;
         if (g.phase == Game.Phase.STARVATION) return g.starving.containsKey(seat);
         if (g.phase == Game.Phase.EVENTS) return g.pending != null && !Boolean.TRUE.equals(g.pending.ready.get(seat));
-        return g.phase == Game.Phase.TURNS && g.currentPlayer == seat;
+        return g.phase == Game.Phase.TURNS && !g.players.get(seat).done;
     }
 
     /** Makes one move for this seat, if it needs to act. Returns false if it had nothing to do. */
@@ -45,7 +46,7 @@ public final class AiPlayer {
         Player p = g.players.get(seat);
         if (g.phase == Game.Phase.STARVATION) { starveFor(g, seat); return true; }
         if (g.phase == Game.Phase.EVENTS) return respond(g, p);
-        if (g.actionsLeft > 0 && takeAction(g, p)) return true;
+        if (p.actions > 0 && takeAction(g, p)) return true;
         while (p.hand.size() > g.handLimit(p)) g.act(p.seat, Map.of("type", "discard", "card", p.hand.get(0).id));
         g.act(p.seat, Map.of("type", "endTurn"));
         return true;
@@ -128,7 +129,9 @@ public final class AiPlayer {
             if (f.opened && freeOnce(g, p, "l" + f.land.id) && tryAct(g, p, landPay(g, p, f, Map.of("type", "colonize")))) return true;
         }
         if (!g.queue.isEmpty() && p.hand.size() < g.handLimit(p)) {
-            return tryAct(g, p, Map.of("type", "pick", "slot", rng.nextInt(g.queue.size())));
+            List<Integer> open = new java.util.ArrayList<>();
+            for (int i = 0; i < g.queue.size(); i++) if (!g.queue.get(i).taken) open.add(i);
+            if (!open.isEmpty()) return tryAct(g, p, Map.of("type", "pick", "slot", open.get(rng.nextInt(open.size()))));
         }
         return false;
     }

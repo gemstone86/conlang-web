@@ -115,6 +115,8 @@ function render(m) {
   // keep what people were typing in forms across redraws
   const kept = {};
   document.querySelectorAll('#game [data-keep]').forEach(el => { kept[el.dataset.keep] = el.type === 'checkbox' ? el.checked : el.value; });
+  pickEnd = state.pickLeftMs > 0 ? Date.now() + state.pickLeftMs : null;
+  tickPickTimer.closed = state.pickLeftMs === 0;
   renderStatus();
   renderQueue();
   renderRealm();
@@ -122,6 +124,7 @@ function render(m) {
   renderEvents();
   renderCiv();
   checkPickReveal();
+  checkNotices();
   checkTurnDraw();
   renderStarvation();
   renderTechs();
@@ -162,16 +165,16 @@ $('copyLink').onclick = async () => {
 };
 
 const me = () => state.players[state.you];
-const myTurn = () => state.phase === 'turns' && state.currentPlayer === state.you && !state.result;
+const myTurn = () => state.phase === 'turns' && !me().done && !state.result;
 const canAct = () => myTurn() && state.actionsLeft > 0;
 const resList = (r, opts = {}) => RES.filter(k => (r?.[k] ?? 0) !== 0 || opts.all)
   .map(k => `<span class="res r-${k}">${opts.signed && r[k] > 0 ? '+' : ''}${r[k] ?? 0}<i>${RES_SHORT[k]}</i></span>`).join('') || '<span class="muted">—</span>';
 const affordable = cost => !cost || RES.every(k => (me().resources[k] || 0) >= (cost[k] || 0));
 
 function renderStatus() {
-  const s = state, cur = s.players[s.currentPlayer];
+  const s = state, waiting = s.players.filter(o => !o.done && !o.away).map(o => esc(o.name));
   const phase = s.result ? (s.result === 'victory' ? 'Victory' : 'Defeat')
-    : s.phase === 'events' ? 'Events' : s.phase === 'starvation' ? 'Starvation — choosing who goes' : myTurn() ? `<span class="turn">Your turn — ${s.actionsLeft} action${s.actionsLeft === 1 ? '' : 's'} left</span>` : `${esc(cur.name)}'s turn`;
+    : s.phase === 'events' ? 'Events' : s.phase === 'starvation' ? 'Starvation — choosing who goes' : myTurn() ? `<span class="turn">${s.actionsLeft} action${s.actionsLeft === 1 ? '' : 's'} left</span>` : `You are done — waiting for ${waiting.join(', ') || 'the others'}`;
   $('status').innerHTML = `<span>${esc(s.era)} era (${s.eraIndex + 1}/${s.eraCount})</span><span>Round <b>${s.round}</b></span>
     <span>${phase}</span><span>Stability <b class="${s.stability <= 3 ? 'bad' : ''}">${s.stability}</b></span>
     <span>Health <b>${s.health}</b></span><span class="${s.threat ? 'threat' : ''}">Enemies massing <b>${s.threat}</b></span><span>Era deck <b>${s.eraDeck}</b></span><span>Points <b>${s.score}</b></span>
@@ -193,16 +196,33 @@ function renderQueue() {
     const isLeaving = i >= n - leaving;
     const fd = c.faceDown ? '<div class="facedown">+ a face-down card underneath</div>' : '';
     const label = c.type === 'event' ? 'Take on' : c.type === 'great_wonder' ? 'Start building' : 'Pick';
-    const btn = `<div class="actions"><button ${canAct() ? '' : 'disabled'} data-pick="${i}">${label} (1 action)</button></div>`;
+    if (c.taken) return `<div class="cardx gap" title="Taken; the queue closes up at the end of the round"><div class="muted small">taken</div></div>`;
+    const btn = `<div class="actions"><button ${canAct() && !pickClosed() ? '' : 'disabled'} data-pick="${i}">${label} (1 action)</button></div>`;
     return cardHtml(c, `${isLeaving ? '<div class="leave-x" title="Leaves the queue at the end of the round">✕</div>' : ''}${fd}${btn}`, isLeaving ? 'leaving' : '');
   }).reverse().join('');
   $('queuePanel').innerHTML = `<div class="queue-head"><h2>Card queue</h2><span class="muted small">At the end of the round the ${leaving} leftmost card${leaving > 1 ? 's' : ''} (dashed) leave${leaving > 1 ? '' : 's'}; events that leave go to the future deck.</span></div>
+    <div class="row small" id="pickBar"><span id="pickTimer"></span><label style="margin:0">Pick time (s, 0 = no limit) <input type="number" min="0" max="3600" step="10" id="pickSecs" value="${s.pickSeconds}" data-keep="pickSecs" style="width:4.5rem"></label><button class="tiny" data-picktime>Set</button></div>
     <div class="queue-row">${items || '<p class="muted">The queue is empty.</p>'}</div>
     <div class="queue-ends"><span>← leaves here</span><span>new cards come in here →</span></div>`;
 }
 // Taking on an event gives the face-down card under it: when it arrives in the hand, show it in a pop-up.
 let pickWatch = null;
+// The time to pick cards: counted down here from what the server says is left.
+let pickEnd = null;
+const pickClosed = () => state.pickLeftMs === 0 || (pickEnd != null && Date.now() >= pickEnd);
+function tickPickTimer() {
+  const el = $('pickTimer');
+  if (!el || !state || state.phase !== 'turns') { if (el) el.textContent = ''; return; }
+  if (state.pickLeftMs < 0) { el.textContent = 'Picking: no time limit'; return; }
+  const left = pickEnd == null ? 0 : Math.max(0, Math.round((pickEnd - Date.now()) / 1000));
+  el.textContent = left > 0 ? `Time to pick cards: ${left}s` : 'The queue is closed until the next round';
+  el.className = left > 0 && left <= 15 ? 'bad' : '';
+  if (left === 0 && !tickPickTimer.closed) { tickPickTimer.closed = true; renderQueue(); }
+}
+setInterval(tickPickTimer, 500);
 $('queuePanel').onclick = e => {
+  const pt = e.target.closest('[data-picktime]');
+  if (pt) return send({ type: 'pickTime', seconds: Math.max(0, Math.round(+$('pickSecs').value || 0)) });
   const b = e.target.closest('[data-pick]'); if (!b) return;
   const card = state.queue[+b.dataset.pick];
   if (card && card.type === 'event') {
@@ -223,7 +243,7 @@ function checkTurnDraw() {
   const body = m.turnDraw
     ? `<div class="cards">${cardHtml(m.turnDraw)}</div>${m.turnDraw.type === 'great_wonder' ? '<p class="muted small">A great wonder: it goes on the board for the whole tribe to build.</p>' : ''}`
     : '<p class="muted">The era deck is empty: nothing to draw.</p>';
-  $('gotBox').innerHTML = `<h2>Your turn: you drew</h2>${ev}${body}<div class="row"><button class="primary" data-gotok>OK</button></div>`;
+  $('gotBox').innerHTML = `<h2>Round ${state.round}: your turn. You drew</h2>${ev}${body}<div class="row"><button class="primary" data-gotok>OK</button></div>`;
   $('gotModal').hidden = false;
 }
 // Starvation: when food runs short and your people are in more than one place, you choose who starves.
@@ -253,6 +273,35 @@ function renderStarvation() {
   };
 }
 
+// Events that resolve at once (nobody can respond) are shown too, so they don't pass by unseen in the log.
+function checkNotices() {
+  if (!room || !state.notices) return;
+  const key = 'dawnNotice-' + room.code;
+  let last = 0, stored = null;
+  try { stored = sessionStorage.getItem(key); } catch (e) {}
+  if (stored == null) {                                  // first look in this tab: what already happened isn't shown again
+    const top = state.notices.length ? state.notices[state.notices.length - 1].seq : 0;
+    try { sessionStorage.setItem(key, String(top)); } catch (e) {}
+    return;
+  }
+  last = +stored || 0;
+  const fresh = state.notices.filter(n => n.seq > last);
+  if (!fresh.length) return;
+  try { sessionStorage.setItem(key, String(fresh[fresh.length - 1].seq)); } catch (e) {}
+  if (!$('noticeModal').hidden) { noticeQueue.push(...fresh); return; }
+  showNotices(fresh);
+}
+let noticeQueue = [];
+function showNotices(list) {
+  $('noticeBox').innerHTML = `<h2>${list.length > 1 ? 'Events' : 'An event'} struck</h2>` + list.map(n => cardHtml(n.card,
+    `${n.target ? `<div class="small">Struck <b>${esc(n.target)}</b>.</div>` : ''}<div class="small">${n.lines.map(esc).join('<br>')}</div>`)).join('') + `<div class="row"><button class="primary" data-noticeok>OK</button></div>`;
+  $('noticeModal').hidden = false;
+}
+$('noticeModal').onclick = e => {
+  if (!e.target.closest('[data-noticeok]') && e.target !== $('noticeModal')) return;
+  $('noticeModal').hidden = true;
+  if (noticeQueue.length) { const q = noticeQueue; noticeQueue = []; showNotices(q); }
+};
 function checkPickReveal() {
   if (!pickWatch) return;
   if (Date.now() - pickWatch.at > 5000) { pickWatch = null; return; }
@@ -469,7 +518,7 @@ function renderCiv() {
   $('civPanel').innerHTML = `<h2>Your people — ${esc(p.name)}</h2>
     <div class="row">${resList(p.resources, { all: true })}</div>
     <div class="row small muted">Per round: ${resList(p.income, { signed: true })} (food after feeding your people)</div>
-    <div class="row small">Population <b>${p.population}</b> · idle ${p.idle} · Army <b>${p.army}</b>${p.committed ? ` (${p.committed} away at war)` : ''} · raid defense +${p.raidDefense} · hand ${p.handSize}/${p.handLimit}</div>
+    <div class="row small">Population <b>${p.population}</b> · idle ${p.idle} · Army <b>${p.army}</b>${p.strength !== p.army ? ` (strength ${p.strength})` : ''}${p.committed ? ` (${p.committed} away at war)` : ''} · raid defense +${p.raidDefense} · hand ${p.handSize}/${p.handLimit}</div>
     ${(() => { const techs = s.players.flatMap(o => o.techs); return techs.length ? `<div class="small">Technologies (they help everyone): ${techs.map(t => `<span class="chip" title="${esc(t.text)}">${esc(t.name)}</span>`).join('')}</div>` : ''; })()}
     ${p.minorWonders.length ? `<div class="small">${p.minorWonders.map(t => `<span class="chip" title="${esc(t.text)}">★ ${esc(t.name)}</span>`).join('')}</div>` : ''}
     ${s.strengthPerTwoTroops || s.freeSettlers ? `<div class="small muted">${s.strengthPerTwoTroops ? `Military strength +${s.strengthPerTwoTroops} per 2 troops. ` : ''}${s.freeSettlers ? `Settling takes ${s.freeSettlers} settler${s.freeSettlers > 1 ? 's' : ''} less.` : ''}</div>` : ''}
@@ -480,7 +529,7 @@ function renderCiv() {
     <div class="row">
       <button ${act && affordable(s.rules.growthCost) ? '' : 'disabled'} data-grow>Grow +1 Population — ${resList(s.rules.growthCost)}</button>
       <button ${act && affordable(s.rules.recruitCost) ? '' : 'disabled'} data-recruit>Train 1 troop — ${resList(s.rules.recruitCost)}</button>
-      <button class="primary" ${myTurn() ? '' : 'disabled'} data-end>End turn</button>
+      <button class="primary" ${myTurn() ? '' : 'disabled'} data-end>Done for the round</button>
     </div>
     ${s.sharedPool ? `<h3>Shared pool</h3><div class="row">${resList(s.sharedPool, { all: true })}</div>
       <div class="row small">${RES.map(k => `<label class="res r-${k}" style="margin:0">${RES_SHORT[k]} <input type="number" min="0" value="0" data-keep="pool-${k}" data-pres="${k}"></label>`).join('')}</div>
@@ -529,7 +578,7 @@ function renderHand() {
   const giveBar = others.length && p.giveCards ? `<div class="row small">Roman Roads: give up to ${p.giveCards} ticked cards to
       <select id="giveCardsTo" data-keep="giveCardsTo">${others.map(o => `<option value="${o.seat}">${esc(o.name)}</option>`).join('')}</select>
       <button ${act ? '' : 'disabled'} data-givecards>Give (1 action)</button></div>` : '';
-  $('handPanel').innerHTML = `<h2>Your hand (${p.hand.length}/${p.handLimit})</h2>${over ? `<p class="small bad" style="color:var(--err)">Discard down to ${p.handLimit} before ending your turn.</p>` : ''}${giveBar}
+  $('handPanel').innerHTML = `<h2>Your hand (${p.hand.length}/${p.handLimit})</h2>${over ? `<p class="small bad" style="color:var(--err)">Discard down to ${p.handLimit} before you are done.</p>` : ''}${giveBar}
     <div class="cards">${cards || '<p class="muted">No cards. Pick from the queue.</p>'}</div>`;
 }
 $('handPanel').onclick = e => {
@@ -559,13 +608,13 @@ $('handPanel').onclick = e => {
 function renderTeam() {
   const s = state;
   const others = s.players.filter(o => o.seat !== s.you);
-  const list = s.players.map(o => `<div class="teammate ${o.seat === s.currentPlayer && s.phase === 'turns' ? 'active' : ''}">
-      <div class="tname">${o.seat === s.currentPlayer && s.phase === 'turns' ? '▶ ' : ''}${esc(o.name)}${o.seat === s.you ? ' (you)' : ''}${room.players[o.seat]?.ai ? ' <span class="chip">AI</span>' : ''}${o.seat === s.firstPlayer ? ' <span class="chip">first</span>' : ''}${o.away ? ' <span class="chip">away</span>' : ''}</div>
+  const list = s.players.map(o => `<div class="teammate ${s.phase === 'turns' && !o.done ? 'active' : ''}">
+      <div class="tname">${s.phase === 'turns' ? (o.done ? '✔ ' : '▶ ') : ''}${esc(o.name)}${o.seat === s.you ? ' (you)' : ''}${room.players[o.seat]?.ai ? ' <span class="chip">AI</span>' : ''}${o.seat === s.firstPlayer ? ' <span class="chip">first</span>' : ''}${o.away ? ' <span class="chip">away</span>' : ''}</div>
       <div class="small">${resList(o.resources)}</div>
-      <div class="small muted">Pop ${o.population} · Army ${o.army} · Hand ${o.handSize} · ${o.buildings.map(b => esc(b.name) + ' ' + b.workers + '/' + b.slots).join(', ')}</div>
+      <div class="small muted">Pop ${o.population} · Army ${o.army}${o.strength !== o.army ? ` (strength ${o.strength})` : ''} · Hand ${o.handSize} · ${o.buildings.map(b => esc(b.name) + ' ' + b.workers + '/' + b.slots).join(', ')}</div>
       ${o.techs.length || o.minorWonders.length ? `<div>${o.techs.map(t => `<span class="chip" title="${esc(t.text)}">${esc(t.name)}</span>`).join('')}${o.minorWonders.map(t => `<span class="chip">★ ${esc(t.name)}</span>`).join('')}</div>` : ''}
     </div>`).join('');
-  $('teamPanel').innerHTML = `<h2>The tribe</h2>${list}`;
+  $('teamPanel').innerHTML = `<h2>The tribe</h2><p class="small" style="margin:0 0 .3rem">Army ${s.players.reduce((t, o) => t + o.army, 0)} (total strength against an invasion: <b>${s.tribeStrength}</b>)</p>${list}`;
 }
 function renderDecks() {
   const s = state;
