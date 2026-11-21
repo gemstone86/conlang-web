@@ -2,6 +2,9 @@
 
 Newest first. Versions from 1.x on are the combined app (Root and Rune + Weather generator).
 
+## v1.57.7 (combined app)
+- **Dawn of Mankind: Plains** now reads "+2 max farm slots". Changed in the combined app's copy only.
+
 ## v1.57.6 (combined app)
 - **New event "Civil War" (Dawn of Mankind).** A random core territory loses its core status; with no core territory, a random territory is lost instead. In the Ancient event deck. New effect `civilWar`. (The realm is shared by the whole team, so "your" core means the team's.) Changed in the combined app's copy only.
 

@@ -76,7 +76,7 @@ territories:
     name: Plains
     copies: 3
     slots: {farm: 2}
-    text: +2 farm worker slots.
+    text: +2 max farm slots.
   mountains:
     name: Mountains
     copies: 3
