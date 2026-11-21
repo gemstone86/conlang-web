@@ -97,10 +97,11 @@ public final class AiPlayer {
             for (Res r : Res.values()) give.put(r, Math.max(0, Math.min(p.res.get(r) - (r == Res.FOOD ? pop : 0), 3)));
             Map<String, Object> m = new HashMap<>();
             for (Res r : Res.values()) m.put(r.key(), give.get(r));
-            if (tryAct(g, p, Map.of("type", "contribute", "wonder", w.def.id, "resources", m))) return true;
+            // paying toward a wonder is free: once per wonder per round, or the AI would pour everything in at once
+            if (freeOnce(g, p, "w" + w.def.id) && tryAct(g, p, Map.of("type", "contribute", "wonder", w.def.id, "resources", m))) return true;
         }
         for (Game.Frontier f : g.frontier) {
-            if (f.opened && tryAct(g, p, landPay(g, p, f, Map.of("type", "colonize")))) return true;
+            if (f.opened && freeOnce(g, p, "l" + f.land.id) && tryAct(g, p, landPay(g, p, f, Map.of("type", "colonize")))) return true;
         }
         if (!g.queue.isEmpty() && p.hand.size() < g.handLimit(p)) {
             return tryAct(g, p, Map.of("type", "pick", "slot", rng.nextInt(g.queue.size())));
@@ -128,6 +129,13 @@ public final class AiPlayer {
 
     private static int countFarms(Player p) {
         return (int) p.buildings.stream().filter(b -> b.def.id.equals("farm")).count();
+    }
+
+    private final java.util.Set<String> freeDone = new java.util.HashSet<>();
+
+    /** True the first time for this seat, round and thing (a free payment that takes no action). */
+    private boolean freeOnce(Game g, Player p, String what) {
+        return freeDone.add(System.identityHashCode(g) + ":" + g.round + ":" + p.seat + ":" + what);
     }
 
     private static boolean tryAct(Game g, Player p, Map<String, Object> a) {
