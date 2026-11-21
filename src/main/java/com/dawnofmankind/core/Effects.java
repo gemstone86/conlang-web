@@ -1,0 +1,99 @@
+package com.dawnofmankind.core;
+
+import java.util.EnumMap;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
+/**
+ * The effect vocabulary used in content.yaml. Each effect is a one-key map, e.g. {@code - gain: {food: 2}}.
+ *
+ * <p><b>Immediate</b> (applied once, when a card is played, a wonder is finished or an event resolves):
+ * gain, lose, population, army, stability, health, draw, extraActions, addCrisis, destroyBuilding, freeBuilding,
+ * discover (put lands from the world deck, or a named special land, face up), enemy ({each: n} or {one: n}: raise
+ * face-up lands' enemy strength), removeLand (n random face-up lands are discarded with what was paid), settle (the card settles a chosen face-up land), core (the card cores a territory).
+ *
+ * <p><b>Lasting</b> (active while the owner holds the tech or wonder, or while a persistent event is in play):
+ * income, perWorker, handLimit, actionsPerTurn, raidDefense, invasionDefense, mitigate, buildDiscount, sharedPool,
+ * victoryPoints, faceUpLands (more lands face up), settleDiscount (off every land's settling cost), freeSettlers
+ * (fewer settlers needed per land), strengthPerTwoTroops (military strength +n for every 2 troops), giveCards (the
+ * owner may give up to n cards to teammates for 1 action). trade ([resources]: the card sends any amount of those
+ * resources to a chosen teammate; giving is otherwise not possible).
+ * <p><b>Crisis</b> (in a lasting crisis's stages / everyRound): threat (+n enemies massing), invadeIfStronger (an
+ * invasion card strikes if the massing enemies outnumber the players' military strength), raidAll ({card, strength}:
+ * a raid on every player), invasion (an invasion card strikes), healthTest ({threshold, populationLoss}).
+ * coreTerritory (great wonders, when finished): cores the territory the wonder stands in, else another one.
+ *
+ * <p><b>Response</b> (only on response cards, for the event being resolved): defense, halve, cancel, healthBonus.
+ */
+public final class Effects {
+    private Effects() {}
+
+    static final Set<String> IMMEDIATE = Set.of("gain", "lose", "population", "army", "stability", "health", "draw",
+            "extraActions", "addCrisis", "destroyBuilding", "freeBuilding", "discover", "enemy", "settle", "core", "removeLand", "coreTerritory", "hostility",
+            "threat", "invadeIfStronger", "raidAll", "invasion", "healthTest", "trade");
+    static final Set<String> LASTING = Set.of("income", "perWorker", "handLimit", "actionsPerTurn", "raidDefense",
+            "mitigate", "buildDiscount", "sharedPool", "victoryPoints", "invasionDefense", "faceUpLands", "settleDiscount", "freeSettlers", "strengthPerTwoTroops", "giveCards");
+    static final Set<String> RESPONSE = Set.of("defense", "halve", "cancel", "healthBonus");
+
+    static String key(Map<String, Object> e) {
+        return e.keySet().iterator().next();
+    }
+
+    static void check(Map<String, Object> e, String owner) {
+        String k = key(e);
+        if (!IMMEDIATE.contains(k) && !LASTING.contains(k) && !RESPONSE.contains(k)) {
+            throw new IllegalStateException(owner + ": unknown effect '" + k + "'");
+        }
+    }
+
+    /** Lasting bonuses for one player, summed from their techs and minor wonders, the team's great wonders and active curses. */
+    public static final class Mods {
+        public final EnumMap<Res, Integer> income = Res.empty();
+        public final Map<String, EnumMap<Res, Integer>> perWorker = new HashMap<>();
+        public final EnumMap<Res, Integer> buildDiscount = Res.empty();
+        public final EnumMap<Res, Integer> poolIncome = Res.empty();
+        public final Set<String> mitigate = new HashSet<>();
+        public int handLimit, actionsPerTurn, raidDefense, victoryPoints, invasionDefense, faceUpLands, freeSettlers, strengthPerTwoTroops, giveCards;
+        public final EnumMap<Res, Integer> settleDiscount = Res.empty();
+        public boolean sharedPool;
+
+        void add(List<Map<String, Object>> effects) {
+            for (Map<String, Object> e : effects) add(e);
+        }
+
+        void add(Map<String, Object> e) {
+            String k = key(e);
+            Object v = e.get(k);
+            switch (k) {
+                case "income" -> Res.parse(v).forEach((r, n) -> income.merge(r, n, Integer::sum));
+                case "perWorker" -> {
+                    Map<String, Object> m = new HashMap<>(Y.map(v));
+                    String building = String.valueOf(m.remove("building"));
+                    EnumMap<Res, Integer> add = Res.parse(m);
+                    EnumMap<Res, Integer> cur = perWorker.computeIfAbsent(building, x -> Res.empty());
+                    add.forEach((r, n) -> cur.merge(r, n, Integer::sum));
+                }
+                case "buildDiscount" -> Res.parse(v).forEach((r, n) -> buildDiscount.merge(r, n, Integer::sum));
+                case "handLimit" -> handLimit += Y.toInt(v);
+                case "actionsPerTurn" -> actionsPerTurn += Y.toInt(v);
+                case "raidDefense" -> raidDefense += Y.toInt(v);
+                case "invasionDefense" -> invasionDefense += Y.toInt(v);
+                case "faceUpLands" -> faceUpLands += Y.toInt(v);
+                case "freeSettlers" -> freeSettlers += Y.toInt(v);
+                case "strengthPerTwoTroops" -> strengthPerTwoTroops += Y.toInt(v);
+                case "giveCards" -> giveCards += Y.toInt(v);
+                case "settleDiscount" -> Res.parse(v).forEach((r, n) -> settleDiscount.merge(r, n, Integer::sum));
+                case "victoryPoints" -> victoryPoints += Y.toInt(v);
+                case "mitigate" -> mitigate.addAll(Y.strings(v));
+                case "sharedPool" -> {
+                    sharedPool = true;
+                    Res.parse(Y.map(v).get("income")).forEach((r, n) -> poolIncome.merge(r, n, Integer::sum));
+                }
+                default -> { /* immediate and response effects are not lasting */ }
+            }
+        }
+    }
+}

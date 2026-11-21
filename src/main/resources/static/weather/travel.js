@@ -68,6 +68,10 @@
     landHours: 4,
     // how much routes off the roads and rivers wander (1 = normal, 0 = straight, 2 = twice as much)
     wiggle: 1,
+    // the rivers swell in the spring thaw of their region: the flow counts this much more (0.5 = +50 %) in the months 3–4 (north) or 9–10 (south)
+    springRise: 0.5,
+    // on foot, below this speed (km/h) the way counts as blocked (deep snow, storm): the journey asks about a new route (0 = never)
+    blockSpeed: 0.5,
     // Säkrast: off the roads the time counts (off + perKm × km from anything civilised, at most max) times as
     // much (nation: inside a nation's borders instead; path: on a path), plus forest × the share of trees;
     // the route is never allowed to take more than maxTimes the time of Snabbast
@@ -217,7 +221,14 @@
    * Hours to get across a river off the roads: fording (hours per size of the river there), or, for a journey
    * that uses ferries, the ferry where the river is big enough for boats (the boarding hours, if fewer).
    */
-  const fordHours = (cfg, flow, ferry) => {
+  /** The flow's factor in a month at a height on the map (y, 0–1): the rivers rise in their region's spring thaw. */
+  function springMul(fm, cfg, y, month) {
+    if (month == null || !(cfg.springRise > 0) || !fm.ctFloodDefault || y == null) return 1;
+    const [a, b] = fm.ctFloodDefault(y);
+    return month >= a && month <= b ? 1 + cfg.springRise : 1;
+  }
+  const fordHours = (cfg, flow, ferry, mul) => {
+    flow = flow * (mul || 1);
     const h = cfg.riverHoursPerSize * flow;
     return ferry && flow >= cfg.boatMinFlow ? Math.min(h, cfg.boardHours) : h;
   };
@@ -286,7 +297,8 @@
         const x = crossingAt(fm, (a.x + (b.x - a.x) * c.t) * W, (a.y + (b.y - a.y) * c.t) * H, reach);
         if (x && x.kind === "bridge") continue;
         if (x && !keepFords && fordOpen(x, planMonth)) continue;
-        out.push(x ? { km: km + c.t * L, flow: c.flow, ford: { floodFrom: x.floodFrom, floodTo: x.floodTo } } : { km: km + c.t * L, flow: c.flow });
+        const y = a.y + (b.y - a.y) * c.t;
+        out.push(x ? { km: km + c.t * L, flow: c.flow, y, ford: { floodFrom: x.floodFrom, floodTo: x.floodTo } } : { km: km + c.t * L, flow: c.flow, y });
       }
       km += L;
     }
@@ -696,7 +708,7 @@
       for (const c of crossings(G.rivers, ux * W, uy * H, vx * W, vy * H)) {
         const x = crossingAt(fm, (ux + (vx - ux) * c.t) * W, (uy + (vy - uy) * c.t) * H, cfg.crossingReach);
         if (x && (x.kind === "bridge" || fordOpen(x, planMonth))) continue;
-        h += fordHours(cfg, c.flow, BT != null);
+        h += fordHours(cfg, c.flow, BT != null, springMul(fm, cfg, uy + (vy - uy) * c.t, planMonth));
       }
       return h;
     };
@@ -782,11 +794,11 @@
     };
     const sm = smoothOffRoad(pts);
     if (G.rivers && G.rivers.seg.length) {
-      const fordH = (q) => routeCrossings(fm, q, G.rivers).reduce((t, c) => t + fordHours(cfg, c.flow, BT != null), 0);
+      const fordH = (q) => routeCrossings(fm, q, G.rivers).reduce((t, c) => t + fordHours(cfg, c.flow, BT != null, springMul(fm, cfg, c.y, planMonth)), 0);
       if (fordH(sm) <= fordH(pts) && rgHits(sm) <= rgHits(pts)) pts = sm;
     } else if (rgHits(sm) <= rgHits(pts)) pts = sm;
     // nobody walks (or sails) in a straight line: a meander off the roads and rivers
-    pts = wiggle(fm, G, pts, cfg.wiggle, (q) => (G.rivers && G.rivers.seg.length ? routeCrossings(fm, q, G.rivers).reduce((t, c) => t + fordHours(cfg, c.flow, BT != null), 0) : 0) + rgHits(q) * 1000);   // (and not into a range that was gone round)
+    if (!opt.straight) pts = wiggle(fm, G, pts, cfg.wiggle, (q) => (G.rivers && G.rivers.seg.length ? routeCrossings(fm, q, G.rivers).reduce((t, c) => t + fordHours(cfg, c.flow, BT != null, springMul(fm, cfg, c.y, planMonth)), 0) : 0) + rgHits(q) * 1000);   // (and not into a range that was gone round)
     let km = 0;
     for (let i = 1; i < pts.length; i++) km += Math.hypot((pts[i].x - pts[i - 1].x) * W, (pts[i].y - pts[i - 1].y) * H) * kmpx;
     return { pts, km, hours: tm[t] };
@@ -930,7 +942,7 @@
       if (dh > 0 && !MODE_OF(S[i - 1].k)) climb += dh;
     }
     return { km: S.length ? S[S.length - 1].km : 0, byKind, climb, fords: fords.length, fordSize: fords.reduce((a, c) => a + c.flow, 0), boards,
-      fordHours: cfg ? fords.reduce((a, c) => a + fordHours(cfg, c.flow, ferry), 0) : 0,
+      fordHours: cfg ? fords.reduce((a, c) => a + fordHours(cfg, c.flow, ferry, springMul(fm, cfg, c.y, planMonth)), 0) : 0,
       ferries: cfg && ferry ? fords.filter((c) => c.flow >= cfg.boatMinFlow && cfg.boardHours < cfg.riverHoursPerSize * c.flow).length : 0 };
   }
 
@@ -964,7 +976,8 @@
     // pend: travel hours to spend (fords, boarding, and delays made before 2.16); hold: clock hours the
     // party stands still whatever the hour (a delay: 24 is a whole day)
     let t = trip.startT, d = 0, i = 0, pend = 0, hold = 0, di = 0, h = 0, fi = 0;
-    const climCache = new Map();
+    const climCache = new Map(), blocks = [];
+    let inBlock = false;
     while (d < total - 1e-9 && t < trip.startT + 200) {
       while (di < delays.length && delays[di].at <= t + 1e-9) {
         const dl = delays[di++];
@@ -1008,12 +1021,14 @@
             const wx = weatherLevel(fm, cfg, s.x, s.y, F, hourG);
             v = speedAt(cfg, trip.pace, s.k, s.f, s.g, deepSnow(climCache.get(ck), s.h, s.ice), wx, s.m, mt);
             lastV = v;
+            // a blocked stretch: noted where it starts (a new one once the way is open again)
+            if (cfg.blockSpeed > 0 && v < cfg.blockSpeed) { if (!inBlock) blocks.push({ t: +t.toFixed(4), km: +d.toFixed(2) }); inBlock = true; } else inBlock = false;
           }
           let nd = Math.min(total, d + v * dt);
           if (fi < fords.length && fords[fi].km <= nd) {
             nd = Math.max(d, fords[fi].km);
             // a ford is crossed freely outside its flood months (by the date the party gets there)
-            if (!(fords[fi].ford && fordOpen(fords[fi].ford, monthOf(serial)))) pend += fordHours(cfg, fords[fi].flow, !!trip.ferry);
+            if (!(fords[fi].ford && fordOpen(fords[fi].ford, monthOf(serial)))) pend += fordHours(cfg, fords[fi].flow, !!trip.ferry, springMul(fm, cfg, fords[fi].y, monthOf(serial)));
             fi++;
           }
           // a city reached late in the day (or pushed on for): the night is spent there
@@ -1041,7 +1056,7 @@
       if (h >= 1 - 1e-9) { km.push(d); h = 0; }
     }
     if (h > 0) km.push(d);
-    return { km, total, arriveT: t, nights };
+    return { km, total, arriveT: t, nights, blocks };
   }
 
   // ── journeys on the map ──
@@ -1059,6 +1074,44 @@
     const state = T < trip.startT ? "before" : T >= tl.arriveT ? "after" : "on";
     const p = pointAtKm(trip, km);
     return { ...p, km, state };
+  }
+  /** How far along (km) a journey is at the time t, delays included (the same reading as tripAt). */
+  function kmAtTime(trip, t) {
+    const tl = trip.timeline;
+    if (!tl || !tl.km || !tl.km.length) return 0;
+    if (t <= trip.startT) return 0;
+    const f = (t - trip.startT) * 24, i = Math.floor(f);
+    return i + 1 < tl.km.length ? tl.km[i] + (tl.km[i + 1] - tl.km[i]) * (f - i) : tl.km[tl.km.length - 1];
+  }
+  /** The list of a journey's stops in order — start, waypoints, end — with each delay (försening) in the place it happens. */
+  function stopItems(trip) {
+    const tl = trip.timeline, r = trip.route;
+    if (!tl || !r || r.length < 2) return [];
+    const cum = trip._cum || (trip._cum = cumulative(r)), top = cum[cum.length - 1] || 1, total = tl.total || 0;
+    const idxOf = (x, y) => { let bi = 0, bd = Infinity; r.forEach((q, i) => { const d = (q[0] - x) ** 2 + (q[1] - y) ** 2; if (d < bd) { bd = d; bi = i; } }); return bi; };
+    const items = [{ type: "start", km: 0 }];
+    (trip.via || []).forEach((v, i) => items.push({ type: v.ret ? "detour" : "via", n: i + 1, km: cum[idxOf(v.x, v.y)] / top * total }));
+    items.push({ type: "end", km: total });
+    // the waypoints keep their order whatever the nearest point of the route says
+    for (let i = 1; i < items.length; i++) items[i].km = Math.max(items[i].km, items[i - 1].km);
+    (trip.delays || []).forEach((d, i) => items.push({ type: "delay", d, i, km: kmAtTime(trip, d.at), after: true }));
+    // a delay goes after the stop it is past (and before the next): stable sort by km, stops first on ties
+    return items.map((it, k) => ({ it, k })).sort((a, b) => a.it.km - b.it.km || (a.it.after ? 1 : 0) - (b.it.after ? 1 : 0) || a.k - b.k).map((o) => o.it);
+  }
+  function stopList(trip, T, fmtT) {
+    const items = stopItems(trip);
+    if (items.length < 2 || !(trip.via && trip.via.length) && !(trip.delays && trip.delays.length)) return null;
+    const det = document.createElement("details"); det.className = "tr-stops";
+    const sm = document.createElement("summary"); sm.textContent = T("trStopsList", (trip.via || []).length, (trip.delays || []).length); det.append(sm);
+    const ol = document.createElement("ol");
+    for (const it of items) {
+      const li = document.createElement("li");
+      if (it.type === "delay") { li.className = "tr-stop-delay"; li.textContent = "⏱ " + T("trDelayChip", it.d.hours, fmtT(it.d.at)) + " · " + T("trAtKm", Math.round(it.km)); }
+      else li.textContent = T(it.type === "start" ? "trStopStart" : it.type === "end" ? "trStopEnd" : it.type === "detour" ? "trDetourN" : "trViaN", it.n) + " · " + T("trAtKm", Math.round(it.km));
+      ol.append(li);
+    }
+    det.append(ol);
+    return det;
   }
   let ASPECT = 0.5;                       // the map's height / width (set when the calculator starts)
   function cumulative(route) {
@@ -1200,7 +1253,7 @@
       this.fm = fm;
       ASPECT = (fm.imgH || 1) / (fm.imgW || 2);
       this.tv = fm._travel = { trips: [], candidates: null, start: null, end: null, chosen: null, panelOpen: false, cfg: this.cfg(), selId: null,
-        onDraw: (T) => { this._checkEvents(T); this._onTime(T); }, evMarks: (trip, T) => this._drawEvents(trip, T) };
+        onDraw: (T) => { this._checkBlocks(T); this._checkEvents(T); this._onTime(T); }, evMarks: (trip, T) => this._drawEvents(trip, T) };
       this.evOpen = new Set();
       fm.roadSteep = this.cfg().steep;
       this.fieldCache = new Map();
@@ -1442,7 +1495,7 @@
       if (!this._grid) { this.msg(this.T("trNoHeight")); this._stopPicking(true); return; }
       const pace = cfg.pace.normal;
       planMonth = fm.monthOf ? fm.monthOf(Math.floor(this._departT())) : null;
-      const out = [], opt = { mount: mountOf(cfg, this.mount, this.wagonOff), ferry: !!this.ferry, sea: !!this.sea, landAnywhere: !!this.sea && !!this.landAny, boats: this.ferry ? this._ensureBoats() : null,
+      const out = [], opt = { mount: mountOf(cfg, this.mount, this.wagonOff), ferry: !!this.ferry, sea: !!this.sea, landAnywhere: !!this.sea && !!this.landAny, straight: !!this.straight, boats: this.ferry ? this._ensureBoats() : null,
         hours: this._day().hoursPerDay };
       if (opt.sea) {
         // the wind at planning time bends a ship's course out at sea
@@ -1497,7 +1550,7 @@
         if (same) { (same.also = same.also || []).unshift(out[i].mode); out.splice(i, 1); }
       }
       tv.candidates = out; tv.chosen = out[0].mode;
-      this._planned = { ferry: opt.ferry, sea: opt.sea, landAny: opt.landAnywhere, mount: this.mount && this.mount !== "foot" ? this.mount : null, wagonOff: this.mount === "wagon" && this.wagonOff != null ? this.wagonOff : null };
+      this._planned = { ferry: opt.ferry, sea: opt.sea, landAny: opt.landAnywhere, straight: opt.straight, mount: this.mount && this.mount !== "foot" ? this.mount : null, wagonOff: this.mount === "wagon" && this.wagonOff != null ? this.wagonOff : null };
       this.msg("");
       this.render(); fm.draw();
       await this._etas();
@@ -1520,7 +1573,7 @@
     _tripFrom(c, o) {
       return { route: c.pts.map((p) => (p.c != null ? [+p.x.toFixed(6), +p.y.toFixed(6), p.k, +p.c.toFixed(2)] : [+p.x.toFixed(6), +p.y.toFixed(6), p.k])), startT: o.startT, pace: o.pace,
         dayStart: o.dayStart != null ? o.dayStart : this.cfg().dayStart, dayEnd: o.dayEnd, firstStart: o.firstStart, offset: this.fm.spotOffset ? this.fm.spotOffset(c.pts[0].x) : 0, delays: o.delays || [],
-        ...(this._planned && this._planned.ferry ? { ferry: true } : {}), ...(this._planned && this._planned.sea ? { sea: true } : {}), ...(this._planned && this._planned.landAny ? { landAny: true } : {}), ...(this._planned && this._planned.mount ? { mount: this._planned.mount } : {}), ...(this._planned && this._planned.wagonOff != null ? { wagonOff: this._planned.wagonOff } : {}) };
+        ...(this._planned && this._planned.ferry ? { ferry: true } : {}), ...(this._planned && this._planned.sea ? { sea: true } : {}), ...(this._planned && this._planned.landAny ? { landAny: true } : {}), ...(this._planned && this._planned.straight ? { straight: true } : {}), ...(this._planned && this._planned.mount ? { mount: this._planned.mount } : {}), ...(this._planned && this._planned.wagonOff != null ? { wagonOff: this._planned.wagonOff } : {}) };
     },
     /** The journey's hour-by-hour progress, fetching the days' weather it needs. */
     async _timeline(trip) {
@@ -1548,7 +1601,7 @@
       const idxOf = (p) => { let bi = 0, bd = Infinity; r.forEach((q, i) => { const d = (q[0] - p.x) ** 2 + (q[1] - p.y) ** 2; if (d < bd) { bd = d; bi = i; } }); return bi; };
       tv.via = (trip.via || []).map((v) => JSON.parse(JSON.stringify(v))).filter((v) => idxOf(v) > here.i);   // the places not yet reached
       for (const v of tv.via) if (v.from && idxOf(v.from) <= here.i) delete v.from;
-      this.ferry = !!trip.ferry; this.sea = !!trip.sea; this.landAny = !!trip.landAny; this.mount = trip.mount || "foot"; this.wagonOff = trip.wagonOff;
+      this.ferry = !!trip.ferry; this.sea = !!trip.sea; this.landAny = !!trip.landAny; this.straight = !!trip.straight; this.mount = trip.mount || "foot"; this.wagonOff = trip.wagonOff;
       tv.chosen = null; this.picking = null;
       this.$("stage").classList.remove("picking");
       if (grab) {
@@ -1587,7 +1640,7 @@
       trip.route = tv.keep.concat(c.pts.map((p) => (p.c != null ? [+p.x.toFixed(6), +p.y.toFixed(6), p.k, +p.c.toFixed(2)] : [+p.x.toFixed(6), +p.y.toFixed(6), p.k])));
       if (tv.via.length) trip.via = JSON.parse(JSON.stringify(tv.via)); else delete trip.via;
       trip.mode = c.mode;
-      for (const [k, v] of [["ferry", pl.ferry], ["sea", pl.sea], ["landAny", pl.landAny], ["mount", pl.mount], ["wagonOff", pl.wagonOff]]) { if (v) trip[k] = v; else delete trip[k]; }
+      for (const [k, v] of [["ferry", pl.ferry], ["sea", pl.sea], ["landAny", pl.landAny], ["straight", pl.straight], ["mount", pl.mount], ["wagonOff", pl.wagonOff]]) { if (v) trip[k] = v; else delete trip[k]; }
       for (const k of ["_samples", "_cum", "_fords", "_towns", "_ev", "_evKey"]) delete trip[k];
       this.msg(this.T("trWorking"));
       const planTl = await this._timeline({ ...trip, delays: [] });
@@ -1615,7 +1668,7 @@
       trip.color = COLOURS[(tv.trips.length) % COLOURS.length];
       this.msg(this.T("trWorking"));
       const tl = await this._timeline(trip);
-      trip.timeline = { km: tl.km.map((v) => +v.toFixed(3)), total: +tl.total.toFixed(3), arriveT: tl.arriveT, nights: tl.nights || [] };
+      trip.timeline = { km: tl.km.map((v) => +v.toFixed(3)), total: +tl.total.toFixed(3), arriveT: tl.arriveT, nights: tl.nights || [], blocks: tl.blocks || [] };
       trip.plan = trip.timeline;                 // the journey as planned, without delays (the events belong to it)
       const body = { ...trip }; delete body._samples; delete body._cum; delete body._fords; delete body._towns; delete body._ev; delete body._evKey;
       try {
@@ -1642,6 +1695,14 @@
       trip.delays = (trip.delays || []).concat([{ at: Math.max(T, trip.startT), hours, clock: true }]);
       await this._recompute(trip);
     },
+    async renameTrip(trip) {
+      const v = await this.ctx.ask({ title: this.T("trRename"), input: { label: this.T("trName") }, value: trip.name || "" });
+      const name = String(v == null ? "" : v).trim().slice(0, 80);
+      if (!name || name === trip.name) return;
+      const old = trip.name; trip.name = name;
+      try { await this._save(trip); } catch (e) { trip.name = old; this.msg(this.T("saveFailed") + e.message); return; }
+      this.renderList(); this.fm.draw();
+    },
     async removeDelay(trip, i) {
       trip.delays.splice(i, 1);
       await this._recompute(trip);
@@ -1651,14 +1712,14 @@
       if (trip.plan) return;
       if (!(trip.delays && trip.delays.length)) { trip.plan = trip.timeline; return; }
       const tl = await this._timeline({ ...trip, delays: [] });
-      trip.plan = { km: tl.km.map((v) => +v.toFixed(3)), total: +tl.total.toFixed(3), arriveT: tl.arriveT, nights: tl.nights || [] };
+      trip.plan = { km: tl.km.map((v) => +v.toFixed(3)), total: +tl.total.toFixed(3), arriveT: tl.arriveT, nights: tl.nights || [], blocks: tl.blocks || [] };
     },
     async _recompute(trip) {
       this.msg(this.T("trWorking"));
       trip._samples = null; trip._fords = null;
       await this._ensurePlan(trip);
       const tl = await this._timeline(trip);
-      trip.timeline = { km: tl.km.map((v) => +v.toFixed(3)), total: +tl.total.toFixed(3), arriveT: tl.arriveT, nights: tl.nights || [] };
+      trip.timeline = { km: tl.km.map((v) => +v.toFixed(3)), total: +tl.total.toFixed(3), arriveT: tl.arriveT, nights: tl.nights || [], blocks: tl.blocks || [] };
       try { await this._save(trip); this.msg(this.T("trArrives", trip.name, this.ctx.fmtT(trip.timeline.arriveT))); }
       catch (e) { this.msg(this.T("saveFailed") + e.message); }
       this.render(); this.fm.draw();
@@ -1690,6 +1751,35 @@
       this.renderList(); this.fm.draw();
     },
     /** Called on every frame: events of the user's own journeys that the clock has just passed. */
+    /** A saved journey of yours whose way is blocked ahead: asks whether to plan a new route from where the party is. */
+    _checkBlocks(T) {
+      if (this._evBusy) return;
+      const prev = this._blkLastT;
+      this._blkLastT = T;
+      if (prev == null || T <= prev) return;
+      for (const trip of this.tv.trips) {
+        if (!trip.mine || !trip.timeline || !trip.timeline.blocks) continue;
+        const seen = new Set(trip.blocksSeen || []);
+        const b = trip.timeline.blocks.find((x) => x.t > prev && x.t <= T && !seen.has(Math.round(x.km)));
+        if (!b) continue;
+        this._evBusy = true;
+        const wasPlaying = this.ctx.pause ? this.ctx.pause() : false;
+        this._blockPopup(trip, b, wasPlaying).finally(() => { this._evBusy = false; });
+        return;
+      }
+    },
+    async _blockPopup(trip, b, wasPlaying) {
+      const at = pointAtKm(trip, b.km);
+      this.tv.selId = trip.id;
+      this._centre(at.x, at.y);
+      trip.blocksSeen = [...new Set([...(trip.blocksSeen || []), Math.round(b.km)])];
+      this._save(trip).catch((err) => this.msg(this.T("saveFailed") + err.message));
+      const pick = await this.ctx.ask({ title: this.T("blkTitle"), text: this.T("blkText", trip.name || "?", Math.round(b.km), this.ctx.fmtT(b.t + (trip.offset || 0) / 24) + " " + this.T("evLocal")),
+        buttons: [{ id: "reroute", label: this.T("blkReroute"), primary: true }, { id: "go", label: this.T("evContinue") }], cancel: false });
+      if (pick === "reroute") { if (!this.tv.panelOpen) this.open(); this.startEdit(trip); }
+      else if (wasPlaying && this.ctx.play) this.ctx.play();
+      this.renderList();
+    },
     _checkEvents(T) {
       // while a box is open nothing moves on: what the clock passes meanwhile is caught when it closes
       if (this._evBusy || !window.TravelEvents) return;
@@ -1853,7 +1943,7 @@
         ["steep.path", T("trSetSteepPath")], ["steep.road", T("trSetSteepRoad")], ["steep.highway", T("trSetSteepHighway")],
         ["boat.still", T("trSetBoatStill")], ["boat.downShare", T("trSetBoatShare")], ["boat.minUp", T("trSetBoatMinUp")], ["boatMinFlow", T("trSetBoatMin")],
         ["sea.normal", T("trSetSeaNormal")], ["sea.sight", T("trSetSeaSight")], ["sea.far", T("trSetSeaFar")], ["landHours", T("trSetLandHours")], ["sea.good", T("trSetSeaGood")], ["sea.bad", T("trSetSeaBad")],
-        ["mount.horse", T("trSetHorse")], ["mount.wagon", T("trSetWagon")], ["mount.wagonOff", T("trSetWagonOff")], ["cityStop", T("trSetCityStop")], ["cityPush", T("trSetCityPush")], ["crossingReach", T("trSetCrossingReach")], ["wiggle", T("trSetWiggle")], ["safe.off", T("trSetSafeOff")], ["safe.perKm", T("trSetSafePerKm")], ["safe.max", T("trSetSafeMax")], ["safe.nation", T("trSetSafeNation")], ["safe.path", T("trSetSafePath")], ["safe.forest", T("trSetSafeForest")], ["safe.maxTimes", T("trSetSafeMaxTimes")], ["windGood", T("trSetWindGood")], ["windCalm", T("trSetWindCalm")], ["seaAllDay", T("trSetSeaAllDay")], ["boardHours", T("trSetBoard")],
+        ["mount.horse", T("trSetHorse")], ["mount.wagon", T("trSetWagon")], ["mount.wagonOff", T("trSetWagonOff")], ["cityStop", T("trSetCityStop")], ["cityPush", T("trSetCityPush")], ["crossingReach", T("trSetCrossingReach")], ["wiggle", T("trSetWiggle")], ["springRise", T("trSetSpring")], ["blockSpeed", T("trSetBlock")], ["safe.off", T("trSetSafeOff")], ["safe.perKm", T("trSetSafePerKm")], ["safe.max", T("trSetSafeMax")], ["safe.nation", T("trSetSafeNation")], ["safe.path", T("trSetSafePath")], ["safe.forest", T("trSetSafeForest")], ["safe.maxTimes", T("trSetSafeMaxTimes")], ["windGood", T("trSetWindGood")], ["windCalm", T("trSetWindCalm")], ["seaAllDay", T("trSetSeaAllDay")], ["boardHours", T("trSetBoard")],
       ];
       const get = (k) => k.split(".").reduce((o, p) => o[p], cfg);
       const dlg = this.$("trSettings"), body = this.$("trSettingsBody");
@@ -2000,6 +2090,9 @@
           const chip = document.createElement("span"); chip.className = "tr-via-chip"; chip.textContent = T(v.ret ? "trDetourN" : "trViaN", i + 1) + " ";
           if (v.ret) { const r = document.createElement("button"); r.type = "button"; r.textContent = "↩"; r.title = T("trDetourBack"); r.onclick = () => { delete v.ret; delete v.from; this.render(); this.fm.draw(); this._plan(); }; chip.append(r); }
           else { const r = document.createElement("button"); r.type = "button"; r.textContent = "⤺"; r.title = T("trViaToDetour"); r.onclick = () => { v.ret = true; this.render(); this.fm.draw(); this._plan(); }; chip.append(r); }
+          const mv = (d, ch) => { const r = document.createElement("button"); r.type = "button"; r.textContent = ch; r.title = T(d < 0 ? "trViaUp" : "trViaDown"); r.disabled = i + d < 0 || i + d >= tv.via.length;
+            r.onclick = () => { const o = tv.via[i]; tv.via[i] = tv.via[i + d]; tv.via[i + d] = o; this.render(); this.fm.draw(); this._plan(); }; chip.append(r); };
+          mv(-1, "▲"); mv(1, "▼");
           const x = document.createElement("button"); x.type = "button"; x.textContent = "✕"; x.title = T("trViaRemove"); x.onclick = () => this._removeVia(i);
           chip.append(x); via.append(chip);
         });
@@ -2083,9 +2176,9 @@
       // by boat: allowed before the routes are found (changing it finds them again)
       if (S.user) {
         const modes = document.createElement("div"); modes.className = "tr-modes";
-        for (const [k, label, tip] of [["ferry", "trFerry", "trFerryTip"], ["sea", "trSea", "trSeaTip"], ["landAny", "trLandAny", "trLandAnyTip"]]) {
+        for (const [k, label, tip] of [["ferry", "trFerry", "trFerryTip"], ["sea", "trSea", "trSeaTip"], ["landAny", "trLandAny", "trLandAnyTip"], ["straight", "trStraight", "trStraightTip"]]) {
           const l = document.createElement("label"); l.className = "check";
-          l.title = k === "ferry" ? T(tip, cfg.boat.still, cfg.boat.downShare, cfg.boatMinFlow, cfg.boardHours, cfg.boat.minUp) : k === "landAny" ? T(tip, cfg.landHours) : T(tip, cfg.sea.normal, cfg.sea.good, cfg.sea.bad, cfg.boardHours);
+          l.title = k === "ferry" ? T(tip, cfg.boat.still, cfg.boat.downShare, cfg.boatMinFlow, cfg.boardHours, cfg.boat.minUp) : k === "straight" ? T(tip) : k === "landAny" ? T(tip, cfg.landHours) : T(tip, cfg.sea.normal, cfg.sea.good, cfg.sea.bad, cfg.boardHours);
           l.innerHTML = `<input type="checkbox" id="tr_${k}"><span></span>`; l.lastChild.textContent = T(label); l.firstChild.checked = !!this[k];
           l.firstChild.onchange = (e) => { this[k] = e.target.checked; if (tv.candidates && tv.start && tv.end) this._plan(); };
           modes.append(l);
@@ -2179,11 +2272,13 @@
           });
           li.append(dl);
         }
+        const stl = stopList(trip, T, (t) => this.ctx.fmtT(t));
+        if (stl) li.append(stl);
         const row = document.createElement("div"); row.className = "tr-row";
         const b = (label, fn) => { const e = document.createElement("button"); e.type = "button"; e.textContent = label; e.onclick = fn; return e; };
         row.append(b(T("trShow"), () => this.focus(trip)));
         if (trip.mine) {
-          row.append(b(T("trDelay") + "…", () => this.addDelay(trip)), b(T("trEdit") + "…", () => this.startEdit(trip)), b(T("trDelete"), () => this.deleteTrip(trip)));
+          row.append(b(T("trDelay") + "…", () => this.addDelay(trip)), b(T("trRename") + "…", () => this.renameTrip(trip)), b(T("trEdit") + "…", () => this.startEdit(trip)), b(T("trDelete"), () => this.deleteTrip(trip)));
           const sh = document.createElement("label"); sh.className = "check"; sh.innerHTML = `<input type="checkbox"><span></span>`;
           sh.firstChild.checked = !!trip.shared; sh.lastChild.textContent = T("trSharedShort");
           sh.firstChild.onchange = (e) => this.toggleShared(trip, e.target.checked);
@@ -2212,6 +2307,6 @@
   // for tests
   Travel._steepAt = steepAt;
   Travel._seaSpeed = seaSpeed; Travel._buildBoats = buildBoats;
-  Travel._speedAt = speedAt; Travel._simulate = simulate; Travel._findRoute = findRoute; Travel._buildGrid = buildGrid; Travel._buildRoads = buildRoads; Travel._tripAt = tripAt; Travel._defaults = DEFAULTS; Travel._riverIndex = riverIndex; Travel._setPlanMonth = (m) => { planMonth = m; };
+  Travel._springMul = springMul; Travel._stopItems = stopItems; Travel._speedAt = speedAt; Travel._simulate = simulate; Travel._findRoute = findRoute; Travel._buildGrid = buildGrid; Travel._buildRoads = buildRoads; Travel._tripAt = tripAt; Travel._defaults = DEFAULTS; Travel._riverIndex = riverIndex; Travel._setPlanMonth = (m) => { planMonth = m; };
   window.Travel = Travel;
 })();

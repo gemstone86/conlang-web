@@ -2,6 +2,26 @@
 
 Newest first. Versions from 1.x on are the combined app (Root and Rune + Weather generator).
 
+## v1.57.1 (combined app)
+- **Dawn of Mankind updated** to the newest `main` (`49326c9`): AI players the host can add in the lobby, settlers and colonies, global techs, lasting crises, new cards. Setting `dawn.ai-move-millis` (default 900) is the pause before an AI player's move.
+
+## v1.57.0 (combined app)
+- **Dawn of Mankind added as a third app** at `/dawn/`: the co-operative card game (1–6 players, rooms with a 5-letter code, live over a WebSocket), copied in from `gemstone86/dawn-of-mankind` main (`49326c9`: rules engine, AI players, web part and page; sources under `com.dawnofmankind`, cards in `dawn/content.yaml`). Logged-in players play under their account name, guests type one. New tile on the start page; its API is covered by the same-site check. Games run in memory, so each deploy ends the games in progress.
+- **Azure: turn on Web sockets** for the App Service (Configuration → General settings), or the rooms won't connect.
+
+## v1.56.0 (combined app)
+Weather generator:
+- **Blocked way: ask to reroute.** When the weather (deep snow, storm) makes a stretch too slow to walk (under *Blockerad väg*, default 0.5 km/h; 0 turns it off), the journey notes where it gets blocked. When the clock reaches that point, a box asks whether to plan a new route from where the party is (it opens the usual *Ändra resa* from there, planned for the conditions of that day) or to carry on. Asked once per blocked stretch, for your own journeys.
+
+## v1.55.0 (combined app)
+Weather generator:
+- **Rak väg.** A journey option that turns off the wiggle: the route follows the best path without the small bends and meanders. Saved with the journey.
+- **Waypoints as a list you can sort.** Each waypoint has ▲ ▼ buttons; moving one plans the route again.
+- **Rename a journey** (*Byt namn…* on your own journeys).
+- **Stops and delays on the journey.** A saved journey has a list of its stops (start, waypoints, end) with km, and every försening is marked in it at the place along the route where it happens.
+- **Flytta floder m.m.…** moved from the map-layer list to the river tools bar (admins, standard map).
+- **Spring flood.** Rivers carry more water in their region's spring months (3–4 north, 9–10 south of the middle of the map): fords there cost more time. The rise is a travel rule (*Vårflod*, default +50 %).
+
 ## v1.54.1 (combined app)
 Weather generator:
 - **Journey hours are local time at the start.** The daily travel hours (and the first day's start) are the local time at the place the journey starts, kept for the whole journey (the party doesn't change time zone on the way). The departure moment typed in the form is now turned from local time into the app's clock the same way, so *Resa varje dag från kl 08:00* leaves at 08:00 local time, however far east or west the start lies.

@@ -1,0 +1,1 @@
+Snapshot of github.com/gemstone86/dawn-of-mankind main @ 49326c9. dawn-core and dawn-web sources, copied in; the standalone launcher (dawn-app) is not needed.

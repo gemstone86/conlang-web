@@ -647,3 +647,8 @@ div.tr-cand { cursor: default; }
 
 .tr-date-in { display: inline-flex; align-items: center; gap: 0.25rem; }
 .tr-date-in .tr-year { width: 4.6rem; }
+
+.tr-stops { font-size: 0.75rem; margin: 0.2rem 0; }
+.tr-stops ol { margin: 0.2rem 0 0; padding-left: 1.3rem; }
+.tr-stops .tr-stop-delay { color: #e8833a; font-weight: 600; }
+.tr-via-chip { flex: 1 1 100%; border-radius: 6px; padding: 0.1rem 0.4rem; }

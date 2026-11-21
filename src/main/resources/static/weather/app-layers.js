@@ -335,6 +335,7 @@
     const r = fieldMap.rvSel != null ? (fieldMap.rivers || []).find((x) => x.id === fieldMap.rvSel) : null;
     const lake = fieldMap.lkSel != null ? (fieldMap.lakes || []).find((x) => x.id === fieldMap.lkSel) : null;
     $("rvDelete").disabled = !r && !lake;
+    $("rvMove").hidden = !(S.admin && S.map && S.map.isDefault);     // moving rivers (and the rest) is for the admins, on the standard map
     $("rvDelete").textContent = T(lake ? "lkDelete" : "rvDelete");
     $("rvExtend").hidden = !!lake;
     $("rvExtend").disabled = !r || !!fieldMap.rvDraft;
@@ -650,6 +651,7 @@
     $("rvSizeNum").onchange = (e) => setSize(e.target.value);
     $("rvName").oninput = (e) => fieldMap.rvSetName(e.target.value);
     $("rvSpeed").onchange = (e) => { fieldMap.rvSetSpeed(e.target.value === "" ? null : String(e.target.value).replace(",", ".")); renderRiverBar(); };
+    $("rvMove").onclick = () => openMoveData();
     $("rvNew").onclick = () => { fieldMap.rvNew(); renderRiverBar(); $("stage").focus(); };
     $("rvExtend").onclick = () => { if (fieldMap.rvExtend("tail")) { renderRiverBar(); $("stage").focus(); } };
     $("lkNew").onclick = () => { fieldMap.lkNew(); renderRiverBar(); $("stage").focus(); };
@@ -1040,9 +1042,6 @@
       const ex = document.createElement("button"); ex.type = "button"; ex.textContent = T("mlExport"); ex.title = T("mlExportTip");
       ex.onclick = (e) => { e.preventDefault(); exportMapLayers(); };
       list.append(ex);
-      const mvb = document.createElement("button"); mvb.type = "button"; mvb.textContent = T("mvOpen"); mvb.title = T("mvOpenTip");
-      mvb.onclick = (e) => { e.preventDefault(); $("mapLayerDrop").open = false; openMoveData(); };
-      list.append(mvb);
     }
     const hint = document.createElement("div"); hint.className = "ml-hint"; hint.textContent = T("mlHint") + (canOrder ? " " + T("mlAdminHint") : "");
     list.append(hint);
