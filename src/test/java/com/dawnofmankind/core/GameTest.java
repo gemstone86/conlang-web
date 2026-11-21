@@ -362,21 +362,36 @@ class GameTest {
     }
 
     @Test
-    void resourcesOnlyTravelByTradingRoute() {
+    void aTradingRouteSendsTwoOfTheOtherResourceForOne() {
         Game g = game(2, 24);
         Player p = g.players.get(0);
-        Player other = g.players.get(1 - p.seat);
+        Player other = g.players.get(1);
         p.res.put(Res.FOOD, 10);
-        p.res.put(Res.CULTURE, 5);
+        p.res.put(Res.PRODUCTION, 10);
         assertThrows(GameException.class, () -> g.act(p.seat, Map.of("type", "give", "to", other.seat, "resources", Map.of("food", 1))));
         Game.CardInst route = card(g, "new_trading_route");
         p.hand.add(route);
-        assertThrows(GameException.class, () -> g.act(p.seat, Map.of("type", "play", "card", route.id, "to", other.seat, "resources", Map.of("culture", 1))),
-                "culture can't travel the route");
-        int before = other.res.get(Res.FOOD);
-        g.act(p.seat, Map.of("type", "play", "card", route.id, "to", other.seat, "resources", Map.of("food", 6)));
-        assertEquals(before + 6, other.res.get(Res.FOOD));
-        assertEquals(4, p.res.get(Res.FOOD));
+        assertThrows(GameException.class, () -> g.act(p.seat, Map.of("type", "play", "card", route.id, "to", other.seat)), "an option must be chosen");
+        int prod = other.res.get(Res.PRODUCTION);
+        g.act(p.seat, Map.of("type", "play", "card", route.id, "to", other.seat, "option", 0));        // pay 1 food: they get 2 production
+        assertEquals(prod + 2, other.res.get(Res.PRODUCTION));
+        assertEquals(9, p.res.get(Res.FOOD));
+        Game.CardInst again = card(g, "new_trading_route");
+        p.hand.add(again);
+        int food = other.res.get(Res.FOOD);
+        g.act(p.seat, Map.of("type", "play", "card", again.id, "to", other.seat, "option", 1));        // pay 1 production: they get 2 food
+        assertEquals(food + 2, other.res.get(Res.FOOD));
+        assertEquals(9, p.res.get(Res.PRODUCTION));
+    }
+
+    @Test
+    void theTradingRouteIsOnlyInTheDeckWithTeammates() {
+        for (int players : new int[]{1, 2}) {
+            Game g = game(players, 50 + players);
+            boolean found = g.eraDeck.stream().anyMatch(c -> c.def.id.equals("new_trading_route"))
+                    || g.queue.stream().anyMatch(sl -> sl.card.def.id.equals("new_trading_route"));
+            if (players == 1) assertFalse(found, "not in a solo game");
+        }
     }
 
     @Test

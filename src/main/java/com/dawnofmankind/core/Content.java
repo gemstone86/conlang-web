@@ -68,6 +68,8 @@ public final class Content {
         public List<Map<String, Object>> ongoing = new ArrayList<>();
         public EnumMap<Res, Integer> cleanseCost;
         public boolean eraTrigger, crisis, persistent;
+        /** The card is only put in the era deck when at least this many play. */
+        public int minPlayers = 1;
         /** Only used inside a crisis (its raids and invasions); never in a deck or the past events. */
         public boolean helper;
         /**
@@ -273,6 +275,7 @@ public final class Content {
         c.ongoing = effects(pers.get("ongoing"));
         c.cleanseCost = Res.parse(pers.get("cleanse"));
         c.eraTrigger = Y.b(m, "eraTrigger");
+        c.minPlayers = Y.i(m, "minPlayers", 1);
         c.helper = Y.b(m, "helper");
         Map<String, Object> lasts = Y.map(m.get("lasts"));
         c.lastsRounds = Y.i(lasts, "rounds", 0);

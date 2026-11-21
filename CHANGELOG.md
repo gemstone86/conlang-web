@@ -2,6 +2,10 @@
 
 Newest first. Versions from 1.x on are the combined app (Root and Rune + Weather generator).
 
+## v1.59.1 (combined app)
+- **Dawn of Mankind: New Trading Route** now works as a choice: pick a teammate, then either pay 1 food so they get 2 production, or pay 1 production so they get 2 food. It is a two-or-more-players card (`minPlayers: 2` on a card keeps it out of the deck in solo games).
+- **Two boxes instead of one:** *Technologies* (the technologies) and *Bonuses* (minor wonders such as Roman Roads), between *Event decks* and the log. New Trading Route is an action card and is used from the hand, so it doesn't show in either box.
+
 ## v1.59.0 (combined app)
 - **Dawn of Mankind: science scores.** Every technology card played gives +1 point (in the final score, together with wonders and territories).
 - **Great wonders are cheaper**: every cost reduced to 3/3.5 (about 86 %), rounded (e.g. Stonehenge 12 production + 4 culture per player is now 10 + 3).

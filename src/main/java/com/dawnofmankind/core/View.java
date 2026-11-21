@@ -321,7 +321,14 @@ public final class View {
             if (e.containsKey("core")) m.put("target", "territory");
             if (e.containsKey("trade")) {
                 m.put("target", "player");
-                m.put("trade", e.get("trade"));
+                List<Object> opts = new ArrayList<>();
+                for (Object o : (List<?>) e.get("trade")) {
+                    Map<String, Object> om = Y.map(o), t = new LinkedHashMap<>();
+                    t.put("give", res(Res.parse(om.get("give"))));
+                    t.put("get", res(Res.parse(om.get("get"))));
+                    opts.add(t);
+                }
+                m.put("trade", opts);
             }
         }
         return m;

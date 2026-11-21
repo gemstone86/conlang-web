@@ -621,8 +621,12 @@ cards:
   new_trading_route:
     name: New Trading Route
     type: action
-    effects: [{trade: [food, production, research]}]
-    text: Send any amount of food, production and research to one teammate. (Resources can't be given otherwise.)
+    minPlayers: 2                      # needs a teammate: not in the deck in solo games
+    effects:
+      - trade:
+          - {give: {food: 1}, get: {production: 2}}
+          - {give: {production: 1}, get: {food: 2}}
+    text: Choose a teammate, then either pay 1 food so they get 2 production, or pay 1 production so they get 2 food.
   roman_roads:
     name: Roman Roads
     type: minor_wonder

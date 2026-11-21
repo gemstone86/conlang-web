@@ -242,6 +242,7 @@ public final class Game {
         List<CardInst> pool = new ArrayList<>(), triggers = new ArrayList<>();
         e.cards.forEach((id, copies) -> {
             CardDef d = content.cards.get(id);
+            if (d.minPlayers > players.size()) return;                 // e.g. trading needs a teammate
             for (int i = 0; i < copies; i++) (d.eraTrigger ? triggers : pool).add(inst(d));
         });
         int size = content.rules.deckBase + content.rules.deckPerPlayer * players.size() - triggers.size();
@@ -801,19 +802,21 @@ public final class Game {
         Frontier land = null;
         Territory core = null;
         Player tradeTo = null;
-        EnumMap<Res, Integer> tradeAmounts = null;
+        EnumMap<Res, Integer> tradeAmounts = null, tradeGets = null;
         if (tradeEffect != null) {
+            // a trade offers choices: what you pay (to the bank) and what your teammate gets
             tradeTo = other(p, a);
-            tradeAmounts = Res.parse(a.get("resources"));
-            List<String> allowed = Y.strings(tradeEffect.get("trade"));
+            List<?> options = (List<?>) tradeEffect.get("trade");
+            int opt = Y.i(a, "option", -1);
+            if (opt < 0 || opt >= options.size()) throw new GameException("Choose which trade you want.");
+            Map<String, Object> o = Y.map(options.get(opt));
+            tradeAmounts = Res.parse(o.get("give"));
+            tradeGets = Res.parse(o.get("get"));
             for (Res r : Res.values()) {
-                int v = tradeAmounts.get(r);
-                if (v < 0) throw new GameException("Amounts can't be negative.");
-                if (v > 0 && !allowed.contains(r.key())) throw new GameException(d.name + " carries only " + String.join(", ", allowed) + ".");
-                if (p.res.get(r) < v + d.cost.get(r)) throw new GameException("Not enough " + r.key() + ".");
+                if (p.res.get(r) < tradeAmounts.get(r) + d.cost.get(r)) throw new GameException("Not enough " + r.key() + ".");
             }
-            if (Res.isZero(tradeAmounts)) throw new GameException("Choose what to send.");
         }
+        final EnumMap<Res, Integer> tradeGet = tradeGets;
         LandPayment opening = null;
         if (settles) {
             opening = landPayment(p, a, d.cost, true);
@@ -844,7 +847,7 @@ public final class Game {
         }
         if (land != null) {
             land.opened = true;
-            log("The " + land.land.def.name + " becomes a colony: anyone can now send resources, troops and settlers to it (1 action each).");
+            log("The " + land.land.def.name + " becomes a colony: anyone can now send resources, troops and settlers to it (free on their turn).");
             refillLands();
             LandPayment now = landPayment(p, a, Res.empty(), true);
             if (!Res.isZero(now.res()) || now.troops() > 0 || now.settlers() > 0) payLand(p, now);
@@ -852,8 +855,8 @@ public final class Game {
         if (tradeTo != null) {
             pay(p, tradeAmounts);
             Player to = tradeTo;
-            tradeAmounts.forEach((r, v) -> to.res.merge(r, v, Integer::sum));
-            log(p.name + " sends " + Res.describe(tradeAmounts) + " to " + to.name + " along a new trading route.");
+            tradeGet.forEach((r, v) -> to.res.merge(r, v, Integer::sum));
+            log(p.name + " pays " + Res.describe(tradeAmounts) + " and " + to.name + " gets " + Res.describe(tradeGet) + " along a new trading route.");
         }
         if (core != null) {
             core.cored = true;

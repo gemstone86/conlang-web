@@ -469,6 +469,11 @@ function renderTechs() {
   $('techPanel').innerHTML = `<h2>Technologies <span class="muted small">(${list.length})</span></h2>` + (list.length
     ? list.map(({ t, by }) => `<div class="techrow"><b>${esc(t.name)}</b> <span class="muted small">by ${esc(by)}</span><div class="small">${esc(t.text)}</div></div>`).join('')
     : '<p class="muted small">None yet. Technologies help every player once anyone has researched them.</p>');
+  // the lasting bonuses that aren't technologies: minor wonders such as Roman Roads
+  const bonus = s.players.flatMap(o => o.minorWonders.map(t => ({ t, by: o.name })));
+  $('bonusPanel').innerHTML = `<h2>Bonuses <span class="muted small">(${bonus.length})</span></h2>` + (bonus.length
+    ? bonus.map(({ t, by }) => `<div class="techrow"><b>★ ${esc(t.name)}</b> <span class="muted small">by ${esc(by)}</span><div class="small">${esc(t.text)}</div></div>`).join('')
+    : '<p class="muted small">None yet. Minor wonders (like Roman Roads) and other lasting bonuses show here.</p>');
 }
 let growCb = null;
 function openGrowChoice(free, cb) {
@@ -570,7 +575,8 @@ function renderHand() {
     }
     const opts = c.target === 'territory' ? s.realm.filter(t => !t.cored).map(t => [t.id, t.name])
       : c.target === 'player' ? others.map(o => [o.seat, o.name]) : null;
-    const tradeInputs = c.trade ? `<div class="row small">${c.trade.map(k => `<label class="res r-${k}" style="margin:0">${RES_SHORT[k]} <input type="number" min="0" value="0" data-keep="tr-${c.id}-${k}" data-tres="${k}" data-tcard="${c.id}"></label>`).join('')}</div>` : '';
+    const tradeText = o => `pay ${resList(o.give)} → your teammate gets ${resList(o.get)}`;
+    const tradeInputs = c.trade ? `<div class="row small"><select id="opt-${c.id}" data-keep="opt-${c.id}">${c.trade.map((o, k) => `<option value="${k}">${RES.filter(r => o.give[r]).map(r => o.give[r] + ' ' + r).join(', ')} → ${RES.filter(r => o.get[r]).map(r => '+' + o.get[r] + ' ' + r).join(', ')} for them</option>`).join('')}</select></div>` : '';
     const pickTarget = opts ? `<select id="tgt-${c.id}" data-keep="tgt-${c.id}">${opts.map(([v, t]) => `<option value="${v}">${esc(t)}</option>`).join('')}</select>` : '';
     return cardHtml(c, `${tradeInputs}<div class="actions">${pickTarget}${playable ? `<button ${act && affordable(c.cost) && (!opts || opts.length) ? '' : 'disabled'} data-play="${c.id}" data-target="${c.target || ''}">Play (1 action)</button>` : '<span class="small muted">Play it when an event strikes.</span>'}
       <button class="tiny" data-discard="${c.id}">Discard</button>${give}</div>`);
@@ -589,8 +595,7 @@ $('handPanel').onclick = e => {
     if (t.dataset.target === 'territory') msg.territory = +sel.value;
     if (t.dataset.target === 'player') {
       msg.to = +sel.value;
-      msg.resources = {};
-      document.querySelectorAll(`[data-tcard="${t.dataset.play}"]`).forEach(i => { msg.resources[i.dataset.tres] = Math.max(0, +i.value || 0); i.value = 0; });
+      msg.option = +($('opt-' + t.dataset.play)?.value || 0);
     }
     // a card that brings a person, with more than one building with a free slot: choose where they work
     const card = (me().hand || []).find(c => c.id === msg.card), free = (me().buildings || []).filter(b => b.workers < b.slots);
