@@ -119,3 +119,8 @@ details summary { cursor: pointer; color: var(--bone-dim); font-size: .88rem; }
 .modal { position: fixed; inset: 0; background: rgba(0,0,0,.55); display: flex; align-items: flex-start; justify-content: center; padding: 3rem 1rem; z-index: 15; }
 .result { font: 400 2.2rem/1 var(--serif); color: var(--brass); margin: .2rem 0 .6rem; }
 .result.defeat { color: var(--err); }
+
+/* the event pop-up: the event panel lifts out over the board until the player is done or looks at the board */
+.backdrop { position: fixed; inset: 0; background: rgba(0,0,0,.6); z-index: 14; }
+#eventPanel.popup { position: fixed; z-index: 16; left: 50%; top: 4vh; transform: translateX(-50%); width: min(720px, 94vw); max-height: 90vh; overflow: auto; box-shadow: 0 14px 50px rgba(0,0,0,.6); border: 3px solid var(--brass); background: #26303f; }
+#eventPanel.popup h2 { font-size: 1.3rem; }

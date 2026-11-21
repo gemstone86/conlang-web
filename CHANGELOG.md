@@ -2,6 +2,9 @@
 
 Newest first. Versions from 1.x on are the combined app (Root and Rune + Weather generator).
 
+## v1.57.2 (combined app)
+- **Dawn of Mankind: events pop up.** An event that strikes now opens over the board with a dark backdrop (the card, what it will do, response cards, Accept/Decline, troops), so it can't be resolved without looking at it. Land the event finds shows in the same pop-up, ready to pay for. *Look at the board* hides it for that event (a *Show the event again* button brings it back); a new event pops up again. Changed here in the combined app's copy of the page only (`META-INF/resources/dawn`): the same change needs making in the dawn-of-mankind repository.
+
 ## v1.57.1 (combined app)
 - **Dawn of Mankind updated** to the newest `main` (`49326c9`): AI players the host can add in the lobby, settlers and colonies, global techs, lasting crises, new cards. Setting `dawn.ai-move-millis` (default 900) is the pause before an AI player's move.
 

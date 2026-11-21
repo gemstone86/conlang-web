@@ -200,12 +200,13 @@ $('queuePanel').onclick = e => { const b = e.target.closest('[data-pick]'); if (
 
 const slotText = slots => Object.entries(slots || {}).map(([b, n]) => `+${n} ${b}`).join(', ');
 
+let landCardFn;                       // the land card drawing of renderRealm, also used in the event pop-up
 function renderRealm() {
   const s = state;
   const lands = s.realm.map(t => `<div class="cardx territory ${t.cored ? 'cored' : ''}"><div class="type">Territory${t.cored ? ' · core' : ''}</div><div class="name">${esc(t.name)}</div>
       <div class="text">${esc(t.text)}</div>${t.wonders.length ? `<div class="small">${t.wonders.map(w => `<span class="chip">★ ${esc(w)}</span>`).join('')}</div>` : ''}</div>`).join('');
   const settleCard = (me().hand || []).find(c => c.target === 'land');
-  const landCard = f => {
+  const landCard = landCardFn = f => {
     const need = RES.filter(k => f.left[k] > 0);
     const troopsLeft = f.troops - f.troopsPaid, settlersLeft = f.settlers - f.settlersPaid;
     const inputs = `<div class="row small">${need.map(k => `<label class="res r-${k}" style="margin:0">${RES_SHORT[k]} <input type="number" min="0" max="${f.left[k]}" value="0" data-keep="f-${f.id}-${k}" data-fres="${k}"></label>`).join('')}
@@ -225,8 +226,9 @@ function renderRealm() {
       <div class="small">Paid ${resList(f.paid)} of ${resList(f.cost)}${f.troops ? ` · military strength ${f.troopsPaid}/${f.troops}` : ''}${f.settlers ? ` · settlers ${f.settlersPaid}/${f.settlers}` : ''}</div>
       ${by}${inputs}<div class="row">${button}</div></div>`;
   };
-  const colonies = s.frontier.filter(f => f.opened).map(landCard).join('');
-  const front = s.frontier.filter(f => !f.opened).map(landCard).join('');
+  const inPopup = f => f.duringEvent && eventPopupOpen();
+  const colonies = s.frontier.filter(f => f.opened && !inPopup(f)).map(landCard).join('');
+  const front = s.frontier.filter(f => !f.opened && !inPopup(f)).map(landCard).join('');
   $('realmPanel').innerHTML = `<h2>The realm</h2>
     <p class="muted small">Shared land. Each territory gives every player room for buildings and its bonus. A broken invasion takes a territory (a core territory only loses its core status); with none left, the game is lost.
     World deck: ${s.worldDeck} lands · colonization value ${s.colonizationValue}.</p>
@@ -236,7 +238,7 @@ function renderRealm() {
     <div class="cards">${front || '<p class="muted">None face up.</p>'}</div>`;
 }
 
-$('realmPanel').onclick = e => {
+$('realmPanel').onclick = $('eventPanel').landClick = e => {
   const b = e.target.closest('[data-colonize],[data-settle]'); if (!b) return;
   const box = b.closest('[data-f]'), resources = {};
   box.querySelectorAll('[data-fres]').forEach(i => { resources[i.dataset.fres] = Math.max(0, +i.value || 0); i.value = 0; });
@@ -275,9 +277,21 @@ $('wonderPanel').onclick = e => {
   box.querySelectorAll('[data-wres]').forEach(i => { i.value = 0; });
 };
 
+// An event that strikes pops up over the board (with any land it found), so it can't be clicked through unread.
+let popupHiddenFor = null, popupLastKey = null;
+function pendingKey() { const p = state && state.pending; return p ? (p.id ?? p.name) + '|' + (state.round ?? '') : null; }
+function eventPopupOpen() {
+  const p = state && state.pending;
+  return !!p && !p.ready[state.you] && popupHiddenFor !== pendingKey();
+}
 function renderEvents() {
   const s = state, p = s.pending;
-  let html = '<h2>Events</h2>';
+  if (!p) { popupHiddenFor = null; }
+  const popup = eventPopupOpen();
+  $('eventPanel').classList.toggle('popup', popup);
+  $('eventBackdrop').hidden = !popup;
+  let html = popup ? '<h2>An event strikes</h2>' : '<h2>Events</h2>';
+  if (p && !popup && !p.ready[s.you]) html += '<button class="primary" data-showpop>Show the event again</button>';
   if (p) {
     const amReady = p.ready[s.you];
     const target = p.target >= 0 ? `<p class="small">Strikes <b>${esc(s.players[p.target].name)}</b>.</p>` : '';
@@ -292,14 +306,14 @@ function renderEvents() {
       if (p.kind === 'opportunity' && p.target === s.you) {
         controls += `<button data-decide="1" class="${p.accept === true ? 'primary' : ''}">Accept</button><button data-decide="0" class="${p.accept === false ? 'primary' : ''}">Decline</button>`;
       }
-      controls += `<button class="primary" data-ready>Done — resolve</button>`;
+      controls += `<button class="primary" data-ready>Done — resolve</button><button data-hidepop title="Look at the board first; it stays pending">Look at the board</button>`;
     } else {
       controls = '<span class="muted small">You are done. Waiting for the others…</span>';
     }
     const waiting = Object.entries(p.ready).filter(([, r]) => !r).map(([seat]) => esc(s.players[seat].name));
     const found = s.frontier.filter(f => f.duringEvent);
     html += cardHtml(p, `${target}<div class="preview">${esc(p.preview)}</div>
-      ${found.length ? `<div class="small" style="color:var(--brass)">Found: ${found.map(f => esc(f.name)).join(', ')}. Pay for it in The realm panel before everyone is done, or it is lost.</div>` : ''}
+      ${found.length ? `<div class="small" style="color:var(--brass)">New land found: ${found.map(f => esc(f.name)).join(', ')}. Settle it before everyone is done, or it is lost.</div>${popup && landCardFn ? '<div class="cards">' + found.map(landCardFn).join('') + '</div>' : ''}` : ''}
       ${p.responses.length ? `<div class="small">Responses: ${p.responses.map(esc).join(', ')}</div>` : ''}
       ${p.kind === 'invasion' ? `<div class="small">Troops sent: ${Object.entries(p.troops).map(([seat, n]) => esc(s.players[seat].name) + ' ' + n).join(', ') || 'none yet'}</div>` : ''}
       <div class="actions">${controls}</div><div class="readylist">${waiting.length ? 'Waiting for: ' + waiting.join(', ') : ''}</div>`, 'pending');
@@ -318,8 +332,11 @@ function renderEvents() {
   $('eventPanel').classList.toggle('pending', !!p);
 }
 $('eventPanel').onclick = e => {
+  if (e.target.closest('[data-colonize],[data-settle]')) return $('eventPanel').landClick(e);
   const t = e.target.closest('button'); if (!t) return;
-  if (t.dataset.respond) send({ type: 'respond', card: +t.dataset.respond });
+  if ('hidepop' in t.dataset) { popupHiddenFor = pendingKey(); renderEvents(); renderRealm(); }
+  else if ('showpop' in t.dataset) { popupHiddenFor = null; renderEvents(); renderRealm(); }
+  else if (t.dataset.respond) send({ type: 'respond', card: +t.dataset.respond });
   else if ('troops' in t.dataset) send({ type: 'troops', troops: +$('troopIn').value || 0 });
   else if (t.dataset.decide) send({ type: 'decide', accept: t.dataset.decide === '1' });
   else if ('ready' in t.dataset) {
