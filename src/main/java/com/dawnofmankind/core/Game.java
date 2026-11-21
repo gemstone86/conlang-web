@@ -1446,6 +1446,12 @@ public final class Game {
                         if (t != null) discover(t);
                     }
                 }
+                case "civilWar" -> {
+                    List<Territory> cores = realm.stream().filter(t -> t.cored).toList();
+                    List<Territory> pool = cores.isEmpty() ? realm : cores;
+                    log("Civil war breaks out!");
+                    if (!pool.isEmpty()) loseTerritory(pool.get(rng.nextInt(pool.size())));
+                }
                 case "colony" -> {
                     for (int i = 0; i < Y.toInt(v) && !worldDeck.isEmpty(); i++) {
                         Territory land = worldDeck.remove(0);

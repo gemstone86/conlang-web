@@ -138,6 +138,28 @@ class GameTest {
     }
 
     @Test
+    void civilWarUncoresARandomCoreOrElseCostsATerritory() {
+        Game g = game(1, 34);
+        g.currentEvents.clear();
+        g.futureEvents.clear();
+        g.futureEvents.add(card(g, "foraging"));
+        g.currentEvents.add(card(g, "civil_war"));
+        g.realm.get(0).cored = true;
+        int n = g.realm.size();
+        g.act(0, Map.of("type", "endTurn"));
+        assertEquals(n, g.realm.size(), "a core is lost, not the territory");
+        assertTrue(g.realm.stream().noneMatch(t -> t.cored));
+        Game h = game(1, 35);
+        h.currentEvents.clear();
+        h.futureEvents.clear();
+        h.futureEvents.add(card(h, "foraging"));
+        h.currentEvents.add(card(h, "civil_war"));
+        int m = h.realm.size();
+        h.act(0, Map.of("type", "endTurn"));
+        assertEquals(m - 1, h.realm.size(), "no core: a territory is lost");
+    }
+
+    @Test
     void techsAreGlobal() {
         Game g = game(2, 18);
         Player a = g.players.get(g.currentPlayer), b = g.players.get(1 - g.currentPlayer);
