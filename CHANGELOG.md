@@ -2,6 +2,11 @@
 
 Newest first. Versions from 1.x on are the combined app (Root and Rune + Weather generator).
 
+## v1.59.0 (combined app)
+- **Dawn of Mankind: science scores.** Every technology card played gives +1 point (in the final score, together with wonders and territories).
+- **Great wonders are cheaper**: every cost reduced to 3/3.5 (about 86 %), rounded (e.g. Stonehenge 12 production + 4 culture per player is now 10 + 3).
+- **The game ends later:** in the last era it no longer ends when the era deck runs out; it goes on until the queue is empty at the end of a round (earlier eras still move on when their deck runs out).
+
 ## v1.58.0 (combined app)
 - **Dawn of Mankind: parallel rounds.** There are no turns now: every player has their own 4 actions each round and acts at the same time, in any order. Everyone draws their blind card as the round starts. A player presses *Done for the round* (hand within its limit); when everyone is done, the events come, as before. First click wins when two players take the same card.
 - **The card queue keeps its gaps.** A taken card leaves an empty (dotted) slot; nothing slides down during the round. At the end of the round the last slots leave (an empty one loses nothing, and the red ✕ cards are exactly those about to go), the gaps close and the queue is refilled.

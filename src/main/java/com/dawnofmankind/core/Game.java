@@ -563,8 +563,10 @@ public final class Game {
         queue.removeIf(sl -> sl.taken);
         refillQueue();
         for (Player p : players) p.committed = 0;
-        if (eraEnding || eraDeck.isEmpty()) {
-            if (!eraEnding) log("The era deck is exhausted.");
+        // in the last era the game goes on after the era deck runs out, until the queue is empty at the end of a round
+        boolean lastEra = eraIndex + 1 >= content.eras.size();
+        if (eraEnding || (eraDeck.isEmpty() && (!lastEra || queue.isEmpty()))) {
+            if (!eraEnding) log(lastEra ? "The queue is empty and the era deck is exhausted." : "The era deck is exhausted.");
             advanceEra();
             if (result != null) return;
         }
@@ -822,7 +824,11 @@ public final class Game {
         if (cores) core = ownTerritory(a);
         pay(p, d.cost);
         p.hand.remove(c);
-        if (d.type == CardType.TECH) p.techs.add(d);
+        if (d.type == CardType.TECH) {
+            p.techs.add(d);
+            sciencePoints++;
+            log("Science: +1 point for " + d.name + ".");
+        }
         if (d.type == CardType.MINOR_WONDER) p.minorWonders.add(d);
         log(p.name + " plays " + d.name + ".");
         if (a.get("building") != null) {
@@ -1710,9 +1716,12 @@ public final class Game {
         return content.rules.handLimit + mods(p).handLimit;
     }
 
+    /** 1 point for every science (technology) card played. */
+    public int sciencePoints;
+
     /** The final score: victory points from the great wonders the team built, +1 per territory of the realm. */
     public int score() {
-        int vp = realm.size();
+        int vp = realm.size() + sciencePoints;
         for (WonderDef w : builtWonders) vp += w.victoryPoints;
         return vp;
     }

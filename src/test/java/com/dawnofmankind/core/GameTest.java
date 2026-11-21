@@ -269,6 +269,19 @@ class GameTest {
     }
 
     @Test
+    void everyTechnologyPlayedScoresAPoint() {
+        Game g = game(1, 43);
+        Player p = g.players.get(0);
+        p.res.put(Res.RESEARCH, 20);
+        p.res.put(Res.PRODUCTION, 20);
+        int before = g.score();
+        Game.CardInst tools = card(g, "stone_tools");
+        p.hand.add(tools);
+        g.act(0, Map.of("type", "play", "card", tools.id));
+        assertEquals(before + 1, g.score());
+    }
+
+    @Test
     void techsAreGlobal() {
         Game g = game(2, 18);
         Player a = g.players.get(0), b = g.players.get(1);

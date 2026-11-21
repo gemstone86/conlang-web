@@ -139,35 +139,35 @@ greatWonders:
   stonehenge:
     name: Stonehenge
     era: prehistoric
-    costPerPlayer: {production: 12, culture: 4}
+    costPerPlayer: {production: 10, culture: 3}
     effects: [{actionsPerTurn: 1}]
     victoryPoints: 2
     text: Every player gets +1 action per turn.
   pyramids:
     name: The Pyramids
     era: ancient
-    costPerPlayer: {production: 15, culture: 5}
+    costPerPlayer: {production: 13, culture: 4}
     effects: [{stability: 2}, {income: {culture: 2}}, {coreTerritory: 1}]
     victoryPoints: 2
     text: +2 Stability, every player +2 culture per turn, +2 victory points. Cores a territory (the one it stands in).
   hanging_gardens:
     name: The Hanging Gardens
     era: ancient
-    costPerPlayer: {production: 11, food: 10}
+    costPerPlayer: {production: 9, food: 9}
     effects: [{perWorker: {building: farm, food: 1}}, {income: {culture: 1}}]
     victoryPoints: 2
     text: Every farmer +1 food, every player +1 culture per turn.
   great_library:
     name: The Great Library
     era: ancient
-    costPerPlayer: {production: 10, culture: 5, research: 4}
+    costPerPlayer: {production: 9, culture: 4, research: 3}
     effects: [{income: {research: 4}}, {handLimit: 1}]
     victoryPoints: 2
     text: Every player +4 research per turn and +1 max hand size.
   nomadic_living:
     name: Nomadic Living
     era: prehistoric
-    costPerPlayer: {production: 6, food: 3}       # cheap: about 2.5 rounds of the team's output
+    costPerPlayer: {production: 5, food: 3}       # cheap: about 2.5 rounds of the team's output
     effects: [{freeSettlers: 1}]
     victoryPoints: 1
     obsoleteAfter: prehistoric
@@ -175,14 +175,14 @@ greatWonders:
   great_lighthouse:
     name: The Great Lighthouse
     era: ancient
-    costPerPlayer: {production: 12, food: 4}
+    costPerPlayer: {production: 10, food: 3}
     effects: [{faceUpLands: 1}, {settleDiscount: {production: 2}}, {freeSettlers: 1}, {coreTerritory: 1}]
     victoryPoints: 2
     text: One more land lies face up. Settling any land costs 2 production and 1 settler less. Cores a territory (the one it stands in).
   colossus:
     name: The Colossus
     era: ancient
-    costPerPlayer: {production: 15, influence: 3}
+    costPerPlayer: {production: 13, influence: 3}
     effects: [{perWorker: {building: mine, production: 1}}]
     victoryPoints: 2
     text: Every miner +1 production.
