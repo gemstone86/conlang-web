@@ -39,11 +39,13 @@
   .app:hover, .app:focus-visible { transform: translateY(-3px); box-shadow: 0 10px 30px rgba(0,0,0,.35); outline: none; }
   .app.rune:hover, .app.rune:focus-visible { border-color: var(--moss); }
   .app.weather:hover, .app.weather:focus-visible { border-color: var(--sky); }
+  .app.dawn:hover, .app.dawn:focus-visible { border-color: #e6c27a; }
   .app .glyph { width: 64px; height: 64px; margin-bottom: .3rem; }
   .app img.logo { width: auto; align-self: flex-start; }
   .app h2 { font: 400 1.7rem/1.1 var(--serif); margin: 0; }
   .app.rune h2 { color: #a9d1b5; }
   .app.weather h2 { color: #b5d6ee; }
+  .app.dawn h2 { color: #e6c27a; }
   .app p { margin: 0; color: var(--bone-dim); font-size: .95rem; }
   .app .note { margin-top: .5rem; font-size: .82rem; color: var(--brass); min-height: 1.2em; }
   .app .go { position: absolute; right: 1.2rem; top: 1.3rem; font-size: 1.3rem; color: var(--bone-dim); transition: transform .15s; }
@@ -87,7 +89,7 @@
 </head>
 <body>
 <header>
-  <h1>Root and Rune · Weather</h1>
+  <h1>Root and Rune · Weather · Dawn</h1>
   <p>Languages and skies for your worlds</p>
 </header>
 
@@ -109,6 +111,16 @@
       <h2>Weather generator</h2>
       <p>Eon's day-by-day weather, calendars and events, with the world map and campaign notes.</p>
       <div class="note" id="weatherNote"></div>
+    </a>
+    <a class="app dawn" href="/dawn/">
+      <svg class="glyph" viewBox="0 0 52 52" aria-hidden="true" fill="none" stroke="#e6c27a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M6 38h40"/>
+        <path d="M14 38a12 12 0 0 1 24 0"/>
+        <path d="M26 14v6M12 20l4 4M40 20l-4 4M6 30h5M41 30h5"/>
+      </svg>
+      <span class="go" aria-hidden="true">&#8594;</span>
+      <h2>Dawn of Mankind</h2>
+      <p>A co-operative card game for 1&ndash;6 players: build a civilization together and see it through the ages.</p>
     </a>
   </nav>
 

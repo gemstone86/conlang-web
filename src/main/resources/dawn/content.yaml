@@ -1,0 +1,735 @@
+# Dawn of Mankind — game content and rule numbers.
+#
+# Effects are one-key maps. See com.dawnofmankind.core.Effects for the full list:
+#   immediate: gain, lose, population, army, stability, health, draw, extraActions, addCrisis, destroyBuilding, freeBuilding
+#   lasting:   income, perWorker, handLimit, actionsPerTurn, raidDefense, mitigate, buildDiscount, sharedPool
+#   response:  defense, halve, cancel, healthBonus
+# Resources: food, production, culture, influence, research.
+
+rules:
+  actionsPerTurn: 4
+  handLimit: 7
+  startWorkers: {farm: 2, mine: 1}        # start with a Farm and a Mine; 3 Population: 2 farmers, 1 miner
+  startResources: {food: 3, production: 2}
+  growthCost: {food: 3}                   # action "grow": +1 Population
+  recruitCost: {production: 2}            # action "recruit": +1 troop
+  foodUpkeepPerPop: 1
+  startStability: 10
+  startHealth: 2
+  queueExtra: 2                           # queue size = players + 2
+  removedPerRound: {1: 1, 2: 1, 3: 2, 4: 2, 5: 3, 6: 3}
+  startingEventsPerPlayer: 2
+  eraDeckSize: {base: 20, perPlayer: 12}
+  eraTriggerBottomPercent: 30             # era-trigger events are placed in the bottom 30% of the era deck
+  raidCasualtyDivisor: 3                  # a repelled raid of strength S costs S/3 troops
+  invasionCasualtyDivisor: 2              # a repelled invasion of strength S costs S/2 troops, split between senders
+
+buildings:
+  farm:
+    name: Farm
+    cost: {production: 2}
+    slots: 2
+    perWorker: {food: 2}
+    text: Each farmer produces 2 food.
+  mine:
+    name: Mine
+    cost: {production: 2}
+    slots: 2
+    perWorker: {production: 2}
+    text: Each miner produces 2 production.
+  temple:
+    name: Temple
+    cost: {production: 3}
+    slots: 2
+    perWorker: {culture: 1}
+    text: Each worker produces 1 culture (and 1 happiness, coming later).
+  village:
+    name: Village
+    cost: {production: 3}
+    slots: 2
+    perWorker: {research: 1, culture: 1}
+    text: Each worker produces 1 research and 1 culture.
+
+# Great wonders are the measure of a game: the final score is the sum of their victory points.
+# Bonuses and points are placeholders, to be reworked.
+greatWonders:
+  stonehenge:
+    name: Stonehenge
+    era: prehistoric
+    costPerPlayer: {production: 5, culture: 2}
+    effects: [{actionsPerTurn: 1}]
+    victoryPoints: 2
+    text: Every player gets +1 action per turn.
+  pyramids:
+    name: The Pyramids
+    era: ancient
+    costPerPlayer: {production: 5, culture: 3}
+    effects: [{stability: 2}, {income: {culture: 2}}]
+    victoryPoints: 2
+    text: +2 Stability, every player +2 culture per turn, +2 victory points.
+  hanging_gardens:
+    name: The Hanging Gardens
+    era: ancient
+    costPerPlayer: {production: 4, food: 3}
+    effects: [{perWorker: {building: farm, food: 1}}, {income: {culture: 1}}]
+    victoryPoints: 2
+    text: Every farmer +1 food, every player +1 culture per turn.
+  great_library:
+    name: The Great Library
+    era: ancient
+    costPerPlayer: {production: 3, culture: 2, research: 2}
+    effects: [{income: {research: 4}}, {handLimit: 1}]
+    victoryPoints: 2
+    text: Every player +4 research per turn and +1 max hand size.
+  colossus:
+    name: The Colossus
+    era: ancient
+    costPerPlayer: {production: 5, influence: 2}
+    effects: [{perWorker: {building: mine, production: 1}}]
+    victoryPoints: 2
+    text: Every miner +1 production.
+
+eras:
+  - id: prehistoric
+    name: Prehistoric
+    greatWonders: [stonehenge]
+    cards:
+      # technologies
+      fire: 1
+      stone_tools: 1
+      hunting: 1
+      animal_husbandry: 1
+      pottery: 1
+      mysticism: 1
+      spear_throwing: 1
+      herbalism: 1
+      # actions
+      foraging: 3
+      great_hunt: 2
+      flint_quarry: 2
+      cave_paintings: 2
+      arm_the_hunters: 2
+      storytelling: 1
+      shamans_vision: 2
+      shell_trading: 2
+      gather_the_tribe: 2
+      long_day: 1
+      # responses
+      rally_the_hunters: 2
+      hide_in_the_caves: 1
+      tribal_healer: 1
+      offering_to_the_spirits: 1
+      # minor wonder
+      epic: 1
+      # events
+      wolf_pack: 2
+      rival_tribe: 2
+      wandering_horde: 1
+      harsh_winter: 1
+      flash_flood: 1
+      fever: 1
+      tribal_quarrel: 1
+      bad_omen: 1
+      bountiful_season: 2
+      wandering_sage: 1
+      strangers_at_the_fire: 1
+      dawn_of_agriculture: 1
+  - id: ancient
+    name: Ancient
+    greatWonders: [pyramids, hanging_gardens, great_library, colossus]
+    cards:
+      agriculture: 1
+      bronze_working: 1
+      writing: 1
+      masonry: 1
+      medicine: 1
+      currency: 1
+      calendar: 1
+      code_of_laws: 1
+      horseback_riding: 1
+      irrigation: 2
+      harvest_festival: 2
+      conscription: 2
+      scribes: 2
+      merchants: 2
+      stone_quarry: 2
+      census: 2
+      festival: 1
+      long_day: 1
+      foraging: 1
+      city_walls: 2
+      bronze_levy: 1
+      quarantine: 1
+      priests: 1
+      granary_reserve: 1
+      epic: 1
+      barbarian_raid: 2
+      chariot_raiders: 1
+      sea_peoples: 1
+      drought: 1
+      earthquake: 1
+      plague: 1
+      revolt: 1
+      wrath_of_the_gods: 1
+      golden_age: 1
+      great_scientist: 1
+      refugees: 1
+      rumbling_mountain: 1
+      comet_sighted: 1
+      failing_rains: 1
+      rise_of_empires: 1
+
+# The starting event deck: 2 per player, drawn from these (number = copies in the pool).
+startingEvents:
+  wolf_pack: 2
+  cold_night: 2
+  fever: 1
+  tribal_quarrel: 1
+  good_hunt: 2
+  strangers_at_the_fire: 1
+  rival_tribe: 1
+  small_fire: 1
+  wandering_sage: 1
+
+# Crisis cards: kept apart, added to the future deck only by other events or when a player's Population hits 0.
+crisisCards: [black_plague, supervolcano, meteor_impact, climate_change]
+
+cards:
+  # ------------------------------------------------------------------ technologies (cost research + resources)
+  fire:
+    name: Fire
+    type: tech
+    cost: {research: 2}
+    effects: [{health: 1}, {raidDefense: 1}]
+    text: +1 Health. Your camp is +1 defense against raids.
+  stone_tools:
+    name: Stone Tools
+    type: tech
+    cost: {research: 2, production: 1}
+    effects: [{perWorker: {building: mine, production: 1}}]
+    text: Your miners produce +1 production.
+  hunting:
+    name: Hunting
+    type: tech
+    cost: {research: 2}
+    effects: [{income: {food: 1}}, {army: 1}]
+    text: +1 food per turn and 1 troop.
+  animal_husbandry:
+    name: Animal Husbandry
+    type: tech
+    cost: {research: 3, food: 2}
+    effects: [{perWorker: {building: farm, food: 1}}]
+    text: Your farmers produce +1 food.
+  pottery:
+    name: Pottery
+    type: tech
+    cost: {research: 3, production: 1}
+    effects: [{handLimit: 1}, {income: {food: 1}}]
+    text: +1 max hand size, +1 food per turn.
+  mysticism:
+    name: Mysticism
+    type: tech
+    cost: {research: 3, culture: 1}
+    effects: [{perWorker: {building: temple, culture: 1}}]
+    text: Your temple workers produce +1 culture.
+  spear_throwing:
+    name: Spear Throwing
+    type: tech
+    cost: {research: 2, production: 2}
+    effects: [{raidDefense: 2}]
+    text: +2 defense against raids.
+  herbalism:
+    name: Herbalism
+    type: tech
+    cost: {research: 3}
+    effects: [{health: 2}]
+    text: +2 Health.
+  agriculture:
+    name: Agriculture
+    type: tech
+    cost: {research: 4, food: 2}
+    effects: [{perWorker: {building: farm, food: 1}}]
+    text: Your farmers produce +1 food.
+  bronze_working:
+    name: Bronze Working
+    type: tech
+    cost: {research: 4, production: 3}
+    effects: [{raidDefense: 2}, {army: 1}]
+    text: +2 defense against raids and 1 troop.
+  writing:
+    name: Writing
+    type: tech
+    cost: {research: 4}
+    effects: [{perWorker: {building: village, research: 1}}]
+    text: Your village workers produce +1 research.
+  masonry:
+    name: Masonry
+    type: tech
+    cost: {research: 4, production: 2}
+    effects: [{buildDiscount: {production: 1}}]
+    text: Your buildings cost 1 production less.
+  medicine:
+    name: Medicine
+    type: tech
+    cost: {research: 5}
+    effects: [{mitigate: plague}, {health: 1}]
+    text: +1 Health. Plagues (including the Black Plague) do half the harm, for everyone.
+  currency:
+    name: Currency
+    type: tech
+    cost: {research: 5, influence: 1}
+    effects: [{sharedPool: {income: {influence: 1}}}, {income: {influence: 1}}]
+    text: Creates the shared pool (+1 influence per turn into it). +1 influence per turn for you.
+  calendar:
+    name: Calendar
+    type: tech
+    cost: {research: 4, culture: 1}
+    effects: [{income: {food: 1, culture: 1}}]
+    text: +1 food and +1 culture per turn.
+  code_of_laws:
+    name: Code of Laws
+    type: tech
+    cost: {research: 5, culture: 2}
+    effects: [{stability: 2}]
+    text: +2 Stability.
+  horseback_riding:
+    name: Horseback Riding
+    type: tech
+    cost: {research: 4, food: 2}
+    effects: [{army: 2}, {raidDefense: 1}]
+    text: 2 troops and +1 defense against raids.
+
+  # ------------------------------------------------------------------ actions
+  foraging:
+    name: Foraging
+    type: action
+    effects: [{gain: {food: 3}}]
+    text: +3 food.
+  great_hunt:
+    name: Great Hunt
+    type: action
+    effects: [{gain: {food: 2}}, {army: 1}]
+    text: +2 food and 1 troop.
+  flint_quarry:
+    name: Flint Quarry
+    type: action
+    effects: [{gain: {production: 3}}]
+    text: +3 production.
+  cave_paintings:
+    name: Cave Paintings
+    type: action
+    effects: [{gain: {culture: 2, research: 1}}]
+    text: +2 culture, +1 research.
+  arm_the_hunters:
+    name: Arm the Hunters
+    type: action
+    cost: {production: 2}
+    effects: [{army: 2}]
+    text: Pay 2 production for 2 troops.
+  storytelling:
+    name: Storytelling
+    type: action
+    effects: [{draw: 2}, {gain: {culture: 1}}]
+    text: Draw 2 cards, +1 culture.
+  shamans_vision:
+    name: Shaman's Vision
+    type: action
+    effects: [{gain: {research: 3}}]
+    text: +3 research.
+  shell_trading:
+    name: Shell Trading
+    type: action
+    effects: [{gain: {influence: 2, food: 1}}]
+    text: +2 influence, +1 food.
+  gather_the_tribe:
+    name: Gather the Tribe
+    type: action
+    cost: {food: 2}
+    effects: [{population: 1}]
+    text: Pay 2 food for +1 Population.
+  long_day:
+    name: A Long Day
+    type: action
+    effects: [{extraActions: 2}]
+    text: +2 actions this turn.
+  irrigation:
+    name: Irrigation
+    type: action
+    effects: [{gain: {food: 4}}]
+    text: +4 food.
+  harvest_festival:
+    name: Harvest Festival
+    type: action
+    effects: [{gain: {food: 2}}, {stability: 1}]
+    text: +2 food, +1 Stability.
+  conscription:
+    name: Conscription
+    type: action
+    cost: {production: 2}
+    effects: [{army: 3}]
+    text: Pay 2 production for 3 troops.
+  scribes:
+    name: Scribes
+    type: action
+    effects: [{gain: {research: 4}}]
+    text: +4 research.
+  merchants:
+    name: Merchants
+    type: action
+    effects: [{gain: {influence: 2, food: 2}}]
+    text: +2 influence, +2 food.
+  stone_quarry:
+    name: Stone Quarry
+    type: action
+    effects: [{gain: {production: 4}}]
+    text: +4 production.
+  census:
+    name: Census
+    type: action
+    cost: {food: 1}
+    effects: [{population: 1}]
+    text: Pay 1 food for +1 Population.
+  festival:
+    name: Festival
+    type: action
+    cost: {food: 2}
+    effects: [{stability: 2}, {gain: {culture: 1}}]
+    text: Pay 2 food for +2 Stability and +1 culture.
+
+  # ------------------------------------------------------------------ responses (played when an event resolves)
+  rally_the_hunters:
+    name: Rally the Hunters
+    type: response
+    respondsTo: [raid, invasion]
+    effects: [{defense: 3}]
+    text: +3 defense against this raid or invasion.
+  hide_in_the_caves:
+    name: Hide in the Caves
+    type: response
+    respondsTo: [raid, catastrophe]
+    effects: [{halve: true}]
+    text: Halve the losses from this raid or catastrophe.
+  tribal_healer:
+    name: Tribal Healer
+    type: response
+    respondsTo: [plague]
+    effects: [{healthBonus: 3}]
+    text: +3 Health against this plague.
+  offering_to_the_spirits:
+    name: Offering to the Spirits
+    type: response
+    respondsTo: [curse, unrest]
+    effects: [{cancel: true}]
+    text: Cancel this curse or unrest.
+  city_walls:
+    name: City Walls
+    type: response
+    cost: {production: 1}
+    respondsTo: [raid, invasion]
+    effects: [{defense: 5}]
+    text: Pay 1 production for +5 defense against this raid or invasion.
+  bronze_levy:
+    name: Bronze Levy
+    type: response
+    cost: {food: 1}
+    respondsTo: [raid, invasion]
+    effects: [{defense: 4}]
+    text: Pay 1 food for +4 defense against this raid or invasion.
+  quarantine:
+    name: Quarantine
+    type: response
+    respondsTo: [plague]
+    effects: [{halve: true}]
+    text: Halve the losses from this plague.
+  priests:
+    name: Priests
+    type: response
+    cost: {culture: 1}
+    respondsTo: [curse, unrest]
+    effects: [{cancel: true}]
+    text: Pay 1 culture to cancel this curse or unrest.
+  granary_reserve:
+    name: Granary Reserve
+    type: response
+    respondsTo: [catastrophe]
+    effects: [{halve: true}]
+    text: Halve the losses from this catastrophe.
+
+  # ------------------------------------------------------------------ minor wonders (built by one player)
+  epic:
+    name: Epic
+    type: minor_wonder
+    cost: {culture: 3, production: 2}
+    effects: [{income: {culture: 1}}, {handLimit: 1}]
+    text: +1 culture per turn, +1 max hand size.
+
+  # ------------------------------------------------------------------ events
+  # kind: raid (one player defends alone), invasion (everyone may send troops), test (a stat against a threshold),
+  #       opportunity (the target may pay for a benefit), effects (just happens). target: one | each | civ.
+  wolf_pack:
+    name: Wolf Pack
+    type: event
+    category: raid
+    kind: raid
+    strength: 2
+    perShortfall: [{lose: {food: 1}}]
+    text: Raid, strength 2. Each point you fall short costs 1 food.
+  rival_tribe:
+    name: Rival Tribe
+    type: event
+    category: raid
+    kind: raid
+    strength: 3
+    perShortfall: [{lose: {food: 1, production: 1}}]
+    text: Raid, strength 3. Each point short costs 1 food and 1 production.
+  wandering_horde:
+    name: Wandering Horde
+    type: event
+    category: invasion
+    kind: invasion
+    strength: {base: 1, perPlayer: 2}
+    perShortfall: [{lose: {food: 1}}]
+    text: Invasion, strength 1 + 2 per player. Each point short costs every player 1 food.
+  harsh_winter:
+    name: Harsh Winter
+    type: event
+    category: catastrophe
+    target: each
+    effects: [{lose: {food: 2}}]
+    text: Every player loses 2 food.
+  cold_night:
+    name: Cold Night
+    type: event
+    category: catastrophe
+    target: each
+    effects: [{lose: {food: 1}}]
+    text: Every player loses 1 food.
+  flash_flood:
+    name: Flash Flood
+    type: event
+    category: catastrophe
+    target: one
+    effects: [{destroyBuilding: 1}, {lose: {food: 1}}]
+    text: One player loses a building (the one with fewest workers) and 1 food.
+  small_fire:
+    name: Camp Fire Spreads
+    type: event
+    category: catastrophe
+    target: one
+    effects: [{lose: {production: 2}}]
+    text: One player loses 2 production.
+  fever:
+    name: Fever
+    type: event
+    category: plague
+    kind: test
+    stat: health
+    threshold: 2
+    target: civ
+    perShortfall: [{population: -1}]
+    text: Health test 2. Each point short costs the civilization 1 Population.
+  tribal_quarrel:
+    name: Tribal Quarrel
+    type: event
+    category: unrest
+    effects: [{stability: -1}]
+    text: -1 Stability.
+  bad_omen:
+    name: Bad Omen
+    type: event
+    category: curse
+    persistent:
+      ongoing: [{income: {culture: -1}}, {stability: -1}]
+      cleanse: {culture: 3}
+    text: Until lifted (3 culture, 1 action), every player produces 1 less culture per turn and Stability drops by 1 each round.
+  bountiful_season:
+    name: Bountiful Season
+    type: event
+    category: boon
+    target: each
+    effects: [{gain: {food: 2}}]
+    text: Every player gains 2 food.
+  good_hunt:
+    name: Good Hunt
+    type: event
+    category: boon
+    target: each
+    effects: [{gain: {food: 1}}]
+    text: Every player gains 1 food.
+  wandering_sage:
+    name: Wandering Sage
+    type: event
+    category: boon
+    target: one
+    effects: [{gain: {research: 3}}]
+    text: One player gains 3 research.
+  strangers_at_the_fire:
+    name: Strangers at the Fire
+    type: event
+    category: opportunity
+    kind: opportunity
+    offer:
+      cost: {food: 2}
+      effects: [{population: 1}]
+    text: One player may pay 2 food to take them in (+1 Population).
+  dawn_of_agriculture:
+    name: Dawn of Agriculture
+    type: event
+    category: era
+    eraTrigger: true
+    target: each
+    effects: [{gain: {food: 2}}]
+    text: Every player gains 2 food. The Prehistoric era ends at the end of this round.
+  barbarian_raid:
+    name: Barbarian Raid
+    type: event
+    category: raid
+    kind: raid
+    strength: 4
+    perShortfall: [{lose: {food: 1, production: 1}}]
+    text: Raid, strength 4. Each point short costs 1 food and 1 production.
+  chariot_raiders:
+    name: Chariot Raiders
+    type: event
+    category: raid
+    kind: raid
+    strength: 5
+    perShortfall: [{lose: {food: 1, production: 1, culture: 1}}]
+    text: Raid, strength 5. Each point short costs 1 food, 1 production and 1 culture.
+  sea_peoples:
+    name: The Sea Peoples
+    type: event
+    category: invasion
+    kind: invasion
+    strength: {base: 2, perPlayer: 3}
+    perShortfall: [{lose: {food: 1, production: 1}}]
+    text: Invasion, strength 2 + 3 per player. Each point short costs every player 1 food and 1 production.
+  drought:
+    name: Drought
+    type: event
+    category: catastrophe
+    target: each
+    effects: [{lose: {food: 3}}]
+    text: Every player loses 3 food.
+  earthquake:
+    name: Earthquake
+    type: event
+    category: catastrophe
+    target: one
+    effects: [{destroyBuilding: 1}, {lose: {production: 2}}]
+    text: One player loses a building and 2 production.
+  plague:
+    name: Plague
+    type: event
+    category: plague
+    kind: test
+    stat: health
+    threshold: 4
+    target: civ
+    perShortfall: [{population: -1}]
+    text: Health test 4. Each point short costs the civilization 1 Population.
+  revolt:
+    name: Revolt
+    type: event
+    category: unrest
+    effects: [{stability: -2}]
+    text: -2 Stability.
+  wrath_of_the_gods:
+    name: Wrath of the Gods
+    type: event
+    category: curse
+    persistent:
+      ongoing: [{income: {food: -1}}, {stability: -1}]
+      cleanse: {culture: 4}
+    text: Until lifted (4 culture, 1 action), every player produces 1 less food per turn and Stability drops by 1 each round.
+  golden_age:
+    name: Golden Age
+    type: event
+    category: boon
+    target: each
+    effects: [{gain: {culture: 2, research: 1}}]
+    text: Every player gains 2 culture and 1 research.
+  great_scientist:
+    name: Great Scientist
+    type: event
+    category: boon
+    target: one
+    effects: [{gain: {research: 5}}]
+    text: One player gains 5 research.
+  refugees:
+    name: Refugees
+    type: event
+    category: opportunity
+    kind: opportunity
+    offer:
+      cost: {food: 3}
+      effects: [{population: 2}]
+    text: One player may pay 3 food to take them in (+2 Population).
+  rumbling_mountain:
+    name: Rumbling Mountain
+    type: event
+    category: catastrophe
+    target: each
+    effects: [{lose: {production: 1}}, {addCrisis: supervolcano}]
+    text: Every player loses 1 production. The Supervolcano crisis is added to the future deck.
+  comet_sighted:
+    name: Comet Sighted
+    type: event
+    category: unrest
+    effects: [{stability: -1}, {addCrisis: meteor_impact}]
+    text: -1 Stability. The Meteor Impact crisis is added to the future deck.
+  failing_rains:
+    name: Failing Rains
+    type: event
+    category: catastrophe
+    target: each
+    effects: [{lose: {food: 1}}, {addCrisis: climate_change}]
+    text: Every player loses 1 food. The Climate Change crisis is added to the future deck.
+  rise_of_empires:
+    name: Rise of Empires
+    type: event
+    category: era
+    eraTrigger: true
+    target: each
+    effects: [{gain: {culture: 2}}]
+    text: Every player gains 2 culture. The Ancient era ends at the end of this round.
+
+  # ------------------------------------------------------------------ crisis cards
+  black_plague:
+    name: Black Plague
+    type: event
+    crisis: true
+    category: plague
+    kind: test
+    stat: health
+    threshold: 8
+    target: civ
+    perShortfall: [{population: -1}]
+    text: "CRISIS. Health test 8: each point short costs the civilization 1 Population. Medicine halves it."
+  supervolcano:
+    name: Supervolcano Eruption
+    type: event
+    crisis: true
+    category: catastrophe
+    target: each
+    effects: [{lose: {food: 4, production: 4}}, {destroyBuilding: 1}, {stability: -2}]
+    text: CRISIS. Every player loses 4 food, 4 production and a building. -2 Stability.
+  meteor_impact:
+    name: Meteor Impact
+    type: event
+    crisis: true
+    category: catastrophe
+    target: civ
+    effects: [{population: -4}, {lose: {production: 3}}, {stability: -2}]
+    text: CRISIS. The civilization loses 4 Population; every player loses 3 production. -2 Stability.
+  climate_change:
+    name: Climate Change
+    type: event
+    crisis: true
+    category: catastrophe
+    target: each
+    effects: [{stability: -1}]
+    persistent:
+      ongoing: [{income: {food: -2}}]
+      cleanse: {culture: 6, research: 4}
+    text: CRISIS. -1 Stability. Until lifted (6 culture + 4 research, 1 action), every player produces 2 less food per turn.

@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dawn of Mankind</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Alegreya+Sans:wght@400;500;700&family=IM+Fell+English:ital@0;1&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="top">
+  <h1><a href="./">Dawn of Mankind</a></h1>
+  <div id="status" class="status"></div>
+</header>
+
+<div id="toast" class="toast" hidden></div>
+
+<!-- start: create or join a room -->
+<main id="start" class="start" hidden>
+  <p class="lead">A co-operative card game for 1–6 players. Build a civilization together and see it through the ages.</p>
+  <div class="card narrow">
+    <label for="name">Your name</label>
+    <input id="name" maxlength="24" autocomplete="nickname">
+    <p id="loggedIn" class="muted small" hidden></p>
+    <div class="row">
+      <button id="create" class="primary">Create a room</button>
+    </div>
+    <label for="code">Or join with a room code</label>
+    <div class="row">
+      <input id="code" maxlength="5" placeholder="K7QWX" class="code-input" autocomplete="off">
+      <button id="join">Join</button>
+    </div>
+  </div>
+</main>
+
+<!-- lobby -->
+<main id="lobby" hidden>
+  <div class="card narrow">
+    <p class="muted small">Room code</p>
+    <div class="bigcode" id="lobbyCode"></div>
+    <div class="row"><button id="copyLink">Copy invite link</button></div>
+    <h3>Players</h3>
+    <ul id="lobbyPlayers" class="plist"></ul>
+    <div class="row">
+      <button id="startGame" class="primary">Start the game</button>
+      <button id="leave">Leave</button>
+    </div>
+    <p id="lobbyNote" class="muted small"></p>
+  </div>
+</main>
+
+<!-- the game -->
+<main id="game" hidden>
+  <div class="board">
+    <section class="col-left">
+      <div class="panel" id="queuePanel"></div>
+      <div class="panel" id="wonderPanel"></div>
+    </section>
+    <section class="col-mid">
+      <div class="panel" id="eventPanel"></div>
+      <div class="panel" id="civPanel"></div>
+      <div class="panel" id="handPanel"></div>
+    </section>
+    <section class="col-right">
+      <div class="panel" id="teamPanel"></div>
+      <div class="panel" id="deckPanel"></div>
+      <div class="panel side">
+        <div class="tabs"><button data-tab="log" class="on">Log</button><button data-tab="chat">Chat</button></div>
+        <div id="logBox" class="logbox"></div>
+        <div id="chatBox" class="chatbox" hidden>
+          <div id="chatList" class="chatlist"></div>
+          <form id="chatForm" class="row"><input id="chatInput" maxlength="300" placeholder="Say something" autocomplete="off"><button>Send</button></form>
+        </div>
+      </div>
+    </section>
+  </div>
+</main>
+
+<div id="over" class="modal" hidden><div class="card narrow" id="overBox"></div></div>
+
+<script src="app.js"></script>
+</body>
+</html>

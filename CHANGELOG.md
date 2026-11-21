@@ -2,6 +2,10 @@
 
 Newest first. Versions from 1.x on are the combined app (Root and Rune + Weather generator).
 
+## v1.57.0 (combined app)
+- **Dawn of Mankind added as a third app** at `/dawn/`: the co-operative card game (1–6 players, rooms with a 5-letter code, live over a WebSocket), copied in from `gemstone86/dawn-of-mankind` main (`b7d5048`: rules engine, web part and page; sources under `com.dawnofmankind`, cards in `dawn/content.yaml`). Logged-in players play under their account name, guests type one. New tile on the start page; its API is covered by the same-site check. Games run in memory, so each deploy ends the games in progress.
+- **Azure: turn on Web sockets** for the App Service (Configuration → General settings), or the rooms won't connect.
+
 ## v1.56.0 (combined app)
 Weather generator:
 - **Blocked way: ask to reroute.** When the weather (deep snow, storm) makes a stretch too slow to walk (under *Blockerad väg*, default 0.5 km/h; 0 turns it off), the journey notes where it gets blocked. When the clock reaches that point, a box asks whether to plan a new route from where the party is (it opens the usual *Ändra resa* from there, planned for the conditions of that day) or to carry on. Asked once per blocked stretch, for your own journeys.

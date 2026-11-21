@@ -21,7 +21,8 @@ public class SameOriginFilter extends OncePerRequestFilter {
     protected void doFilterInternal(HttpServletRequest req, HttpServletResponse res, FilterChain chain) throws ServletException, IOException {
         String m = req.getMethod(), path = req.getRequestURI();
         boolean changing = !(m.equals("GET") || m.equals("HEAD") || m.equals("OPTIONS"));
-        boolean api = path.startsWith("/api/") || path.startsWith("/rune/api/") || path.startsWith("/weather/api/");
+        boolean api = path.startsWith("/api/") || path.startsWith("/rune/api/") || path.startsWith("/weather/api/")
+                || path.startsWith("/dawn/api/");
         if (changing && api && fromAnotherSite(req)) {
             res.setStatus(403);
             res.setContentType("application/json;charset=UTF-8");

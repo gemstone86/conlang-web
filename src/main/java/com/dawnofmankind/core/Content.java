@@ -1,0 +1,243 @@
+package com.dawnofmankind.core;
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.ArrayList;
+import java.util.EnumMap;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import org.yaml.snakeyaml.LoaderOptions;
+import org.yaml.snakeyaml.Yaml;
+
+/**
+ * All game data, loaded from {@code dawn/content.yaml}: the rules' numbers, buildings, cards, wonders, eras, starting
+ * events and crisis cards. Change the YAML to change the game; no code needed for new cards that use existing effects.
+ */
+public final class Content {
+
+    public enum CardType { TECH, ACTION, RESPONSE, MINOR_WONDER, EVENT }
+
+    /** Rule numbers from the {@code rules:} block. */
+    public static final class Rules {
+        public int actionsPerTurn, handLimit, foodUpkeepPerPop, startStability, startHealth, queueExtra,
+                startingEventsPerPlayer, raidCasualtyDivisor, invasionCasualtyDivisor, eraTriggerBottomShare;
+        public EnumMap<Res, Integer> startResources, growthCost, recruitCost;
+        public Map<String, Integer> startWorkers = new LinkedHashMap<>();
+        public Map<Integer, Integer> removedPerRound = new LinkedHashMap<>();
+        public int deckBase, deckPerPlayer;
+
+        public int removedPerRound(int players) {
+            return removedPerRound.getOrDefault(players, players <= 2 ? 1 : players <= 4 ? 2 : 3);
+        }
+    }
+
+    public static final class BuildingDef {
+        public String id, name, text;
+        public int slots;
+        public boolean buildable;
+        public EnumMap<Res, Integer> cost, perWorker;
+    }
+
+    /** One card in a deck: a technology, action, response, minor wonder or event (crisis cards are events). */
+    public static final class CardDef {
+        public String id, name, text, flavor, era;
+        public CardType type;
+        public EnumMap<Res, Integer> cost;
+        /** What playing the card does (tech, action, wonder) or, for events, what happens on resolution. */
+        public List<Map<String, Object>> effects = new ArrayList<>();
+        // responses
+        public List<String> respondsTo = List.of();
+        // events
+        public String category, kind, target;
+        public int strengthBase, strengthPerPlayer, threshold;
+        public String stat;
+        public List<Map<String, Object>> perShortfall = new ArrayList<>();
+        public EnumMap<Res, Integer> offerCost;
+        public List<Map<String, Object>> ongoing = new ArrayList<>();
+        public EnumMap<Res, Integer> cleanseCost;
+        public boolean eraTrigger, crisis, persistent;
+
+        public boolean isEvent() {
+            return type == CardType.EVENT;
+        }
+
+        public int strength(int players) {
+            return strengthBase + strengthPerPlayer * players;
+        }
+    }
+
+    public static final class WonderDef {
+        public String id, name, text, era;
+        /** Cost per player; great wonders are paid for by the whole team. */
+        public EnumMap<Res, Integer> costPerPlayer;
+        public List<Map<String, Object>> effects = new ArrayList<>();
+        public int victoryPoints;
+
+        public EnumMap<Res, Integer> cost(int players) {
+            EnumMap<Res, Integer> m = Res.empty();
+            costPerPlayer.forEach((r, v) -> m.put(r, v * players));
+            return m;
+        }
+    }
+
+    public static final class EraDef {
+        public String id, name;
+        public int order;
+        public Map<String, Integer> cards = new LinkedHashMap<>();
+        public List<String> greatWonders = new ArrayList<>();
+    }
+
+    public final Rules rules = new Rules();
+    public final Map<String, BuildingDef> buildings = new LinkedHashMap<>();
+    public final Map<String, CardDef> cards = new LinkedHashMap<>();
+    public final Map<String, WonderDef> greatWonders = new LinkedHashMap<>();
+    public final List<EraDef> eras = new ArrayList<>();
+    public final Map<String, Integer> startingEvents = new LinkedHashMap<>();
+    public final List<String> crisisCards = new ArrayList<>();
+
+    public static Content loadDefault() {
+        try (InputStream in = Content.class.getResourceAsStream("/dawn/content.yaml")) {
+            if (in == null) throw new IllegalStateException("dawn/content.yaml is missing from the classpath");
+            return load(in);
+        } catch (IOException e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
+    public static Content load(InputStream in) {
+        LoaderOptions opts = new LoaderOptions();
+        Map<String, Object> root = Y.map(new Yaml(opts).load(in));
+        Content c = new Content();
+        c.readRules(Y.map(root.get("rules")));
+        Y.map(root.get("buildings")).forEach((id, v) -> c.buildings.put(id, building(id, Y.map(v))));
+        Y.map(root.get("cards")).forEach((id, v) -> c.cards.put(id, card(id, Y.map(v))));
+        Y.map(root.get("greatWonders")).forEach((id, v) -> c.greatWonders.put(id, wonder(id, Y.map(v))));
+        int order = 0;
+        for (Object o : Y.list(root.get("eras"))) {
+            Map<String, Object> m = Y.map(o);
+            EraDef e = new EraDef();
+            e.id = Y.s(m, "id", null);
+            e.name = Y.s(m, "name", e.id);
+            e.order = order++;
+            Y.map(m.get("cards")).forEach((k, v) -> e.cards.put(k, Y.toInt(v)));
+            e.greatWonders.addAll(Y.strings(m.get("greatWonders")));
+            c.eras.add(e);
+        }
+        Y.map(root.get("startingEvents")).forEach((k, v) -> c.startingEvents.put(k, Y.toInt(v)));
+        c.crisisCards.addAll(Y.strings(root.get("crisisCards")));
+        c.validate();
+        return c;
+    }
+
+    private void readRules(Map<String, Object> m) {
+        rules.actionsPerTurn = Y.i(m, "actionsPerTurn", 4);
+        rules.handLimit = Y.i(m, "handLimit", 7);
+        rules.foodUpkeepPerPop = Y.i(m, "foodUpkeepPerPop", 1);
+        rules.startStability = Y.i(m, "startStability", 10);
+        rules.startHealth = Y.i(m, "startHealth", 0);
+        rules.queueExtra = Y.i(m, "queueExtra", 2);
+        rules.startingEventsPerPlayer = Y.i(m, "startingEventsPerPlayer", 2);
+        rules.raidCasualtyDivisor = Y.i(m, "raidCasualtyDivisor", 3);
+        rules.invasionCasualtyDivisor = Y.i(m, "invasionCasualtyDivisor", 2);
+        rules.eraTriggerBottomShare = Y.i(m, "eraTriggerBottomPercent", 40);
+        rules.startResources = Res.parse(m.get("startResources"));
+        rules.growthCost = Res.parse(m.get("growthCost"));
+        rules.recruitCost = Res.parse(m.get("recruitCost"));
+        Y.map(m.get("startWorkers")).forEach((k, v) -> rules.startWorkers.put(k, Y.toInt(v)));
+        if (m.get("removedPerRound") instanceof Map<?, ?> rp) {
+            rp.forEach((k, v) -> rules.removedPerRound.put(Y.toInt(k), Y.toInt(v)));
+        }
+        Map<String, Object> deck = Y.map(m.get("eraDeckSize"));
+        rules.deckBase = Y.i(deck, "base", 16);
+        rules.deckPerPlayer = Y.i(deck, "perPlayer", 10);
+    }
+
+    private static BuildingDef building(String id, Map<String, Object> m) {
+        BuildingDef b = new BuildingDef();
+        b.id = id;
+        b.name = Y.s(m, "name", id);
+        b.text = Y.s(m, "text", "");
+        b.slots = Y.i(m, "slots", 2);
+        b.buildable = !m.containsKey("buildable") || Y.b(m, "buildable");
+        b.cost = Res.parse(m.get("cost"));
+        b.perWorker = Res.parse(m.get("perWorker"));
+        return b;
+    }
+
+    private static List<Map<String, Object>> effects(Object o) {
+        List<Map<String, Object>> out = new ArrayList<>();
+        for (Object e : Y.list(o)) {
+            Map<String, Object> m = Y.map(e);
+            if (m.size() != 1) throw new IllegalArgumentException("Each effect must have exactly one key: " + m);
+            out.add(m);
+        }
+        return out;
+    }
+
+    private static CardDef card(String id, Map<String, Object> m) {
+        CardDef c = new CardDef();
+        c.id = id;
+        c.name = Y.s(m, "name", id);
+        c.text = Y.s(m, "text", "");
+        c.flavor = Y.s(m, "flavor", "");
+        c.type = CardType.valueOf(Y.s(m, "type", "action").toUpperCase().replace(' ', '_'));
+        c.cost = Res.parse(m.get("cost"));
+        c.effects = effects(m.get("effects"));
+        c.respondsTo = Y.strings(m.get("respondsTo"));
+        c.category = Y.s(m, "category", null);
+        c.kind = Y.s(m, "kind", "effects");
+        c.target = Y.s(m, "target", "civ");
+        Object st = m.get("strength");
+        if (st instanceof Map<?, ?>) {
+            Map<String, Object> sm = Y.map(st);
+            c.strengthBase = Y.i(sm, "base", 0);
+            c.strengthPerPlayer = Y.i(sm, "perPlayer", 0);
+        } else {
+            c.strengthBase = Y.toInt(st);
+        }
+        c.stat = Y.s(m, "stat", null);
+        c.threshold = Y.i(m, "threshold", 0);
+        c.perShortfall = effects(m.get("perShortfall"));
+        Map<String, Object> offer = Y.map(m.get("offer"));
+        c.offerCost = Res.parse(offer.get("cost"));
+        if (!offer.isEmpty()) c.effects = effects(offer.get("effects"));
+        Map<String, Object> pers = Y.map(m.get("persistent"));
+        c.persistent = !pers.isEmpty();
+        c.ongoing = effects(pers.get("ongoing"));
+        c.cleanseCost = Res.parse(pers.get("cleanse"));
+        c.eraTrigger = Y.b(m, "eraTrigger");
+        c.crisis = Y.b(m, "crisis");
+        return c;
+    }
+
+    private static WonderDef wonder(String id, Map<String, Object> m) {
+        WonderDef w = new WonderDef();
+        w.id = id;
+        w.name = Y.s(m, "name", id);
+        w.text = Y.s(m, "text", "");
+        w.era = Y.s(m, "era", null);
+        w.costPerPlayer = Res.parse(m.get("costPerPlayer"));
+        w.effects = effects(m.get("effects"));
+        w.victoryPoints = Y.i(m, "victoryPoints", 0);
+        return w;
+    }
+
+    private void validate() {
+        for (EraDef e : eras) {
+            for (String id : e.cards.keySet()) if (!cards.containsKey(id)) throw new IllegalStateException("Era " + e.id + " lists unknown card " + id);
+            for (String id : e.greatWonders) if (!greatWonders.containsKey(id)) throw new IllegalStateException("Era " + e.id + " lists unknown wonder " + id);
+        }
+        for (String id : startingEvents.keySet()) if (!cards.containsKey(id) || !cards.get(id).isEvent()) throw new IllegalStateException("Starting event " + id + " is not an event card");
+        for (String id : crisisCards) if (!cards.containsKey(id) || !cards.get(id).isEvent()) throw new IllegalStateException("Crisis " + id + " is not an event card");
+        for (String id : rules.startWorkers.keySet()) if (!buildings.containsKey(id)) throw new IllegalStateException("Unknown start building " + id);
+        for (CardDef c : cards.values()) {
+            if (c.isEvent() && c.category == null) throw new IllegalStateException("Event " + c.id + " needs a category");
+            for (Map<String, Object> e : c.effects) Effects.check(e, c.id);
+            for (Map<String, Object> e : c.perShortfall) Effects.check(e, c.id);
+            for (Map<String, Object> e : c.ongoing) Effects.check(e, c.id);
+        }
+        for (WonderDef w : greatWonders.values()) for (Map<String, Object> e : w.effects) Effects.check(e, w.id);
+        if (eras.isEmpty()) throw new IllegalStateException("No eras defined");
+    }
+}

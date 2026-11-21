@@ -75,4 +75,13 @@ public class HubConfig implements WebMvcConfigurer {
             r.addViewController("/" + app + "/").setViewName("forward:/" + app + "/index.html");
         }
     }
+
+    /** Players who are logged in play Dawn of Mankind under their account name; others type a name. */
+    @Bean
+    public com.dawnofmankind.web.DawnIdentity dawnIdentity(com.conlangs.web.Auth auth) {
+        return req -> {
+            var user = auth.current(req.getSession(false));
+            return java.util.Optional.ofNullable(user == null ? null : String.valueOf(user.get("username")));
+        };
+    }
 }
