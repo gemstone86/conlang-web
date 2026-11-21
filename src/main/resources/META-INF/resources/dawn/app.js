@@ -194,7 +194,7 @@ function renderQueue() {
     const fd = c.faceDown ? '<div class="facedown">+ a face-down card underneath</div>' : '';
     const label = c.type === 'event' ? 'Take on' : c.type === 'great_wonder' ? 'Start building' : 'Pick';
     const btn = `<div class="actions"><button ${canAct() ? '' : 'disabled'} data-pick="${i}">${label} (1 action)</button></div>`;
-    return cardHtml(c, `${fd}${btn}`, isLeaving ? 'leaving' : '');
+    return cardHtml(c, `${isLeaving ? '<div class="leave-x" title="Leaves the queue at the end of the round">✕</div>' : ''}${fd}${btn}`, isLeaving ? 'leaving' : '');
   }).reverse().join('');
   $('queuePanel').innerHTML = `<div class="queue-head"><h2>Card queue</h2><span class="muted small">At the end of the round the ${leaving} leftmost card${leaving > 1 ? 's' : ''} (dashed) leave${leaving > 1 ? '' : 's'}; events that leave go to the future deck.</span></div>
     <div class="queue-row">${items || '<p class="muted">The queue is empty.</p>'}</div>

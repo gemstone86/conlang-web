@@ -2,6 +2,9 @@
 
 Newest first. Versions from 1.x on are the combined app (Root and Rune + Weather generator).
 
+## v1.57.12 (combined app)
+- **Dawn of Mankind: cards that leave the queue are marked with a red ✕** (besides the dashed border).
+
 ## v1.57.11 (combined app)
 - **Dawn of Mankind: you choose who starves.** When food runs short and your people are in more than one place (idle, or in different buildings), the new round waits and a box asks how many of the starving come from where. If everyone is in one place, or you are away, it happens by itself as before (idle people first, then the fullest building). AI players let idle people go first. New game phase `starvation`, action `starve`.
 

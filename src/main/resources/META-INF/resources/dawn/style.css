@@ -129,3 +129,6 @@ details summary { cursor: pointer; color: var(--bone-dim); font-size: .88rem; }
 .techrow:first-of-type { border-top: 0; }
 
 .bld .makes { margin-left: auto; font-size: .85rem; white-space: nowrap; }
+
+.cardx.leaving { position: relative; }
+.leave-x { position: absolute; top: .15rem; right: .35rem; color: #e5484d; font-size: 1.6rem; font-weight: 700; line-height: 1; text-shadow: 0 0 3px #000; pointer-events: none; }
