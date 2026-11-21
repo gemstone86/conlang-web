@@ -673,3 +673,28 @@ function renderOver() {
 }
 
 boot();
+
+// ---- the list of every card in the game ----
+let catalogue = null;
+async function openAllCards() {
+  const box = $('cardsBox');
+  $('cardsModal').hidden = false;
+  box.innerHTML = '<p class="muted">Loading…</p>';
+  try {
+    if (!catalogue) catalogue = await (await fetch(API + '/cards')).json();
+  } catch (e) { box.innerHTML = '<p class="bad">Could not load the cards.</p>'; return; }
+  const cost = c => c ? Object.entries(c).filter(([, v]) => v).map(([k, v]) => v + ' ' + k).join(', ') : '';
+  const item = (name, meta, text) => `<div><div class="nm">${esc(name)}</div><div class="meta">${esc(meta)}</div><div>${esc(text || '')}</div></div>`;
+  const group = (title, kinds) => {
+    const list = catalogue.cards.filter(c => kinds.includes(c.type));
+    return list.length ? `<h3>${title} (${list.length})</h3><div class="catalog">${list.map(c =>
+      item(c.name, [c.type, c.era, cost(c.cost) && 'cost ' + cost(c.cost), c.minPlayers && c.minPlayers + '+ players only'].filter(Boolean).join(' · '), c.text)).join('')}</div>` : '';
+  };
+  const types = [...new Set(catalogue.cards.map(c => c.type))].filter(t => t !== 'great_wonder');
+  box.innerHTML = `<div class="row"><h2 style="margin:0">All cards</h2><button data-close style="margin-left:auto">Close</button></div>
+    ${types.map(t => group(t.charAt(0).toUpperCase() + t.slice(1).replace('_', ' ') + ' cards', [t])).join('')}
+    <h3>Lands (${catalogue.lands.length})</h3><div class="catalog">${catalogue.lands.map(l => item(l.name, l.special ? 'special land' : 'land', l.text)).join('')}</div>
+    <h3>Great wonders (${catalogue.wonders.length})</h3><div class="catalog">${catalogue.wonders.map(w => item(w.name, w.era || '', w.text)).join('')}</div>`;
+}
+$('allCards').onclick = openAllCards;
+$('cardsModal').onclick = e => { if (e.target === $('cardsModal') || e.target.closest('[data-close]')) $('cardsModal').hidden = true; };

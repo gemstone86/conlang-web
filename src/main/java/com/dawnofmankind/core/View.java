@@ -295,6 +295,39 @@ public final class View {
         return m;
     }
 
+    /** Every card, land and wonder in the game, for the "all cards" list (no state, just what they do). */
+    public static Map<String, Object> catalogue(Content content) {
+        Map<String, Object> out = new LinkedHashMap<>();
+        List<Object> cards = new ArrayList<>();
+        for (CardDef d : content.cards.values()) {
+            if (d.helper) continue;
+            Map<String, Object> m = def(d);
+            m.put("era", d.era);
+            if (d.minPlayers > 1) m.put("minPlayers", d.minPlayers);
+            cards.add(m);
+        }
+        out.put("cards", cards);
+        List<Object> lands = new ArrayList<>();
+        for (Content.TerritoryDef t : content.territories.values()) {
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("name", t.name);
+            m.put("text", t.text);
+            m.put("special", t.special);
+            lands.add(m);
+        }
+        out.put("lands", lands);
+        List<Object> wonders = new ArrayList<>();
+        for (Content.WonderDef w : content.greatWonders.values()) {
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("name", w.name);
+            m.put("text", w.text);
+            m.put("era", w.era);
+            wonders.add(m);
+        }
+        out.put("wonders", wonders);
+        return out;
+    }
+
     static Map<String, Object> card(CardInst c) {
         Map<String, Object> m = def(c.def);
         m.put("id", c.id);

@@ -135,3 +135,10 @@ details summary { cursor: pointer; color: var(--bone-dim); font-size: .88rem; }
 
 .cardx.gap { opacity: .35; border-style: dotted; display: flex; align-items: center; justify-content: center; min-height: 6rem; }
 #pickBar { gap: .6rem; align-items: center; margin: .3rem 0; }
+
+.allcards { margin-left: auto; align-self: center; }
+.card.wide { max-width: 64rem; width: 100%; max-height: 85vh; overflow: auto; }
+.catalog { display: grid; grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr)); gap: .5rem; margin-bottom: 1rem; }
+.catalog > div { border: 1px solid var(--line); border-radius: 7px; padding: .4rem .6rem; }
+.catalog .nm { font-weight: 700; color: var(--brass); }
+.catalog .meta { font-size: .8rem; opacity: .7; }
