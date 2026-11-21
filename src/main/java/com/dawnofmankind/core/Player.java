@@ -37,6 +37,10 @@ public final class Player {
     public final List<Game.CardInst> hand = new ArrayList<>();
     public final List<CardDef> techs = new ArrayList<>();
     public final List<CardDef> minorWonders = new ArrayList<>();
+    /** The leader in play (drawn leaders play themselves and replace the old one; a leader leaves when its era ends). */
+    public CardDef leader;
+    /** The free troop a leader like Gilgamesh allows has been trained this round. */
+    public boolean freeRecruitUsed;
     /** Population with no building to work in. */
     public int idle;
     public int army;
@@ -44,6 +48,11 @@ public final class Player {
     public int committed;
     /** Disconnected: their turn and responses are passed automatically. */
     public boolean away;
+    /** Parallel rounds: this player's actions left this round, whether they have ended their round, and what they drew blind at its start. */
+    public int actions;
+    public boolean done;
+    public Game.CardInst turnDraw;
+    public int turnEvents, turnSeq;
 
     Player(int seat, String name) {
         this.seat = seat;

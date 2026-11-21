@@ -2,6 +2,50 @@
 
 Newest first. Versions from 1.x on are the combined app (Root and Rune + Weather generator).
 
+## v1.62.0 (combined app)
+
+- Dawn leaders reworked. Prehistoric: The First Shaman (+1 culture/turn, temples cost 1 production), The Great Hunter (+1 food/turn, +1 max farm slot), The Storyteller (an event leaving the queue gives you the face-down card under it), The Great Mother (hand size -2, action cards leaving the queue go to your hand). Ancient: Julius Caesar (+1 military strength per 2 troops, for you), Gilgamesh (first troop each round takes no action, +2 military strength), Hammurabi (+1 research/turn, +1 hand size), Ramses (every unfinished great wonder gains 1 of each resource it needs, every round).
+- Buildings above what the land allows (a lost territory, a leader leaving) now stay but are inactive: their workers produce nothing and no one can be moved in until there is room again. Before, they shrank.
+
+## v1.61.0 (combined app)
+
+- Dawn: a new card type, leaders. A drawn or picked leader plays itself at once, replaces your current leader and leaves when its era ends. Shown beside your realm and in the "All cards" list.
+- Prehistoric: Gilgamesh (the first troop you train each round takes no action) and Hammurabi (+1 research per turn). Ancient: Julius Caesar (every 2 troops at home give +1 raid defense).
+
+## v1.60.0 (combined app)
+
+- Dawn: an "All cards" button at the far right of the header lists every card, land and great wonder with what it does.
+
+## v1.59.1 (combined app)
+- **Dawn of Mankind: New Trading Route** now works as a choice: pick a teammate, then either pay 1 food so they get 2 production, or pay 1 production so they get 2 food. It is a two-or-more-players card (`minPlayers: 2` on a card keeps it out of the deck in solo games).
+- **Two boxes instead of one:** *Technologies* (the technologies) and *Bonuses* (minor wonders such as Roman Roads), between *Event decks* and the log. New Trading Route is an action card and is used from the hand, so it doesn't show in either box.
+
+## v1.59.0 (combined app)
+- **Dawn of Mankind: science scores.** Every technology card played gives +1 point (in the final score, together with wonders and territories).
+- **Great wonders are cheaper**: every cost reduced to 3/3.5 (about 86 %), rounded (e.g. Stonehenge 12 production + 4 culture per player is now 10 + 3).
+- **The game ends later:** in the last era it no longer ends when the era deck runs out; it goes on until the queue is empty at the end of a round (earlier eras still move on when their deck runs out).
+
+## v1.58.0 (combined app)
+- **Dawn of Mankind: parallel rounds.** There are no turns now: every player has their own 4 actions each round and acts at the same time, in any order. Everyone draws their blind card as the round starts. A player presses *Done for the round* (hand within its limit); when everyone is done, the events come, as before. First click wins when two players take the same card.
+- **The card queue keeps its gaps.** A taken card leaves an empty (dotted) slot; nothing slides down during the round. At the end of the round the last slots leave (an empty one loses nothing, and the red ✕ cards are exactly those about to go), the gaps close and the queue is refilled.
+- **Pick time.** The queue can be picked from for 90 seconds after the round starts, then it is closed until the next round (a countdown shows it). Anyone can change the time during play (0 = no limit); setting it to less than has already passed closes the queue at once.
+- **Every drawn event shows.** An event that resolves at once (no response cards, nothing to decide, e.g. Flash Flood) now pops up for every player with what it did, instead of passing by unseen in the log.
+- **Round start pop-up:** at the start of every round a box says it is your turn (round number) and shows the card you drew.
+- **Temples make 2 culture per worker** (was 1).
+- **Strength in the tribe panel:** *Army Y (strength X)* for each player (when technologies add strength), and a line for the whole tribe: total army and total strength against an invasion (everyone sending all their troops, plus any invasion defense).
+- **Settling a land costs the troops sent:** all troops sent against a land's enemy strength are lost (was half, rounded up). Invasions are unchanged.
+- Away players are marked done automatically; AI players pick from the open slots. Changed in the combined app's copy only.
+
+## v1.57.12 (combined app)
+- **Dawn of Mankind: cards that leave the queue are marked with a red ✕** (besides the dashed border).
+
+## v1.57.11 (combined app)
+- **Dawn of Mankind: you choose who starves.** When food runs short and your people are in more than one place (idle, or in different buildings), the new round waits and a box asks how many of the starving come from where. If everyone is in one place, or you are away, it happens by itself as before (idle people first, then the fullest building). AI players let idle people go first. New game phase `starvation`, action `starve`.
+
+## v1.57.10 (combined app)
+- **Dawn of Mankind: the card you draw at the start of your turn pops up** (with a note if events came up first and went face down). Shown once per turn, also after a reload.
+- **Cards that bring a person ask where they work** too (e.g. Gather the Tribe), when more than one building has a free slot, like *Grow*.
+
 ## v1.57.9 (combined app)
 - **Dawn of Mankind: paying toward colonies and great wonders is free** (no action; it must still be your turn). Choosing a wonder from the queue and playing a Settle card to open a face-up land as a colony still cost actions. AI players pay toward each wonder and colony at most once a round. Changed in the combined app's copy only.
 

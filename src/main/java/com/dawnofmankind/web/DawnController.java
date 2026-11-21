@@ -38,6 +38,12 @@ public class DawnController {
         return m;
     }
 
+    /** Every card in the game, for the "All cards" button. */
+    @GetMapping("/cards")
+    public Map<String, Object> cards() {
+        return rooms.catalogue();
+    }
+
     @PostMapping("/rooms")
     public RoomService.Joined create(@RequestBody(required = false) Map<String, Object> body, HttpServletRequest req) {
         return rooms.create(name(body, req));

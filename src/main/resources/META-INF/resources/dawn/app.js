@@ -115,6 +115,8 @@ function render(m) {
   // keep what people were typing in forms across redraws
   const kept = {};
   document.querySelectorAll('#game [data-keep]').forEach(el => { kept[el.dataset.keep] = el.type === 'checkbox' ? el.checked : el.value; });
+  pickEnd = state.pickLeftMs > 0 ? Date.now() + state.pickLeftMs : null;
+  tickPickTimer.closed = state.pickLeftMs === 0;
   renderStatus();
   renderQueue();
   renderRealm();
@@ -122,6 +124,9 @@ function render(m) {
   renderEvents();
   renderCiv();
   checkPickReveal();
+  checkNotices();
+  checkTurnDraw();
+  renderStarvation();
   renderTechs();
   renderHand();
   renderTeam();
@@ -160,16 +165,16 @@ $('copyLink').onclick = async () => {
 };
 
 const me = () => state.players[state.you];
-const myTurn = () => state.phase === 'turns' && state.currentPlayer === state.you && !state.result;
+const myTurn = () => state.phase === 'turns' && !me().done && !state.result;
 const canAct = () => myTurn() && state.actionsLeft > 0;
 const resList = (r, opts = {}) => RES.filter(k => (r?.[k] ?? 0) !== 0 || opts.all)
   .map(k => `<span class="res r-${k}">${opts.signed && r[k] > 0 ? '+' : ''}${r[k] ?? 0}<i>${RES_SHORT[k]}</i></span>`).join('') || '<span class="muted">—</span>';
 const affordable = cost => !cost || RES.every(k => (me().resources[k] || 0) >= (cost[k] || 0));
 
 function renderStatus() {
-  const s = state, cur = s.players[s.currentPlayer];
+  const s = state, waiting = s.players.filter(o => !o.done && !o.away).map(o => esc(o.name));
   const phase = s.result ? (s.result === 'victory' ? 'Victory' : 'Defeat')
-    : s.phase === 'events' ? 'Events' : myTurn() ? `<span class="turn">Your turn — ${s.actionsLeft} action${s.actionsLeft === 1 ? '' : 's'} left</span>` : `${esc(cur.name)}'s turn`;
+    : s.phase === 'events' ? 'Events' : s.phase === 'starvation' ? 'Starvation — choosing who goes' : myTurn() ? `<span class="turn">${s.actionsLeft} action${s.actionsLeft === 1 ? '' : 's'} left</span>` : `You are done — waiting for ${waiting.join(', ') || 'the others'}`;
   $('status').innerHTML = `<span>${esc(s.era)} era (${s.eraIndex + 1}/${s.eraCount})</span><span>Round <b>${s.round}</b></span>
     <span>${phase}</span><span>Stability <b class="${s.stability <= 3 ? 'bad' : ''}">${s.stability}</b></span>
     <span>Health <b>${s.health}</b></span><span class="${s.threat ? 'threat' : ''}">Enemies massing <b>${s.threat}</b></span><span>Era deck <b>${s.eraDeck}</b></span><span>Points <b>${s.score}</b></span>
@@ -191,27 +196,117 @@ function renderQueue() {
     const isLeaving = i >= n - leaving;
     const fd = c.faceDown ? '<div class="facedown">+ a face-down card underneath</div>' : '';
     const label = c.type === 'event' ? 'Take on' : c.type === 'great_wonder' ? 'Start building' : 'Pick';
-    const btn = `<div class="actions"><button ${canAct() ? '' : 'disabled'} data-pick="${i}">${label} (1 action)</button></div>`;
-    return cardHtml(c, `${fd}${btn}`, isLeaving ? 'leaving' : '');
+    if (c.taken) return `<div class="cardx gap" title="Taken; the queue closes up at the end of the round"><div class="muted small">taken</div></div>`;
+    const btn = `<div class="actions"><button ${canAct() && !pickClosed() ? '' : 'disabled'} data-pick="${i}">${label} (1 action)</button></div>`;
+    return cardHtml(c, `${isLeaving ? '<div class="leave-x" title="Leaves the queue at the end of the round">✕</div>' : ''}${fd}${btn}`, isLeaving ? 'leaving' : '');
   }).reverse().join('');
   $('queuePanel').innerHTML = `<div class="queue-head"><h2>Card queue</h2><span class="muted small">At the end of the round the ${leaving} leftmost card${leaving > 1 ? 's' : ''} (dashed) leave${leaving > 1 ? '' : 's'}; events that leave go to the future deck.</span></div>
+    <div class="row small" id="pickBar"><span id="pickTimer"></span><label style="margin:0">Pick time (s, 0 = no limit) <input type="number" min="0" max="3600" step="10" id="pickSecs" value="${s.pickSeconds}" data-keep="pickSecs" style="width:4.5rem"></label><button class="tiny" data-picktime>Set</button></div>
     <div class="queue-row">${items || '<p class="muted">The queue is empty.</p>'}</div>
     <div class="queue-ends"><span>← leaves here</span><span>new cards come in here →</span></div>`;
 }
 // Taking on an event gives the face-down card under it: when it arrives in the hand, show it in a pop-up.
 let pickWatch = null;
+// The time to pick cards: counted down here from what the server says is left.
+let pickEnd = null;
+const pickClosed = () => state.pickLeftMs === 0 || (pickEnd != null && Date.now() >= pickEnd);
+function tickPickTimer() {
+  const el = $('pickTimer');
+  if (!el || !state || state.phase !== 'turns') { if (el) el.textContent = ''; return; }
+  if (state.pickLeftMs < 0) { el.textContent = 'Picking: no time limit'; return; }
+  const left = pickEnd == null ? 0 : Math.max(0, Math.round((pickEnd - Date.now()) / 1000));
+  el.textContent = left > 0 ? `Time to pick cards: ${left}s` : 'The queue is closed until the next round';
+  el.className = left > 0 && left <= 15 ? 'bad' : '';
+  if (left === 0 && !tickPickTimer.closed) { tickPickTimer.closed = true; renderQueue(); }
+}
+setInterval(tickPickTimer, 500);
 $('queuePanel').onclick = e => {
+  const pt = e.target.closest('[data-picktime]');
+  if (pt) return send({ type: 'pickTime', seconds: Math.max(0, Math.round(+$('pickSecs').value || 0)) });
   const b = e.target.closest('[data-pick]'); if (!b) return;
   const card = state.queue[+b.dataset.pick];
   if (card && card.type === 'event') {
-    pickWatch = { ids: new Set((me().hand || []).map(c => c.id)), event: card.name, at: Date.now() };
+    pickWatch = { ids: new Set((me().hand || []).map(c => c.id)), event: card.name, at: Date.now() , leader: me().leader && me().leader.name};
   }
   send({ type: 'pick', slot: +b.dataset.pick });
+};
+// The card drawn blind at the start of your turn is shown in a pop-up (once per turn, also after a reload).
+function checkTurnDraw() {
+  const m = me();
+  if (!m || m.turnSeq == null || !room) return;
+  const key = 'dawnDraw-' + room.code;
+  let seen = null;
+  try { seen = sessionStorage.getItem(key); } catch (e) {}
+  if (seen === String(m.turnSeq)) return;
+  try { sessionStorage.setItem(key, String(m.turnSeq)); } catch (e) {}
+  const ev = m.turnEvents ? `<p class="muted small">${m.turnEvents} event${m.turnEvents > 1 ? 's' : ''} came up first and went face down into the future deck.</p>` : '';
+  const body = m.turnDraw
+    ? `<div class="cards">${cardHtml(m.turnDraw)}</div>${m.turnDraw.type === 'great_wonder' ? '<p class="muted small">A great wonder: it goes on the board for the whole tribe to build.</p>' : ''}${m.turnDraw.type === 'leader' ? '<p class="muted small">A leader: they take over at once and leave when the era ends.</p>' : ''}`
+    : '<p class="muted">The era deck is empty: nothing to draw.</p>';
+  $('gotBox').innerHTML = `<h2>Round ${state.round}: your turn. You drew</h2>${ev}${body}<div class="row"><button class="primary" data-gotok>OK</button></div>`;
+  $('gotModal').hidden = false;
+}
+// Starvation: when food runs short and your people are in more than one place, you choose who starves.
+function renderStarvation() {
+  const s = state, need = s.starving && s.starving[s.you];
+  if (s.phase !== 'starvation' || !need) { $('starveModal').hidden = true; return; }
+  if (!$('starveModal').hidden) return;                      // keep what is being chosen across redraws
+  const p = me();
+  const rows = [['idle', 'Idle', p.idle], ...(p.buildings || []).map(b => [b.id, b.name, b.workers])].filter(r => r[2] > 0);
+  $('starveBox').innerHTML = `<h2>Not enough food</h2><p>${need} of your people ${need === 1 ? 'starves' : 'starve'}. Choose who.</p>
+    <div class="column">${rows.map(([id, name, have]) => `<label class="row" style="justify-content:space-between">${esc(name)} <span class="muted small">(${have})</span>
+      <input type="number" min="0" max="${Math.min(have, need)}" value="0" data-starve="${id}" style="width:4rem"></label>`).join('')}</div>
+    <div class="row"><span class="small muted" id="starveSum"></span><button class="primary" id="starveOk">Confirm</button></div>`;
+  $('starveModal').hidden = false;
+  const upd = () => {
+    const sum = [...document.querySelectorAll('[data-starve]')].reduce((t, i) => t + (+i.value || 0), 0);
+    $('starveSum').textContent = `${sum} of ${need} chosen`;
+    $('starveOk').disabled = sum !== need;
+  };
+  document.querySelectorAll('[data-starve]').forEach(i => { i.oninput = upd; });
+  upd();
+  $('starveOk').onclick = () => {
+    const lose = {};
+    document.querySelectorAll('[data-starve]').forEach(i => { if (+i.value > 0) lose[i.dataset.starve] = +i.value; });
+    $('starveModal').hidden = true;
+    send({ type: 'starve', lose });
+  };
+}
+
+// Events that resolve at once (nobody can respond) are shown too, so they don't pass by unseen in the log.
+function checkNotices() {
+  if (!room || !state.notices) return;
+  const key = 'dawnNotice-' + room.code;
+  let last = 0, stored = null;
+  try { stored = sessionStorage.getItem(key); } catch (e) {}
+  if (stored == null) {                                  // first look in this tab: what already happened isn't shown again
+    const top = state.notices.length ? state.notices[state.notices.length - 1].seq : 0;
+    try { sessionStorage.setItem(key, String(top)); } catch (e) {}
+    return;
+  }
+  last = +stored || 0;
+  const fresh = state.notices.filter(n => n.seq > last);
+  if (!fresh.length) return;
+  try { sessionStorage.setItem(key, String(fresh[fresh.length - 1].seq)); } catch (e) {}
+  if (!$('noticeModal').hidden) { noticeQueue.push(...fresh); return; }
+  showNotices(fresh);
+}
+let noticeQueue = [];
+function showNotices(list) {
+  $('noticeBox').innerHTML = `<h2>${list.length > 1 ? 'Events' : 'An event'} struck</h2>` + list.map(n => cardHtml(n.card,
+    `${n.target ? `<div class="small">Struck <b>${esc(n.target)}</b>.</div>` : ''}<div class="small">${n.lines.map(esc).join('<br>')}</div>`)).join('') + `<div class="row"><button class="primary" data-noticeok>OK</button></div>`;
+  $('noticeModal').hidden = false;
+}
+$('noticeModal').onclick = e => {
+  if (!e.target.closest('[data-noticeok]') && e.target !== $('noticeModal')) return;
+  $('noticeModal').hidden = true;
+  if (noticeQueue.length) { const q = noticeQueue; noticeQueue = []; showNotices(q); }
 };
 function checkPickReveal() {
   if (!pickWatch) return;
   if (Date.now() - pickWatch.at > 5000) { pickWatch = null; return; }
   const got = (me().hand || []).filter(c => !pickWatch.ids.has(c.id));
+  if (me().leader && me().leader.name !== pickWatch.leader) got.push(me().leader);      // a leader plays at once
   if (!got.length) return;
   const ev = pickWatch.event;
   pickWatch = null;
@@ -257,7 +352,7 @@ function renderRealm() {
     World deck: ${s.worldDeck} lands · colonization value ${s.colonizationValue}.</p>
     <div class="cards">${lands}</div>
     ${colonies ? `<h3 style="margin-top:.6rem">Colonies</h3><p class="muted small">Lands being settled. Anyone can send to them (free, on their turn) until the whole cost is paid; then they join the realm.</p><div class="cards">${colonies}</div>` : ''}
-    <h3 style="margin-top:.6rem">Lands to settle</h3><p class="muted small">Pay toward a land until its whole cost is met: resources, troops against its enemy strength (half of the troops sent are lost), settlers. Play a Settle card on a face-up land to make it a colony (a new land is turned up in its place). A land found by an event must be paid for at once, before the event resolves (anyone, free), or it is lost with everything sent.</p>
+    <h3 style="margin-top:.6rem">Lands to settle</h3><p class="muted small">Pay toward a land until its whole cost is met: resources, troops against its enemy strength (all the troops sent are lost), settlers. Play a Settle card on a face-up land to make it a colony (a new land is turned up in its place). A land found by an event must be paid for at once, before the event resolves (anyone, free), or it is lost with everything sent.</p>
     <div class="cards">${front || '<p class="muted">None face up.</p>'}</div>`;
 }
 
@@ -375,8 +470,15 @@ function renderTechs() {
   $('techPanel').innerHTML = `<h2>Technologies <span class="muted small">(${list.length})</span></h2>` + (list.length
     ? list.map(({ t, by }) => `<div class="techrow"><b>${esc(t.name)}</b> <span class="muted small">by ${esc(by)}</span><div class="small">${esc(t.text)}</div></div>`).join('')
     : '<p class="muted small">None yet. Technologies help every player once anyone has researched them.</p>');
+  // the lasting bonuses that aren't technologies: minor wonders such as Roman Roads
+  const bonus = s.players.flatMap(o => o.minorWonders.map(t => ({ t, by: o.name })));
+  $('bonusPanel').innerHTML = `<h2>Bonuses <span class="muted small">(${bonus.length})</span></h2>` + (bonus.length
+    ? bonus.map(({ t, by }) => `<div class="techrow"><b>★ ${esc(t.name)}</b> <span class="muted small">by ${esc(by)}</span><div class="small">${esc(t.text)}</div></div>`).join('')
+    : '<p class="muted small">None yet. Minor wonders (like Roman Roads) and other lasting bonuses show here.</p>');
 }
-function openGrowChoice(free) {
+let growCb = null;
+function openGrowChoice(free, cb) {
+  growCb = cb || (id => send({ type: 'grow', building: id }));
   const box = $('growBox');
   box.innerHTML = `<h2>Where does the new person work?</h2><div class="column">${free.map(b =>
     `<button data-gb="${b.id}">${esc(b.name)} <span class="muted small">(${b.workers}/${b.slots} workers)</span></button>`).join('')}</div>
@@ -385,7 +487,7 @@ function openGrowChoice(free) {
 }
 $('growModal').onclick = e => {
   const t = e.target.closest('button');
-  if (t && t.dataset.gb) send({ type: 'grow', building: +t.dataset.gb });
+  if (t && t.dataset.gb && growCb) growCb(+t.dataset.gb);
   if (t || e.target === $('growModal')) $('growModal').hidden = true;
 };
 
@@ -401,6 +503,7 @@ function renderCiv() {
     const cap = capOf(b.type);
     const room = cap != null ? Math.max(0, cap - b.slots) : 0;
     const dots = Array.from({ length: b.slots }, (_, i) => `<span class="slot ${i < b.workers ? 'full' : ''}" title="${i < b.workers ? 'worker' : 'empty slot'}"></span>`).join('')
+      + Array.from({ length: b.inactive || 0 }, (_, i) => `<span class="slot off ${b.slots + i < b.workers ? 'full' : ''}" title="inactive: above what your land allows"></span>`).join('')
       + Array.from({ length: room }, () => '<span class="slot room" title="room on your land: build to use it"></span>').join('');
     const controls = b.id == null ? '<span class="small muted">not built</span>' : `
       <button class="tiny" ${act && p.idle > 0 && b.workers < b.slots ? '' : 'disabled'} data-move-in="${b.id}" title="Move an idle worker here (1 action)">+ worker</button>
@@ -408,7 +511,7 @@ function renderCiv() {
     return `<div class="bld"><span class="bname">${esc(b.name)}${b.level > 1 ? ` <span class="chip">level ${b.level}</span>` : ''}</span>
       <span class="slots">${dots}</span>${controls}
       ${b.id != null ? `<span class="makes" title="${esc(Object.entries(b.each || {}).map(([r, n]) => `${n} ${r} per worker`).join(', ') || 'makes nothing')} (technologies included)">${Object.keys(b.makes || {}).length ? resList(b.makes, { signed: true }) : '<span class="muted">—</span>'}</span>` : ''}
-      ${cap != null ? `<span class="small muted">${b.slots}/${cap} slots built</span>` : ''}</div>`;
+      ${cap != null ? `<span class="small muted">${b.slots}/${cap} slots built</span>` : ''}${b.inactive ? `<span class="small bad">${b.inactive} inactive (over the land limit)</span>` : ''}</div>`;
   }).join('');
   const moveOpts = [['idle', `Idle (${p.idle})`], ...p.buildings.map(b => [b.id, `${b.name} #${b.id} (${b.workers}/${b.slots})`])]
     .map(([v, t]) => `<option value="${v}">${esc(t)}</option>`).join('');
@@ -422,8 +525,9 @@ function renderCiv() {
   $('civPanel').innerHTML = `<h2>Your people — ${esc(p.name)}</h2>
     <div class="row">${resList(p.resources, { all: true })}</div>
     <div class="row small muted">Per round: ${resList(p.income, { signed: true })} (food after feeding your people)</div>
-    <div class="row small">Population <b>${p.population}</b> · idle ${p.idle} · Army <b>${p.army}</b>${p.committed ? ` (${p.committed} away at war)` : ''} · raid defense +${p.raidDefense} · hand ${p.handSize}/${p.handLimit}</div>
+    <div class="row small">Population <b>${p.population}</b> · idle ${p.idle} · Army <b>${p.army}</b>${p.strength !== p.army ? ` (strength ${p.strength})` : ''}${p.committed ? ` (${p.committed} away at war)` : ''} · raid defense +${p.raidDefense} · hand ${p.handSize}/${p.handLimit}</div>
     ${(() => { const techs = s.players.flatMap(o => o.techs); return techs.length ? `<div class="small">Technologies (they help everyone): ${techs.map(t => `<span class="chip" title="${esc(t.text)}">${esc(t.name)}</span>`).join('')}</div>` : ''; })()}
+    ${p.leader ? `<div class="small">Leader: <span class="chip" title="${esc(p.leader.text)}">♛ ${esc(p.leader.name)}</span> <span class="muted">${esc(p.leader.text)} Leaves when the era ends.</span></div>` : ''}
     ${p.minorWonders.length ? `<div class="small">${p.minorWonders.map(t => `<span class="chip" title="${esc(t.text)}">★ ${esc(t.name)}</span>`).join('')}</div>` : ''}
     ${s.strengthPerTwoTroops || s.freeSettlers ? `<div class="small muted">${s.strengthPerTwoTroops ? `Military strength +${s.strengthPerTwoTroops} per 2 troops. ` : ''}${s.freeSettlers ? `Settling takes ${s.freeSettlers} settler${s.freeSettlers > 1 ? 's' : ''} less.` : ''}</div>` : ''}
     <h3 style="margin-top:.5rem">Buildings</h3><p class="small muted" style="margin:0">● worker · ○ empty slot · <span style="opacity:.5">●</span> room on your land, not built yet</p>${blds}
@@ -433,7 +537,7 @@ function renderCiv() {
     <div class="row">
       <button ${act && affordable(s.rules.growthCost) ? '' : 'disabled'} data-grow>Grow +1 Population — ${resList(s.rules.growthCost)}</button>
       <button ${act && affordable(s.rules.recruitCost) ? '' : 'disabled'} data-recruit>Train 1 troop — ${resList(s.rules.recruitCost)}</button>
-      <button class="primary" ${myTurn() ? '' : 'disabled'} data-end>End turn</button>
+      <button class="primary" ${myTurn() ? '' : 'disabled'} data-end>Done for the round</button>
     </div>
     ${s.sharedPool ? `<h3>Shared pool</h3><div class="row">${resList(s.sharedPool, { all: true })}</div>
       <div class="row small">${RES.map(k => `<label class="res r-${k}" style="margin:0">${RES_SHORT[k]} <input type="number" min="0" value="0" data-keep="pool-${k}" data-pres="${k}"></label>`).join('')}</div>
@@ -474,7 +578,8 @@ function renderHand() {
     }
     const opts = c.target === 'territory' ? s.realm.filter(t => !t.cored).map(t => [t.id, t.name])
       : c.target === 'player' ? others.map(o => [o.seat, o.name]) : null;
-    const tradeInputs = c.trade ? `<div class="row small">${c.trade.map(k => `<label class="res r-${k}" style="margin:0">${RES_SHORT[k]} <input type="number" min="0" value="0" data-keep="tr-${c.id}-${k}" data-tres="${k}" data-tcard="${c.id}"></label>`).join('')}</div>` : '';
+    const tradeText = o => `pay ${resList(o.give)} → your teammate gets ${resList(o.get)}`;
+    const tradeInputs = c.trade ? `<div class="row small"><select id="opt-${c.id}" data-keep="opt-${c.id}">${c.trade.map((o, k) => `<option value="${k}">${RES.filter(r => o.give[r]).map(r => o.give[r] + ' ' + r).join(', ')} → ${RES.filter(r => o.get[r]).map(r => '+' + o.get[r] + ' ' + r).join(', ')} for them</option>`).join('')}</select></div>` : '';
     const pickTarget = opts ? `<select id="tgt-${c.id}" data-keep="tgt-${c.id}">${opts.map(([v, t]) => `<option value="${v}">${esc(t)}</option>`).join('')}</select>` : '';
     return cardHtml(c, `${tradeInputs}<div class="actions">${pickTarget}${playable ? `<button ${act && affordable(c.cost) && (!opts || opts.length) ? '' : 'disabled'} data-play="${c.id}" data-target="${c.target || ''}">Play (1 action)</button>` : '<span class="small muted">Play it when an event strikes.</span>'}
       <button class="tiny" data-discard="${c.id}">Discard</button>${give}</div>`);
@@ -482,7 +587,7 @@ function renderHand() {
   const giveBar = others.length && p.giveCards ? `<div class="row small">Roman Roads: give up to ${p.giveCards} ticked cards to
       <select id="giveCardsTo" data-keep="giveCardsTo">${others.map(o => `<option value="${o.seat}">${esc(o.name)}</option>`).join('')}</select>
       <button ${act ? '' : 'disabled'} data-givecards>Give (1 action)</button></div>` : '';
-  $('handPanel').innerHTML = `<h2>Your hand (${p.hand.length}/${p.handLimit})</h2>${over ? `<p class="small bad" style="color:var(--err)">Discard down to ${p.handLimit} before ending your turn.</p>` : ''}${giveBar}
+  $('handPanel').innerHTML = `<h2>Your hand (${p.hand.length}/${p.handLimit})</h2>${over ? `<p class="small bad" style="color:var(--err)">Discard down to ${p.handLimit} before you are done.</p>` : ''}${giveBar}
     <div class="cards">${cards || '<p class="muted">No cards. Pick from the queue.</p>'}</div>`;
 }
 $('handPanel').onclick = e => {
@@ -493,10 +598,12 @@ $('handPanel').onclick = e => {
     if (t.dataset.target === 'territory') msg.territory = +sel.value;
     if (t.dataset.target === 'player') {
       msg.to = +sel.value;
-      msg.resources = {};
-      document.querySelectorAll(`[data-tcard="${t.dataset.play}"]`).forEach(i => { msg.resources[i.dataset.tres] = Math.max(0, +i.value || 0); i.value = 0; });
+      msg.option = +($('opt-' + t.dataset.play)?.value || 0);
     }
-    send(msg);
+    // a card that brings a person, with more than one building with a free slot: choose where they work
+    const card = (me().hand || []).find(c => c.id === msg.card), free = (me().buildings || []).filter(b => b.workers < b.slots);
+    if (card && card.population && free.length > 1) openGrowChoice(free, id => send({ ...msg, building: id }));
+    else send(msg);
   }
   else if (t.dataset.discard) send({ type: 'discard', card: +t.dataset.discard });
   else if ('givecards' in t.dataset) {
@@ -509,13 +616,14 @@ $('handPanel').onclick = e => {
 function renderTeam() {
   const s = state;
   const others = s.players.filter(o => o.seat !== s.you);
-  const list = s.players.map(o => `<div class="teammate ${o.seat === s.currentPlayer && s.phase === 'turns' ? 'active' : ''}">
-      <div class="tname">${o.seat === s.currentPlayer && s.phase === 'turns' ? '▶ ' : ''}${esc(o.name)}${o.seat === s.you ? ' (you)' : ''}${room.players[o.seat]?.ai ? ' <span class="chip">AI</span>' : ''}${o.seat === s.firstPlayer ? ' <span class="chip">first</span>' : ''}${o.away ? ' <span class="chip">away</span>' : ''}</div>
+  const list = s.players.map(o => `<div class="teammate ${s.phase === 'turns' && !o.done ? 'active' : ''}">
+      <div class="tname">${s.phase === 'turns' ? (o.done ? '✔ ' : '▶ ') : ''}${esc(o.name)}${o.seat === s.you ? ' (you)' : ''}${room.players[o.seat]?.ai ? ' <span class="chip">AI</span>' : ''}${o.seat === s.firstPlayer ? ' <span class="chip">first</span>' : ''}${o.away ? ' <span class="chip">away</span>' : ''}</div>
       <div class="small">${resList(o.resources)}</div>
-      <div class="small muted">Pop ${o.population} · Army ${o.army} · Hand ${o.handSize} · ${o.buildings.map(b => esc(b.name) + ' ' + b.workers + '/' + b.slots).join(', ')}</div>
+      <div class="small muted">Pop ${o.population} · Army ${o.army}${o.strength !== o.army ? ` (strength ${o.strength})` : ''} · Hand ${o.handSize} · ${o.buildings.map(b => esc(b.name) + ' ' + b.workers + '/' + b.slots).join(', ')}</div>
       ${o.techs.length || o.minorWonders.length ? `<div>${o.techs.map(t => `<span class="chip" title="${esc(t.text)}">${esc(t.name)}</span>`).join('')}${o.minorWonders.map(t => `<span class="chip">★ ${esc(t.name)}</span>`).join('')}</div>` : ''}
+      ${o.leader ? `<div class="small"><span class="chip" title="${esc(o.leader.text)}">♛ ${esc(o.leader.name)}</span></div>` : ''}
     </div>`).join('');
-  $('teamPanel').innerHTML = `<h2>The tribe</h2>${list}`;
+  $('teamPanel').innerHTML = `<h2>The tribe</h2><p class="small" style="margin:0 0 .3rem">Army ${s.players.reduce((t, o) => t + o.army, 0)} (total strength against an invasion: <b>${s.tribeStrength}</b>)</p>${list}`;
 }
 function renderDecks() {
   const s = state;
@@ -569,3 +677,28 @@ function renderOver() {
 }
 
 boot();
+
+// ---- the list of every card in the game ----
+let catalogue = null;
+async function openAllCards() {
+  const box = $('cardsBox');
+  $('cardsModal').hidden = false;
+  box.innerHTML = '<p class="muted">Loading…</p>';
+  try {
+    if (!catalogue) catalogue = await (await fetch(API + '/cards')).json();
+  } catch (e) { box.innerHTML = '<p class="bad">Could not load the cards.</p>'; return; }
+  const cost = c => c ? Object.entries(c).filter(([, v]) => v).map(([k, v]) => v + ' ' + k).join(', ') : '';
+  const item = (name, meta, text) => `<div><div class="nm">${esc(name)}</div><div class="meta">${esc(meta)}</div><div>${esc(text || '')}</div></div>`;
+  const group = (title, kinds) => {
+    const list = catalogue.cards.filter(c => kinds.includes(c.type));
+    return list.length ? `<h3>${title} (${list.length})</h3><div class="catalog">${list.map(c =>
+      item(c.name, [c.type, c.era, cost(c.cost) && 'cost ' + cost(c.cost), c.minPlayers && c.minPlayers + '+ players only'].filter(Boolean).join(' · '), c.text)).join('')}</div>` : '';
+  };
+  const types = [...new Set(catalogue.cards.map(c => c.type))].filter(t => t !== 'great_wonder');
+  box.innerHTML = `<div class="row"><h2 style="margin:0">All cards</h2><button data-close style="margin-left:auto">Close</button></div>
+    ${types.map(t => group(t.charAt(0).toUpperCase() + t.slice(1).replace('_', ' ') + ' cards', [t])).join('')}
+    <h3>Lands (${catalogue.lands.length})</h3><div class="catalog">${catalogue.lands.map(l => item(l.name, l.special ? 'special land' : 'land', l.text)).join('')}</div>
+    <h3>Great wonders (${catalogue.wonders.length})</h3><div class="catalog">${catalogue.wonders.map(w => item(w.name, w.era || '', w.text)).join('')}</div>`;
+}
+$('allCards').onclick = openAllCards;
+$('cardsModal').onclick = e => { if (e.target === $('cardsModal') || e.target.closest('[data-close]')) $('cardsModal').hidden = true; };

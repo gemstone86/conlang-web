@@ -23,29 +23,54 @@ public final class AiPlayer {
     /** Makes one move for whoever needs to move. Returns false if nothing could be done. */
     public boolean step(Game g) {
         if (g.result != null) return false;
+        if (g.phase == Game.Phase.STARVATION) { for (int seat : List.copyOf(g.starving.keySet())) { starveFor(g, seat); return true; } return false; }
         if (g.phase == Game.Phase.EVENTS) {
             for (Player p : g.players) if (respond(g, p)) return true;
             return false;
         }
-        return stepFor(g, g.currentPlayer);
+        for (int seat = 0; seat < g.players.size(); seat++) if (needsToAct(g, seat)) return stepFor(g, seat);
+        return false;
     }
 
     /** True if this seat has something to do now (its turn, or an event waiting for its response). */
     public static boolean needsToAct(Game g, int seat) {
         if (g.result != null) return false;
+        if (g.phase == Game.Phase.STARVATION) return g.starving.containsKey(seat);
         if (g.phase == Game.Phase.EVENTS) return g.pending != null && !Boolean.TRUE.equals(g.pending.ready.get(seat));
-        return g.phase == Game.Phase.TURNS && g.currentPlayer == seat;
+        return g.phase == Game.Phase.TURNS && !g.players.get(seat).done;
     }
 
     /** Makes one move for this seat, if it needs to act. Returns false if it had nothing to do. */
     public boolean stepFor(Game g, int seat) {
         if (!needsToAct(g, seat)) return false;
         Player p = g.players.get(seat);
+        if (g.phase == Game.Phase.STARVATION) { starveFor(g, seat); return true; }
         if (g.phase == Game.Phase.EVENTS) return respond(g, p);
-        if (g.actionsLeft > 0 && takeAction(g, p)) return true;
+        if (p.actions > 0 && takeAction(g, p)) return true;
         while (p.hand.size() > g.handLimit(p)) g.act(p.seat, Map.of("type", "discard", "card", p.hand.get(0).id));
         g.act(p.seat, Map.of("type", "endTurn"));
         return true;
+    }
+
+    /** The AI lets idle people starve first, then the building with the most workers. */
+    private void starveFor(Game g, int seat) {
+        Player p = g.players.get(seat);
+        int need = g.starving.get(seat);
+        Map<String, Object> lose = new HashMap<>();
+        int idle = Math.min(need, p.idle);
+        if (idle > 0) lose.put("idle", idle);
+        int left = need - idle;
+        java.util.Map<Integer, Integer> w = new java.util.HashMap<>();
+        for (Player.Building b : p.buildings) w.put(b.id, b.workers);
+        while (left > 0) {
+            int best = -1;
+            for (var e : w.entrySet()) if (e.getValue() > 0 && (best < 0 || e.getValue() > w.get(best))) best = e.getKey();
+            if (best < 0) break;
+            w.put(best, w.get(best) - 1);
+            lose.merge(String.valueOf(best), 1, (x, y) -> (Integer) x + (Integer) y);
+            left--;
+        }
+        if (!tryAct(g, p, Map.of("type", "starve", "lose", lose))) g.setAway(seat, true);
     }
 
     private boolean respond(Game g, Player p) {
@@ -81,12 +106,12 @@ public final class AiPlayer {
         // put idle people to work
         if (p.idle > 0) {
             for (Player.Building b : p.buildings) {
-                if (b.workers < b.slots && tryAct(g, p, Map.of("type", "move", "from", "idle", "to", b.id))) return true;
+                if (b.workers < g.activeSlots(p, b) && tryAct(g, p, Map.of("type", "move", "from", "idle", "to", b.id))) return true;
             }
         }
         int food = p.res.get(Res.FOOD), pop = p.population();
-        if (food >= 3 + pop && p.freeSlots() > 0 && tryAct(g, p, Map.of("type", "grow"))) return true;
-        if (p.freeSlots() == 0) {
+        if (food >= 3 + pop && g.freeSlots(p) > 0 && tryAct(g, p, Map.of("type", "grow"))) return true;
+        if (g.freeSlots(p) == 0) {
             String b = countFarms(p) * 2 * 2 < pop + 3 ? "farm" : pick("village", "temple", "mine", "farm");
             if (tryAct(g, p, Map.of("type", "build", "building", b))) return true;
         }
@@ -104,7 +129,9 @@ public final class AiPlayer {
             if (f.opened && freeOnce(g, p, "l" + f.land.id) && tryAct(g, p, landPay(g, p, f, Map.of("type", "colonize")))) return true;
         }
         if (!g.queue.isEmpty() && p.hand.size() < g.handLimit(p)) {
-            return tryAct(g, p, Map.of("type", "pick", "slot", rng.nextInt(g.queue.size())));
+            List<Integer> open = new java.util.ArrayList<>();
+            for (int i = 0; i < g.queue.size(); i++) if (!g.queue.get(i).taken) open.add(i);
+            if (!open.isEmpty()) return tryAct(g, p, Map.of("type", "pick", "slot", open.get(rng.nextInt(open.size()))));
         }
         return false;
     }

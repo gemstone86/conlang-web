@@ -26,7 +26,7 @@ import java.util.Random;
  */
 public final class Game {
 
-    public enum Phase { TURNS, EVENTS, OVER }
+    public enum Phase { TURNS, EVENTS, STARVATION, OVER }
 
     /** One physical card. */
     public static final class CardInst {
@@ -43,6 +43,8 @@ public final class Game {
     public static final class Slot {
         public final CardInst card;
         public CardInst under;
+        /** Taken during the round: the slot stays empty (nothing slides down) until the end of the round. */
+        public boolean taken;
 
         Slot(CardInst card, CardInst under) {
             this.card = card;
@@ -142,11 +144,15 @@ public final class Game {
     private int nextId = 1;
 
     public Phase phase = Phase.TURNS;
+    /** Players who must choose which of their people starve: seat → how many (the round waits for them). */
+    public final Map<Integer, Integer> starving = new LinkedHashMap<>();
     public int round = 1;
     public int eraIndex = 0;
     public int firstPlayer = 0;
-    public int currentPlayer = 0;
-    public int actionsLeft;
+    /** Seconds the queue can be picked from after a round starts (0 = no limit); changeable during play. */
+    public int pickSeconds = 90;
+    public long roundStartedAt;
+    public boolean picksLocked;
     public int stability, health;
     /** Enemies massing from hostility cards; the next invasion adds them to its strength. */
     public int threat;
@@ -236,6 +242,7 @@ public final class Game {
         List<CardInst> pool = new ArrayList<>(), triggers = new ArrayList<>();
         e.cards.forEach((id, copies) -> {
             CardDef d = content.cards.get(id);
+            if (d.minPlayers > players.size()) return;                 // e.g. trading needs a teammate
             for (int i = 0; i < copies; i++) (d.eraTrigger ? triggers : pool).add(inst(d));
         });
         int size = content.rules.deckBase + content.rules.deckPerPlayer * players.size() - triggers.size();
@@ -277,6 +284,10 @@ public final class Game {
             return;
         }
         log("The " + era().name + " era ends.");
+        for (Player p : players) {
+            if (p.leader != null) log(p.leader.name + " leaves with the era.");
+            p.leader = null;
+        }
         // an era's trigger event only ends its own era: leftovers are retired
         for (List<CardInst> deck : List.of(currentEvents, futureEvents)) {
             for (CardInst c : List.copyOf(deck)) {
@@ -294,11 +305,58 @@ public final class Game {
 
     private void startRound() {
         log("— Round " + round + " (" + era().name + ") —");
+        starving.clear();
         production();
         if (checkDefeat()) return;
-        phase = Phase.TURNS;
-        currentPlayer = firstPlayer;
-        beginTurn();
+        if (!starving.isEmpty()) {
+            phase = Phase.STARVATION;
+            log("Some people must starve: " + starving.keySet().stream().map(i -> players.get(i).name).toList() + " choose who.");
+            return;
+        }
+        beginTurns();
+    }
+
+    /** Whether a player has a real choice of who starves: people in more than one place (idle, or in different buildings). */
+    private boolean canChooseWhoStarves(Player p, int n) {
+        long places = (p.idle > 0 ? 1 : 0) + p.buildings.stream().filter(b -> b.workers > 0).count();
+        return places > 1 && p.population() > n;
+    }
+
+    /** {"type":"starve","lose":{"idle":1,"<building id>":2}}: who of your people starves (the numbers must add up). */
+    private void starve(Player p, Map<String, Object> a) {
+        Integer need = starving.get(p.seat);
+        if (phase != Phase.STARVATION || need == null) throw new GameException("No one of yours has to starve now.");
+        Map<String, Object> lose = Y.map(a.get("lose"));
+        int total = 0;
+        for (Map.Entry<String, Object> e : lose.entrySet()) {
+            int n = Y.toInt(e.getValue());
+            if (n < 0) throw new GameException("Amounts can't be negative.");
+            total += n;
+            int have = "idle".equals(e.getKey()) ? p.idle : p.buildings.stream().filter(b -> String.valueOf(b.id).equals(e.getKey())).mapToInt(b -> b.workers).findFirst().orElse(-1);
+            if (have < 0) throw new GameException("You have no such building.");
+            if (n > have) throw new GameException("You don't have that many there.");
+        }
+        if (total != need) throw new GameException("Choose exactly " + need + " " + (need == 1 ? "person" : "people") + ".");
+        boolean had = p.population() > 0;
+        for (Map.Entry<String, Object> e : lose.entrySet()) {
+            int n = Y.toInt(e.getValue());
+            if ("idle".equals(e.getKey())) p.idle -= n;
+            else p.buildings.stream().filter(b -> String.valueOf(b.id).equals(e.getKey())).findFirst().ifPresent(b -> b.workers -= n);
+        }
+        log(p.name + " loses " + need + " Population to starvation.");
+        starving.remove(p.seat);
+        if (had && p.population() == 0) {
+            stability--;
+            log(p.name + "'s people are gone. Stability -1 (now " + stability + ").");
+            addCrisis("random");
+        }
+        starvationDone();
+    }
+
+    private void starvationDone() {
+        if (!starving.isEmpty() || phase != Phase.STARVATION) return;
+        if (checkDefeat()) return;
+        beginTurns();
     }
 
     private void production() {
@@ -307,9 +365,10 @@ public final class Game {
             Mods m = mods(p);
             EnumMap<Res, Integer> gain = Res.empty();
             for (Building b : p.buildings) {
-                b.def.perWorker.forEach((r, v) -> gain.merge(r, v * b.workers, Integer::sum));
+                int w = working(p, b);
+                b.def.perWorker.forEach((r, v) -> gain.merge(r, v * w, Integer::sum));
                 EnumMap<Res, Integer> bonus = m.perWorker.get(b.def.id);
-                if (bonus != null) bonus.forEach((r, v) -> gain.merge(r, v * b.workers, Integer::sum));
+                if (bonus != null) bonus.forEach((r, v) -> gain.merge(r, v * w, Integer::sum));
             }
             m.income.forEach((r, v) -> gain.merge(r, v, Integer::sum));
             gain.forEach((r, v) -> p.res.put(r, Math.max(0, p.res.get(r) + v)));
@@ -323,9 +382,25 @@ public final class Game {
                 int starve = (int) Math.ceil((upkeep - food) / (double) Math.max(1, content.rules.foodUpkeepPerPop));
                 msg += " Not enough food: " + starve + " Population starve. Stability -1.";
                 stability--;
-                losePopulation(p, starve);
+                if (p.away || !canChooseWhoStarves(p, starve)) losePopulation(p, starve);
+                else starving.put(p.seat, starve);
             }
             log(msg);
+        }
+        // a leader like Ramses makes every unfinished great wonder grow by itself
+        for (Player p : players) {
+            if (p.leader == null) continue;
+            int n = p.leader.effects.stream().filter(e -> e.containsKey("wonderGrowth")).mapToInt(e -> Y.toInt(e.get("wonderGrowth"))).sum();
+            if (n <= 0) continue;
+            for (WonderProgress w : List.copyOf(greatWonders)) {
+                if (w.done) continue;
+                EnumMap<Res, Integer> need = w.def.cost(players.size()), add = Res.empty();
+                for (Res r : Res.values()) if (need.get(r) > 0) add.put(r, Math.min(n, need.get(r) - w.paid.get(r)));
+                if (Res.isZero(add)) continue;
+                add.forEach((r, v) -> w.paid.merge(r, v, Integer::sum));
+                log(p.leader.name + ": " + w.def.name + " grows by " + Res.describe(add) + ".");
+                if (w.paid.equals(need)) completeWonder(w, p, -1);
+            }
         }
         for (CardInst e : persistentEvents) {
             for (Map<String, Object> eff : e.def.ongoing) {
@@ -341,12 +416,48 @@ public final class Game {
         }
     }
 
-    private void beginTurn() {
-        Player p = players.get(currentPlayer);
-        actionsLeft = content.rules.actionsPerTurn + mods(p).actionsPerTurn;
-        CardInst c = drawFromEraDeck(p);
-        log(p.name + "'s turn." + (c == null ? " (The era deck is empty.)" : ""));
-        if (p.away) endTurnInternal();
+    /** Every player starts the round at once: their actions, and one blind card each from the era deck. */
+    private void beginTurns() {
+        phase = Phase.TURNS;
+        picksLocked = false;
+        roundStartedAt = System.currentTimeMillis();
+        for (Player p : players) {
+            p.actions = content.rules.actionsPerTurn + mods(p).actionsPerTurn;
+            p.done = false;
+            p.freeRecruitUsed = false;
+            p.turnEvents = 0;
+            CardInst c = drawFromEraDeck(p);
+            p.turnDraw = c;
+            p.turnSeq++;
+            log(p.name + " draws" + (c == null ? " nothing (the era deck is empty)." : " a card."));
+        }
+        for (Player p : players) if (p.away) endRoundFor(p);
+    }
+
+    /** Milliseconds left to pick cards (-1: no limit, 0: closed). */
+    public long pickLeftMillis() {
+        if (picksLocked) return 0;
+        if (pickSeconds <= 0) return -1;
+        return Math.max(0, roundStartedAt + pickSeconds * 1000L - System.currentTimeMillis());
+    }
+
+    /** Called every few seconds: closes the queue when the pick time is over. Returns true if something changed. */
+    public boolean tick() {
+        if (result != null || phase != Phase.TURNS || picksLocked || pickSeconds <= 0) return false;
+        if (pickLeftMillis() > 0) return false;
+        picksLocked = true;
+        log("The time to pick cards is over: the queue is closed until the next round.");
+        version++;
+        return true;
+    }
+
+    /** {"type":"pickTime","seconds":n}: the time to pick cards each round (0 = no limit). */
+    private void pickTime(Map<String, Object> a) {
+        int sec = Y.i(a, "seconds", pickSeconds);
+        if (sec < 0 || sec > 3600) throw new GameException("Pick time is 0 (no limit) to 3600 seconds.");
+        pickSeconds = sec;
+        picksLocked = sec > 0 && pickLeftMillis() <= 0;
+        log("Time to pick cards: " + (sec == 0 ? "no limit" : sec + " seconds") + " each round" + (picksLocked ? " (already over this round)." : "."));
     }
 
     /** Draws for a player: events go to the future deck and the player draws again. Returns the card kept, or null. */
@@ -355,6 +466,7 @@ public final class Game {
         while ((c = nextFromEraDeck()) != null) {
             if (c.def.isEvent()) {
                 futureEvents.add(c);
+                p.turnEvents++;
                 log(p.name + " drew an event; it goes face down into the future deck.");
                 continue;
             }
@@ -364,14 +476,12 @@ public final class Game {
         return null;
     }
 
-    private void endTurnInternal() {
-        int next = (currentPlayer + 1) % players.size();
-        if (next == firstPlayer) {
-            startEvents();
-        } else {
-            currentPlayer = next;
-            beginTurn();
-        }
+    /** A player is done with the round (the hand is kept to its limit); when everyone is, the events come. */
+    private void endRoundFor(Player p) {
+        if (p.away) while (p.hand.size() > handLimit(p)) p.hand.remove(p.hand.size() - 1);
+        p.done = true;
+        log(p.name + " is done for the round.");
+        if (phase == Phase.TURNS && players.stream().allMatch(x -> x.done)) startEvents();
     }
 
     private void startEvents() {
@@ -410,7 +520,15 @@ public final class Game {
             // a land found by this event is shown now, so the team can pay for it before the event resolves
             applyImmediate(d.effects.stream().filter(x -> x.containsKey("discover")).toList(), players, null, 1.0, false);
             if (!needsResponses()) {
+                // nobody can respond: it resolves at once, but every player is shown what happened
+                CardInst shown = pending.event;
+                int tg = pending.target;
+                collect = new ArrayList<>();
                 resolvePending();
+                Notice n = new Notice(++noticeSeq, shown, tg, collect);
+                collect = null;
+                notices.add(n);
+                while (notices.size() > 30) notices.remove(0);
                 continue;
             }
             return;
@@ -451,25 +569,54 @@ public final class Game {
         endRound();
     }
 
+    /** The player whose leader has this lasting effect (the first, if several do). */
+    private Player leaderWith(String effect) {
+        for (Player p : players) {
+            if (p.leader != null && p.leader.effects.stream().anyMatch(e -> e.containsKey(effect))) return p;
+        }
+        return null;
+    }
+
     private void endRound() {
+        // the last k slots leave (an empty one costs nothing); then the gaps close up and the queue is refilled
         int k = Math.min(queue.size(), content.rules.removedPerRound(players.size()));
         for (int i = 0; i < k; i++) {
             Slot s = queue.remove(queue.size() - 1);
+            if (s.taken) continue;
             if (s.card.def.isEvent()) {
                 futureEvents.add(s.card);
                 log(s.card.def.name + " leaves the bottom of the queue and goes to the future deck.");
+                Player teller = leaderWith("eventUnder");
+                CardInst under = s.under;
+                if (teller != null && under != null) {
+                    while (under != null && under.def.isEvent()) {
+                        futureEvents.add(under);
+                        log("The face-down card was another event; it goes face down into the future deck.");
+                        under = nextFromEraDeck();
+                    }
+                    if (under != null) {
+                        log(teller.leader.name + ": " + teller.name + " gets the face-down card.");
+                        take(teller, under);
+                    }
+                }
+            } else if (s.card.def.type == CardType.ACTION && leaderWith("actionsToHand") != null) {
+                Player mother = leaderWith("actionsToHand");
+                mother.hand.add(s.card);
+                log(s.card.def.name + " leaves the bottom of the queue; " + mother.name + " takes it (" + mother.leader.name + ").");
             } else {
                 log(s.card.def.name + " leaves the bottom of the queue.");
             }
         }
+        queue.removeIf(sl -> sl.taken);
         refillQueue();
         for (Player p : players) p.committed = 0;
-        if (eraEnding || eraDeck.isEmpty()) {
-            if (!eraEnding) log("The era deck is exhausted.");
+        // in the last era the game goes on after the era deck runs out, until the queue is empty at the end of a round
+        boolean lastEra = eraIndex + 1 >= content.eras.size();
+        if (eraEnding || (eraDeck.isEmpty() && (!lastEra || queue.isEmpty()))) {
+            if (!eraEnding) log(lastEra ? "The queue is empty and the era deck is exhausted." : "The era deck is exhausted.");
             advanceEra();
             if (result != null) return;
         }
-        firstPlayer = (firstPlayer + 1) % players.size();
         round++;
         startRound();
     }
@@ -518,17 +665,20 @@ public final class Game {
             case "decide" -> decide(p, a);
             case "ready" -> ready(p);
             case "colonize" -> colonize(p, a);
+            case "starve" -> starve(p, a);
             case "contribute" -> { myTurn(p); contribute(p, a); }          // paying toward a great wonder is free
             // turn
             case "endTurn" -> {
                 myTurn(p);
                 int limit = handLimit(p);
-                if (p.hand.size() > limit) throw new GameException("Discard down to " + limit + " cards before ending your turn.");
-                endTurnInternal();
+                if (p.hand.size() > limit) throw new GameException("Discard down to " + limit + " cards before you are done.");
+                endRoundFor(p);
             }
+            case "pickTime" -> pickTime(a);
             default -> {
                 myTurn(p);
-                if (actionsLeft <= 0) throw new GameException("No actions left. End your turn.");
+                boolean free = type.equals("recruit") && !p.freeRecruitUsed && mods(p).freeRecruit > 0;   // a leader's free troop
+                if (!free && p.actions <= 0) throw new GameException("No actions left. You can be done for the round.");
                 switch (type) {
                     case "move" -> move(p, a);
                     case "build" -> build(p, a);
@@ -540,7 +690,7 @@ public final class Game {
                     case "cleanse" -> cleanse(p, a);
                     default -> throw new GameException("Unknown action: " + type);
                 }
-                actionsLeft--;
+                if (!free) p.actions--;
             }
         }
         version++;
@@ -565,7 +715,7 @@ public final class Game {
 
     private void myTurn(Player p) {
         if (phase != Phase.TURNS) throw new GameException("Wait for the events to be resolved.");
-        if (p.seat != currentPlayer) throw new GameException("It is " + players.get(currentPlayer).name + "'s turn.");
+        if (p.done) throw new GameException("You are done for this round.");
     }
 
     private void move(Player p, Map<String, Object> a) {
@@ -575,7 +725,7 @@ public final class Game {
         Building fb = fromIdle ? null : p.building(Y.toInt(from));
         Building tb = toIdle ? null : p.building(Y.toInt(to));
         if (fromIdle ? p.idle == 0 : fb.workers == 0) throw new GameException("There is no worker there.");
-        if (tb != null && tb.workers >= tb.slots) throw new GameException(tb.def.name + " has no free worker slot.");
+        if (tb != null && tb.workers >= activeSlots(p, tb)) throw new GameException(tb.def.name + " has no free worker slot.");
         if (fromIdle) p.idle--; else fb.workers--;
         if (toIdle) p.idle++; else tb.workers++;
         log(p.name + " moves a worker " + (fromIdle ? "" : "from the " + fb.def.name + " ") + "to "
@@ -588,6 +738,11 @@ public final class Game {
         Building existing = p.ofType(b.id);
         int levels = existing == null ? 0 : existing.level();
         EnumMap<Res, Integer> cost = Res.empty();
+        EnumMap<Res, Integer> fixed = m.fixedCost.get(b.id);
+        if (fixed != null) {
+            fixed.forEach((r, v) -> cost.put(r, v));       // a leader makes it cost only this
+            return cost;
+        }
         b.cost.forEach((r, v) -> {
             int c = v + (r == Res.PRODUCTION ? levels * content.rules.buildingEscalation : 0);
             cost.put(r, Math.max(0, c - (c > 0 ? m.buildDiscount.get(r) : 0)));
@@ -599,9 +754,25 @@ public final class Game {
     public int capacity(Player p, String type) {
         Integer home = content.rules.homeSlots.get(type);
         if (home == null) return Integer.MAX_VALUE;
-        int cap = home;
+        int cap = home + mods(p).maxSlots.getOrDefault(type, 0);
         for (Territory t : realm) cap += t.def.slots.getOrDefault(type, 0);
         return cap;
+    }
+
+    /** Slots that work: a building above what the land allows is inactive until there is room for it again. */
+    public int activeSlots(Player p, Building b) {
+        return Math.min(b.slots, capacity(p, b.def.id));
+    }
+
+    /** Workers that produce (those in inactive slots don't). */
+    public int working(Player p, Building b) {
+        return Math.min(b.workers, activeSlots(p, b));
+    }
+
+    public int freeSlots(Player p) {
+        int n = 0;
+        for (Building b : p.buildings) n += Math.max(0, activeSlots(p, b) - b.workers);
+        return n;
     }
 
     /** Food for 3 (base) more for every {@code growthStep} people beyond the first. */
@@ -641,7 +812,14 @@ public final class Game {
     private void pick(Player p, Map<String, Object> a) {
         int i = Y.i(a, "slot", -1);
         if (i < 0 || i >= queue.size()) throw new GameException("No card in that queue slot.");
-        Slot s = queue.remove(i);
+        Slot s = queue.get(i);
+        if (!picksLocked && pickSeconds > 0 && pickLeftMillis() <= 0) {
+            picksLocked = true;
+            log("The time to pick cards is over: the queue is closed until the next round.");
+        }
+        if (picksLocked) throw new GameException("The time to pick cards is over for this round.");
+        if (s.taken) throw new GameException("That card was just taken.");
+        s.taken = true;
         if (!s.card.def.isEvent()) {
             log(p.name + " takes " + s.card.def.name + " from the queue.");
             take(p, s.card);
@@ -660,6 +838,13 @@ public final class Game {
 
     /** A card a player gets: into their hand, except great wonders, which go on the board for the whole team to build. */
     private void take(Player p, CardInst c) {
+        if (c.def.type == CardType.LEADER) {
+            // a leader plays at once and replaces the one before
+            if (p.leader != null) log(p.leader.name + " steps down.");
+            p.leader = c.def;
+            log(p.name + " is now led by " + c.def.name + ": " + c.def.text);
+            return;
+        }
         if (c.def.type != CardType.GREAT_WONDER) {
             p.hand.add(c);
             return;
@@ -692,19 +877,21 @@ public final class Game {
         Frontier land = null;
         Territory core = null;
         Player tradeTo = null;
-        EnumMap<Res, Integer> tradeAmounts = null;
+        EnumMap<Res, Integer> tradeAmounts = null, tradeGets = null;
         if (tradeEffect != null) {
+            // a trade offers choices: what you pay (to the bank) and what your teammate gets
             tradeTo = other(p, a);
-            tradeAmounts = Res.parse(a.get("resources"));
-            List<String> allowed = Y.strings(tradeEffect.get("trade"));
+            List<?> options = (List<?>) tradeEffect.get("trade");
+            int opt = Y.i(a, "option", -1);
+            if (opt < 0 || opt >= options.size()) throw new GameException("Choose which trade you want.");
+            Map<String, Object> o = Y.map(options.get(opt));
+            tradeAmounts = Res.parse(o.get("give"));
+            tradeGets = Res.parse(o.get("get"));
             for (Res r : Res.values()) {
-                int v = tradeAmounts.get(r);
-                if (v < 0) throw new GameException("Amounts can't be negative.");
-                if (v > 0 && !allowed.contains(r.key())) throw new GameException(d.name + " carries only " + String.join(", ", allowed) + ".");
-                if (p.res.get(r) < v + d.cost.get(r)) throw new GameException("Not enough " + r.key() + ".");
+                if (p.res.get(r) < tradeAmounts.get(r) + d.cost.get(r)) throw new GameException("Not enough " + r.key() + ".");
             }
-            if (Res.isZero(tradeAmounts)) throw new GameException("Choose what to send.");
         }
+        final EnumMap<Res, Integer> tradeGet = tradeGets;
         LandPayment opening = null;
         if (settles) {
             opening = landPayment(p, a, d.cost, true);
@@ -715,13 +902,27 @@ public final class Game {
         if (cores) core = ownTerritory(a);
         pay(p, d.cost);
         p.hand.remove(c);
-        if (d.type == CardType.TECH) p.techs.add(d);
+        if (d.type == CardType.TECH) {
+            p.techs.add(d);
+            sciencePoints++;
+            log("Science: +1 point for " + d.name + ".");
+        }
         if (d.type == CardType.MINOR_WONDER) p.minorWonders.add(d);
         log(p.name + " plays " + d.name + ".");
-        applyImmediate(d.effects, List.of(p), p, 1.0, false);
+        if (a.get("building") != null) {
+            int bid = Y.toInt(a.get("building"));
+            popInto = p.buildings.stream().filter(b -> b.id == bid).findFirst().orElse(null);
+            popFor = p;
+        }
+        try {
+            applyImmediate(d.effects, List.of(p), p, 1.0, false);
+        } finally {
+            popInto = null;
+            popFor = null;
+        }
         if (land != null) {
             land.opened = true;
-            log("The " + land.land.def.name + " becomes a colony: anyone can now send resources, troops and settlers to it (1 action each).");
+            log("The " + land.land.def.name + " becomes a colony: anyone can now send resources, troops and settlers to it (free on their turn).");
             refillLands();
             LandPayment now = landPayment(p, a, Res.empty(), true);
             if (!Res.isZero(now.res()) || now.troops() > 0 || now.settlers() > 0) payLand(p, now);
@@ -729,8 +930,8 @@ public final class Game {
         if (tradeTo != null) {
             pay(p, tradeAmounts);
             Player to = tradeTo;
-            tradeAmounts.forEach((r, v) -> to.res.merge(r, v, Integer::sum));
-            log(p.name + " sends " + Res.describe(tradeAmounts) + " to " + to.name + " along a new trading route.");
+            tradeGet.forEach((r, v) -> to.res.merge(r, v, Integer::sum));
+            log(p.name + " pays " + Res.describe(tradeAmounts) + " and " + to.name + " gets " + Res.describe(tradeGet) + " along a new trading route.");
         }
         if (core != null) {
             core.cored = true;
@@ -744,7 +945,7 @@ public final class Game {
         if (a.get("building") != null) {
             int id = Y.toInt(a.get("building"));
             into = p.buildings.stream().filter(b -> b.id == id).findFirst().orElseThrow(() -> new GameException("You have no such building."));
-            if (into.workers >= into.slots) throw new GameException("The " + into.def.name + " has no free slot.");
+            if (into.workers >= activeSlots(p, into)) throw new GameException("The " + into.def.name + " has no free slot.");
         }
         pay(p, growthCost(p));
         if (into != null) into.workers++; else addPopulation(p, 1);
@@ -754,7 +955,9 @@ public final class Game {
     private void recruit(Player p) {
         pay(p, content.rules.recruitCost);
         p.army++;
-        log(p.name + " trains 1 troop (army " + p.army + ").");
+        boolean free = !p.freeRecruitUsed && mods(p).freeRecruit > 0;
+        if (free) p.freeRecruitUsed = true;
+        log(p.name + " trains 1 troop (army " + p.army + ")" + (free ? ", which takes no action (" + p.leader.name + ")." : "."));
     }
 
     private void contribute(Player p, Map<String, Object> a) {
@@ -775,27 +978,28 @@ public final class Game {
         EnumMap<Res, Integer> mine = w.bySeat.computeIfAbsent(p.seat, x -> Res.empty());
         give.forEach((r, v) -> mine.merge(r, v, Integer::sum));
         log(p.name + " gives " + Res.describe(give) + (fromPool ? " from the shared pool" : "") + " to " + w.def.name + ".");
-        if (w.paid.equals(cost)) {
-            w.done = true;
-            builtWonders.add(w.def);
-            Territory where = null;
-            int tid = Y.i(a, "territory", -1);
-            for (Territory t : realm) if (t.id == tid) where = t;
-            if (where == null) where = realm.stream().min((x, y) -> x.wonders.size() - y.wonders.size()).orElseThrow();
-            where.wonders.add(w.def);
-            log("The great wonder " + w.def.name + " is complete, in the " + where.def.name + "! " + w.def.text);
-            applyImmediate(w.def.effects, players, p, 1.0, false);
-            for (Map<String, Object> e : w.def.effects) {
-                if (!e.containsKey("coreTerritory")) continue;
-                for (int i = 0; i < Y.toInt(e.get("coreTerritory")); i++) {
-                    Territory t = !where.cored ? where : realm.stream().filter(x -> !x.cored).findFirst().orElse(null);
-                    if (t == null) break;
-                    t.cored = true;
-                    log("The " + t.def.name + " becomes a core territory.");
-                }
+        if (w.paid.equals(cost)) completeWonder(w, p, Y.i(a, "territory", -1));
+    }
+
+    private void completeWonder(WonderProgress w, Player p, int tid) {
+        w.done = true;
+        builtWonders.add(w.def);
+        Territory where = null;
+        for (Territory t : realm) if (t.id == tid) where = t;
+        if (where == null) where = realm.stream().min((x, y) -> x.wonders.size() - y.wonders.size()).orElseThrow();
+        where.wonders.add(w.def);
+        log("The great wonder " + w.def.name + " is complete, in the " + where.def.name + "! " + w.def.text);
+        applyImmediate(w.def.effects, players, p, 1.0, false);
+        for (Map<String, Object> e : w.def.effects) {
+            if (!e.containsKey("coreTerritory")) continue;
+            for (int i = 0; i < Y.toInt(e.get("coreTerritory")); i++) {
+                Territory t = !where.cored ? where : realm.stream().filter(x -> !x.cored).findFirst().orElse(null);
+                if (t == null) break;
+                t.cored = true;
+                log("The " + t.def.name + " becomes a core territory.");
             }
-            refillLands();
         }
+        refillLands();
     }
 
     private void cleanse(Player p, Map<String, Object> a) {
@@ -861,10 +1065,20 @@ public final class Game {
         return troops + (troops / 2) * civMods().strengthPerTwoTroops;
     }
 
+    /** A player's strength for settling lands: Bronze Working's bonus plus a leader like Julius Caesar's. */
+    public int strength(Player p, int troops) {
+        return troops + (troops / 2) * (civMods().strengthPerTwoTroops + mods(p).ownStrengthPerTwoTroops);
+    }
+
+    /** A player's strength in a raid or invasion: the above plus a leader's flat bonus (Gilgamesh). */
+    public int fighting(Player p, int troops) {
+        return strength(p, troops) + mods(p).strengthBonus;
+    }
+
     /** The fewest troops whose strength reaches {@code needed}. */
-    private int troopsFor(int needed) {
+    private int troopsFor(Player p, int needed) {
         int t = 0;
-        while (strength(t) < needed) t++;
+        while (strength(p, t) < needed) t++;
         return t;
     }
 
@@ -894,7 +1108,7 @@ public final class Game {
         if (troops < 0 || settlers < 0 || give.values().stream().anyMatch(v -> v < 0)) throw new GameException("Amounts can't be negative.");
         EnumMap<Res, Integer> left = settleLeft(f);
         give.replaceAll((r, v) -> Math.min(v, left.get(r)));
-        troops = Math.min(troops, troopsFor(Math.max(0, settleTroops(f) - f.troopsPaid)));
+        troops = Math.min(troops, troopsFor(p, Math.max(0, settleTroops(f) - f.troopsPaid)));
         settlers = Math.min(settlers, Math.max(0, settleSettlers(f) - f.settlersPaid));
         for (Res r : Res.values()) {
             if (p.res.get(r) < give.get(r) + reserved.getOrDefault(r, 0)) throw new GameException("Not enough " + r.key() + ".");
@@ -912,10 +1126,10 @@ public final class Game {
         lp.res().forEach((r, v) -> f.paid.merge(r, v, Integer::sum));
         EnumMap<Res, Integer> mine = f.bySeat.computeIfAbsent(p.seat, x -> Res.empty());
         lp.res().forEach((r, v) -> mine.merge(r, v, Integer::sum));
-        // troops sent count fully against the land's enemy strength; half of them (rounded up) are lost, the rest return
-        int troopsLost = (lp.troops() + 1) / 2;
+        // troops sent count fully against the land's enemy strength, and all of them are lost in the fighting
+        int troopsLost = lp.troops();
         p.army -= troopsLost;
-        f.troopsPaid += strength(lp.troops());
+        f.troopsPaid += strength(p, lp.troops());
         f.settlersPaid += lp.settlers();
         String what = Res.describe(lp.res()) + (lp.troops() > 0 ? ", " + lp.troops() + " troops (" + troopsLost + " lost)" : "") + (lp.settlers() > 0 ? ", " + lp.settlers() + " settlers" : "");
         log(p.name + " sends " + what + " toward the " + f.land.def.name + ".");
@@ -974,15 +1188,9 @@ public final class Game {
         for (WonderDef w : t.wonders) builtWonders.remove(w);
         log("The " + t.def.name + " is lost" + (t.wonders.isEmpty() ? "!" : ", and with it " + String.join(", ", t.wonders.stream().map(w -> w.name).toList()) + "!"));
         for (Player p : players) {
-            for (Building b : List.copyOf(p.buildings)) {
+            for (Building b : p.buildings) {
                 int cap = capacity(p, b.def.id);
-                if (b.slots <= cap) continue;
-                b.slots = cap;
-                int out = Math.max(0, b.workers - b.slots);
-                b.workers -= out;
-                p.idle += out;
-                if (b.slots <= 0) p.buildings.remove(b);
-                log(p.name + "'s " + b.def.name + " shrinks to " + Math.max(0, cap) + " worker slots" + (out > 0 ? "; " + out + " workers are idle." : "."));
+                if (b.slots > cap) log(p.name + "'s " + b.def.name + " is above what the land allows: " + (b.slots - Math.max(0, cap)) + " slots are inactive until there is room again.");
             }
         }
     }
@@ -1121,12 +1329,14 @@ public final class Game {
         if (p.away == away) return;
         p.away = away;
         if (result == null && away) {
-            if (phase == Phase.TURNS && currentPlayer == seat) {
-                while (p.hand.size() > handLimit(p)) p.hand.remove(p.hand.size() - 1);
-                endTurnInternal();
+            if (phase == Phase.TURNS && !p.done) {
+                endRoundFor(p);
             } else if (phase == Phase.EVENTS && pending != null) {
                 pending.ready.put(seat, true);
                 maybeResolve();
+            } else if (phase == Phase.STARVATION && starving.containsKey(seat)) {
+                losePopulation(p, starving.remove(seat));
+                starvationDone();
             }
         }
         version++;
@@ -1237,13 +1447,13 @@ public final class Game {
     /** Total military strength the players could field now (free troops) plus team-wide invasion defense. */
     public int teamStrength() {
         int s = civMods().invasionDefense;
-        for (Player p : players) s += strength(Math.max(0, p.army - p.committed));
+        for (Player p : players) s += fighting(p, Math.max(0, p.army - p.committed));
         return s;
     }
 
     private void raid(Pending pe, Player t, double factor) {
         CardDef d = pe.event.def;
-        int defense = strength(Math.max(0, t.army - t.committed)) + mods(t).raidDefense + pe.defenseBonus;
+        int defense = fighting(t, Math.max(0, t.army - t.committed)) + mods(t).raidDefense + pe.defenseBonus;
         int s = pe.strength;
         // the troops that fight (up to the raid's strength) are spent; half of them, rounded up, are lost
         int spent = Math.min(Math.max(0, t.army - t.committed), s);
@@ -1272,7 +1482,7 @@ public final class Game {
             threat = 0;
         }
         int sent = pe.troops.values().stream().mapToInt(Integer::intValue).sum();
-        int total = pe.troops.values().stream().mapToInt(this::strength).sum() + pe.defenseBonus + civMods().invasionDefense;
+        int total = pe.troops.entrySet().stream().mapToInt(en -> fighting(players.get(en.getKey()), en.getValue())).sum() + pe.defenseBonus + civMods().invasionDefense;
         int s = pe.strength;
         pe.troops.forEach((seat, n) -> players.get(seat).committed += n);
         // the troops spent (up to the invasion's strength) lose half, rounded up, split between the senders
@@ -1380,7 +1590,7 @@ public final class Game {
                     for (Player p : actor == null ? targets : List.of(actor)) for (int i = 0; i < Y.toInt(v); i++) drawFromEraDeck(p);
                 }
                 case "extraActions" -> {
-                    if (actor != null && phase == Phase.TURNS && actor.seat == currentPlayer) actionsLeft += Y.toInt(v);
+                    if (actor != null && phase == Phase.TURNS) actor.actions += Y.toInt(v);
                 }
                 case "addCrisis" -> addCrisis(String.valueOf(v));
                 case "threat" -> {
@@ -1524,9 +1734,15 @@ public final class Game {
     }
 
     /** New Population fills free worker slots (first building first), the rest is idle. */
+    /** The building a player chose for the person a card brings (set while that card is played). */
+    private Building popInto;
+    private Player popFor;
+
     private void addPopulation(Player p, int n) {
         for (int i = 0; i < n; i++) {
-            Building free = p.buildings.stream().filter(b -> b.workers < b.slots).findFirst().orElse(null);
+            Building free = null;
+            if (popInto != null && popFor == p && popInto.workers < activeSlots(p, popInto)) free = popInto;     // the building the player chose
+            if (free == null) free = p.buildings.stream().filter(b -> b.workers < activeSlots(p, b)).findFirst().orElse(null);
             if (free != null) free.workers++; else p.idle++;
         }
     }
@@ -1556,6 +1772,7 @@ public final class Game {
         Mods m = new Mods();
         for (Player o : players) for (CardDef t : o.techs) m.add(t.effects);
         for (CardDef w : p.minorWonders) m.add(w.effects);
+        if (p.leader != null) m.add(p.leader.effects);
         for (WonderDef w : builtWonders) if (!obsolete(w)) m.add(w.effects);
         for (CardInst e : persistentEvents) m.add(e.def.ongoing);
         for (Territory t : realm) m.add(t.def.effects);
@@ -1582,12 +1799,15 @@ public final class Game {
     }
 
     public int handLimit(Player p) {
-        return content.rules.handLimit + mods(p).handLimit;
+        return Math.max(0, content.rules.handLimit + mods(p).handLimit);
     }
+
+    /** 1 point for every science (technology) card played. */
+    public int sciencePoints;
 
     /** The final score: victory points from the great wonders the team built, +1 per territory of the realm. */
     public int score() {
-        int vp = realm.size();
+        int vp = realm.size() + sciencePoints;
         for (WonderDef w : builtWonders) vp += w.victoryPoints;
         return vp;
     }
@@ -1621,7 +1841,26 @@ public final class Game {
         return n + " " + word + (n == 1 ? "" : "s");
     }
 
+    /** An event that resolved at once (no one could respond): shown to everyone as a pop-up. */
+    public static final class Notice {
+        public final int seq, target;
+        public final CardInst card;
+        public final List<String> lines;
+
+        Notice(int seq, CardInst card, int target, List<String> lines) {
+            this.seq = seq;
+            this.card = card;
+            this.target = target;
+            this.lines = lines;
+        }
+    }
+
+    public final List<Notice> notices = new ArrayList<>();
+    private int noticeSeq;
+    private List<String> collect;
+
     void log(String s) {
+        if (collect != null) collect.add(s);
         log.add(s);
         if (log.size() > 400) log.remove(0);
     }

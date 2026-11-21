@@ -35,7 +35,7 @@ rules:
   eraDeckSize: {base: 20, perPlayer: 12}
   eraTriggerBottomPercent: 30             # era-trigger events are placed in the bottom 30% of the era deck
   # fights: troops spent (up to the enemy's strength) must reach that strength (response cards add to it);
-  # half of the troops spent, rounded up, are lost
+  # the troops spent settling a land are all lost; in invasions half of them, rounded up
 
 # A player has one building of each type. Building it again adds a level: 2 more worker slots.
 buildings:
@@ -55,8 +55,8 @@ buildings:
     name: Temple
     cost: {production: 3}
     slots: 2
-    perWorker: {culture: 1}
-    text: Each worker produces 1 culture (and 1 happiness, coming later).
+    perWorker: {culture: 2}
+    text: Each worker produces 2 culture (and 1 happiness, coming later).
   village:
     name: Village
     cost: {production: 3}
@@ -139,35 +139,35 @@ greatWonders:
   stonehenge:
     name: Stonehenge
     era: prehistoric
-    costPerPlayer: {production: 12, culture: 4}
+    costPerPlayer: {production: 10, culture: 3}
     effects: [{actionsPerTurn: 1}]
     victoryPoints: 2
     text: Every player gets +1 action per turn.
   pyramids:
     name: The Pyramids
     era: ancient
-    costPerPlayer: {production: 15, culture: 5}
+    costPerPlayer: {production: 13, culture: 4}
     effects: [{stability: 2}, {income: {culture: 2}}, {coreTerritory: 1}]
     victoryPoints: 2
     text: +2 Stability, every player +2 culture per turn, +2 victory points. Cores a territory (the one it stands in).
   hanging_gardens:
     name: The Hanging Gardens
     era: ancient
-    costPerPlayer: {production: 11, food: 10}
+    costPerPlayer: {production: 9, food: 9}
     effects: [{perWorker: {building: farm, food: 1}}, {income: {culture: 1}}]
     victoryPoints: 2
     text: Every farmer +1 food, every player +1 culture per turn.
   great_library:
     name: The Great Library
     era: ancient
-    costPerPlayer: {production: 10, culture: 5, research: 4}
+    costPerPlayer: {production: 9, culture: 4, research: 3}
     effects: [{income: {research: 4}}, {handLimit: 1}]
     victoryPoints: 2
     text: Every player +4 research per turn and +1 max hand size.
   nomadic_living:
     name: Nomadic Living
     era: prehistoric
-    costPerPlayer: {production: 6, food: 3}       # cheap: about 2.5 rounds of the team's output
+    costPerPlayer: {production: 5, food: 3}       # cheap: about 2.5 rounds of the team's output
     effects: [{freeSettlers: 1}]
     victoryPoints: 1
     obsoleteAfter: prehistoric
@@ -175,14 +175,14 @@ greatWonders:
   great_lighthouse:
     name: The Great Lighthouse
     era: ancient
-    costPerPlayer: {production: 12, food: 4}
+    costPerPlayer: {production: 10, food: 3}
     effects: [{faceUpLands: 1}, {settleDiscount: {production: 2}}, {freeSettlers: 1}, {coreTerritory: 1}]
     victoryPoints: 2
     text: One more land lies face up. Settling any land costs 2 production and 1 settler less. Cores a territory (the one it stands in).
   colossus:
     name: The Colossus
     era: ancient
-    costPerPlayer: {production: 15, influence: 3}
+    costPerPlayer: {production: 13, influence: 3}
     effects: [{perWorker: {building: mine, production: 1}}]
     victoryPoints: 2
     text: Every miner +1 production.
@@ -194,6 +194,11 @@ eras:
       # great wonders (taking one puts it on the board for the team to build)
       stonehenge: 1
       nomadic_living: 1
+      # leaders (play themselves; replace the current leader; leave with the era)
+      first_shaman: 1
+      great_hunter: 1
+      storyteller: 1
+      great_mother: 1
       # hostility: triggers when revealed, adding enemies to the next invasion
       hostility_1: 3
       hostility_2: 3
@@ -254,6 +259,10 @@ eras:
       great_lighthouse: 1
       colossus: 1
       roman_roads: 1
+      julius_caesar: 1
+      gilgamesh: 1
+      hammurabi: 1
+      ramses: 1
       hostility_2: 2
       hostility_3: 2
       hostility_5: 1
@@ -332,6 +341,49 @@ crisisCards: [black_plague, supervolcano, meteor_impact, climate_change]
 # (Rise of a Nomad Empire and the Sea Peoples are crisis cards in the Ancient era deck.)
 
 cards:
+  # ---- leaders: drawn leaders play themselves at once, replace your current leader, and leave when the era ends
+  # Prehistoric leaders
+  first_shaman:
+    name: The First Shaman
+    type: leader
+    effects: [{income: {culture: 1}}, {buildCost: {building: temple, production: 1}}]
+    text: +1 culture per turn. Temples cost only 1 production to build.
+  great_hunter:
+    name: The Great Hunter
+    type: leader
+    effects: [{income: {food: 1}}, {maxSlots: {farm: 1}}]
+    text: +1 food per turn and +1 max farm slot.
+  storyteller:
+    name: The Storyteller
+    type: leader
+    effects: [{eventUnder: 1}]
+    text: When an event leaves the queue unpicked, you get the face-down card under it.
+  great_mother:
+    name: The Great Mother
+    type: leader
+    effects: [{handLimit: -2}, {actionsToHand: 1}]
+    text: Hand size -2. Action cards that leave the queue go into your hand instead.
+  # Ancient leaders
+  julius_caesar:
+    name: Julius Caesar
+    type: leader
+    effects: [{ownStrengthPerTwoTroops: 1}]
+    text: Your military strength is +1 for every 2 troops.
+  gilgamesh:
+    name: Gilgamesh
+    type: leader
+    effects: [{freeRecruit: 1}, {strengthBonus: 2}]
+    text: The first troop you train each round takes no action (it still costs resources). +2 military strength.
+  hammurabi:
+    name: Hammurabi
+    type: leader
+    effects: [{income: {research: 1}}, {handLimit: 1}]
+    text: +1 research per turn and +1 hand size.
+  ramses:
+    name: Ramses
+    type: leader
+    effects: [{wonderGrowth: 1}]
+    text: Every great wonder under construction gains 1 of each resource it needs, every round.
   # ------------------------------------------------------------------ technologies (cost research + resources)
   fire:
     name: Fire
@@ -543,7 +595,7 @@ cards:
     name: Settle
     type: action
     effects: [{settle: true}]
-    text: "Open a face-up land for settling (you may pay toward it at once). From then on anyone can send it resources, troops against its enemy strength (half of them are lost) and settlers, free on their turn, until its whole cost is paid."
+    text: "Open a face-up land for settling (you may pay toward it at once). From then on anyone can send it resources, troops against its enemy strength (all of them are lost) and settlers, free on their turn, until its whole cost is paid."
   core_territory:
     name: Fortify the Heartland
     type: action
@@ -621,8 +673,12 @@ cards:
   new_trading_route:
     name: New Trading Route
     type: action
-    effects: [{trade: [food, production, research]}]
-    text: Send any amount of food, production and research to one teammate. (Resources can't be given otherwise.)
+    minPlayers: 2                      # needs a teammate: not in the deck in solo games
+    effects:
+      - trade:
+          - {give: {food: 1}, get: {production: 2}}
+          - {give: {production: 1}, get: {food: 2}}
+    text: Choose a teammate, then either pay 1 food so they get 2 production, or pay 1 production so they get 2 food.
   roman_roads:
     name: Roman Roads
     type: minor_wonder

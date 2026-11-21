@@ -13,6 +13,7 @@
 <header class="top">
   <h1><a href="./">Dawn of Mankind</a></h1>
   <div id="status" class="status"></div>
+  <button id="allCards" class="allcards" type="button">All cards</button>
 </header>
 
 <div id="toast" class="toast" hidden></div>
@@ -69,6 +70,7 @@
       <div class="panel" id="teamPanel"></div>
       <div class="panel" id="deckPanel"></div>
       <div class="panel" id="techPanel"></div>
+      <div class="panel" id="bonusPanel"></div>
       <div class="panel side">
         <div class="tabs"><button data-tab="log" class="on">Log</button><button data-tab="chat">Chat</button></div>
         <div id="logBox" class="logbox"></div>
@@ -82,6 +84,9 @@
 </main>
 
 <div id="eventBackdrop" class="backdrop" hidden></div>
+<div id="cardsModal" class="modal" hidden><div class="card wide" id="cardsBox"></div></div>
+<div id="noticeModal" class="modal" hidden><div class="card narrow" id="noticeBox"></div></div>
+<div id="starveModal" class="modal" hidden><div class="card narrow" id="starveBox"></div></div>
 <div id="gotModal" class="modal" hidden><div class="card narrow" id="gotBox"></div></div>
 <div id="growModal" class="modal" hidden><div class="card narrow" id="growBox"></div></div>
 <div id="over" class="modal" hidden><div class="card narrow" id="overBox"></div></div>

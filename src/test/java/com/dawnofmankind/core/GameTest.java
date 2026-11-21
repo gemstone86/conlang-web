@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.dawnofmankind.core.Content.BuildingDef;
 import com.dawnofmankind.core.Game.CardInst;
 import com.dawnofmankind.core.Game.Slot;
 import java.util.ArrayList;
@@ -28,7 +29,7 @@ class GameTest {
         Player p = g.players.get(0);
         assertEquals(3, p.population());
         assertEquals(2, p.buildings.size());
-        assertEquals(4, g.actionsLeft);
+        assertEquals(4, g.players.get(0).actions);
         assertEquals(8, g.currentEvents.size(), "2 starting events per player");
         assertEquals(8, g.queue.size(), "queue = players + 4");
         for (Slot s : g.queue) assertEquals(s.card.def.isEvent(), s.under != null, "events have a face-down card under them");
@@ -38,10 +39,42 @@ class GameTest {
     }
 
     @Test
-    void onlyTheCurrentPlayerActs() {
+    void everyoneActsAtOnceUntilTheyAreDone() {
         Game g = game(2, 2);
-        int other = (g.currentPlayer + 1) % 2;
-        assertThrows(GameException.class, () -> g.act(other, Map.of("type", "recruit")));
+        g.act(1, Map.of("type", "recruit".equals("x") ? "x" : "endTurn"));
+        assertTrue(g.players.get(1).done);
+        assertThrows(GameException.class, () -> g.act(1, Map.of("type", "recruit")), "done players can't act");
+        g.players.get(0).res.put(Res.PRODUCTION, 5);
+        g.act(0, Map.of("type", "recruit"));                      // the other is still free to act
+        assertEquals(3, g.players.get(0).actions);
+    }
+
+    @Test
+    void takenCardsLeaveAGapAndTheQueueClosesAtTheEnd() {
+        Game g = game(2, 40);
+        int n = g.queue.size();
+        int slot = -1;
+        for (int i = 0; i < n; i++) if (!g.queue.get(i).card.def.isEvent()) { slot = i; break; }
+        final int pick = slot;
+        g.act(0, Map.of("type", "pick", "slot", pick));
+        assertEquals(n, g.queue.size(), "nothing slides down during the round");
+        assertTrue(g.queue.get(pick).taken);
+        assertThrows(GameException.class, () -> g.act(1, Map.of("type", "pick", "slot", pick)), "first click wins");
+        g.picksLocked = true;
+        assertThrows(GameException.class, () -> g.act(1, Map.of("type", "pick", "slot", (pick + 1) % n)), "the queue is closed");
+    }
+
+    @Test
+    void pickTimeCanBeChangedDuringPlay() {
+        Game g = game(2, 41);
+        g.act(1, Map.of("type", "pickTime", "seconds", 30));
+        assertEquals(30, g.pickSeconds);
+        g.roundStartedAt = System.currentTimeMillis() - 60_000;
+        assertTrue(g.tick(), "the time was over");
+        assertTrue(g.picksLocked);
+        g.act(0, Map.of("type", "pickTime", "seconds", 0));
+        assertEquals(0, g.pickSeconds);
+        assertFalse(g.picksLocked, "no limit again");
     }
 
     @Test
@@ -50,7 +83,7 @@ class GameTest {
         Player p = g.players.get(0);
         p.res.put(Res.PRODUCTION, 20);
         for (int i = 0; i < 4; i++) g.act(0, Map.of("type", "recruit"));
-        assertEquals(0, g.actionsLeft);
+        assertEquals(0, g.players.get(0).actions);
         assertThrows(GameException.class, () -> g.act(0, Map.of("type", "recruit")));
         assertEquals(4, p.army);
     }
@@ -92,7 +125,7 @@ class GameTest {
         g.eraDeck.add(card(g, "hostility_2"));
         g.eraDeck.add(card(g, "foraging"));
         g.eraDeck.add(card(g, "foraging"));
-        Player p = g.players.get(g.currentPlayer);
+        Player p = g.players.get(0);
         p.hand.add(card(g, "storytelling"));
         g.act(p.seat, Map.of("type", "play", "card", p.hand.get(p.hand.size() - 1).id)); // draws 2: reveals the hostility card
         assertEquals(before + 2, g.threat);
@@ -104,9 +137,9 @@ class GameTest {
         Game g = game(1, 31);
         Player p = g.players.get(0);
         p.hand.add(card(g, "long_day"));
-        int before = g.actionsLeft;
+        int before = g.players.get(0).actions;
         g.act(0, Map.of("type", "play", "card", p.hand.get(p.hand.size() - 1).id));
-        assertEquals(before + 2, g.actionsLeft);
+        assertEquals(before + 2, g.players.get(0).actions);
     }
 
     @Test
@@ -166,15 +199,93 @@ class GameTest {
         p.res.put(Res.PRODUCTION, 5);
         Game.WonderProgress w = g.greatWonders.isEmpty() ? null : g.greatWonders.get(0);
         if (w == null) return;                      // none on the board in this seed
-        int before = g.actionsLeft;
+        int before = g.players.get(0).actions;
         g.act(0, Map.of("type", "contribute", "wonder", w.def.id, "resources", Map.of("production", 1)));
-        assertEquals(before, g.actionsLeft);
+        assertEquals(before, g.players.get(0).actions);
+    }
+
+    @Test
+    void aCardsNewPersonGoesWhereChosen() {
+        Game g = game(1, 37);
+        Player p = g.players.get(0);
+        p.res.put(Res.FOOD, 10);
+        Player.Building mine = p.ofType("mine");
+        int before = mine.workers;
+        Game.CardInst c = card(g, "gather_the_tribe");
+        p.hand.add(c);
+        g.act(0, Map.of("type", "play", "card", c.id, "building", mine.id));
+        assertEquals(before + 1, mine.workers);
+    }
+
+    @Test
+    void theTurnStartDrawIsShownToThePlayer() {
+        Game g = game(1, 38);
+        Map<String, Object> me = (Map<String, Object>) ((java.util.List<?>) View.of(g, 0).get("players")).get(0);
+        assertNotNull(me.get("turnSeq"));
+        assertTrue(me.containsKey("turnDraw") || g.players.get(0).turnDraw == null);
+    }
+
+    @Test
+    void starvingPlayersChooseWhoGoes() {
+        Game g = game(2, 39);
+        Player p = g.players.get(0);
+        // people idle and in a mine, 2 food for 3 Population and a round about to start: one person must starve
+        p.res.put(Res.FOOD, 2);
+        Player.Building farm = p.ofType("farm"), mine = p.ofType("mine");
+        assertTrue(farm.workers > 0 && mine.workers > 0);
+        p.idle += farm.workers;
+        farm.workers = 0;                           // nobody farms: the food runs short
+        for (Player q : g.players) g.act(q.seat, Map.of("type", "endTurn"));
+        // events, then the next round's production
+        int guard = 0;
+        AiPlayer ai = new AiPlayer(1);
+        while (g.phase != Game.Phase.STARVATION && g.result == null && guard++ < 400) {
+            if (g.phase == Game.Phase.EVENTS) { for (Player q : g.players) { try { g.act(q.seat, Map.of("type", "ready")); } catch (GameException e) { } } }
+            else { for (Player q : g.players) { try { g.act(q.seat, Map.of("type", "endTurn")); } catch (GameException e) { } } }
+            p.res.put(Res.FOOD, 2);
+        }
+        assertEquals(Game.Phase.STARVATION, g.phase, "a starving player with people in two places chooses");
+        int need = g.starving.get(g.starving.keySet().iterator().next());
+        int seat = g.starving.keySet().iterator().next();
+        assertThrows(GameException.class, () -> g.act(seat, Map.of("type", "starve", "lose", Map.of("idle", need + 5))));
+        Player who = g.players.get(seat);
+        assertTrue(who.idle >= need, "idle people can be the ones who go");
+        int before = who.idle;
+        g.act(seat, Map.of("type", "starve", "lose", Map.of("idle", need)));
+        assertEquals(before - need, who.idle);
+        assertFalse(g.starving.containsKey(seat));
+    }
+
+    @Test
+    void anEventThatResolvesAtOnceStillGetsANotice() {
+        Game g = game(1, 42);
+        g.futureEvents.clear();
+        g.futureEvents.add(card(g, "foraging"));
+        g.currentEvents.clear();
+        g.currentEvents.add(card(g, "flash_flood"));
+        g.act(0, Map.of("type", "endTurn"));
+        assertFalse(g.notices.isEmpty(), "everyone is shown what happened");
+        assertEquals("Flash Flood", g.notices.get(g.notices.size() - 1).card.def.name);
+        assertFalse(g.notices.get(g.notices.size() - 1).lines.isEmpty());
+    }
+
+    @Test
+    void everyTechnologyPlayedScoresAPoint() {
+        Game g = game(1, 43);
+        Player p = g.players.get(0);
+        p.res.put(Res.RESEARCH, 20);
+        p.res.put(Res.PRODUCTION, 20);
+        int before = g.score();
+        Game.CardInst tools = card(g, "stone_tools");
+        p.hand.add(tools);
+        g.act(0, Map.of("type", "play", "card", tools.id));
+        assertEquals(before + 1, g.score());
     }
 
     @Test
     void techsAreGlobal() {
         Game g = game(2, 18);
-        Player a = g.players.get(g.currentPlayer), b = g.players.get(1 - g.currentPlayer);
+        Player a = g.players.get(0), b = g.players.get(1);
         Player.Building bMine = b.ofType("mine");
         int before = View.income(g, b, g.mods(b)).get("production");
         a.res.put(Res.RESEARCH, 10);
@@ -208,7 +319,7 @@ class GameTest {
     @Test
     void cardsCanOnlyBeGivenWithRomanRoads() {
         Game g = game(2, 21);
-        Player p = g.players.get(g.currentPlayer);
+        Player p = g.players.get(0);
         Player other = g.players.get(1 - p.seat);
         p.hand.add(card(g, "foraging"));
         p.hand.add(card(g, "irrigation"));
@@ -218,7 +329,7 @@ class GameTest {
         int before = other.hand.size();
         g.act(p.seat, Map.of("type", "giveCards", "to", other.seat, "cards", List.of(a, b)));
         assertEquals(before + 2, other.hand.size());
-        assertEquals(3, g.actionsLeft, "1 action for both cards");
+        assertEquals(3, g.players.get(0).actions, "1 action for both cards");
     }
 
     @Test
@@ -252,21 +363,138 @@ class GameTest {
     }
 
     @Test
-    void resourcesOnlyTravelByTradingRoute() {
+    void aTradingRouteSendsTwoOfTheOtherResourceForOne() {
         Game g = game(2, 24);
-        Player p = g.players.get(g.currentPlayer);
-        Player other = g.players.get(1 - p.seat);
+        Player p = g.players.get(0);
+        Player other = g.players.get(1);
         p.res.put(Res.FOOD, 10);
-        p.res.put(Res.CULTURE, 5);
+        p.res.put(Res.PRODUCTION, 10);
         assertThrows(GameException.class, () -> g.act(p.seat, Map.of("type", "give", "to", other.seat, "resources", Map.of("food", 1))));
         Game.CardInst route = card(g, "new_trading_route");
         p.hand.add(route);
-        assertThrows(GameException.class, () -> g.act(p.seat, Map.of("type", "play", "card", route.id, "to", other.seat, "resources", Map.of("culture", 1))),
-                "culture can't travel the route");
-        int before = other.res.get(Res.FOOD);
-        g.act(p.seat, Map.of("type", "play", "card", route.id, "to", other.seat, "resources", Map.of("food", 6)));
-        assertEquals(before + 6, other.res.get(Res.FOOD));
-        assertEquals(4, p.res.get(Res.FOOD));
+        assertThrows(GameException.class, () -> g.act(p.seat, Map.of("type", "play", "card", route.id, "to", other.seat)), "an option must be chosen");
+        int prod = other.res.get(Res.PRODUCTION);
+        g.act(p.seat, Map.of("type", "play", "card", route.id, "to", other.seat, "option", 0));        // pay 1 food: they get 2 production
+        assertEquals(prod + 2, other.res.get(Res.PRODUCTION));
+        assertEquals(9, p.res.get(Res.FOOD));
+        Game.CardInst again = card(g, "new_trading_route");
+        p.hand.add(again);
+        int food = other.res.get(Res.FOOD);
+        g.act(p.seat, Map.of("type", "play", "card", again.id, "to", other.seat, "option", 1));        // pay 1 production: they get 2 food
+        assertEquals(food + 2, other.res.get(Res.FOOD));
+        assertEquals(9, p.res.get(Res.PRODUCTION));
+    }
+
+    @Test
+    void aLeaderPlaysItselfReplacesTheOldOneAndLeavesWithTheEra() {
+        Game g = game(2, 61);
+        Player p = g.players.get(0);
+        Game.CardInst a = card(g, "hammurabi"), b = card(g, "gilgamesh");
+        g.queue.add(0, new Game.Slot(a, null));
+        g.queue.add(1, new Game.Slot(b, null));
+        g.act(p.seat, Map.of("type", "pick", "slot", 0));
+        assertEquals("Hammurabi", p.leader.name);
+        assertFalse(p.hand.contains(a), "a leader never sits in the hand");
+        g.act(p.seat, Map.of("type", "pick", "slot", 1));
+        assertEquals("Gilgamesh", p.leader.name, "the new leader replaces the old");
+    }
+
+    @Test
+    void gilgameshsFirstTroopEachRoundTakesNoAction() {
+        Game g = game(1, 62);
+        Player p = g.players.get(0);
+        p.leader = C.cards.get("gilgamesh");
+        p.res.put(Res.PRODUCTION, 20);
+        int actions = p.actions, army = p.army;
+        g.act(p.seat, Map.of("type", "recruit"));
+        assertEquals(actions, p.actions, "the first troop is free of actions");
+        g.act(p.seat, Map.of("type", "recruit"));
+        assertEquals(actions - 1, p.actions, "the second one costs an action");
+        assertEquals(army + 2, p.army);
+        assertEquals(16, p.res.get(Res.PRODUCTION), "both still cost resources");
+    }
+
+    @Test
+    void leaderBonusesAddUp() {
+        Game g = game(1, 63);
+        Player p = g.players.get(0);
+        int limit = g.handLimit(p);
+        p.leader = C.cards.get("hammurabi");
+        assertEquals(1, g.mods(p).income.get(Res.RESEARCH));
+        assertEquals(limit + 1, g.handLimit(p));
+        p.leader = C.cards.get("julius_caesar");
+        assertEquals(6, g.strength(p, 4), "every 2 troops add 1 strength");
+        p.leader = C.cards.get("gilgamesh");
+        assertEquals(g.strength(p, 3) + 2, g.fighting(p, 3), "+2 military strength");
+        p.leader = C.cards.get("great_mother");
+        assertEquals(limit - 2, g.handLimit(p));
+    }
+
+    @Test
+    void theFirstShamansTemplesCostOneProduction() {
+        Game g = game(1, 64);
+        Player p = g.players.get(0);
+        BuildingDef temple = C.buildings.get("temple");
+        assertEquals(3, g.buildCost(p, temple).get(Res.PRODUCTION));
+        p.leader = C.cards.get("first_shaman");
+        assertEquals(1, g.buildCost(p, temple).get(Res.PRODUCTION));
+        assertEquals(1, g.mods(p).income.get(Res.CULTURE));
+    }
+
+    @Test
+    void theGreatHuntersFarmsAndInactiveBuildings() {
+        Game g = game(1, 65);
+        Player p = g.players.get(0);
+        int cap = g.capacity(p, "farm");
+        p.leader = C.cards.get("great_hunter");
+        assertEquals(cap + 1, g.capacity(p, "farm"));
+        Player.Building farm = p.ofType("farm");
+        farm.slots = cap + 1;
+        farm.workers = cap + 1;
+        assertEquals(cap + 1, g.working(p, farm));
+        p.leader = null;                                  // the era ends: the extra slot is inactive, not gone
+        assertEquals(cap, g.working(p, farm));
+        assertEquals(cap + 1, farm.slots);
+        assertThrows(GameException.class, () -> g.act(p.seat, Map.of("type", "build", "building", "farm")), "can't build while above the limit");
+    }
+
+    @Test
+    void ramsesGrowsUnfinishedWonders() {
+        Game g = game(1, 66);
+        Player p = g.players.get(0);
+        p.leader = C.cards.get("ramses");
+        Game.WonderProgress w = new Game.WonderProgress(C.greatWonders.get("pyramids"));
+        g.greatWonders.add(w);
+        int before = w.paid.values().stream().mapToInt(Integer::intValue).sum();
+        g.act(p.seat, Map.of("type", "endTurn"));
+        int after = w.paid.values().stream().mapToInt(Integer::intValue).sum();
+        assertTrue(after > before, "the wonder grew by itself");
+    }
+
+    @Test
+    void theGreatMotherTakesActionCardsLeavingTheQueue() {
+        Game g = game(1, 67);
+        Player p = g.players.get(0);
+        p.leader = C.cards.get("great_mother");
+        Game.CardInst action = card(g, "foraging");
+        g.queue.add(new Game.Slot(action, null));          // the bottom slot
+        while (g.queue.size() > 1 && g.queue.get(g.queue.size() - 2).card == action) break;
+        p.hand.clear();
+        g.act(p.seat, Map.of("type", "endTurn"));
+        for (int i = 0; i < 10 && g.phase == Game.Phase.EVENTS; i++) {
+            try { g.act(p.seat, Map.of("type", "ready")); } catch (GameException e) { break; }
+        }
+        assertTrue(p.hand.contains(action), "the action card went to her hand; phase " + g.phase + "; " + last(g));
+    }
+
+    @Test
+    void theTradingRouteIsOnlyInTheDeckWithTeammates() {
+        for (int players : new int[]{1, 2}) {
+            Game g = game(players, 50 + players);
+            boolean found = g.eraDeck.stream().anyMatch(c -> c.def.id.equals("new_trading_route"))
+                    || g.queue.stream().anyMatch(sl -> sl.card.def.id.equals("new_trading_route"));
+            if (players == 1) assertFalse(found, "not in a solo game");
+        }
     }
 
     @Test
@@ -312,7 +540,7 @@ class GameTest {
     void settleCardOpensALandThenAnyonePays() {
         Game g = game(2, 11);
         assertEquals(2, g.frontier.size(), "two lands face up at the start");
-        Player p = g.players.get(g.currentPlayer);
+        Player p = g.players.get(0);
         Game.Frontier f = g.frontier.get(0);
         f.enemy = 4;
         assertThrows(GameException.class, () -> g.act(p.seat, Map.of("type", "colonize", "land", f.land.id, "resources", Map.of("food", 1))),
@@ -324,26 +552,26 @@ class GameTest {
         assertTrue(f.opened);
         assertEquals(2, g.frontier.stream().filter(x -> !x.fromEvent && !x.opened).count(), "a new face-up land replaces the colony");
         assertEquals(2, f.troopsPaid);
-        assertEquals(1, p.army, "half of the 2 troops sent are lost");
+        assertEquals(0, p.army, "all of the 2 troops sent are lost");
         // later payments need no card and no action
         p.res.put(Res.FOOD, 50);
         p.res.put(Res.PRODUCTION, 50);
         p.army = 5;
         p.idle += 5;
-        int actions = g.actionsLeft;
+        int actions = g.players.get(0).actions;
         Map<String, Object> all = new java.util.HashMap<>();
         for (Res r : Res.values()) all.put(r.key(), 50);
         g.act(p.seat, Map.of("type", "colonize", "land", f.land.id, "resources", all, "army", 5, "population", 5));
-        assertEquals(actions, g.actionsLeft, "paying toward a colony is free");
+        assertEquals(actions, g.players.get(0).actions, "paying toward a colony is free");
         assertEquals(3, g.realm.size());
-        assertEquals(4, p.army, "only the missing 2 troops were sent, 1 lost");
+        assertEquals(3, p.army, "only the missing 2 troops were sent, and lost");
         assertEquals(2, g.frontier.size(), "the colony is settled; two face-up lands remain");
     }
 
     @Test
     void scoutedLandsStayFaceUp() {
         Game g = game(2, 13);
-        Player p = g.players.get(g.currentPlayer);
+        Player p = g.players.get(0);
         p.res.put(Res.FOOD, 10);
         Game.CardInst scouts = card(g, "send_scouts");
         p.hand.add(scouts);
@@ -374,7 +602,7 @@ class GameTest {
     @Test
     void greatWondersGoOnTheBoard() {
         Game g = game(2, 7);
-        Player p = g.players.get(g.currentPlayer);
+        Player p = g.players.get(0);
         g.greatWonders.clear();
         Game.CardInst w = card(g, "stonehenge");
         g.queue.add(0, new Game.Slot(w, null));
@@ -386,7 +614,7 @@ class GameTest {
     @Test
     void greatLighthouse() {
         Game g = game(2, 14);
-        Player p = g.players.get(g.currentPlayer);
+        Player p = g.players.get(0);
         g.greatWonders.clear();
         g.queue.add(0, new Game.Slot(card(g, "great_lighthouse"), null));
         g.act(p.seat, Map.of("type", "pick", "slot", 0));
@@ -433,7 +661,7 @@ class GameTest {
             if (slot < 0) continue;
             CardInst event = g.queue.get(slot).card;
             int future = g.futureEvents.size();
-            Player p = g.players.get(g.currentPlayer);
+            Player p = g.players.get(0);
             int got = p.hand.size() + g.greatWonders.size();
             g.act(p.seat, Map.of("type", "pick", "slot", slot));
             assertTrue(g.futureEvents.contains(event));

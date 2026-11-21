@@ -207,7 +207,7 @@ public final class Room {
     /** Called every few seconds: players gone longer than the grace period have their turns passed for them. */
     synchronized void tick(long now, long graceMillis) {
         if (game == null || game.result != null) return;
-        boolean changed = false;
+        boolean changed = game.tick();               // the pick time may have run out
         for (int i = 0; i < seats.size(); i++) {
             Seat s = seats.get(i);
             if (!s.ai && !s.connected() && now - s.disconnectedAt > graceMillis && !game.players.get(i).away) {

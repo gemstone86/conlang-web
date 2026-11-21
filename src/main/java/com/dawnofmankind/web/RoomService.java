@@ -102,4 +102,8 @@ public class RoomService {
     void stop() {
         timer.shutdownNow();
     }
+
+    public java.util.Map<String, Object> catalogue() {
+        return com.dawnofmankind.core.View.catalogue(content);
+    }
 }

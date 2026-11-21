@@ -24,13 +24,25 @@ public final class View {
         Map<String, Object> v = new LinkedHashMap<>();
         v.put("version", g.version);
         v.put("phase", g.phase.name().toLowerCase());
+        v.put("starving", g.starving);
+        List<Object> notices = new ArrayList<>();
+        for (Game.Notice n : g.notices) {
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("seq", n.seq);
+            m.put("card", card(n.card));
+            if (n.target >= 0) m.put("target", g.players.get(n.target).name);
+            m.put("lines", n.lines);
+            notices.add(m);
+        }
+        v.put("notices", notices);
         v.put("round", g.round);
         v.put("era", g.era().name);
         v.put("eraIndex", g.eraIndex);
         v.put("eraCount", g.content.eras.size());
         v.put("firstPlayer", g.firstPlayer);
-        v.put("currentPlayer", g.currentPlayer);
-        v.put("actionsLeft", g.actionsLeft);
+        v.put("actionsLeft", g.players.get(seat).actions);
+        v.put("pickSeconds", g.pickSeconds);
+        v.put("pickLeftMs", g.pickLeftMillis());
         v.put("stability", g.stability);
         v.put("health", g.health);
         v.put("threat", g.threat);
@@ -52,6 +64,7 @@ public final class View {
                 m.put("victoryPoints", w.victoryPoints);
             }
             m.put("slot", i);
+            m.put("taken", s.taken);
             m.put("faceDown", s.under != null);
             queue.add(m);
         }
@@ -92,6 +105,7 @@ public final class View {
         }
         v.put("builtWonders", built);
         v.put("strengthPerTwoTroops", g.civMods().strengthPerTwoTroops);
+        v.put("tribeStrength", g.players.stream().mapToInt(x -> g.fighting(x, x.army)).sum() + g.civMods().invasionDefense);
         v.put("freeSettlers", g.civMods().freeSettlers);
 
         List<Object> realm = new ArrayList<>();
@@ -140,6 +154,7 @@ public final class View {
             pm.put("army", p.army);
             pm.put("committed", p.committed);
             pm.put("raidDefense", m.raidDefense);
+            pm.put("strength", g.fighting(p, p.army));
             pm.put("handSize", p.hand.size());
             pm.put("handLimit", g.handLimit(p));
             pm.put("giveCards", m.giveCards);
@@ -153,22 +168,30 @@ public final class View {
                 bm.put("type", b.def.id);
                 bm.put("name", b.def.name);
                 bm.put("workers", b.workers);
-                bm.put("slots", b.slots);
+                bm.put("slots", g.activeSlots(p, b));          // slots above what the land allows are inactive
+                bm.put("inactive", b.slots - g.activeSlots(p, b));
                 bm.put("level", b.level());
                 // what the building makes each round as things stand (its workers, technologies and wonders included)
                 Map<String, Integer> makes = new LinkedHashMap<>(), each = new LinkedHashMap<>();
                 b.def.perWorker.forEach((r, n) -> each.merge(r.key(), n, Integer::sum));
                 var bonus = m.perWorker.get(b.def.id);
                 if (bonus != null) bonus.forEach((r, n) -> each.merge(r.key(), n, Integer::sum));
-                each.forEach((r, n) -> { if (n * b.workers != 0) makes.put(r, n * b.workers); });
+                each.forEach((r, n) -> { if (n * g.working(p, b) != 0) makes.put(r, n * g.working(p, b)); });
                 bm.put("makes", makes);
                 bm.put("each", each);
                 bs.add(bm);
             }
             pm.put("buildings", bs);
             pm.put("techs", p.techs.stream().map(View::def).toList());
+            if (p.leader != null) pm.put("leader", def(p.leader));
             pm.put("minorWonders", p.minorWonders.stream().map(View::def).toList());
             if (p.seat == seat) pm.put("hand", p.hand.stream().map(View::card).toList());
+            pm.put("done", p.done);
+            if (p.seat == seat && g.phase == Game.Phase.TURNS) {
+                pm.put("turnSeq", p.turnSeq);
+                pm.put("turnEvents", p.turnEvents);
+                if (p.turnDraw != null) pm.put("turnDraw", card(p.turnDraw));
+            }
             players.add(pm);
         }
         v.put("players", players);
@@ -226,12 +249,12 @@ public final class View {
         return switch (d.kind) {
             case "raid" -> {
                 Player t = g.players.get(pe.target);
-                int def = g.strength(Math.max(0, t.army - t.committed)) + g.mods(t).raidDefense + pe.defenseBonus;
+                int def = g.fighting(t, Math.max(0, t.army - t.committed)) + g.mods(t).raidDefense + pe.defenseBonus;
                 yield def >= pe.strength ? t.name + " will drive it off (defense " + def + " vs " + pe.strength + ")."
                         : t.name + " is " + (pe.strength - def) + " short (defense " + def + " vs " + pe.strength + ")" + half + ".";
             }
             case "invasion" -> {
-                int sent = pe.troops.values().stream().mapToInt(g::strength).sum() + pe.defenseBonus + g.civMods().invasionDefense;
+                int sent = pe.troops.entrySet().stream().mapToInt(en -> g.fighting(g.players.get(en.getKey()), en.getValue())).sum() + pe.defenseBonus + g.civMods().invasionDefense;
                 yield sent >= pe.strength ? "The defenders (" + sent + ") will hold against " + pe.strength + "."
                         : "Defenders " + sent + " vs strength " + pe.strength + ": " + (pe.strength - sent) + " short" + half + ".";
             }
@@ -249,9 +272,10 @@ public final class View {
         Map<String, Integer> out = new LinkedHashMap<>();
         for (Res r : Res.values()) out.put(r.key(), m.income.get(r));
         for (Player.Building b : p.buildings) {
-            b.def.perWorker.forEach((r, n) -> out.merge(r.key(), n * b.workers, Integer::sum));
+            int w = g.working(p, b);
+            b.def.perWorker.forEach((r, n) -> out.merge(r.key(), n * w, Integer::sum));
             var bonus = m.perWorker.get(b.def.id);
-            if (bonus != null) bonus.forEach((r, n) -> out.merge(r.key(), n * b.workers, Integer::sum));
+            if (bonus != null) bonus.forEach((r, n) -> out.merge(r.key(), n * w, Integer::sum));
         }
         out.merge(Res.FOOD.key(), -p.population() * g.content.rules.foodUpkeepPerPop, Integer::sum);
         return out;
@@ -272,6 +296,39 @@ public final class View {
         m.put("slots", t.def.slots);
         m.put("colonization", t.def.colonization);
         return m;
+    }
+
+    /** Every card, land and wonder in the game, for the "all cards" list (no state, just what they do). */
+    public static Map<String, Object> catalogue(Content content) {
+        Map<String, Object> out = new LinkedHashMap<>();
+        List<Object> cards = new ArrayList<>();
+        for (CardDef d : content.cards.values()) {
+            if (d.helper) continue;
+            Map<String, Object> m = def(d);
+            m.put("era", d.era);
+            if (d.minPlayers > 1) m.put("minPlayers", d.minPlayers);
+            cards.add(m);
+        }
+        out.put("cards", cards);
+        List<Object> lands = new ArrayList<>();
+        for (Content.TerritoryDef t : content.territories.values()) {
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("name", t.name);
+            m.put("text", t.text);
+            m.put("special", t.special);
+            lands.add(m);
+        }
+        out.put("lands", lands);
+        List<Object> wonders = new ArrayList<>();
+        for (Content.WonderDef w : content.greatWonders.values()) {
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("name", w.name);
+            m.put("text", w.text);
+            m.put("era", w.era);
+            wonders.add(m);
+        }
+        out.put("wonders", wonders);
+        return out;
     }
 
     static Map<String, Object> card(CardInst c) {
@@ -295,11 +352,19 @@ public final class View {
         }
         if (!d.respondsTo.isEmpty()) m.put("respondsTo", d.respondsTo);
         for (Map<String, Object> e : d.effects) {
+            if (e.get("population") instanceof Number n && n.intValue() > 0) m.put("population", true);
             if (e.containsKey("settle")) m.put("target", "land");
             if (e.containsKey("core")) m.put("target", "territory");
             if (e.containsKey("trade")) {
                 m.put("target", "player");
-                m.put("trade", e.get("trade"));
+                List<Object> opts = new ArrayList<>();
+                for (Object o : (List<?>) e.get("trade")) {
+                    Map<String, Object> om = Y.map(o), t = new LinkedHashMap<>();
+                    t.put("give", res(Res.parse(om.get("give"))));
+                    t.put("get", res(Res.parse(om.get("get"))));
+                    opts.add(t);
+                }
+                m.put("trade", opts);
             }
         }
         return m;
