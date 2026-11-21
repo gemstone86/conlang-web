@@ -123,6 +123,7 @@ function render(m) {
   renderCiv();
   checkPickReveal();
   checkTurnDraw();
+  renderStarvation();
   renderTechs();
   renderHand();
   renderTeam();
@@ -170,7 +171,7 @@ const affordable = cost => !cost || RES.every(k => (me().resources[k] || 0) >= (
 function renderStatus() {
   const s = state, cur = s.players[s.currentPlayer];
   const phase = s.result ? (s.result === 'victory' ? 'Victory' : 'Defeat')
-    : s.phase === 'events' ? 'Events' : myTurn() ? `<span class="turn">Your turn — ${s.actionsLeft} action${s.actionsLeft === 1 ? '' : 's'} left</span>` : `${esc(cur.name)}'s turn`;
+    : s.phase === 'events' ? 'Events' : s.phase === 'starvation' ? 'Starvation — choosing who goes' : myTurn() ? `<span class="turn">Your turn — ${s.actionsLeft} action${s.actionsLeft === 1 ? '' : 's'} left</span>` : `${esc(cur.name)}'s turn`;
   $('status').innerHTML = `<span>${esc(s.era)} era (${s.eraIndex + 1}/${s.eraCount})</span><span>Round <b>${s.round}</b></span>
     <span>${phase}</span><span>Stability <b class="${s.stability <= 3 ? 'bad' : ''}">${s.stability}</b></span>
     <span>Health <b>${s.health}</b></span><span class="${s.threat ? 'threat' : ''}">Enemies massing <b>${s.threat}</b></span><span>Era deck <b>${s.eraDeck}</b></span><span>Points <b>${s.score}</b></span>
@@ -225,6 +226,33 @@ function checkTurnDraw() {
   $('gotBox').innerHTML = `<h2>Your turn: you drew</h2>${ev}${body}<div class="row"><button class="primary" data-gotok>OK</button></div>`;
   $('gotModal').hidden = false;
 }
+// Starvation: when food runs short and your people are in more than one place, you choose who starves.
+function renderStarvation() {
+  const s = state, need = s.starving && s.starving[s.you];
+  if (s.phase !== 'starvation' || !need) { $('starveModal').hidden = true; return; }
+  if (!$('starveModal').hidden) return;                      // keep what is being chosen across redraws
+  const p = me();
+  const rows = [['idle', 'Idle', p.idle], ...(p.buildings || []).map(b => [b.id, b.name, b.workers])].filter(r => r[2] > 0);
+  $('starveBox').innerHTML = `<h2>Not enough food</h2><p>${need} of your people ${need === 1 ? 'starves' : 'starve'}. Choose who.</p>
+    <div class="column">${rows.map(([id, name, have]) => `<label class="row" style="justify-content:space-between">${esc(name)} <span class="muted small">(${have})</span>
+      <input type="number" min="0" max="${Math.min(have, need)}" value="0" data-starve="${id}" style="width:4rem"></label>`).join('')}</div>
+    <div class="row"><span class="small muted" id="starveSum"></span><button class="primary" id="starveOk">Confirm</button></div>`;
+  $('starveModal').hidden = false;
+  const upd = () => {
+    const sum = [...document.querySelectorAll('[data-starve]')].reduce((t, i) => t + (+i.value || 0), 0);
+    $('starveSum').textContent = `${sum} of ${need} chosen`;
+    $('starveOk').disabled = sum !== need;
+  };
+  document.querySelectorAll('[data-starve]').forEach(i => { i.oninput = upd; });
+  upd();
+  $('starveOk').onclick = () => {
+    const lose = {};
+    document.querySelectorAll('[data-starve]').forEach(i => { if (+i.value > 0) lose[i.dataset.starve] = +i.value; });
+    $('starveModal').hidden = true;
+    send({ type: 'starve', lose });
+  };
+}
+
 function checkPickReveal() {
   if (!pickWatch) return;
   if (Date.now() - pickWatch.at > 5000) { pickWatch = null; return; }

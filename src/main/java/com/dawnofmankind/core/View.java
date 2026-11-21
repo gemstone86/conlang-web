@@ -24,6 +24,7 @@ public final class View {
         Map<String, Object> v = new LinkedHashMap<>();
         v.put("version", g.version);
         v.put("phase", g.phase.name().toLowerCase());
+        v.put("starving", g.starving);
         v.put("round", g.round);
         v.put("era", g.era().name);
         v.put("eraIndex", g.eraIndex);

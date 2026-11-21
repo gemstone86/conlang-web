@@ -23,6 +23,7 @@ public final class AiPlayer {
     /** Makes one move for whoever needs to move. Returns false if nothing could be done. */
     public boolean step(Game g) {
         if (g.result != null) return false;
+        if (g.phase == Game.Phase.STARVATION) { for (int seat : List.copyOf(g.starving.keySet())) { starveFor(g, seat); return true; } return false; }
         if (g.phase == Game.Phase.EVENTS) {
             for (Player p : g.players) if (respond(g, p)) return true;
             return false;
@@ -33,6 +34,7 @@ public final class AiPlayer {
     /** True if this seat has something to do now (its turn, or an event waiting for its response). */
     public static boolean needsToAct(Game g, int seat) {
         if (g.result != null) return false;
+        if (g.phase == Game.Phase.STARVATION) return g.starving.containsKey(seat);
         if (g.phase == Game.Phase.EVENTS) return g.pending != null && !Boolean.TRUE.equals(g.pending.ready.get(seat));
         return g.phase == Game.Phase.TURNS && g.currentPlayer == seat;
     }
@@ -41,11 +43,33 @@ public final class AiPlayer {
     public boolean stepFor(Game g, int seat) {
         if (!needsToAct(g, seat)) return false;
         Player p = g.players.get(seat);
+        if (g.phase == Game.Phase.STARVATION) { starveFor(g, seat); return true; }
         if (g.phase == Game.Phase.EVENTS) return respond(g, p);
         if (g.actionsLeft > 0 && takeAction(g, p)) return true;
         while (p.hand.size() > g.handLimit(p)) g.act(p.seat, Map.of("type", "discard", "card", p.hand.get(0).id));
         g.act(p.seat, Map.of("type", "endTurn"));
         return true;
+    }
+
+    /** The AI lets idle people starve first, then the building with the most workers. */
+    private void starveFor(Game g, int seat) {
+        Player p = g.players.get(seat);
+        int need = g.starving.get(seat);
+        Map<String, Object> lose = new HashMap<>();
+        int idle = Math.min(need, p.idle);
+        if (idle > 0) lose.put("idle", idle);
+        int left = need - idle;
+        java.util.Map<Integer, Integer> w = new java.util.HashMap<>();
+        for (Player.Building b : p.buildings) w.put(b.id, b.workers);
+        while (left > 0) {
+            int best = -1;
+            for (var e : w.entrySet()) if (e.getValue() > 0 && (best < 0 || e.getValue() > w.get(best))) best = e.getKey();
+            if (best < 0) break;
+            w.put(best, w.get(best) - 1);
+            lose.merge(String.valueOf(best), 1, (x, y) -> (Integer) x + (Integer) y);
+            left--;
+        }
+        if (!tryAct(g, p, Map.of("type", "starve", "lose", lose))) g.setAway(seat, true);
     }
 
     private boolean respond(Game g, Player p) {

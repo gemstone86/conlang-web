@@ -26,7 +26,7 @@ import java.util.Random;
  */
 public final class Game {
 
-    public enum Phase { TURNS, EVENTS, OVER }
+    public enum Phase { TURNS, EVENTS, STARVATION, OVER }
 
     /** One physical card. */
     public static final class CardInst {
@@ -142,6 +142,8 @@ public final class Game {
     private int nextId = 1;
 
     public Phase phase = Phase.TURNS;
+    /** Players who must choose which of their people starve: seat → how many (the round waits for them). */
+    public final Map<Integer, Integer> starving = new LinkedHashMap<>();
     public int round = 1;
     public int eraIndex = 0;
     public int firstPlayer = 0;
@@ -294,11 +296,64 @@ public final class Game {
 
     private void startRound() {
         log("— Round " + round + " (" + era().name + ") —");
+        starving.clear();
         production();
         if (checkDefeat()) return;
+        if (!starving.isEmpty()) {
+            phase = Phase.STARVATION;
+            log("Some people must starve: " + starving.keySet().stream().map(i -> players.get(i).name).toList() + " choose who.");
+            return;
+        }
+        beginTurns();
+    }
+
+    private void beginTurns() {
         phase = Phase.TURNS;
         currentPlayer = firstPlayer;
         beginTurn();
+    }
+
+    /** Whether a player has a real choice of who starves: people in more than one place (idle, or in different buildings). */
+    private boolean canChooseWhoStarves(Player p, int n) {
+        long places = (p.idle > 0 ? 1 : 0) + p.buildings.stream().filter(b -> b.workers > 0).count();
+        return places > 1 && p.population() > n;
+    }
+
+    /** {"type":"starve","lose":{"idle":1,"<building id>":2}}: who of your people starves (the numbers must add up). */
+    private void starve(Player p, Map<String, Object> a) {
+        Integer need = starving.get(p.seat);
+        if (phase != Phase.STARVATION || need == null) throw new GameException("No one of yours has to starve now.");
+        Map<String, Object> lose = Y.map(a.get("lose"));
+        int total = 0;
+        for (Map.Entry<String, Object> e : lose.entrySet()) {
+            int n = Y.toInt(e.getValue());
+            if (n < 0) throw new GameException("Amounts can't be negative.");
+            total += n;
+            int have = "idle".equals(e.getKey()) ? p.idle : p.buildings.stream().filter(b -> String.valueOf(b.id).equals(e.getKey())).mapToInt(b -> b.workers).findFirst().orElse(-1);
+            if (have < 0) throw new GameException("You have no such building.");
+            if (n > have) throw new GameException("You don't have that many there.");
+        }
+        if (total != need) throw new GameException("Choose exactly " + need + " " + (need == 1 ? "person" : "people") + ".");
+        boolean had = p.population() > 0;
+        for (Map.Entry<String, Object> e : lose.entrySet()) {
+            int n = Y.toInt(e.getValue());
+            if ("idle".equals(e.getKey())) p.idle -= n;
+            else p.buildings.stream().filter(b -> String.valueOf(b.id).equals(e.getKey())).findFirst().ifPresent(b -> b.workers -= n);
+        }
+        log(p.name + " loses " + need + " Population to starvation.");
+        starving.remove(p.seat);
+        if (had && p.population() == 0) {
+            stability--;
+            log(p.name + "'s people are gone. Stability -1 (now " + stability + ").");
+            addCrisis("random");
+        }
+        starvationDone();
+    }
+
+    private void starvationDone() {
+        if (!starving.isEmpty() || phase != Phase.STARVATION) return;
+        if (checkDefeat()) return;
+        beginTurns();
     }
 
     private void production() {
@@ -323,7 +378,8 @@ public final class Game {
                 int starve = (int) Math.ceil((upkeep - food) / (double) Math.max(1, content.rules.foodUpkeepPerPop));
                 msg += " Not enough food: " + starve + " Population starve. Stability -1.";
                 stability--;
-                losePopulation(p, starve);
+                if (p.away || !canChooseWhoStarves(p, starve)) losePopulation(p, starve);
+                else starving.put(p.seat, starve);
             }
             log(msg);
         }
@@ -526,6 +582,7 @@ public final class Game {
             case "decide" -> decide(p, a);
             case "ready" -> ready(p);
             case "colonize" -> colonize(p, a);
+            case "starve" -> starve(p, a);
             case "contribute" -> { myTurn(p); contribute(p, a); }          // paying toward a great wonder is free
             // turn
             case "endTurn" -> {
@@ -1145,6 +1202,9 @@ public final class Game {
             } else if (phase == Phase.EVENTS && pending != null) {
                 pending.ready.put(seat, true);
                 maybeResolve();
+            } else if (phase == Phase.STARVATION && starving.containsKey(seat)) {
+                losePopulation(p, starving.remove(seat));
+                starvationDone();
             }
         }
         version++;

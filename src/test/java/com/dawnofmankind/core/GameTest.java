@@ -193,6 +193,38 @@ class GameTest {
     }
 
     @Test
+    void starvingPlayersChooseWhoGoes() {
+        Game g = game(2, 39);
+        Player p = g.players.get(0);
+        // people idle and in a mine, 2 food for 3 Population and a round about to start: one person must starve
+        p.res.put(Res.FOOD, 2);
+        Player.Building farm = p.ofType("farm"), mine = p.ofType("mine");
+        assertTrue(farm.workers > 0 && mine.workers > 0);
+        p.idle += farm.workers;
+        farm.workers = 0;                           // nobody farms: the food runs short
+        g.act(g.currentPlayer, Map.of("type", "endTurn"));
+        g.act(g.currentPlayer, Map.of("type", "endTurn"));
+        // events, then the next round's production
+        int guard = 0;
+        AiPlayer ai = new AiPlayer(1);
+        while (g.phase != Game.Phase.STARVATION && g.result == null && guard++ < 400) {
+            if (g.phase == Game.Phase.EVENTS) { for (Player q : g.players) { try { g.act(q.seat, Map.of("type", "ready")); } catch (GameException e) { } } }
+            else { try { g.act(g.currentPlayer, Map.of("type", "endTurn")); } catch (GameException e) { break; } }
+            p.res.put(Res.FOOD, 2);
+        }
+        assertEquals(Game.Phase.STARVATION, g.phase, "a starving player with people in two places chooses");
+        int need = g.starving.get(g.starving.keySet().iterator().next());
+        int seat = g.starving.keySet().iterator().next();
+        assertThrows(GameException.class, () -> g.act(seat, Map.of("type", "starve", "lose", Map.of("idle", need + 5))));
+        Player who = g.players.get(seat);
+        assertTrue(who.idle >= need, "idle people can be the ones who go");
+        int before = who.idle;
+        g.act(seat, Map.of("type", "starve", "lose", Map.of("idle", need)));
+        assertEquals(before - need, who.idle);
+        assertFalse(g.starving.containsKey(seat));
+    }
+
+    @Test
     void techsAreGlobal() {
         Game g = game(2, 18);
         Player a = g.players.get(g.currentPlayer), b = g.players.get(1 - g.currentPlayer);
