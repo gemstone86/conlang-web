@@ -100,6 +100,29 @@ class GameTest {
     }
 
     @Test
+    void aLongDayIsThreeMoreActionsSoTwoInAll() {
+        Game g = game(1, 31);
+        Player p = g.players.get(0);
+        p.hand.add(card(g, "long_day"));
+        int before = g.actionsLeft;
+        g.act(0, Map.of("type", "play", "card", p.hand.get(p.hand.size() - 1).id));
+        assertEquals(before + 2, g.actionsLeft);
+    }
+
+    @Test
+    void aFreeColonyOpensALandFromTheWorldDeck() {
+        Game g = game(1, 32);
+        g.futureEvents.clear();
+        g.futureEvents.add(card(g, "foraging"));
+        g.currentEvents.clear();
+        g.currentEvents.add(card(g, "free_colony"));
+        int deck = g.worldDeck.size(), colonies = (int) g.frontier.stream().filter(f -> f.opened).count();
+        g.act(0, Map.of("type", "endTurn"));
+        assertEquals(colonies + 1, g.frontier.stream().filter(f -> f.opened).count());
+        assertTrue(g.worldDeck.size() < deck);
+    }
+
+    @Test
     void techsAreGlobal() {
         Game g = game(2, 18);
         Player a = g.players.get(g.currentPlayer), b = g.players.get(1 - g.currentPlayer);

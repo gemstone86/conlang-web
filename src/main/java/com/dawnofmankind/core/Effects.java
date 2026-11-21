@@ -12,7 +12,7 @@ import java.util.Set;
  *
  * <p><b>Immediate</b> (applied once, when a card is played, a wonder is finished or an event resolves):
  * gain, lose, population, army, stability, health, draw, extraActions, addCrisis, destroyBuilding, freeBuilding,
- * discover (put lands from the world deck, or a named special land, face up), enemy ({each: n} or {one: n}: raise
+ * colony (n lands from the world deck become colonies at once, open to settling), discover (put lands from the world deck, or a named special land, face up), enemy ({each: n} or {one: n}: raise
  * face-up lands' enemy strength), removeLand (n random face-up lands are discarded with what was paid), settle (the card settles a chosen face-up land), core (the card cores a territory).
  *
  * <p><b>Lasting</b> (active while the owner holds the tech or wonder, or while a persistent event is in play):
@@ -32,7 +32,7 @@ public final class Effects {
     private Effects() {}
 
     static final Set<String> IMMEDIATE = Set.of("gain", "lose", "population", "army", "stability", "health", "draw",
-            "extraActions", "addCrisis", "destroyBuilding", "freeBuilding", "discover", "enemy", "settle", "core", "removeLand", "coreTerritory", "hostility",
+            "extraActions", "addCrisis", "destroyBuilding", "freeBuilding", "discover", "colony", "enemy", "settle", "core", "removeLand", "coreTerritory", "hostility",
             "threat", "invadeIfStronger", "raidAll", "invasion", "healthTest", "trade");
     static final Set<String> LASTING = Set.of("income", "perWorker", "handLimit", "actionsPerTurn", "raidDefense",
             "mitigate", "buildDiscount", "sharedPool", "victoryPoints", "invasionDefense", "faceUpLands", "settleDiscount", "freeSettlers", "strengthPerTwoTroops", "giveCards");

@@ -2,6 +2,10 @@
 
 Newest first. Versions from 1.x on are the combined app (Root and Rune + Weather generator).
 
+## v1.57.3 (combined app)
+- **Dawn of Mankind: A Long Day is now +3 actions** (it costs 1 to play, so +2 in all; it was +2, a net +1).
+- **New event "Free Colony".** A land from the territory deck becomes a colony at once, with nothing paid; anyone can then settle it (1 action each), like a Settle-card colony. One in each era's event deck. New effect `colony: n` in the card file. Changed in the combined app's copy only (the same changes are needed in the dawn-of-mankind repository).
+
 ## v1.57.2 (combined app)
 - **Dawn of Mankind: events pop up.** An event that strikes now opens over the board with a dark backdrop (the card, what it will do, response cards, Accept/Decline, troops), so it can't be resolved without looking at it. Land the event finds shows in the same pop-up, ready to pay for. *Look at the board* hides it for that event (a *Show the event again* button brings it back); a new event pops up again. Changed here in the combined app's copy of the page only (`META-INF/resources/dawn`): the same change needs making in the dawn-of-mankind repository.
 

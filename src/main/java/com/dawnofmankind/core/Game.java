@@ -1439,6 +1439,16 @@ public final class Game {
                         if (t != null) discover(t);
                     }
                 }
+                case "colony" -> {
+                    for (int i = 0; i < Y.toInt(v) && !worldDeck.isEmpty(); i++) {
+                        Territory land = worldDeck.remove(0);
+                        Frontier f = new Frontier(land, false, -1);
+                        f.opened = true;
+                        frontier.add(f);
+                        log("A free colony: the " + land.def.name + " (" + land.def.text + ") is open for settling. Anyone can send resources, troops and settlers to it (1 action each).");
+                    }
+                    refillLands();
+                }
                 case "destroyBuilding" -> {
                     int n = (int) Math.floor(Y.toInt(v) * factor);
                     for (Player p : targets) {
