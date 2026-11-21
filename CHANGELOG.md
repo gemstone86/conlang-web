@@ -2,6 +2,9 @@
 
 Newest first. Versions from 1.x on are the combined app (Root and Rune + Weather generator).
 
+## v1.57.8 (combined app)
+- **Dawn of Mankind: what each building makes.** Every building in *Your people* shows, at its right, what it produces each round as things stand (its workers times the per-worker amount, technologies and wonders included); hover for the per-worker numbers. Changed in the combined app's copy only.
+
 ## v1.57.7 (combined app)
 - **Dawn of Mankind: Plains** now reads "+2 max farm slots". Changed in the combined app's copy only.
 

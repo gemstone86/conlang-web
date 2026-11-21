@@ -155,6 +155,14 @@ public final class View {
                 bm.put("workers", b.workers);
                 bm.put("slots", b.slots);
                 bm.put("level", b.level());
+                // what the building makes each round as things stand (its workers, technologies and wonders included)
+                Map<String, Integer> makes = new LinkedHashMap<>(), each = new LinkedHashMap<>();
+                b.def.perWorker.forEach((r, n) -> each.merge(r.key(), n, Integer::sum));
+                var bonus = m.perWorker.get(b.def.id);
+                if (bonus != null) bonus.forEach((r, n) -> each.merge(r.key(), n, Integer::sum));
+                each.forEach((r, n) -> { if (n * b.workers != 0) makes.put(r, n * b.workers); });
+                bm.put("makes", makes);
+                bm.put("each", each);
                 bs.add(bm);
             }
             pm.put("buildings", bs);

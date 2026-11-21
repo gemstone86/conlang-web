@@ -127,3 +127,5 @@ details summary { cursor: pointer; color: var(--bone-dim); font-size: .88rem; }
 
 .techrow { padding: .3rem 0; border-top: 1px solid var(--line); }
 .techrow:first-of-type { border-top: 0; }
+
+.bld .makes { margin-left: auto; font-size: .85rem; white-space: nowrap; }
