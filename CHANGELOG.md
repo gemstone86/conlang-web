@@ -2,6 +2,29 @@
 
 Newest first. Versions from 1.x on are the combined app (Root and Rune + Weather generator).
 
+## v1.57.8 (combined app)
+- **Dawn of Mankind: what each building makes.** Every building in *Your people* shows, at its right, what it produces each round as things stand (its workers times the per-worker amount, technologies and wonders included); hover for the per-worker numbers. Changed in the combined app's copy only.
+
+## v1.57.7 (combined app)
+- **Dawn of Mankind: Plains** now reads "+2 max farm slots". Changed in the combined app's copy only.
+
+## v1.57.6 (combined app)
+- **New event "Civil War" (Dawn of Mankind).** A random core territory loses its core status; with no core territory, a random territory is lost instead. In the Ancient event deck. New effect `civilWar`. (The realm is shared by the whole team, so "your" core means the team's.) Changed in the combined app's copy only.
+
+## v1.57.5 (combined app)
+- **Dawn of Mankind: the face-down card pops up.** Taking on an event shows the face-down card you got in a pop-up.
+- **Dawn of Mankind: technologies box.** The technologies researched so far are listed (name, who researched it, what it does) in a box between *Event decks* and the log. Both changed in the combined app's copy only.
+
+## v1.57.4 (combined app)
+- **Dawn of Mankind: choose where the new person works.** *Grow* asks which building gets the new worker when more than one has a free slot (with one, it goes there as before). The game accepts an optional `building` on the grow action. Changed in the combined app's copy only.
+
+## v1.57.3 (combined app)
+- **Dawn of Mankind: A Long Day is now +3 actions** (it costs 1 to play, so +2 in all; it was +2, a net +1).
+- **New event "Free Colony".** A land from the territory deck becomes a colony at once, with nothing paid; anyone can then settle it (1 action each), like a Settle-card colony. One in each era's event deck. New effect `colony: n` in the card file. Changed in the combined app's copy only (the same changes are needed in the dawn-of-mankind repository).
+
+## v1.57.2 (combined app)
+- **Dawn of Mankind: events pop up.** An event that strikes now opens over the board with a dark backdrop (the card, what it will do, response cards, Accept/Decline, troops), so it can't be resolved without looking at it. Land the event finds shows in the same pop-up, ready to pay for. *Look at the board* hides it for that event (a *Show the event again* button brings it back); a new event pops up again. Changed here in the combined app's copy of the page only (`META-INF/resources/dawn`): the same change needs making in the dawn-of-mankind repository.
+
 ## v1.57.1 (combined app)
 - **Dawn of Mankind updated** to the newest `main` (`49326c9`): AI players the host can add in the lobby, settlers and colonies, global techs, lasting crises, new cards. Setting `dawn.ai-move-millis` (default 900) is the pause before an AI player's move.
 

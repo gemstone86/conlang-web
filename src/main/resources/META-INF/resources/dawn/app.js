@@ -121,6 +121,8 @@ function render(m) {
   renderWonders();
   renderEvents();
   renderCiv();
+  checkPickReveal();
+  renderTechs();
   renderHand();
   renderTeam();
   renderDecks();
@@ -196,16 +198,38 @@ function renderQueue() {
     <div class="queue-row">${items || '<p class="muted">The queue is empty.</p>'}</div>
     <div class="queue-ends"><span>← leaves here</span><span>new cards come in here →</span></div>`;
 }
-$('queuePanel').onclick = e => { const b = e.target.closest('[data-pick]'); if (b) send({ type: 'pick', slot: +b.dataset.pick }); };
+// Taking on an event gives the face-down card under it: when it arrives in the hand, show it in a pop-up.
+let pickWatch = null;
+$('queuePanel').onclick = e => {
+  const b = e.target.closest('[data-pick]'); if (!b) return;
+  const card = state.queue[+b.dataset.pick];
+  if (card && card.type === 'event') {
+    pickWatch = { ids: new Set((me().hand || []).map(c => c.id)), event: card.name, at: Date.now() };
+  }
+  send({ type: 'pick', slot: +b.dataset.pick });
+};
+function checkPickReveal() {
+  if (!pickWatch) return;
+  if (Date.now() - pickWatch.at > 5000) { pickWatch = null; return; }
+  const got = (me().hand || []).filter(c => !pickWatch.ids.has(c.id));
+  if (!got.length) return;
+  const ev = pickWatch.event;
+  pickWatch = null;
+  $('gotBox').innerHTML = `<h2>The face-down card</h2><p class="muted small">You took on <b>${esc(ev)}</b> and got:</p>
+    <div class="cards">${got.map(c => cardHtml(c)).join('')}</div><div class="row"><button class="primary" data-gotok>OK</button></div>`;
+  $('gotModal').hidden = false;
+}
+$('gotModal').onclick = e => { if (e.target.closest('[data-gotok]') || e.target === $('gotModal')) $('gotModal').hidden = true; };
 
 const slotText = slots => Object.entries(slots || {}).map(([b, n]) => `+${n} ${b}`).join(', ');
 
+let landCardFn;                       // the land card drawing of renderRealm, also used in the event pop-up
 function renderRealm() {
   const s = state;
   const lands = s.realm.map(t => `<div class="cardx territory ${t.cored ? 'cored' : ''}"><div class="type">Territory${t.cored ? ' · core' : ''}</div><div class="name">${esc(t.name)}</div>
       <div class="text">${esc(t.text)}</div>${t.wonders.length ? `<div class="small">${t.wonders.map(w => `<span class="chip">★ ${esc(w)}</span>`).join('')}</div>` : ''}</div>`).join('');
   const settleCard = (me().hand || []).find(c => c.target === 'land');
-  const landCard = f => {
+  const landCard = landCardFn = f => {
     const need = RES.filter(k => f.left[k] > 0);
     const troopsLeft = f.troops - f.troopsPaid, settlersLeft = f.settlers - f.settlersPaid;
     const inputs = `<div class="row small">${need.map(k => `<label class="res r-${k}" style="margin:0">${RES_SHORT[k]} <input type="number" min="0" max="${f.left[k]}" value="0" data-keep="f-${f.id}-${k}" data-fres="${k}"></label>`).join('')}
@@ -225,8 +249,9 @@ function renderRealm() {
       <div class="small">Paid ${resList(f.paid)} of ${resList(f.cost)}${f.troops ? ` · military strength ${f.troopsPaid}/${f.troops}` : ''}${f.settlers ? ` · settlers ${f.settlersPaid}/${f.settlers}` : ''}</div>
       ${by}${inputs}<div class="row">${button}</div></div>`;
   };
-  const colonies = s.frontier.filter(f => f.opened).map(landCard).join('');
-  const front = s.frontier.filter(f => !f.opened).map(landCard).join('');
+  const inPopup = f => f.duringEvent && eventPopupOpen();
+  const colonies = s.frontier.filter(f => f.opened && !inPopup(f)).map(landCard).join('');
+  const front = s.frontier.filter(f => !f.opened && !inPopup(f)).map(landCard).join('');
   $('realmPanel').innerHTML = `<h2>The realm</h2>
     <p class="muted small">Shared land. Each territory gives every player room for buildings and its bonus. A broken invasion takes a territory (a core territory only loses its core status); with none left, the game is lost.
     World deck: ${s.worldDeck} lands · colonization value ${s.colonizationValue}.</p>
@@ -236,7 +261,7 @@ function renderRealm() {
     <div class="cards">${front || '<p class="muted">None face up.</p>'}</div>`;
 }
 
-$('realmPanel').onclick = e => {
+$('realmPanel').onclick = $('eventPanel').landClick = e => {
   const b = e.target.closest('[data-colonize],[data-settle]'); if (!b) return;
   const box = b.closest('[data-f]'), resources = {};
   box.querySelectorAll('[data-fres]').forEach(i => { resources[i.dataset.fres] = Math.max(0, +i.value || 0); i.value = 0; });
@@ -275,9 +300,21 @@ $('wonderPanel').onclick = e => {
   box.querySelectorAll('[data-wres]').forEach(i => { i.value = 0; });
 };
 
+// An event that strikes pops up over the board (with any land it found), so it can't be clicked through unread.
+let popupHiddenFor = null, popupLastKey = null;
+function pendingKey() { const p = state && state.pending; return p ? (p.id ?? p.name) + '|' + (state.round ?? '') : null; }
+function eventPopupOpen() {
+  const p = state && state.pending;
+  return !!p && !p.ready[state.you] && popupHiddenFor !== pendingKey();
+}
 function renderEvents() {
   const s = state, p = s.pending;
-  let html = '<h2>Events</h2>';
+  if (!p) { popupHiddenFor = null; }
+  const popup = eventPopupOpen();
+  $('eventPanel').classList.toggle('popup', popup);
+  $('eventBackdrop').hidden = !popup;
+  let html = popup ? '<h2>An event strikes</h2>' : '<h2>Events</h2>';
+  if (p && !popup && !p.ready[s.you]) html += '<button class="primary" data-showpop>Show the event again</button>';
   if (p) {
     const amReady = p.ready[s.you];
     const target = p.target >= 0 ? `<p class="small">Strikes <b>${esc(s.players[p.target].name)}</b>.</p>` : '';
@@ -292,14 +329,14 @@ function renderEvents() {
       if (p.kind === 'opportunity' && p.target === s.you) {
         controls += `<button data-decide="1" class="${p.accept === true ? 'primary' : ''}">Accept</button><button data-decide="0" class="${p.accept === false ? 'primary' : ''}">Decline</button>`;
       }
-      controls += `<button class="primary" data-ready>Done — resolve</button>`;
+      controls += `<button class="primary" data-ready>Done — resolve</button><button data-hidepop title="Look at the board first; it stays pending">Look at the board</button>`;
     } else {
       controls = '<span class="muted small">You are done. Waiting for the others…</span>';
     }
     const waiting = Object.entries(p.ready).filter(([, r]) => !r).map(([seat]) => esc(s.players[seat].name));
     const found = s.frontier.filter(f => f.duringEvent);
     html += cardHtml(p, `${target}<div class="preview">${esc(p.preview)}</div>
-      ${found.length ? `<div class="small" style="color:var(--brass)">Found: ${found.map(f => esc(f.name)).join(', ')}. Pay for it in The realm panel before everyone is done, or it is lost.</div>` : ''}
+      ${found.length ? `<div class="small" style="color:var(--brass)">New land found: ${found.map(f => esc(f.name)).join(', ')}. Settle it before everyone is done, or it is lost.</div>${popup && landCardFn ? '<div class="cards">' + found.map(landCardFn).join('') + '</div>' : ''}` : ''}
       ${p.responses.length ? `<div class="small">Responses: ${p.responses.map(esc).join(', ')}</div>` : ''}
       ${p.kind === 'invasion' ? `<div class="small">Troops sent: ${Object.entries(p.troops).map(([seat, n]) => esc(s.players[seat].name) + ' ' + n).join(', ') || 'none yet'}</div>` : ''}
       <div class="actions">${controls}</div><div class="readylist">${waiting.length ? 'Waiting for: ' + waiting.join(', ') : ''}</div>`, 'pending');
@@ -318,8 +355,11 @@ function renderEvents() {
   $('eventPanel').classList.toggle('pending', !!p);
 }
 $('eventPanel').onclick = e => {
+  if (e.target.closest('[data-colonize],[data-settle]')) return $('eventPanel').landClick(e);
   const t = e.target.closest('button'); if (!t) return;
-  if (t.dataset.respond) send({ type: 'respond', card: +t.dataset.respond });
+  if ('hidepop' in t.dataset) { popupHiddenFor = pendingKey(); renderEvents(); renderRealm(); }
+  else if ('showpop' in t.dataset) { popupHiddenFor = null; renderEvents(); renderRealm(); }
+  else if (t.dataset.respond) send({ type: 'respond', card: +t.dataset.respond });
   else if ('troops' in t.dataset) send({ type: 'troops', troops: +$('troopIn').value || 0 });
   else if (t.dataset.decide) send({ type: 'decide', accept: t.dataset.decide === '1' });
   else if ('ready' in t.dataset) {
@@ -327,6 +367,26 @@ $('eventPanel').onclick = e => {
     if (tin && (+tin.value || 0) !== (state.pending.troops[state.you] ?? 0)) send({ type: 'troops', troops: +tin.value || 0 });
     send({ type: 'ready' });
   } else if (t.dataset.cleanse) send({ type: 'cleanse', event: +t.dataset.cleanse });
+};
+
+// The technologies researched so far (global: they help every player), with what each does.
+function renderTechs() {
+  const s = state, list = s.players.flatMap(o => o.techs.map(t => ({ t, by: o.name })));
+  $('techPanel').innerHTML = `<h2>Technologies <span class="muted small">(${list.length})</span></h2>` + (list.length
+    ? list.map(({ t, by }) => `<div class="techrow"><b>${esc(t.name)}</b> <span class="muted small">by ${esc(by)}</span><div class="small">${esc(t.text)}</div></div>`).join('')
+    : '<p class="muted small">None yet. Technologies help every player once anyone has researched them.</p>');
+}
+function openGrowChoice(free) {
+  const box = $('growBox');
+  box.innerHTML = `<h2>Where does the new person work?</h2><div class="column">${free.map(b =>
+    `<button data-gb="${b.id}">${esc(b.name)} <span class="muted small">(${b.workers}/${b.slots} workers)</span></button>`).join('')}</div>
+    <div class="row"><button data-gcancel>Cancel</button></div>`;
+  $('growModal').hidden = false;
+}
+$('growModal').onclick = e => {
+  const t = e.target.closest('button');
+  if (t && t.dataset.gb) send({ type: 'grow', building: +t.dataset.gb });
+  if (t || e.target === $('growModal')) $('growModal').hidden = true;
 };
 
 function renderCiv() {
@@ -347,6 +407,7 @@ function renderCiv() {
       <button class="tiny" ${act && b.workers > 0 ? '' : 'disabled'} data-move-out="${b.id}" title="Make a worker idle (1 action)">− worker</button>`;
     return `<div class="bld"><span class="bname">${esc(b.name)}${b.level > 1 ? ` <span class="chip">level ${b.level}</span>` : ''}</span>
       <span class="slots">${dots}</span>${controls}
+      ${b.id != null ? `<span class="makes" title="${esc(Object.entries(b.each || {}).map(([r, n]) => `${n} ${r} per worker`).join(', ') || 'makes nothing')} (technologies included)">${Object.keys(b.makes || {}).length ? resList(b.makes, { signed: true }) : '<span class="muted">—</span>'}</span>` : ''}
       ${cap != null ? `<span class="small muted">${b.slots}/${cap} slots built</span>` : ''}</div>`;
   }).join('');
   const moveOpts = [['idle', `Idle (${p.idle})`], ...p.buildings.map(b => [b.id, `${b.name} #${b.id} (${b.workers}/${b.slots})`])]
@@ -387,7 +448,11 @@ $('civPanel').onclick = e => {
     const f = $('mvFrom').value, to = $('mvTo').value;
     send({ type: 'move', from: f === 'idle' ? 'idle' : +f, to: to === 'idle' ? 'idle' : +to });
   } else if (d.build) send({ type: 'build', building: d.build });
-  else if ('grow' in d) send({ type: 'grow' });
+  else if ('grow' in d) {
+    // more than one building with a free slot: choose where the new person works
+    const free = (me().buildings || []).filter(b => b.workers < b.slots);
+    if (free.length > 1) openGrowChoice(free); else send({ type: 'grow' });
+  }
   else if ('recruit' in d) send({ type: 'recruit' });
   else if ('end' in d) send({ type: 'endTurn' });
   else if ('deposit' in d || 'withdraw' in d) {

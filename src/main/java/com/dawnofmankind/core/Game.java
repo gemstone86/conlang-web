@@ -533,7 +533,7 @@ public final class Game {
                     case "build" -> build(p, a);
                     case "pick" -> pick(p, a);
                     case "play" -> play(p, a);
-                    case "grow" -> grow(p);
+                    case "grow" -> grow(p, a);
                     case "recruit" -> recruit(p);
                     case "contribute" -> contribute(p, a);
                     case "giveCards" -> giveCards(p, a);
@@ -740,10 +740,17 @@ public final class Game {
         }
     }
 
-    private void grow(Player p) {
+    private void grow(Player p, Map<String, Object> a) {
+        // the new person may be put in a chosen building with a free slot (else the first free one, or idle)
+        Building into = null;
+        if (a.get("building") != null) {
+            int id = Y.toInt(a.get("building"));
+            into = p.buildings.stream().filter(b -> b.id == id).findFirst().orElseThrow(() -> new GameException("You have no such building."));
+            if (into.workers >= into.slots) throw new GameException("The " + into.def.name + " has no free slot.");
+        }
         pay(p, growthCost(p));
-        addPopulation(p, 1);
-        log(p.name + " grows by 1 Population.");
+        if (into != null) into.workers++; else addPopulation(p, 1);
+        log(p.name + " grows by 1 Population" + (into != null ? ", who goes to the " + into.def.name : "") + ".");
     }
 
     private void recruit(Player p) {
@@ -1438,6 +1445,22 @@ public final class Game {
                         TerritoryDef t = content.territories.get(String.valueOf(v));
                         if (t != null) discover(t);
                     }
+                }
+                case "civilWar" -> {
+                    List<Territory> cores = realm.stream().filter(t -> t.cored).toList();
+                    List<Territory> pool = cores.isEmpty() ? realm : cores;
+                    log("Civil war breaks out!");
+                    if (!pool.isEmpty()) loseTerritory(pool.get(rng.nextInt(pool.size())));
+                }
+                case "colony" -> {
+                    for (int i = 0; i < Y.toInt(v) && !worldDeck.isEmpty(); i++) {
+                        Territory land = worldDeck.remove(0);
+                        Frontier f = new Frontier(land, false, -1);
+                        f.opened = true;
+                        frontier.add(f);
+                        log("A free colony: the " + land.def.name + " (" + land.def.text + ") is open for settling. Anyone can send resources, troops and settlers to it (1 action each).");
+                    }
+                    refillLands();
                 }
                 case "destroyBuilding" -> {
                     int n = (int) Math.floor(Y.toInt(v) * factor);

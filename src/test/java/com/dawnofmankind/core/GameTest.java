@@ -100,6 +100,66 @@ class GameTest {
     }
 
     @Test
+    void aLongDayIsThreeMoreActionsSoTwoInAll() {
+        Game g = game(1, 31);
+        Player p = g.players.get(0);
+        p.hand.add(card(g, "long_day"));
+        int before = g.actionsLeft;
+        g.act(0, Map.of("type", "play", "card", p.hand.get(p.hand.size() - 1).id));
+        assertEquals(before + 2, g.actionsLeft);
+    }
+
+    @Test
+    void aFreeColonyOpensALandFromTheWorldDeck() {
+        Game g = game(1, 32);
+        g.futureEvents.clear();
+        g.futureEvents.add(card(g, "foraging"));
+        g.currentEvents.clear();
+        g.currentEvents.add(card(g, "free_colony"));
+        int deck = g.worldDeck.size(), colonies = (int) g.frontier.stream().filter(f -> f.opened).count();
+        g.act(0, Map.of("type", "endTurn"));
+        assertEquals(colonies + 1, g.frontier.stream().filter(f -> f.opened).count());
+        assertTrue(g.worldDeck.size() < deck);
+    }
+
+    @Test
+    void growWithAChosenBuilding() {
+        Game g = game(1, 33);
+        Player p = g.players.get(0);
+        p.res.put(Res.FOOD, 20);
+        Player.Building mine = p.ofType("mine");
+        assertTrue(mine.workers < mine.slots);
+        int before = mine.workers;
+        g.act(0, Map.of("type", "grow", "building", mine.id));
+        assertEquals(before + 1, mine.workers);
+        Player.Building farm = p.ofType("farm");
+        assertTrue(farm.workers >= farm.slots, "the farm was full");
+        assertThrows(GameException.class, () -> g.act(0, Map.of("type", "grow", "building", farm.id)));
+    }
+
+    @Test
+    void civilWarUncoresARandomCoreOrElseCostsATerritory() {
+        Game g = game(1, 34);
+        g.currentEvents.clear();
+        g.futureEvents.clear();
+        g.futureEvents.add(card(g, "foraging"));
+        g.currentEvents.add(card(g, "civil_war"));
+        g.realm.get(0).cored = true;
+        int n = g.realm.size();
+        g.act(0, Map.of("type", "endTurn"));
+        assertEquals(n, g.realm.size(), "a core is lost, not the territory");
+        assertTrue(g.realm.stream().noneMatch(t -> t.cored));
+        Game h = game(1, 35);
+        h.currentEvents.clear();
+        h.futureEvents.clear();
+        h.futureEvents.add(card(h, "foraging"));
+        h.currentEvents.add(card(h, "civil_war"));
+        int m = h.realm.size();
+        h.act(0, Map.of("type", "endTurn"));
+        assertEquals(m - 1, h.realm.size(), "no core: a territory is lost");
+    }
+
+    @Test
     void techsAreGlobal() {
         Game g = game(2, 18);
         Player a = g.players.get(g.currentPlayer), b = g.players.get(1 - g.currentPlayer);

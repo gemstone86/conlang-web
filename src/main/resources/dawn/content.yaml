@@ -76,7 +76,7 @@ territories:
     name: Plains
     copies: 3
     slots: {farm: 2}
-    text: +2 farm worker slots.
+    text: +2 max farm slots.
   mountains:
     name: Mountains
     copies: 3
@@ -239,6 +239,7 @@ eras:
       wandering_sage: 1
       strangers_at_the_fire: 1
       scouts_return: 1
+      free_colony: 1
       rich_land_found: 1
       fertile_delta_found: 1
       hostile_tribes: 2
@@ -294,6 +295,7 @@ eras:
       earthquake: 1
       plague: 1
       revolt: 1
+      civil_war: 1
       wrath_of_the_gods: 1
       golden_age: 1
       great_scientist: 1
@@ -302,6 +304,7 @@ eras:
       comet_sighted: 1
       failing_rains: 1
       explorers: 1
+      free_colony: 1
       great_expedition: 1
       rich_land_found: 1
       fortified_land_found: 1
@@ -484,8 +487,8 @@ cards:
   long_day:
     name: A Long Day
     type: action
-    effects: [{extraActions: 2}]
-    text: +2 actions this turn.
+    effects: [{extraActions: 3}]
+    text: +3 actions this turn (it costs 1 to play, so +2 in all).
   irrigation:
     name: Irrigation
     type: action
@@ -798,6 +801,12 @@ cards:
     category: unrest
     effects: [{stability: -2}]
     text: -2 Stability.
+  civil_war:
+    name: Civil War
+    type: event
+    category: unrest
+    effects: [{civilWar: 1}]
+    text: A random core territory loses its core status. With no core territory, a random territory is lost instead.
   wrath_of_the_gods:
     name: Wrath of the Gods
     type: event
@@ -864,6 +873,12 @@ cards:
     category: discovery
     effects: [{discover: 1}]
     text: A land is found; settle it at once (anyone can pay, free) or lose it.
+  free_colony:
+    name: Free Colony
+    type: event
+    category: discovery
+    effects: [{colony: 1}]
+    text: A land from the territory deck becomes a colony at once, with nothing paid yet; anyone can settle it (1 action each) as usual.
   explorers:
     name: Explorers
     type: event
