@@ -124,3 +124,6 @@ details summary { cursor: pointer; color: var(--bone-dim); font-size: .88rem; }
 .backdrop { position: fixed; inset: 0; background: rgba(0,0,0,.6); z-index: 14; }
 #eventPanel.popup { position: fixed; z-index: 16; left: 50%; top: 4vh; transform: translateX(-50%); width: min(720px, 94vw); max-height: 90vh; overflow: auto; box-shadow: 0 14px 50px rgba(0,0,0,.6); border: 3px solid var(--brass); background: #26303f; }
 #eventPanel.popup h2 { font-size: 1.3rem; }
+
+.techrow { padding: .3rem 0; border-top: 1px solid var(--line); }
+.techrow:first-of-type { border-top: 0; }

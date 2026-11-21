@@ -121,6 +121,8 @@ function render(m) {
   renderWonders();
   renderEvents();
   renderCiv();
+  checkPickReveal();
+  renderTechs();
   renderHand();
   renderTeam();
   renderDecks();
@@ -196,7 +198,28 @@ function renderQueue() {
     <div class="queue-row">${items || '<p class="muted">The queue is empty.</p>'}</div>
     <div class="queue-ends"><span>← leaves here</span><span>new cards come in here →</span></div>`;
 }
-$('queuePanel').onclick = e => { const b = e.target.closest('[data-pick]'); if (b) send({ type: 'pick', slot: +b.dataset.pick }); };
+// Taking on an event gives the face-down card under it: when it arrives in the hand, show it in a pop-up.
+let pickWatch = null;
+$('queuePanel').onclick = e => {
+  const b = e.target.closest('[data-pick]'); if (!b) return;
+  const card = state.queue[+b.dataset.pick];
+  if (card && card.type === 'event') {
+    pickWatch = { ids: new Set((me().hand || []).map(c => c.id)), event: card.name, at: Date.now() };
+  }
+  send({ type: 'pick', slot: +b.dataset.pick });
+};
+function checkPickReveal() {
+  if (!pickWatch) return;
+  if (Date.now() - pickWatch.at > 5000) { pickWatch = null; return; }
+  const got = (me().hand || []).filter(c => !pickWatch.ids.has(c.id));
+  if (!got.length) return;
+  const ev = pickWatch.event;
+  pickWatch = null;
+  $('gotBox').innerHTML = `<h2>The face-down card</h2><p class="muted small">You took on <b>${esc(ev)}</b> and got:</p>
+    <div class="cards">${got.map(c => cardHtml(c)).join('')}</div><div class="row"><button class="primary" data-gotok>OK</button></div>`;
+  $('gotModal').hidden = false;
+}
+$('gotModal').onclick = e => { if (e.target.closest('[data-gotok]') || e.target === $('gotModal')) $('gotModal').hidden = true; };
 
 const slotText = slots => Object.entries(slots || {}).map(([b, n]) => `+${n} ${b}`).join(', ');
 
@@ -346,6 +369,13 @@ $('eventPanel').onclick = e => {
   } else if (t.dataset.cleanse) send({ type: 'cleanse', event: +t.dataset.cleanse });
 };
 
+// The technologies researched so far (global: they help every player), with what each does.
+function renderTechs() {
+  const s = state, list = s.players.flatMap(o => o.techs.map(t => ({ t, by: o.name })));
+  $('techPanel').innerHTML = `<h2>Technologies <span class="muted small">(${list.length})</span></h2>` + (list.length
+    ? list.map(({ t, by }) => `<div class="techrow"><b>${esc(t.name)}</b> <span class="muted small">by ${esc(by)}</span><div class="small">${esc(t.text)}</div></div>`).join('')
+    : '<p class="muted small">None yet. Technologies help every player once anyone has researched them.</p>');
+}
 function openGrowChoice(free) {
   const box = $('growBox');
   box.innerHTML = `<h2>Where does the new person work?</h2><div class="column">${free.map(b =>

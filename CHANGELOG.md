@@ -2,6 +2,10 @@
 
 Newest first. Versions from 1.x on are the combined app (Root and Rune + Weather generator).
 
+## v1.57.5 (combined app)
+- **Dawn of Mankind: the face-down card pops up.** Taking on an event shows the face-down card you got in a pop-up.
+- **Dawn of Mankind: technologies box.** The technologies researched so far are listed (name, who researched it, what it does) in a box between *Event decks* and the log. Both changed in the combined app's copy only.
+
 ## v1.57.4 (combined app)
 - **Dawn of Mankind: choose where the new person works.** *Grow* asks which building gets the new worker when more than one has a free slot (with one, it goes there as before). The game accepts an optional `building` on the grow action. Changed in the combined app's copy only.
 
