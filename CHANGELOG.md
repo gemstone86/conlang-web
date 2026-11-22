@@ -2,6 +2,10 @@
 
 Newest first. Versions from 1.x on are the combined app (Root and Rune + Weather generator).
 
+## v1.66.2 (combined app)
+
+- Dawn: new picture for The First Conqueror.
+
 ## v1.66.1 (combined app)
 
 - Dawn: on cards with a picture, the text now sits at the bottom, on the dark part of the picture.
