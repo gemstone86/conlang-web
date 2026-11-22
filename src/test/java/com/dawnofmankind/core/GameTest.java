@@ -554,6 +554,33 @@ class GameTest {
     }
 
     @Test
+    void spearMenMakeTroopsStrongerButCostlier() {
+        Game g = game(1, 80);
+        Player p = g.players.get(0);
+        p.leader = null;
+        int cost = g.recruitCost(p).get(Res.PRODUCTION), strength = g.strength(p, 4);
+        p.techs.add(C.cards.get("spear_men"));
+        assertEquals(cost + 1, g.recruitCost(p).get(Res.PRODUCTION));
+        assertEquals(strength + 4, g.strength(p, 4), "+1 strength per troop");
+        p.army = 3;
+        assertEquals(2, g.troopUpkeep(p), "half a food per troop, rounded up");
+        p.army = 4;
+        assertEquals(2, g.troopUpkeep(p));
+    }
+
+    @Test
+    void unhealthyLandsTakeHealthOffWhileHeld() {
+        Game g = game(1, 81);
+        g.realm.clear();
+        int plain = g.effectiveHealth();
+        Game.Territory jungle = new Game.Territory(9000, C.territories.get("jungle"));
+        g.realm.add(jungle);
+        assertEquals(Math.max(0, plain - 2), g.effectiveHealth());
+        g.realm.remove(jungle);
+        assertEquals(plain, g.effectiveHealth());
+    }
+
+    @Test
     void theTradingRouteIsOnlyInTheDeckWithTeammates() {
         for (int players : new int[]{1, 2}) {
             Game g = game(players, 50 + players);

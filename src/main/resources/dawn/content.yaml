@@ -102,8 +102,8 @@ territories:
     name: Jungle
     copies: 2
     slots: {farm: 1}
-    effects: [{income: {research: 1}}]
-    text: +1 farm worker slot. +1 research per turn.
+    effects: [{income: {research: 1}}, {healthMod: -2}]
+    text: "+1 farm worker slot. +1 research per turn. Unhealthy: -2 Health while you hold it."
   coast:
     name: Coast
     copies: 3
@@ -141,9 +141,9 @@ territories:
     name: Fertile Delta
     special: true
     slots: {farm: 4}
-    effects: [{income: {food: 1}}]
+    effects: [{income: {food: 1}}, {healthMod: -2}]
     costPerPlayer: {food: 4, production: 2, population: 1}
-    text: +4 farm worker slots, +1 food per turn.
+    text: "+4 farm worker slots, +1 food per turn. Unhealthy: -2 Health while you hold it."
 
 greatWonders:
   stonehenge:
@@ -250,7 +250,7 @@ eras:
       animal_husbandry: 1
       pottery: 1
       mysticism: 1
-      spear_throwing: 1
+      spear_men: 1
       herbalism: 1
       # actions
       foraging: 3
@@ -492,18 +492,18 @@ cards:
     cost: {research: 3, culture: 1}
     effects: [{perWorker: {building: temple, culture: 1}}]
     text: Your temple workers produce +1 culture.
-  spear_throwing:
-    name: Spear Throwing
+  spear_men:
+    name: Spear Men
     type: tech
     cost: {research: 2, production: 2}
-    effects: [{raidDefense: 2}]
-    text: +2 defense against raids.
+    effects: [{troopStrength: 1}, {recruitExtra: {production: 1}}, {troopUpkeep: 0.5}]
+    text: Every troop counts for +1 more strength, but training one costs +1 production and each troop eats half a food per round.
   herbalism:
     name: Herbalism
     type: tech
     cost: {research: 3}
-    effects: [{health: 2}]
-    text: +2 Health.
+    effects: [{health: 2}, {income: {research: 1}}]
+    text: +2 Health and +1 research per turn.
   agriculture:
     name: Agriculture
     type: tech

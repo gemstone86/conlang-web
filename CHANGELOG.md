@@ -2,6 +2,11 @@
 
 Newest first. Versions from 1.x on are the combined app (Root and Rune + Weather generator).
 
+## v1.64.0 (combined app)
+
+- Dawn: Herbalism also gives +1 research per turn. Spear Throwing is now Spear Men: every troop counts for +1 more strength, but training one costs +1 production and each troop eats half a food per round (rounded up per player; shown in your per-round income and the Train button).
+- Jungle and Fertile Delta are unhealthy: while held, each takes 2 off Health (it can't go below 0). Health starts at 2.
+
 ## v1.63.4 (combined app)
 
 - Dawn: Göbekli Tepe no longer gives +2 research. The First Architect no longer costs 1 food per turn (just +1 action per turn).

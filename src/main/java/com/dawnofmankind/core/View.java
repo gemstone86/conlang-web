@@ -44,7 +44,7 @@ public final class View {
         v.put("pickSeconds", g.pickSeconds);
         v.put("pickLeftMs", g.pickLeftMillis());
         v.put("stability", g.stability);
-        v.put("health", g.health);
+        v.put("health", g.effectiveHealth());
         v.put("threat", g.threat);
         v.put("territoryPoints", g.realm.size());
         v.put("you", seat);
@@ -218,7 +218,7 @@ public final class View {
         }
         Map<String, Object> rules = new LinkedHashMap<>();
         rules.put("growthCost", res(seat >= 0 && seat < g.players.size() ? g.growthCost(g.players.get(seat)) : g.content.rules.growthCost));
-        rules.put("recruitCost", res(g.content.rules.recruitCost));
+        rules.put("recruitCost", res(seat >= 0 && seat < g.players.size() ? g.recruitCost(g.players.get(seat)) : g.content.rules.recruitCost));
         v.put("rules", rules);
 
         if (g.pending != null) {
@@ -259,7 +259,7 @@ public final class View {
                         : "Defenders " + sent + " vs strength " + pe.strength + ": " + (pe.strength - sent) + " short" + half + ".";
             }
             case "test" -> {
-                int val = ("stability".equals(d.stat) ? g.stability : g.health) + pe.healthBonus;
+                int val = ("stability".equals(d.stat) ? g.stability : g.effectiveHealth()) + pe.healthBonus;
                 yield val >= d.threshold ? "The civilization withstands it (" + d.stat + " " + val + " vs " + d.threshold + ")."
                         : d.stat + " " + val + " vs " + d.threshold + ": " + (d.threshold - val) + " short" + half + ".";
             }
@@ -277,7 +277,7 @@ public final class View {
             var bonus = m.perWorker.get(b.def.id);
             if (bonus != null) bonus.forEach((r, n) -> out.merge(r.key(), n * w, Integer::sum));
         }
-        out.merge(Res.FOOD.key(), -p.population() * g.content.rules.foodUpkeepPerPop, Integer::sum);
+        out.merge(Res.FOOD.key(), -(p.population() * g.content.rules.foodUpkeepPerPop + g.troopUpkeep(p)), Integer::sum);
         return out;
     }
 

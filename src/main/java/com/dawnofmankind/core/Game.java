@@ -376,7 +376,7 @@ public final class Game {
             }
             m.income.forEach((r, v) -> gain.merge(r, v, Integer::sum));
             gain.forEach((r, v) -> p.res.put(r, Math.max(0, p.res.get(r) + v)));
-            int upkeep = p.population() * content.rules.foodUpkeepPerPop;
+            int upkeep = p.population() * content.rules.foodUpkeepPerPop + troopUpkeep(p);
             int food = p.res.get(Res.FOOD);
             String msg = p.name + " produces " + Res.describe(gain) + "; feeds " + p.population() + " Population.";
             if (food >= upkeep) {
@@ -957,8 +957,25 @@ public final class Game {
         log(p.name + " grows by 1 Population" + (into != null ? ", who goes to the " + into.def.name : "") + ".");
     }
 
+    /** What training a troop costs: the rule's price, plus Spear Men's extra. */
+    public EnumMap<Res, Integer> recruitCost(Player p) {
+        EnumMap<Res, Integer> c = new EnumMap<>(content.rules.recruitCost);
+        mods(p).recruitExtra.forEach((r, v) -> c.merge(r, v, Integer::sum));
+        return c;
+    }
+
+    /** Food the troops eat each round (Spear Men): half a food per troop, rounded up. */
+    public int troopUpkeep(Player p) {
+        return (int) Math.ceil(p.army * mods(p).troopUpkeep - 1e-9);
+    }
+
+    /** Health as the world sees it: the stat, less what unhealthy lands (jungle, deltas) take off while held. */
+    public int effectiveHealth() {
+        return Math.max(0, health + civMods().healthMod);
+    }
+
     private void recruit(Player p) {
-        pay(p, content.rules.recruitCost);
+        pay(p, recruitCost(p));
         p.army++;
         boolean free = !p.freeRecruitUsed && mods(p).freeRecruit > 0;
         if (free) p.freeRecruitUsed = true;
@@ -1074,12 +1091,13 @@ public final class Game {
 
     /** Military strength of a number of troops: Bronze Working adds 1 for every 2. */
     public int strength(int troops) {
-        return troops + (troops / 2) * civMods().strengthPerTwoTroops;
+        Mods m = civMods();
+        return troops * (1 + m.troopStrength) + (troops / 2) * m.strengthPerTwoTroops;
     }
 
     /** A player's strength for settling lands: Bronze Working's bonus plus a leader like Julius Caesar's. */
     public int strength(Player p, int troops) {
-        return troops + (troops / 2) * (civMods().strengthPerTwoTroops + mods(p).ownStrengthPerTwoTroops);
+        return strength(troops) + (troops / 2) * mods(p).ownStrengthPerTwoTroops;
     }
 
     /** A player's strength in a raid or invasion: the above plus a leader's flat bonus (Gilgamesh). */
@@ -1387,7 +1405,7 @@ public final class Game {
             case "raid" -> raid(pe, players.get(pe.target), factor);
             case "invasion" -> invasion(pe, factor);
             case "test" -> {
-                int value = ("stability".equals(d.stat) ? stability : health) + pe.healthBonus;
+                int value = ("stability".equals(d.stat) ? stability : effectiveHealth()) + pe.healthBonus;
                 int shortfall = Math.max(0, d.threshold - value);
                 int times = (int) Math.floor(shortfall * factor);
                 log(d.name + ": " + d.stat + " " + value + " against " + d.threshold
@@ -1445,7 +1463,7 @@ public final class Game {
         CardDef d = c.card.def;
         if (c.roundsDone >= d.lastsRounds) return true;
         Object h = d.endWhen.get("health");
-        if (h != null && health >= Y.toInt(h)) return true;
+        if (h != null && effectiveHealth() >= Y.toInt(h)) return true;
         Object st = d.endWhen.get("stability");
         return st != null && stability >= Y.toInt(st);
     }
@@ -1625,9 +1643,9 @@ public final class Game {
                 case "invasion" -> attacks.add(new Attack(inst(content.cards.get(String.valueOf(v))), -1, 0));
                 case "healthTest" -> {
                     Map<String, Object> m = Y.map(v);
-                    int shortfall = Math.max(0, Y.i(m, "threshold", 0) - health);
+                    int shortfall = Math.max(0, Y.i(m, "threshold", 0) - effectiveHealth());
                     int loss = (int) Math.floor(shortfall * Y.i(m, "populationLoss", 1) * factor);
-                    log("Health " + health + " against " + Y.i(m, "threshold", 0) + (loss == 0 ? ": no one dies." : ": " + loss + " Population lost."));
+                    log("Health " + effectiveHealth() + " against " + Y.i(m, "threshold", 0) + (loss == 0 ? ": no one dies." : ": " + loss + " Population lost."));
                     for (int i = 0; i < loss; i++) {
                         Player most = players.stream().max((x, y) -> x.population() - y.population()).orElseThrow();
                         if (most.population() == 0) break;

@@ -20,6 +20,8 @@ import java.util.Set;
  * victoryPoints, faceUpLands (more lands face up), settleDiscount (off every land's settling cost), freeSettlers
  * (fewer settlers needed per land), strengthPerTwoTroops (military strength +n for every 2 troops), giveCards (the
  * owner may give up to n cards to teammates for 1 action), freeRecruit (leader: the first troop trained each round takes no action),
+ * healthMod (a land: Health counts n more or less while it is held), troopStrength (every troop is worth n more strength), recruitExtra (troops cost this much more to train),
+ * troopUpkeep (food per troop each round, may be 0.5),
  * growthDiscount (growing costs n less food), wonderDouble (resources given to great wonders count double), incomePerTerritory ({food: 1}: per territory in the realm),
  * noEnemy and halveEnemy (leaders: enemy strength on lands to settle is 0 / halved),
  * strengthBonus (leader: +n military strength), ownStrengthPerTwoTroops (leader: the owner's military strength +n per 2 troops), maxSlots ({farm: 1}: more worker slots a
@@ -41,7 +43,7 @@ public final class Effects {
             "threat", "invadeIfStronger", "raidAll", "invasion", "healthTest", "trade");
     static final Set<String> LASTING = Set.of("income", "perWorker", "handLimit", "actionsPerTurn", "raidDefense",
             "mitigate", "buildDiscount", "sharedPool", "victoryPoints", "invasionDefense", "faceUpLands", "settleDiscount", "freeSettlers", "strengthPerTwoTroops", "giveCards", "freeRecruit", "strengthBonus", "ownStrengthPerTwoTroops", "maxSlots", "buildCost", "wonderGrowth", "eventUnder", "actionsToHand",
-            "growthDiscount", "wonderDouble", "incomePerTerritory", "noEnemy", "halveEnemy");
+            "growthDiscount", "wonderDouble", "incomePerTerritory", "noEnemy", "halveEnemy", "healthMod", "troopStrength", "recruitExtra", "troopUpkeep");
     static final Set<String> RESPONSE = Set.of("defense", "halve", "cancel", "healthBonus");
 
     static String key(Map<String, Object> e) {
@@ -62,7 +64,10 @@ public final class Effects {
         public final EnumMap<Res, Integer> buildDiscount = Res.empty();
         public final EnumMap<Res, Integer> poolIncome = Res.empty();
         public final Set<String> mitigate = new HashSet<>();
-        public int handLimit, actionsPerTurn, raidDefense, victoryPoints, invasionDefense, faceUpLands, freeSettlers, strengthPerTwoTroops, giveCards, freeRecruit, strengthBonus, ownStrengthPerTwoTroops, growthDiscount, wonderDouble;
+        public int handLimit, actionsPerTurn, raidDefense, victoryPoints, invasionDefense, faceUpLands, freeSettlers, strengthPerTwoTroops, giveCards, freeRecruit, strengthBonus, ownStrengthPerTwoTroops, growthDiscount, wonderDouble, healthMod, troopStrength;
+        /** Spear Men: troops cost more to train and eat food. */
+        public final EnumMap<Res, Integer> recruitExtra = Res.empty();
+        public double troopUpkeep;
         /** Income for every territory in the realm (Skara Brae). */
         public final EnumMap<Res, Integer> perTerritory = Res.empty();
         /** Extra worker slots a player may have per building type (a leader like the Great Hunter). */
@@ -100,6 +105,10 @@ public final class Effects {
                 case "freeRecruit" -> freeRecruit += Y.toInt(v);
                 case "strengthBonus" -> strengthBonus += Y.toInt(v);
                 case "growthDiscount" -> growthDiscount += Y.toInt(v);
+                case "healthMod" -> healthMod += Y.toInt(v);
+                case "troopStrength" -> troopStrength += Y.toInt(v);
+                case "recruitExtra" -> Res.parse(v).forEach((r, n) -> recruitExtra.merge(r, n, Integer::sum));
+                case "troopUpkeep" -> troopUpkeep += ((Number) v).doubleValue();
                 case "wonderDouble" -> wonderDouble += Y.toInt(v);
                 case "incomePerTerritory" -> Res.parse(v).forEach((r, n) -> perTerritory.merge(r, n, Integer::sum));
                 case "ownStrengthPerTwoTroops" -> ownStrengthPerTwoTroops += Y.toInt(v);
