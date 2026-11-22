@@ -2,6 +2,10 @@
 
 Newest first. Versions from 1.x on are the combined app (Root and Rune + Weather generator).
 
+## v1.63.4 (combined app)
+
+- Dawn: Göbekli Tepe no longer gives +2 research. The First Architect no longer costs 1 food per turn (just +1 action per turn).
+
 ## v1.63.3 (combined app)
 
 - Dawn: a balance simulation for development (`BalanceSim`, skipped in normal test runs): bots play thousands of games and it ranks which leaders, techs, wonders and actions go with winning. Run with `mvn -q test -Dtest=BalanceSim -Dbalance=1`. No gameplay change.

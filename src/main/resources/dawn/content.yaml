@@ -157,9 +157,9 @@ greatWonders:
     name: Göbekli Tepe
     era: prehistoric
     costPerPlayer: {production: 9, culture: 3, research: 2}
-    effects: [{income: {culture: 2}}, {income: {research: 2}}, {growthDiscount: 1}, {maxSlots: {farm: 1}}]
+    effects: [{income: {culture: 2}}, {growthDiscount: 1}, {maxSlots: {farm: 1}}]
     victoryPoints: 2
-    text: Every player gets +2 culture and +2 research per turn, growing costs 1 less food, and +1 farm slot.
+    text: Every player gets +2 culture per turn, growing costs 1 less food, and +1 farm slot.
   ggantija_temples:
     name: Ġgantija Temples
     era: prehistoric
@@ -422,8 +422,8 @@ cards:
   first_architect:
     name: The First Architect
     type: leader
-    effects: [{actionsPerTurn: 1}, {income: {food: -1}}]
-    text: +1 action per turn, -1 food per turn.
+    effects: [{actionsPerTurn: 1}]
+    text: +1 action per turn.
   # Ancient leaders
   tomyris:
     name: Tomyris
