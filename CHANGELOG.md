@@ -2,6 +2,10 @@
 
 Newest first. Versions from 1.x on are the combined app (Root and Rune + Weather generator).
 
+## v1.71.2 (combined app)
+
+- Dawn: a new picture for Stone Tools.
+
 ## v1.71.1 (combined app)
 
 - Dawn: pictures for eight prehistoric techs (Fire, Stone Tools, Hunting, Animal Husbandry, Pottery, Mysticism, Spearmen, Herbalism).
