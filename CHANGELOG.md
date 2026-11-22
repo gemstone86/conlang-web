@@ -2,6 +2,10 @@
 
 Newest first. Versions from 1.x on are the combined app (Root and Rune + Weather generator).
 
+## v1.71.3 (combined app)
+
+- Dawn: pictures for nine more techs (Agriculture, Bronze Working, Writing, Masonry, Medicine, Currency, Calendar, Code of Laws, Horseback Riding).
+
 ## v1.71.2 (combined app)
 
 - Dawn: a new picture for Stone Tools.
