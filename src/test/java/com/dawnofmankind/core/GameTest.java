@@ -659,6 +659,20 @@ class GameTest {
     }
 
     @Test
+    void anEmptyDeckKeepsDrawingFromTheNextEra() {
+        Game g = game(1, 95);
+        Player p = g.players.get(0);
+        g.eraDeck.clear();
+        g.act(p.seat, Map.of("type", "endTurn"));
+        for (int i = 0; i < 10 && g.phase == Game.Phase.EVENTS; i++) {
+            try { g.act(p.seat, Map.of("type", "ready")); } catch (GameException e) { break; }
+        }
+        assertEquals(1, g.eraIndex, "the next era has begun");
+        assertTrue(g.log.stream().anyMatch(l -> l.contains("The era deck is empty")), "it began by itself while drawing");
+        assertTrue(g.queue.size() >= 1 && g.eraDeck.size() > 0, "the queue and deck are filled from the new era");
+    }
+
+    @Test
     void theTradingRouteIsOnlyInTheDeckWithTeammates() {
         for (int players : new int[]{1, 2}) {
             Game g = game(players, 50 + players);

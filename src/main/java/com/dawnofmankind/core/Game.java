@@ -294,6 +294,11 @@ public final class Game {
     }
 
     private void startEra() {
+        startEra(false);
+    }
+
+    /** Builds the era's deck; unless {@code keepQueue}, the queue is cleared and filled from it. */
+    private void startEra(boolean keepQueue) {
         EraDef e = era();
         eraDeck.clear();
         // the era's cards, sorted by kind; the deck takes a set number of each kind (rules: eraDeck, per player count)
@@ -327,12 +332,19 @@ public final class Game {
             int from = eraDeck.size() * (100 - content.rules.eraTriggerBottomShare) / 100;
             eraDeck.add(from + rng.nextInt(eraDeck.size() - from + 1), t);
         }
-        queue.clear();
-        refillQueue();
+        if (!keepQueue) {
+            queue.clear();
+            refillQueue();
+        }
         log("The " + e.name + " era begins. Era deck: " + eraDeck.size() + " cards.");
     }
 
     private void advanceEra() {
+        advanceEra(false);
+    }
+
+    /** Ends the era and starts the next; {@code keepQueue}: the cards in the queue stay (the deck ran out while drawing). */
+    private void advanceEra(boolean keepQueue) {
         eraEnding = false;
         for (WonderProgress w : greatWonders) {
             if (w.done) continue;
@@ -359,7 +371,7 @@ public final class Game {
             }
         }
         eraIndex++;
-        startEra();
+        startEra(keepQueue);
     }
 
     // ------------------------------------------------------------------------------------------------ round flow
@@ -696,7 +708,14 @@ public final class Game {
      * its enemies to the threat massing against the realm, and the next card is taken.
      */
     private CardInst nextFromEraDeck() {
-        while (!eraDeck.isEmpty()) {
+        while (true) {
+            if (eraDeck.isEmpty()) {
+                // the deck ran out: drawing goes on in the next era (in the last era there is nothing more to draw)
+                if (result != null || eraIndex + 1 >= content.eras.size()) return null;
+                log("The era deck is empty: the " + content.eras.get(eraIndex + 1).name + " era begins and its cards are drawn.");
+                advanceEra(true);
+                if (eraDeck.isEmpty()) return null;
+            }
             CardInst c = eraDeck.remove(0);
             if (c.def.type != CardType.HOSTILITY) return c;
             int n = c.def.effects.stream().filter(e -> e.containsKey("hostility")).mapToInt(e -> Y.toInt(e.get("hostility"))).sum();
@@ -704,7 +723,6 @@ public final class Game {
             pastEvents.add(c);
             log("HOSTILITY: " + c.def.name + " — +" + n + " enemies massing (now " + threat + "). The next invasion brings them.");
         }
-        return null;
     }
 
     // ------------------------------------------------------------------------------------------------ actions
