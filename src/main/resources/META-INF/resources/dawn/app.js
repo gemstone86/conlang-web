@@ -201,9 +201,10 @@ function renderQueue() {
     return cardHtml(c, `${isLeaving ? '<div class="leave-x" title="Leaves the queue at the end of the round">✕</div>' : ''}${fd}${btn}`, isLeaving ? 'leaving' : '');
   }).reverse().join('');
   $('queuePanel').innerHTML = `<div class="queue-head"><h2>Card queue</h2><span class="muted small">At the end of the round the ${leaving} leftmost card${leaving > 1 ? 's' : ''} (dashed) leave${leaving > 1 ? '' : 's'}; events that leave go to the future deck.</span></div>
-    <div class="row small" id="pickBar"><span id="pickTimer"></span><label style="margin:0">Pick time (s, 0 = no limit) <input type="number" min="0" max="3600" step="10" id="pickSecs" value="${s.pickSeconds}" data-keep="pickSecs" style="width:4.5rem"></label><button class="tiny" data-picktime>Set</button></div>
-    <div class="queue-row">${items || '<p class="muted">The queue is empty.</p>'}</div>
+    <div class="row small" id="pickBar"><label style="margin:0">Pick time (s, 0 = no limit) <input type="number" min="0" max="3600" step="10" id="pickSecs" value="${s.pickSeconds}" data-keep="pickSecs" style="width:4.5rem"></label><button class="tiny" data-picktime>Set</button></div>
+    <div class="queue-wrap"><div class="queue-row">${items || '<p class="muted">The queue is empty.</p>'}</div><div class="pick-shade" id="pickShade"></div></div>
     <div class="queue-ends"><span>← leaves here</span><span>new cards come in here →</span></div>`;
+  tickPickTimer();
 }
 // Taking on an event gives the face-down card under it: when it arrives in the hand, show it in a pop-up.
 let pickWatch = null;
@@ -211,15 +212,17 @@ let pickWatch = null;
 let pickEnd = null;
 const pickClosed = () => state.pickLeftMs === 0 || (pickEnd != null && Date.now() >= pickEnd);
 function tickPickTimer() {
-  const el = $('pickTimer');
-  if (!el || !state || state.phase !== 'turns') { if (el) el.textContent = ''; return; }
-  if (state.pickLeftMs < 0) { el.textContent = 'Picking: no time limit'; return; }
-  const left = pickEnd == null ? 0 : Math.max(0, Math.round((pickEnd - Date.now()) / 1000));
-  el.textContent = left > 0 ? `Time to pick cards: ${left}s` : 'The queue is closed until the next round';
-  el.className = left > 0 && left <= 15 ? 'bad' : '';
+  // the time left shows as the queue's background darkening from the right to the left
+  const el = $('pickShade');
+  if (!el) return;
+  if (!state || state.phase !== 'turns' || state.pickLeftMs < 0) { el.style.width = '0'; el.title = ''; return; }
+  const total = Math.max(1, (state.pickSeconds || 90) * 1000);
+  const left = pickEnd == null ? 0 : Math.max(0, pickEnd - Date.now());
+  el.style.width = (100 * (1 - Math.min(1, left / total))) + '%';
+  el.title = left > 0 ? `Time to pick cards: ${Math.ceil(left / 1000)}s` : 'The queue is closed until the next round';
   if (left === 0 && !tickPickTimer.closed) { tickPickTimer.closed = true; renderQueue(); }
 }
-setInterval(tickPickTimer, 500);
+setInterval(tickPickTimer, 250);
 $('queuePanel').onclick = e => {
   const pt = e.target.closest('[data-picktime]');
   if (pt) return send({ type: 'pickTime', seconds: Math.max(0, Math.round(+$('pickSecs').value || 0)) });

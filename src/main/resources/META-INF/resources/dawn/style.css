@@ -144,3 +144,5 @@ details summary { cursor: pointer; color: var(--bone-dim); font-size: .88rem; }
 .catalog .meta { font-size: .8rem; opacity: .7; }
 .cardx.leader { border-left: 3px solid var(--brass); background: rgba(200,160,60,.08); }
 .slot.off { opacity: .45; border-style: dashed; }
+.queue-wrap { position: relative; }
+.pick-shade { position: absolute; top: 0; right: 0; bottom: 0; width: 0; background: rgba(0,0,0,.55); pointer-events: none; transition: width .25s linear; border-radius: 6px; }

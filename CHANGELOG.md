@@ -2,6 +2,10 @@
 
 Newest first. Versions from 1.x on are the combined app (Root and Rune + Weather generator).
 
+## v1.63.1 (combined app)
+
+- Dawn: the pick-time countdown is now shown as the queue's background darkening from right to left (hover for the seconds left), instead of text.
+
 ## v1.63.0 (combined app)
 
 - Dawn: each era's deck now holds a set number of each kind of card (X = players): leaders X+1, great wonders X, minor wonders X+1, hostility X, techs X+2, actions 18+2X, responses X, events 12+X, and 1 era-trigger event (9X+35 cards in all). The cards are drawn at random from that era's list; if a list is shorter than the number needed, great wonders and hostility cards stop at what exists and other kinds go round again.
