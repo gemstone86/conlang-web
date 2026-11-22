@@ -2,6 +2,10 @@
 
 Newest first. Versions from 1.x on are the combined app (Root and Rune + Weather generator).
 
+## v1.66.0 (combined app)
+
+- Dawn: cards can have a background picture. A card shows `dawn/cards/<id>.jpg` behind its text (darkened so the text stays readable) if the file exists, in the queue, your hand, pop-ups and the All cards list. The 14 great people have pictures.
+
 ## v1.65.2 (combined app)
 
 - Dawn: the "All cards" window starts with a table of how many cards there are of each kind: different cards, copies in each era's list, and how many a deck takes (with the total).

@@ -150,3 +150,7 @@ details summary { cursor: pointer; color: var(--bone-dim); font-size: .88rem; }
 .counts th, .counts td { border: 1px solid var(--line); padding: .2rem .6rem; text-align: right; }
 .counts th:first-child, .counts td:first-child { text-align: left; }
 .counts tr.total td { font-weight: 700; color: var(--brass); }
+.cardx.hasart { background-image: linear-gradient(rgba(18,24,32,.35), rgba(18,24,32,.80) 70%), var(--art); background-size: cover; background-position: center; }
+.cardx.hasart .text, .cardx.hasart .name, .cardx.hasart .type { text-shadow: 0 1px 3px rgba(0,0,0,.85); }
+.catalog > div.hasart { background-image: linear-gradient(rgba(18,24,32,.35), rgba(18,24,32,.82) 70%), var(--art); background-size: cover; background-position: center; min-height: 9rem; }
+.catalog > div.hasart > div { text-shadow: 0 1px 3px rgba(0,0,0,.9); }

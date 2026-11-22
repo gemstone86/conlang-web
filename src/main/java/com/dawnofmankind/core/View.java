@@ -382,9 +382,17 @@ public final class View {
         return m;
     }
 
+    private static final Map<String, Boolean> ART = new java.util.concurrent.ConcurrentHashMap<>();
+
+    /** True if there is a picture for this card in /dawn/cards/ (id.jpg). */
+    static boolean hasArt(String id) {
+        return ART.computeIfAbsent(id, k -> View.class.getResource("/META-INF/resources/dawn/cards/" + k + ".jpg") != null);
+    }
+
     static Map<String, Object> def(CardDef d) {
         Map<String, Object> m = new LinkedHashMap<>();
         m.put("key", d.id);
+        if (hasArt(d.id)) m.put("art", "cards/" + d.id + ".jpg");
         m.put("name", d.name);
         m.put("type", d.type.name().toLowerCase());
         m.put("text", d.text);

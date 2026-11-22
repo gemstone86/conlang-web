@@ -187,7 +187,8 @@ function cardHtml(c, extra = '', cls = '') {
   const kind = c.type === 'event' ? `event ${c.category || ''} ${c.crisis ? 'crisis' : ''}` : c.type;
   const typeLabel = c.type === 'event' ? (c.crisis ? 'Crisis' : 'Event · ' + (c.category || ''))
     : c.type === 'great_wonder' ? `Great wonder · ${c.victoryPoints} points` : c.type === 'leader' ? 'great person' : c.type.replace('_', ' ');
-  return `<div class="cardx ${kind} ${cls}"><div class="type">${esc(typeLabel)}</div><div class="name">${esc(c.name)}</div>
+  const art = c.art ? ` hasart" style="--art:url('${c.art}')` : '';
+  return `<div class="cardx ${kind} ${cls}${art}"><div class="type">${esc(typeLabel)}</div><div class="name">${esc(c.name)}</div>
     ${c.cost ? `<div class="small">${c.type === 'great_wonder' ? 'Team cost' : 'Cost'}: ${resList(c.cost)}</div>` : ''}<div class="text">${esc(c.text)}</div>${extra}</div>`;
 }
 
@@ -708,11 +709,11 @@ async function openAllCards() {
     if (!catalogue) catalogue = await (await fetch(API + '/cards')).json();
   } catch (e) { box.innerHTML = '<p class="bad">Could not load the cards.</p>'; return; }
   const cost = c => c ? Object.entries(c).filter(([, v]) => v).map(([k, v]) => v + ' ' + k).join(', ') : '';
-  const item = (name, meta, text) => `<div><div class="nm">${esc(name)}</div><div class="meta">${esc(meta)}</div><div>${esc(text || '')}</div></div>`;
+  const item = (name, meta, text, art) => `<div${art ? ` class="hasart" style="--art:url('${art}')"` : ''}><div class="nm">${esc(name)}</div><div class="meta">${esc(meta)}</div><div>${esc(text || '')}</div></div>`;
   const group = (title, kinds) => {
     const list = catalogue.cards.filter(c => kinds.includes(c.type));
     return list.length ? `<h3>${title} (${list.length})</h3><div class="catalog">${list.map(c =>
-      item(c.name, [c.type, c.era, cost(c.cost) && 'cost ' + cost(c.cost), c.minPlayers && c.minPlayers + '+ players only'].filter(Boolean).join(' · '), c.text)).join('')}</div>` : '';
+      item(c.name, [c.type === 'leader' ? 'great person' : c.type.replace('_', ' '), c.era, cost(c.cost) && 'cost ' + cost(c.cost), c.minPlayers && c.minPlayers + '+ players only'].filter(Boolean).join(' · '), c.text, c.art)).join('')}</div>` : '';
   };
   const types = [...new Set(catalogue.cards.map(c => c.type))].filter(t => t !== 'great_wonder');
   const names = { leader: 'Great people', era_trigger: 'Era-trigger events', hostility: 'Hostility cards', tech: 'Techs', action: 'Actions', response: 'Responses', minor_wonder: 'Minor wonders', great_wonder: 'Great wonders', event: 'Events' };
