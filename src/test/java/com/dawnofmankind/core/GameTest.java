@@ -550,6 +550,21 @@ class GameTest {
     }
 
     @Test
+    void theJournalRecordsActionsLogAndSnapshots() {
+        Game g = game(2, 74);
+        g.journalOn = true;
+        Player p = g.players.get(0);
+        try { g.act(p.seat, Map.of("type", "contribute", "wonder", "nope", "resources", Map.of())); } catch (GameException e) { /* refused, and recorded */ }
+        assertTrue(g.journal.stream().anyMatch(e -> "action".equals(e.get("kind")) && Boolean.FALSE.equals(e.get("ok"))));
+        Game.WonderProgress w = new Game.WonderProgress(C.greatWonders.get("pyramids"));
+        g.greatWonders.add(w);
+        g.cheatCompleteWonder(0, "pyramids", -1);
+        assertTrue(w.done);
+        assertTrue(g.builtWonders.contains(w.def));
+        assertTrue(g.journal.stream().anyMatch(e -> "log".equals(e.get("kind")) && String.valueOf(e.get("text")).contains("cheat")));
+    }
+
+    @Test
     void theConquerorAndAlexanderChangeEnemyStrength() {
         Game g = game(1, 72);
         Player p = g.players.get(0);

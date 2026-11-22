@@ -401,7 +401,8 @@ function renderWonders() {
     const form = w.done ? '' : `<div class="row small">${need.map(k => `<label class="res r-${k}" style="margin:0">${RES_SHORT[k]} <input type="number" min="0" value="0" data-keep="w-${w.key}-${k}" data-wres="${k}"></label>`).join('')}</div>
       <div class="row small">If this finishes it, place it in <select data-keep="w-${w.key}-where" data-wwhere>${s.realm.map(t => `<option value="${t.id}">${esc(t.name)}${t.wonders.length ? ' (' + t.wonders.length + ' wonder' + (t.wonders.length > 1 ? 's' : '') + ')' : ''}</option>`).join('')}</select></div>
       <div class="row">${s.sharedPool ? `<label class="small" style="margin:0"><input type="checkbox" data-keep="w-${w.key}-pool" data-wpool> from shared pool</label>` : ''}
-      <button ${myTurn() ? '' : 'disabled'} data-wonder="${w.key}">Contribute (free)</button></div>`;
+      <button ${myTurn() ? '' : 'disabled'} data-wonder="${w.key}">Contribute (free)</button></div>
+      ${room.admin ? `<button class="cheat" title="Admin: finish this wonder now" data-cheat="${w.key}">Complete (admin)</button>` : ''}`;
     const by = Object.entries(w.bySeat).map(([n, r]) => `<div class="small muted">${esc(n)}: ${resList(r)}</div>`).join('');
     return `<div class="cardx wonder ${w.done ? 'done' : ''}${w.art ? ` hasart" style="--art:url('${w.art}')` : ''}" data-w="${w.key}"><div class="type">Great wonder · ${w.victoryPoints} points</div>
       <div class="name">${esc(w.name)}${w.done ? ' ✓' : ''}</div><div class="text">${esc(w.text)}</div>
@@ -411,6 +412,12 @@ function renderWonders() {
   $('wonderPanel').innerHTML = `<h2>Great wonders</h2><p class="muted small">Great wonders turn up in the queue; take one to start building it together. Each stands in a territory: lose the territory, lose the wonder. Their points, plus 1 per territory, are your final score. Unfinished wonders are lost when the era ends (half is returned).</p>${built}<div class="cards">${list || '<p class="muted">None under construction.</p>'}</div>`;
 }
 $('wonderPanel').onclick = e => {
+  const c = e.target.closest('[data-cheat]');
+  if (c) {
+    const where = c.closest('[data-w]').querySelector('[data-wwhere]');
+    send({ type: 'cheatWonder', wonder: c.dataset.cheat, territory: where ? +where.value : -1 });
+    return;
+  }
   const b = e.target.closest('[data-wonder]'); if (!b) return;
   const box = b.closest('[data-w]'), resources = {};
   box.querySelectorAll('[data-wres]').forEach(i => { resources[i.dataset.wres] = Math.max(0, +i.value || 0); });
@@ -753,4 +760,15 @@ async function openAllCards() {
     <h3>Great wonders (${catalogue.wonders.length})</h3><div class="catalog">${catalogue.wonders.map(w => item(w.name, w.era || '', w.text, w.art)).join('')}</div>`;
 }
 $('allCards').onclick = openAllCards;
+$('gameLog').onclick = async () => {
+  try {
+    const r = await fetch(`${API}/rooms/${code}/gamelog?token=${encodeURIComponent(token)}`);
+    if (!r.ok) return toast((await r.json().catch(() => ({}))).error || 'No game log yet.');
+    const url = URL.createObjectURL(await r.blob());
+    const a = document.createElement('a');
+    a.href = url; a.download = `dawn-game-${code}.json`;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+  } catch (e) { toast('Could not download the log.'); }
+};
 $('cardsModal').onclick = e => { if (e.target === $('cardsModal') || e.target.closest('[data-close]')) $('cardsModal').hidden = true; };

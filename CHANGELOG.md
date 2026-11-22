@@ -2,6 +2,11 @@
 
 Newest first. Versions from 1.x on are the combined app (Root and Rune + Weather generator).
 
+## v1.70.0 (combined app)
+
+- Dawn: admins get a "Complete (admin)" button in the top right corner of every great wonder under construction; it finishes the wonder at once, in the territory chosen on the card.
+- Dawn: a "Game log" button in the header downloads a detailed JSON journal of the game: every action (with the player's resources and actions before and after, and refused actions with the reason), every log line, and a full table snapshot at the start of each round and at the end. Send it after a game for review.
+
 ## v1.69.0 (combined app)
 
 - Dawn: your great person now has its own panel above the tribe, with its card.

@@ -33,6 +33,8 @@ public final class Room {
         long disconnectedAt;
         /** A computer player: always "connected", moves on its own. */
         boolean ai;
+        /** A site admin: may use the cheat button on great wonders. */
+        boolean admin;
 
         Seat(String name) {
             this.name = name;
@@ -72,12 +74,17 @@ public final class Room {
     }
 
     synchronized Seat join(String requestedName) {
+        return join(requestedName, false);
+    }
+
+    synchronized Seat join(String requestedName, boolean admin) {
         if (game != null) throw new GameException("This game has already started.");
         if (seats.size() >= MAX_PLAYERS) throw new GameException("This room is full (" + MAX_PLAYERS + " players).");
         String name = cleanName(requestedName);
         String unique = name;
         for (int i = 2; nameTaken(unique); i++) unique = name + " " + i;
         Seat s = new Seat(unique);
+        s.admin = admin;
         seats.add(s);
         touch();
         broadcast();
@@ -135,6 +142,7 @@ public final class Room {
                 if (seat != host) throw new GameException("Only the host can start the game.");
                 if (game != null) throw new GameException("The game has already started.");
                 game = new Game(content, seats.stream().map(s -> s.name).toList(), RANDOM.nextLong(), true);
+                game.journalOn = true;
                 for (int i = 0; i < seats.size(); i++) if (!seats.get(i).connected()) game.setAway(i, true);
             }
             case "addAi" -> {
@@ -168,6 +176,11 @@ public final class Room {
                 if (seat == host) host = 0;
                 else if (seat < host) host--;
                 gone.sessions.forEach(ws -> closeQuietly(ws));
+            }
+            case "cheatWonder" -> {
+                if (!seats.get(seat).admin) throw new GameException("Only admins can do that.");
+                if (game == null) throw new GameException("The game hasn't started yet.");
+                game.cheatCompleteWonder(seat, String.valueOf(msg.getOrDefault("wonder", "")), msg.get("territory") instanceof Number n ? n.intValue() : -1);
             }
             default -> {
                 if (game == null) throw new GameException("The game hasn't started yet.");
@@ -255,6 +268,23 @@ public final class Room {
         }
     }
 
+    /** Everything that happened, for the "Game log" download. Only players in the room may fetch it. */
+    synchronized Map<String, Object> gameLog(String token) {
+        if (seatOf(token) < 0) throw new GameException("You are not a player in this room.");
+        if (game == null) throw new GameException("The game hasn't started yet.");
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("format", "dawn-of-mankind game log");
+        out.put("room", code);
+        out.put("seed", game.seed);
+        out.put("players", seats.stream().map(s -> Map.of("name", s.name, "ai", s.ai)).toList());
+        out.put("result", game.result);
+        out.put("endReason", game.endReason);
+        out.put("roundsPlayed", game.round);
+        out.put("finalScore", game.score());
+        out.put("entries", List.copyOf(game.journal));
+        return out;
+    }
+
     synchronized void sendState(int seat, WebSocketSession ws) {
         sendText(ws, json.apply(state(seat)));
     }
@@ -264,6 +294,7 @@ public final class Room {
         room.put("code", code);
         room.put("host", host);
         room.put("you", seat);
+        room.put("admin", seat >= 0 && seat < seats.size() && seats.get(seat).admin);
         room.put("started", game != null);
         List<Object> ps = new ArrayList<>();
         for (int i = 0; i < seats.size(); i++) {

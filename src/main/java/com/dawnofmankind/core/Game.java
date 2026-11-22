@@ -200,6 +200,7 @@ public final class Game {
         if (names.isEmpty() || names.size() > 6) throw new GameException("A game needs 1 to 6 players.");
         this.content = content;
         this.rng = new Random(seed);
+        this.seed = seed;
         Content.Rules r = content.rules;
         for (TerritoryDef t : content.territories.values()) {
             if (!t.special) for (int i = 0; i < t.copies; i++) worldDeck.add(new Territory(nextId++, t));
@@ -493,6 +494,7 @@ public final class Game {
     /** Every player starts the round at once: their actions, and one blind card each from the era deck. */
     private void beginTurns() {
         phase = Phase.TURNS;
+        snapshot("start of round " + round + " (before cards are drawn)");
         picksLocked = false;
         roundStartedAt = System.currentTimeMillis();
         for (Player p : players) {
@@ -734,6 +736,36 @@ public final class Game {
 
     /** Runs one player action. Throws {@link GameException} if it isn't allowed; then nothing has changed. */
     public void act(int seat, Map<String, Object> a) {
+        if (!journalOn) {
+            doAct(seat, a);
+            return;
+        }
+        Player pl = seat >= 0 && seat < players.size() ? players.get(seat) : null;
+        Map<String, Object> e = entry("action");
+        e.put("seat", seat);
+        e.put("player", pl == null ? null : pl.name);
+        e.put("do", new LinkedHashMap<>(a));
+        if (pl != null) {
+            e.put("actionsBefore", pl.actions);
+            e.put("resourcesBefore", View.res(pl.res));
+        }
+        try {
+            doAct(seat, a);
+            e.put("ok", true);
+        } catch (RuntimeException ex) {
+            e.put("ok", false);
+            e.put("error", ex.getMessage());
+            journal.add(e);
+            throw ex;
+        }
+        if (pl != null) {
+            e.put("actionsAfter", pl.actions);
+            e.put("resourcesAfter", View.res(pl.res));
+        }
+        journal.add(e);
+    }
+
+    private void doAct(int seat, Map<String, Object> a) {
         if (result != null) throw new GameException("The game is over.");
         if (seat < 0 || seat >= players.size()) throw new GameException("Not a player in this game.");
         String type = Y.s(a, "type", "");
@@ -1120,6 +1152,17 @@ public final class Game {
         log(p.name + " gives " + Res.describe(give) + (fromPool ? " from the shared pool" : "") + " to " + w.def.name
                 + (factor > 1 ? " (counts double: " + Res.describe(credit) + ")" : "") + ".");
         if (w.paid.equals(cost)) completeWonder(w, p, Y.i(a, "territory", -1));
+    }
+
+    /** Admin cheat: finish a great wonder at once, paid in full, standing in the given territory. */
+    public void cheatCompleteWonder(int seat, String id, int tid) {
+        WonderProgress w = greatWonders.stream().filter(x -> x.def.id.equals(id) && !x.done).findFirst()
+                .orElseThrow(() -> new GameException("That great wonder can't be built now."));
+        Player p = players.get(seat);
+        EnumMap<Res, Integer> cost = w.def.cost(players.size());
+        cost.forEach((r, v) -> w.paid.put(r, v));
+        log(p.name + " (admin) completes " + w.def.name + " with a cheat.");
+        completeWonder(w, p, tid);
     }
 
     private void completeWonder(WonderProgress w, Player p, int tid) {
@@ -2017,6 +2060,7 @@ public final class Game {
         phase = Phase.OVER;
         pending = null;
         log((result.equals("victory") ? "VICTORY: " : "DEFEAT: ") + reason + " Score: " + score() + ".");
+        snapshot("game over");
     }
 
     private static String plural(int n, String word) {
@@ -2044,9 +2088,51 @@ public final class Game {
     /** When set (by the balance simulation), every log line is kept here, uncut. */
     List<String> audit;
 
+    // ---- the detailed game journal (kept only for real rooms, for export) ----
+    public boolean journalOn;
+    public long seed;
+    public final List<Map<String, Object>> journal = new ArrayList<>();
+
+    private Map<String, Object> entry(String kind) {
+        Map<String, Object> e = new LinkedHashMap<>();
+        e.put("n", journal.size() + 1);
+        e.put("round", round);
+        e.put("era", eraIndex);
+        e.put("phase", phase.name().toLowerCase());
+        e.put("kind", kind);
+        return e;
+    }
+
+    /** Everything on the table, as a player at seat 0 sees it, plus every hand. */
+    private void snapshot(String why) {
+        if (!journalOn) return;
+        Map<String, Object> e = entry("snapshot");
+        e.put("why", why);
+        Map<String, Object> v = new LinkedHashMap<>(View.of(this, 0));
+        v.remove("log");
+        v.remove("version");
+        e.put("table", v);
+        Map<String, Object> hands = new LinkedHashMap<>();
+        for (Player p : players) {
+            Map<String, Object> h = new LinkedHashMap<>();
+            h.put("hand", p.hand.stream().map(c -> c.def.name).toList());
+            h.put("resources", View.res(p.res));
+            h.put("leader", p.leader == null ? null : p.leader.name);
+            h.put("pendingLeader", p.pendingLeader == null ? null : p.pendingLeader.name);
+            hands.put(p.name, h);
+        }
+        e.put("players", hands);
+        journal.add(e);
+    }
+
     void log(String s) {
         if (audit != null) audit.add(s);
         if (collect != null) collect.add(s);
+        if (journalOn) {
+            Map<String, Object> e = entry("log");
+            e.put("text", s);
+            journal.add(e);
+        }
         log.add(s);
         if (log.size() > 400) log.remove(0);
     }

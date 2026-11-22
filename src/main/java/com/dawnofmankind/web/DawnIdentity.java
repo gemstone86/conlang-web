@@ -9,4 +9,9 @@ import java.util.Optional;
  */
 public interface DawnIdentity {
     Optional<String> displayName(HttpServletRequest request);
+
+    /** Admins get a cheat button on great wonders. */
+    default boolean isAdmin(HttpServletRequest request) {
+        return false;
+    }
 }

@@ -46,12 +46,21 @@ public class DawnController {
 
     @PostMapping("/rooms")
     public RoomService.Joined create(@RequestBody(required = false) Map<String, Object> body, HttpServletRequest req) {
-        return rooms.create(name(body, req));
+        return rooms.create(name(body, req), isAdmin(req));
     }
 
     @PostMapping("/rooms/{code}/join")
     public RoomService.Joined join(@PathVariable String code, @RequestBody(required = false) Map<String, Object> body, HttpServletRequest req) {
-        return rooms.join(code, name(body, req));
+        return rooms.join(code, name(body, req), isAdmin(req));
+    }
+
+    /** The full journal of a game (actions with before/after, every log line, a table snapshot each round). */
+    @GetMapping("/rooms/{code}/gamelog")
+    public ResponseEntity<Map<String, Object>> gameLog(@PathVariable String code, @org.springframework.web.bind.annotation.RequestParam String token) {
+        Map<String, Object> log = rooms.room(code).gameLog(token);
+        return ResponseEntity.ok()
+                .header("Content-Disposition", "attachment; filename=\"dawn-game-" + code + ".json\"")
+                .body(log);
     }
 
     @GetMapping("/rooms/{code}")
@@ -64,6 +73,15 @@ public class DawnController {
         if (logged.isPresent()) return logged.get();
         Object n = body == null ? null : body.get("name");
         return n == null ? "" : String.valueOf(n);
+    }
+
+    private boolean isAdmin(HttpServletRequest req) {
+        DawnIdentity id = identity.getIfAvailable();
+        try {
+            return id != null && id.isAdmin(req);
+        } catch (RuntimeException e) {
+            return false;
+        }
     }
 
     private Optional<String> loggedInName(HttpServletRequest req) {
