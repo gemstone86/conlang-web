@@ -2,6 +2,10 @@
 
 Newest first. Versions from 1.x on are the combined app (Root and Rune + Weather generator).
 
+## v1.71.5 (combined app)
+
+- Dawn: pictures for twelve more action cards (the rest of the prehistoric ones and the Ancient era actions).
+
 ## v1.71.4 (combined app)
 
 - Dawn: pictures for ten prehistoric action cards.
