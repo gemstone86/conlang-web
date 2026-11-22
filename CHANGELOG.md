@@ -2,6 +2,10 @@
 
 Newest first. Versions from 1.x on are the combined app (Root and Rune + Weather generator).
 
+## v1.72.1 (combined app)
+
+- Dawn: a picture for the Fertile Delta.
+
 ## v1.72.0 (combined app)
 
 - Dawn: lands have pictures now (Plains, Mountains, Steppe, Jungle, Coast, Forest, Ocean, Rich Land, Fortified Land, Wondrous Land): on the realm and lands-to-settle cards and in the starting-land popup. Fertile Delta and the City State still need one.
