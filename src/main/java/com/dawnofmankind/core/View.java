@@ -131,6 +131,9 @@ public final class View {
         List<Object> frontier = new ArrayList<>();
         for (Game.Frontier f : g.frontier) {
             Map<String, Object> m = territory(f.land);
+            if (f.land.pendingWonder != null) {
+                m.put("text", f.land.def.text + " The wonder here: " + f.land.pendingWonder.name + " (" + f.land.pendingWonder.text + ")");
+            }
             m.put("enemy", f.enemy);
             m.put("cost", res(g.settleCost(f)));
             m.put("paid", res(f.paid));

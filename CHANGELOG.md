@@ -2,6 +2,11 @@
 
 Newest first. Versions from 1.x on are the combined app (Root and Rune + Weather generator).
 
+## v1.65.1 (combined app)
+
+- Dawn: the Wondrous Land now carries a real great wonder of the era that is not in the game yet (not built, not being built, not in the deck or queue). The wonder is built, with its bonuses and points, the moment the land is settled; face-up it shows which wonder it is. The land's own made-up bonuses are gone.
+- Starting lands: the realm always starts with 2 lands. They are drawn from the lands the players chose (more are drawn from the deck if fewer than 2 were chosen); all other lands, chosen or not, go on top of the land deck in random order.
+
 ## v1.65.0 (combined app)
 
 - Dawn: the game now starts with a pop-up where each player is offered two lands and keeps one. The chosen lands are the realm's start (one per player); the others go back into the world deck. AI players choose by themselves and a player who is away gets the first land.

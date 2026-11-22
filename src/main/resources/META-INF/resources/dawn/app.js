@@ -258,7 +258,7 @@ function renderSetup() {
   if (s.phase !== 'setup') { $('setupModal').hidden = true; return; }
   const offer = s.setupOffer || [];
   box.innerHTML = offer.length
-    ? `<h2>Choose your starting land</h2><p class="muted small">Each player is offered two lands and keeps one; together they are where the tribe starts. The other goes back into the world deck.</p>
+    ? `<h2>Choose your starting land</h2><p class="muted small">Each player is offered two lands and keeps one. The realm starts with two of the chosen lands; the rest go back on top of the land deck.</p>
        <div class="catalog">${offer.map(l => `<div><div class="nm">${esc(l.name)}</div><div>${esc(l.text)}</div><div class="actions"><button class="primary" data-land="${l.id}">Start here</button></div></div>`).join('')}</div>`
     : `<h2>Waiting for the others</h2><p class="muted">Still choosing: ${(s.setupWaiting || []).map(esc).join(', ') || '…'}</p>`;
   $('setupModal').hidden = false;

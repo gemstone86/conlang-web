@@ -632,6 +632,30 @@ class GameTest {
         assertEquals(4, f.enemy);
         assertEquals(6, g.settleCost(f).get(Res.FOOD));
         assertEquals(6, g.settleCost(f).get(Res.PRODUCTION));
+        Content.WonderDef w = f.land.pendingWonder;
+        assertNotNull(w, "a wonder of this era that was not in the game");
+        assertEquals(g.era().id, w.era);
+        assertFalse(g.eraDeck.stream().anyMatch(c -> w.id.equals(c.def.wonder)), "not in the deck");
+        p.res.put(Res.FOOD, 50);
+        p.res.put(Res.PRODUCTION, 50);
+        p.army = 10;
+        p.idle += 3;
+        g.act(p.seat, Map.of("type", "colonize", "land", f.land.id, "resources", Map.of("food", 6, "production", 6), "army", 4, "population", 1));
+        assertTrue(g.builtWonders.contains(w), "the wonder is built when the land is settled");
+        assertTrue(g.realm.stream().anyMatch(t -> t.wonders.contains(w)));
+    }
+
+    @Test
+    void theRealmAlwaysStartsWithTwoLands() {
+        for (int n = 1; n <= 4; n++) {
+            List<String> names = new ArrayList<>();
+            for (int i = 0; i < n; i++) names.add("P" + i);
+            Game g = new Game(C, names, 100 + n, true);
+            int total = g.worldDeck.size() + g.setupOffers.values().stream().mapToInt(List::size).sum();
+            for (int seat = 0; seat < n; seat++) g.act(seat, Map.of("type", "chooseLand", "land", g.setupOffers.get(seat).get(0).id));
+            assertEquals(2, g.realm.size(), n + " players");
+            assertEquals(total, g.worldDeck.size() + g.realm.size() + (int) g.frontier.stream().filter(f -> !f.fromEvent).count(), "no land was lost");
+        }
     }
 
     @Test

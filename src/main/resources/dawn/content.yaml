@@ -140,11 +140,10 @@ territories:
   wondrous_land:
     name: Wondrous Land
     special: true
+    hasWonder: true                      # a great wonder of the era that is not in the game stands here; it is built when the land is settled
     enemy: 4
-    slots: {farm: 1, mine: 1}
-    effects: [{income: {culture: 2}}, {income: {research: 2}}]
     costPerPlayer: {food: 6, production: 6, population: 1}
-    text: "A land with a wonder on it: +1 farm slot, +1 mine slot, +2 culture and +2 research per turn. Costly to take: 4 extra food and production per player, and +4 enemy strength."
+    text: "A land with a great wonder on it (one not yet in the game): the wonder is built the moment the land is settled. Costly: 4 extra food and production per player, and +4 enemy strength."
   fertile_delta:
     name: Fertile Delta
     special: true
@@ -1114,7 +1113,7 @@ cards:
     type: event
     category: discovery
     effects: [{discover: wondrous_land}]
-    text: "A Wondrous Land is found, with a wonder on it: settling it takes 6 food, 6 production and 1 settler per player, and has +4 enemy strength. At once."
+    text: "A Wondrous Land is found, with a great wonder (one not in the game yet) on it: settling it takes 6 food, 6 production and 1 settler per player, and +4 enemy strength. Settle it at once, and the wonder is built."
   fertile_delta_found:
     name: Fertile Delta
     type: event

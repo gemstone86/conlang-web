@@ -71,6 +71,8 @@ public final class Game {
         public final List<WonderDef> wonders = new ArrayList<>();
         /** A cored territory is not lost to a broken invasion: it loses its core status instead. */
         public boolean cored;
+        /** The Wondrous Land: a great wonder that is built here the moment the land is settled. */
+        public WonderDef pendingWonder;
 
         Territory(int id, TerritoryDef def) {
             this.id = id;
@@ -187,6 +189,7 @@ public final class Game {
     /** Setup: each player is offered 2 lands and keeps 1 as the start of the realm (seat -> the lands offered). */
     public final Map<Integer, List<Territory>> setupOffers = new LinkedHashMap<>();
     private int startEvents;
+    private final List<Territory> setupChosen = new ArrayList<>(), setupReturned = new ArrayList<>();
 
     public Game(Content content, List<String> names, long seed) {
         this(content, names, seed, false);
@@ -255,13 +258,22 @@ public final class Game {
         if (offer == null) throw new GameException("You have already chosen your land.");
         int id = Y.i(a, "land", -1);
         Territory pick = offer.stream().filter(t -> t.id == id).findFirst().orElseThrow(() -> new GameException("Choose one of the two lands offered."));
-        realm.add(pick);
         offer.remove(pick);
-        worldDeck.addAll(offer);
+        setupChosen.add(pick);
+        setupReturned.addAll(offer);
         setupOffers.remove(p.seat);
-        log(p.name + " starts with the " + pick.def.name + ".");
+        log(p.name + " picks the " + pick.def.name + ".");
         if (setupOffers.isEmpty()) {
-            Collections.shuffle(worldDeck, rng);
+            // the realm starts with 2 of the chosen lands (more are drawn from the deck if fewer were chosen);
+            // all the other lands go back on top of the land deck in random order
+            Collections.shuffle(setupChosen, rng);
+            int keep = Math.min(2, setupChosen.size());
+            realm.addAll(setupChosen.subList(0, keep));
+            List<Territory> rest = new ArrayList<>(setupChosen.subList(keep, setupChosen.size()));
+            rest.addAll(setupReturned);
+            Collections.shuffle(rest, rng);
+            worldDeck.addAll(0, rest);
+            while (realm.size() < 2 && !worldDeck.isEmpty()) realm.add(worldDeck.remove(0));
             refillLands();
             beginGame();
         }
@@ -1225,6 +1237,11 @@ public final class Game {
             frontier.remove(f);
             realm.add(f.land);
             log("The " + f.land.def.name + " is settled and joins the realm! " + f.land.def.text);
+            if (f.land.pendingWonder != null) {
+                WonderDef w = f.land.pendingWonder;
+                f.land.pendingWonder = null;
+                completeWonder(new WonderProgress(w), p, f.land.id);       // the wonder on the land is built at once
+            }
             refillLands();
         }
     }
@@ -1247,10 +1264,26 @@ public final class Game {
     }
 
     /** An event (or Send Scouts) finds a land: it must be settled at once. */
+    /** A great wonder of this era that is not in the game yet: not built, not being built, not in the deck or the queue. */
+    private WonderDef unusedWonder() {
+        List<WonderDef> free = new ArrayList<>();
+        for (WonderDef w : content.greatWonders.values()) {
+            if (!era().id.equals(w.era) || builtWonders.contains(w)) continue;
+            if (greatWonders.stream().anyMatch(x -> x.def == w)) continue;
+            if (frontier.stream().anyMatch(f -> f.land.pendingWonder == w)) continue;
+            boolean inDeck = eraDeck.stream().anyMatch(c -> w.id.equals(c.def.wonder))
+                    || queue.stream().anyMatch(sl -> w.id.equals(sl.card.def.wonder) || (sl.under != null && w.id.equals(sl.under.def.wonder)))
+                    || players.stream().anyMatch(p -> p.turnDraw != null && w.id.equals(p.turnDraw.def.wonder));
+            if (!inDeck) free.add(w);
+        }
+        return free.isEmpty() ? null : free.get(rng.nextInt(free.size()));
+    }
+
     private void discover(TerritoryDef def) {
         Territory land;
         if (def.special) {
             land = new Territory(nextId++, def);
+            if (def.hasWonder) land.pendingWonder = unusedWonder();
         } else {
             land = worldDeck.stream().filter(t -> t.def == def).findFirst().orElse(null);
             if (land == null) return;

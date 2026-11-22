@@ -127,6 +127,8 @@ public final class Content {
         public int populationPerPlayer, armyPerPlayer;
         /** Enemy strength a found land starts with (the Wondrous Land). */
         public int enemy;
+        /** A great wonder of the era that is not in the game stands on this land. */
+        public boolean hasWonder;
     }
 
     public static final class EraDef {
@@ -304,6 +306,7 @@ public final class Content {
         t.effects = effects(m.get("effects"));
         t.special = Y.b(m, "special");
         t.enemy = Y.i(m, "enemy", 0);
+        t.hasWonder = Y.b(m, "hasWonder");
         Map<String, Object> cost = new LinkedHashMap<>(Y.map(m.get("costPerPlayer")));
         t.populationPerPlayer = Y.toInt(cost.remove("population"));
         t.armyPerPlayer = Y.toInt(cost.remove("army"));
