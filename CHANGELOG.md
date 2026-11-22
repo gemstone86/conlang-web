@@ -2,6 +2,10 @@
 
 Newest first. Versions from 1.x on are the combined app (Root and Rune + Weather generator).
 
+## v1.67.1 (combined app)
+
+- Dawn: "Actions left" has its own highlighted box in the top bar (it used to share a spot with "Events"; that spot now says Events / Your turn / waiting). The Tribe panel shows how many actions each player has left this round.
+
 ## v1.67.0 (combined app)
 
 - Dawn: pictures for all 10 great wonders, shown on the wonder cards in the queue, the "Great wonders" board and the All cards list.
