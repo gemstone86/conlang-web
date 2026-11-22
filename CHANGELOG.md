@@ -2,6 +2,14 @@
 
 Newest first. Versions from 1.x on are the combined app (Root and Rune + Weather generator).
 
+## v1.63.0 (combined app)
+
+- Dawn: each era's deck now holds a set number of each kind of card (X = players): leaders X+1, great wonders X, minor wonders X+1, hostility X, techs X+2, actions 18+2X, responses X, events 12+X, and 1 era-trigger event (9X+35 cards in all). The cards are drawn at random from that era's list; if a list is shorter than the number needed, great wonders and hostility cards stop at what exists and other kinds go round again.
+- New leaders: Prehistoric: The First Ruler, The First Conqueror, The First Architect. Ancient: Tomyris, Alexander the Great.
+- New great wonders (Prehistoric): Göbekli Tepe, Ġgantija Temples, Skara Brae.
+- New minor wonders: The First Farms, The First Mine, Oral Tradition, The First Religion (Prehistoric; fades after it), The Great Tomb, The Epic Wall, The Great Trade Route (Ancient).
+- New effects: growing costs less food, great-wonder contributions count double, income per territory, minor wonders that go obsolete, enemy strength halved or zero on lands, extra slots per building type.
+
 ## v1.62.0 (combined app)
 
 - Dawn leaders reworked. Prehistoric: The First Shaman (+1 culture/turn, temples cost 1 production), The Great Hunter (+1 food/turn, +1 max farm slot), The Storyteller (an event leaving the queue gives you the face-down card under it), The Great Mother (hand size -2, action cards leaving the queue go to your hand). Ancient: Julius Caesar (+1 military strength per 2 troops, for you), Gilgamesh (first troop each round takes no action, +2 military strength), Hammurabi (+1 research/turn, +1 hand size), Ramses (every unfinished great wonder gains 1 of each resource it needs, every round).

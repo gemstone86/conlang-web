@@ -488,6 +488,72 @@ class GameTest {
     }
 
     @Test
+    void theEraDeckHoldsASetNumberOfEachKind() {
+        for (int x = 1; x <= 4; x++) {
+            Game g = game(x, 70 + x);
+            Map<String, Integer> n = new java.util.HashMap<>();
+            List<Game.CardInst> all = new ArrayList<>(g.eraDeck);
+            g.queue.forEach(sl -> { all.add(sl.card); if (sl.under != null) all.add(sl.under); });
+            all.addAll(g.futureEvents);                                      // events drawn blind go face down here
+            for (Player p : g.players) all.addAll(p.hand);                 // what they drew blind
+            for (Game.CardInst c : all) n.merge(c.def.eraTrigger ? "era_trigger" : c.def.type.name().toLowerCase(), 1, Integer::sum);
+            // leaders and great wonders play or go to the board as soon as they are drawn; hostility cards are spent
+            int ledBy = (int) g.log.stream().filter(l -> l.contains(" is now led by ")).count();
+            assertEquals(x + 1, n.getOrDefault("leader", 0) + ledBy, "leaders, " + x + " players");
+            assertEquals(x, n.getOrDefault("great_wonder", 0) + g.greatWonders.size(), "great wonders");
+            assertEquals(x + 2, n.getOrDefault("tech", 0), "techs");
+            assertEquals(18 + 2 * x, n.getOrDefault("action", 0), "actions");
+            assertEquals(x, n.getOrDefault("response", 0), "responses");
+            assertEquals(12 + x, n.getOrDefault("event", 0), "events");
+            assertEquals(1, n.getOrDefault("era_trigger", 0), "one era-trigger event");
+        }
+    }
+
+    @Test
+    void goebekliTepeAndTheGgantijaTemples() {
+        Game g = game(1, 71);
+        Player p = g.players.get(0);
+        p.leader = null;
+        int cost = g.growthCost(p).get(Res.FOOD);
+        g.builtWonders.add(C.greatWonders.get("gobekli_tepe"));
+        assertEquals(cost - 1, g.growthCost(p).get(Res.FOOD));
+        g.builtWonders.add(C.greatWonders.get("skara_brae"));
+        assertEquals(g.realm.size(), g.mods(p).income.get(Res.FOOD), "+1 food per territory");
+        g.builtWonders.add(C.greatWonders.get("ggantija_temples"));
+        Game.WonderProgress w = new Game.WonderProgress(C.greatWonders.get("pyramids"));
+        g.greatWonders.add(w);
+        p.res.put(Res.PRODUCTION, 10);
+        g.act(p.seat, Map.of("type", "contribute", "wonder", "pyramids", "resources", Map.of("production", 4)));
+        assertEquals(8, w.paid.get(Res.PRODUCTION), "given resources count double");
+        assertEquals(6, p.res.get(Res.PRODUCTION), "but cost only what was given");
+    }
+
+    @Test
+    void theConquerorAndAlexanderChangeEnemyStrength() {
+        Game g = game(1, 72);
+        Player p = g.players.get(0);
+        Game.Frontier f = g.frontier.get(0);
+        f.enemy = 5;
+        p.leader = null;
+        int base = g.settleTroops(f) - 5;
+        p.leader = C.cards.get("first_conqueror");
+        assertEquals(base + 3, g.settleTroops(f));
+        p.leader = C.cards.get("alexander_the_great");
+        assertEquals(base, g.settleTroops(f));
+    }
+
+    @Test
+    void theFirstReligionFadesAfterThePrehistoricEra() {
+        Game g = game(1, 73);
+        Player p = g.players.get(0);
+        p.leader = null;
+        p.minorWonders.add(C.cards.get("first_religion"));
+        assertEquals(3, g.mods(p).income.get(Res.CULTURE));
+        g.eraIndex = 1;
+        assertEquals(0, g.mods(p).income.get(Res.CULTURE), "obsolete");
+    }
+
+    @Test
     void theTradingRouteIsOnlyInTheDeckWithTeammates() {
         for (int players : new int[]{1, 2}) {
             Game g = game(players, 50 + players);
@@ -539,6 +605,7 @@ class GameTest {
     @Test
     void settleCardOpensALandThenAnyonePays() {
         Game g = game(2, 11);
+        for (Player q : g.players) q.leader = null;           // a drawn leader (Alexander, the Conqueror) would change the enemy strength
         assertEquals(2, g.frontier.size(), "two lands face up at the start");
         Player p = g.players.get(0);
         Game.Frontier f = g.frontier.get(0);

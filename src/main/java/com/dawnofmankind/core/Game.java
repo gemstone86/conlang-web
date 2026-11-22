@@ -239,28 +239,32 @@ public final class Game {
     private void startEra() {
         EraDef e = era();
         eraDeck.clear();
-        List<CardInst> pool = new ArrayList<>(), triggers = new ArrayList<>();
+        // the era's cards, sorted by kind; the deck takes a set number of each kind (rules: eraDeck, per player count)
+        Map<String, List<CardInst>> pools = new LinkedHashMap<>();
         e.cards.forEach((id, copies) -> {
             CardDef d = content.cards.get(id);
             if (d.minPlayers > players.size()) return;                 // e.g. trading needs a teammate
-            for (int i = 0; i < copies; i++) (d.eraTrigger ? triggers : pool).add(inst(d));
+            String kind = d.eraTrigger ? "era_trigger" : d.type.name().toLowerCase();
+            for (int i = 0; i < copies; i++) pools.computeIfAbsent(kind, k -> new ArrayList<>()).add(inst(d));
         });
-        int size = content.rules.deckBase + content.rules.deckPerPlayer * players.size() - triggers.size();
-        // the deck is filled from the era's cards, going round again if needed; great wonders appear only once
-        List<CardInst> bag = new ArrayList<>();
-        boolean firstPass = true;
-        while (eraDeck.size() < size && !pool.isEmpty()) {
-            if (bag.isEmpty()) {
-                // great wonders and hostility cards come in the numbers listed, once per deck
-                for (CardInst c : pool) {
-                    if (firstPass || (c.def.type != CardType.GREAT_WONDER && c.def.type != CardType.HOSTILITY)) bag.add(inst(c.def));
+        List<CardInst> triggers = new ArrayList<>();
+        content.rules.eraDeck.forEach((kind, n) -> {
+            List<CardInst> pool = pools.getOrDefault(kind, List.of());
+            int want = n[0] + n[1] * players.size();
+            // great wonders and hostility cards come at most once each; other kinds go round again if the pool is short
+            boolean cycle = !kind.equals("great_wonder") && !kind.equals("hostility");
+            List<CardInst> picked = new ArrayList<>(), bag = new ArrayList<>();
+            while (picked.size() < want && !pool.isEmpty()) {
+                if (bag.isEmpty()) {
+                    if (!picked.isEmpty() && !cycle) break;
+                    for (CardInst c : pool) bag.add(inst(c.def));
+                    Collections.shuffle(bag, rng);
                 }
-                Collections.shuffle(bag, rng);
-                firstPass = false;
-                if (bag.isEmpty()) break;
+                picked.add(bag.remove(bag.size() - 1));
             }
-            eraDeck.add(bag.remove(bag.size() - 1));
-        }
+            if (kind.equals("era_trigger")) triggers.addAll(picked); else eraDeck.addAll(picked);
+        });
+        Collections.shuffle(eraDeck, rng);
         // era-trigger events go into the bottom part of the deck: they can end the era early, but not at once
         for (CardInst t : triggers) {
             int from = eraDeck.size() * (100 - content.rules.eraTriggerBottomShare) / 100;
@@ -422,7 +426,7 @@ public final class Game {
         picksLocked = false;
         roundStartedAt = System.currentTimeMillis();
         for (Player p : players) {
-            p.actions = content.rules.actionsPerTurn + mods(p).actionsPerTurn;
+            p.actions = Math.max(1, content.rules.actionsPerTurn + mods(p).actionsPerTurn);
             p.done = false;
             p.freeRecruitUsed = false;
             p.turnEvents = 0;
@@ -779,7 +783,8 @@ public final class Game {
     public EnumMap<Res, Integer> growthCost(Player p) {
         EnumMap<Res, Integer> c = new EnumMap<>(content.rules.growthCost);
         int extra = Math.max(0, p.population() - 1) / Math.max(1, content.rules.growthStep);
-        c.merge(Res.FOOD, extra, Integer::sum);
+        c.merge(Res.FOOD, extra - mods(p).growthDiscount, Integer::sum);
+        c.put(Res.FOOD, Math.max(0, c.get(Res.FOOD)));
         return c;
     }
 
@@ -967,17 +972,21 @@ public final class Game {
         EnumMap<Res, Integer> give = Res.parse(a.get("resources"));
         EnumMap<Res, Integer> cost = w.def.cost(players.size());
         boolean fromPool = Y.b(a, "fromPool");
+        int factor = 1 + mods(p).wonderDouble;                 // Ġgantija Temples: what is given counts double
+        EnumMap<Res, Integer> credit = Res.empty();
         for (Res r : Res.values()) {
             int left = cost.get(r) - w.paid.get(r);
             if (give.get(r) < 0) throw new GameException("Amounts can't be negative.");
-            if (give.get(r) > left) give.put(r, left);
+            if (give.get(r) * factor > left) give.put(r, (left + factor - 1) / factor);
+            credit.put(r, Math.min(left, give.get(r) * factor));
         }
         if (Res.isZero(give)) throw new GameException("Give at least one resource the wonder still needs.");
         if (fromPool) payFromPool(give); else pay(p, give);
-        give.forEach((r, v) -> w.paid.merge(r, v, Integer::sum));
+        credit.forEach((r, v) -> w.paid.merge(r, v, Integer::sum));
         EnumMap<Res, Integer> mine = w.bySeat.computeIfAbsent(p.seat, x -> Res.empty());
-        give.forEach((r, v) -> mine.merge(r, v, Integer::sum));
-        log(p.name + " gives " + Res.describe(give) + (fromPool ? " from the shared pool" : "") + " to " + w.def.name + ".");
+        credit.forEach((r, v) -> mine.merge(r, v, Integer::sum));
+        log(p.name + " gives " + Res.describe(give) + (fromPool ? " from the shared pool" : "") + " to " + w.def.name
+                + (factor > 1 ? " (counts double: " + Res.describe(credit) + ")" : "") + ".");
         if (w.paid.equals(cost)) completeWonder(w, p, Y.i(a, "territory", -1));
     }
 
@@ -1051,7 +1060,10 @@ public final class Game {
 
     /** Troops needed: the land's enemy strength plus a special land's own troop cost. Troops sent are spent. */
     public int settleTroops(Frontier f) {
-        return f.enemy + f.land.def.armyPerPlayer * players.size();
+        int enemy = f.enemy;
+        if (leaderWith("noEnemy") != null) enemy = 0;                      // Alexander the Great
+        else if (leaderWith("halveEnemy") != null) enemy = (enemy + 1) / 2;   // The First Conqueror
+        return enemy + f.land.def.armyPerPlayer * players.size();
     }
 
     /** Settlers needed: per player (special lands their own number, other lands the rule's), minus free settlers. */
@@ -1771,11 +1783,12 @@ public final class Game {
     public Mods mods(Player p) {
         Mods m = new Mods();
         for (Player o : players) for (CardDef t : o.techs) m.add(t.effects);
-        for (CardDef w : p.minorWonders) m.add(w.effects);
+        for (CardDef w : p.minorWonders) if (!obsolete(w)) m.add(w.effects);
         if (p.leader != null) m.add(p.leader.effects);
         for (WonderDef w : builtWonders) if (!obsolete(w)) m.add(w.effects);
         for (CardInst e : persistentEvents) m.add(e.def.ongoing);
         for (Territory t : realm) m.add(t.def.effects);
+        m.perTerritory.forEach((r, n) -> m.income.merge(r, n * realm.size(), Integer::sum));
         return m;
     }
 
@@ -1784,7 +1797,9 @@ public final class Game {
         Mods m = new Mods();
         for (Player p : players) {
             for (CardDef t : p.techs) m.add(t.effects);
-            for (CardDef w : p.minorWonders) m.add(w.effects);
+            for (CardDef w : p.minorWonders) if (!obsolete(w)) m.add(w.effects);
+            // a leader like Tomyris defends the whole team
+            if (p.leader != null) for (Map<String, Object> e : p.leader.effects) if (e.containsKey("invasionDefense")) m.add(e);
         }
         for (WonderDef w : builtWonders) if (!obsolete(w)) m.add(w.effects);
         for (Territory t : realm) m.add(t.def.effects);
@@ -1793,8 +1808,17 @@ public final class Game {
 
     /** A wonder that belongs to an earlier era's way of life (e.g. Nomadic Living) stops working after that era. */
     public boolean obsolete(WonderDef w) {
-        if (w.obsoleteAfter == null) return false;
-        for (int i = 0; i < content.eras.size(); i++) if (content.eras.get(i).id.equals(w.obsoleteAfter)) return eraIndex > i;
+        return pastEra(w.obsoleteAfter);
+    }
+
+    /** A minor wonder (like The First Religion) can stop working after an era too. */
+    public boolean obsolete(CardDef c) {
+        return pastEra(c.obsoleteAfter);
+    }
+
+    private boolean pastEra(String era) {
+        if (era == null) return false;
+        for (int i = 0; i < content.eras.size(); i++) if (content.eras.get(i).id.equals(era)) return eraIndex > i;
         return false;
     }
 

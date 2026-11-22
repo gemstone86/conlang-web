@@ -25,7 +25,8 @@ public final class Content {
         public EnumMap<Res, Integer> startResources, growthCost, recruitCost;
         public Map<String, Integer> startWorkers = new LinkedHashMap<>();
         public Map<Integer, Integer> removedPerRound = new LinkedHashMap<>();
-        public int deckBase, deckPerPlayer;
+        /** Cards of each type in an era deck: {base, perPlayer}; types: leader, great_wonder, minor_wonder, hostility, tech, action, response, event, era_trigger. */
+        public Map<String, int[]> eraDeck = new LinkedHashMap<>();
         /** Worker slots every player has for land-bound buildings (farm, mine) before any territory. */
         public Map<String, Integer> homeSlots = new LinkedHashMap<>();
         public int startTerritories, growthStep;
@@ -68,6 +69,8 @@ public final class Content {
         public List<Map<String, Object>> ongoing = new ArrayList<>();
         public EnumMap<Res, Integer> cleanseCost;
         public boolean eraTrigger, crisis, persistent;
+        /** Minor wonders: the era after which the bonuses stop. */
+        public String obsoleteAfter;
         /** The card is only put in the era deck when at least this many play. */
         public int minPlayers = 1;
         /** Only used inside a crisis (its raids and invasions); never in a deck or the past events. */
@@ -214,9 +217,10 @@ public final class Content {
         rules.colonizeEscalationPerPlayer = Res.parse(col.get("extraPerTerritoryPerPlayer"));
         rules.colonizeFreeTerritories = Y.i(col, "territoriesBeforeExtra", 2);
         rules.colonizeSettlersPerPlayer = Y.i(col, "settlersPerPlayer", 0);
-        Map<String, Object> deck = Y.map(m.get("eraDeckSize"));
-        rules.deckBase = Y.i(deck, "base", 16);
-        rules.deckPerPlayer = Y.i(deck, "perPlayer", 10);
+        Y.map(m.get("eraDeck")).forEach((type, v) -> {
+            Map<String, Object> d = Y.map(v);
+            rules.eraDeck.put(type, new int[]{Y.i(d, "base", 0), Y.i(d, "perPlayer", 0)});
+        });
     }
 
     private static BuildingDef building(String id, Map<String, Object> m) {
@@ -276,6 +280,7 @@ public final class Content {
         c.cleanseCost = Res.parse(pers.get("cleanse"));
         c.eraTrigger = Y.b(m, "eraTrigger");
         c.minPlayers = Y.i(m, "minPlayers", 1);
+        c.obsoleteAfter = Y.s(m, "obsoleteAfter", null);
         c.helper = Y.b(m, "helper");
         Map<String, Object> lasts = Y.map(m.get("lasts"));
         c.lastsRounds = Y.i(lasts, "rounds", 0);
