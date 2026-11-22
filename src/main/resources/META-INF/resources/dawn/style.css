@@ -146,3 +146,7 @@ details summary { cursor: pointer; color: var(--bone-dim); font-size: .88rem; }
 .slot.off { opacity: .45; border-style: dashed; }
 .queue-wrap { position: relative; }
 .pick-shade { position: absolute; top: 0; right: 0; bottom: 0; width: 0; background: rgba(0,0,0,.55); pointer-events: none; transition: width .25s linear; border-radius: 6px; }
+.counts { border-collapse: collapse; margin: .3rem 0 .5rem; font-size: .9rem; }
+.counts th, .counts td { border: 1px solid var(--line); padding: .2rem .6rem; text-align: right; }
+.counts th:first-child, .counts td:first-child { text-align: left; }
+.counts tr.total td { font-weight: 700; color: var(--brass); }

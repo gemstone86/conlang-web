@@ -326,6 +326,35 @@ public final class View {
             cards.add(m);
         }
         out.put("cards", cards);
+        // how many cards there are of each kind: different cards, copies in each era's list, and what a deck takes
+        List<Object> counts = new ArrayList<>();
+        Map<String, Integer> distinct = new LinkedHashMap<>();
+        for (CardDef d : content.cards.values()) {
+            if (d.helper) continue;
+            distinct.merge(d.eraTrigger ? "era_trigger" : d.type.name().toLowerCase(), 1, Integer::sum);
+        }
+        for (Map.Entry<String, Integer> en : distinct.entrySet()) {
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("kind", en.getKey());
+            m.put("different", en.getValue());
+            List<Object> perEra = new ArrayList<>();
+            for (Content.EraDef e : content.eras) {
+                int n = 0;
+                for (Map.Entry<String, Integer> c : e.cards.entrySet()) {
+                    CardDef d = content.cards.get(c.getKey());
+                    if (d != null && en.getKey().equals(d.eraTrigger ? "era_trigger" : d.type.name().toLowerCase())) n += c.getValue();
+                }
+                Map<String, Object> pe = new LinkedHashMap<>();
+                pe.put("era", e.name);
+                pe.put("copies", n);
+                perEra.add(pe);
+            }
+            m.put("eras", perEra);
+            int[] rule = content.rules.eraDeck.get(en.getKey());
+            if (rule != null) m.put("deck", Map.of("base", rule[0], "perPlayer", rule[1]));
+            counts.add(m);
+        }
+        out.put("counts", counts);
         List<Object> lands = new ArrayList<>();
         for (Content.TerritoryDef t : content.territories.values()) {
             Map<String, Object> m = new LinkedHashMap<>();

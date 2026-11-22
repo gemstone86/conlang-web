@@ -2,6 +2,10 @@
 
 Newest first. Versions from 1.x on are the combined app (Root and Rune + Weather generator).
 
+## v1.65.2 (combined app)
+
+- Dawn: the "All cards" window starts with a table of how many cards there are of each kind: different cards, copies in each era's list, and how many a deck takes (with the total).
+
 ## v1.65.1 (combined app)
 
 - Dawn: the Wondrous Land now carries a real great wonder of the era that is not in the game yet (not built, not being built, not in the deck or queue). The wonder is built, with its bonuses and points, the moment the land is settled; face-up it shows which wonder it is. The land's own made-up bonuses are gone.

@@ -715,7 +715,21 @@ async function openAllCards() {
       item(c.name, [c.type, c.era, cost(c.cost) && 'cost ' + cost(c.cost), c.minPlayers && c.minPlayers + '+ players only'].filter(Boolean).join(' · '), c.text)).join('')}</div>` : '';
   };
   const types = [...new Set(catalogue.cards.map(c => c.type))].filter(t => t !== 'great_wonder');
+  const names = { leader: 'Great people', era_trigger: 'Era-trigger events', hostility: 'Hostility cards', tech: 'Techs', action: 'Actions', response: 'Responses', minor_wonder: 'Minor wonders', great_wonder: 'Great wonders', event: 'Events' };
+  const nice = k => names[k] || k;
+  const per = x => !x ? '-' : [x.base ? String(x.base) : '', x.perPlayer ? (x.perPlayer === 1 ? 'X' : x.perPlayer + 'X') : ''].filter(Boolean).join(' + ') || '0';
+  const eraNames = catalogue.counts[0].eras.map(e => e.era);
+  const totals = { different: 0, eras: eraNames.map(() => 0) };
+  const countRows = catalogue.counts.map(c => {
+    totals.different += c.different;
+    c.eras.forEach((e, i) => totals.eras[i] += e.copies);
+    return `<tr><td>${nice(c.kind)}</td><td>${c.different}</td>${c.eras.map(e => `<td>${e.copies}</td>`).join('')}<td>${per(c.deck)}</td></tr>`;
+  }).join('');
+  const countTable = `<h3>Number of cards</h3><table class="counts"><tr><th>Kind</th><th>Different cards</th>${eraNames.map(n => `<th>${esc(n)} list</th>`).join('')}<th>In each deck (X = players)</th></tr>
+    ${countRows}<tr class="total"><td>Total</td><td>${totals.different}</td>${totals.eras.map(n => `<td>${n}</td>`).join('')}<td>${per({ base: catalogue.counts.reduce((a, c) => a + (c.deck ? c.deck.base : 0), 0), perPlayer: catalogue.counts.reduce((a, c) => a + (c.deck ? c.deck.perPlayer : 0), 0) })}</td></tr></table>
+    <p class="muted small">"List" is how many cards each era's list holds (copies counted); every deck draws its set number of each kind from that list. Lands (${catalogue.lands.length}) are a separate deck.</p>`;
   box.innerHTML = `<div class="row"><h2 style="margin:0">All cards</h2><button data-close style="margin-left:auto">Close</button></div>
+    ${countTable}
     ${types.map(t => group(t === 'leader' ? 'Great people' : t.charAt(0).toUpperCase() + t.slice(1).replace('_', ' ') + ' cards', [t])).join('')}
     <h3>Lands (${catalogue.lands.length})</h3><div class="catalog">${catalogue.lands.map(l => item(l.name, l.special ? 'special land' : 'land', l.text)).join('')}</div>
     <h3>Great wonders (${catalogue.wonders.length})</h3><div class="catalog">${catalogue.wonders.map(w => item(w.name, w.era || '', w.text)).join('')}</div>`;
