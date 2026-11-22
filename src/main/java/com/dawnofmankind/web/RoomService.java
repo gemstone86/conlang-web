@@ -44,6 +44,10 @@ public class RoomService {
     public record Joined(String code, String token, int seat) {}
 
     public Joined create(String name) {
+        return create(name, false);
+    }
+
+    public Joined create(String name, boolean admin) {
         if (rooms.size() > 2000) throw new GameException("Too many rooms are open right now. Try again later.");
         String code;
         Room room;
@@ -51,13 +55,17 @@ public class RoomService {
             code = newCode();
             room = new Room(code, content, json::writeValueAsString, timer, aiDelayMillis);
         } while (rooms.putIfAbsent(code, room) != null);
-        Room.Seat s = room.join(name);
+        Room.Seat s = room.join(name, admin);
         return new Joined(code, s.token, 0);
     }
 
     public Joined join(String code, String name) {
+        return join(code, name, false);
+    }
+
+    public Joined join(String code, String name, boolean admin) {
         Room r = room(code);
-        Room.Seat s = r.join(name);
+        Room.Seat s = r.join(name, admin);
         return new Joined(r.code, s.token, r.seatOf(s.token));
     }
 

@@ -79,9 +79,18 @@ public class HubConfig implements WebMvcConfigurer {
     /** Players who are logged in play Dawn of Mankind under their account name; others type a name. */
     @Bean
     public com.dawnofmankind.web.DawnIdentity dawnIdentity(com.conlangs.web.Auth auth) {
-        return req -> {
-            var user = auth.current(req.getSession(false));
-            return java.util.Optional.ofNullable(user == null ? null : String.valueOf(user.get("username")));
+        return new com.dawnofmankind.web.DawnIdentity() {
+            @Override
+            public java.util.Optional<String> displayName(jakarta.servlet.http.HttpServletRequest req) {
+                var user = auth.current(req.getSession(false));
+                return java.util.Optional.ofNullable(user == null ? null : String.valueOf(user.get("username")));
+            }
+
+            @Override
+            public boolean isAdmin(jakarta.servlet.http.HttpServletRequest req) {
+                var user = auth.current(req.getSession(false));
+                return user != null && Boolean.TRUE.equals(user.get("is_admin"));
+            }
         };
     }
 }

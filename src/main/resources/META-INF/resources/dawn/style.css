@@ -157,3 +157,12 @@ details summary { cursor: pointer; color: var(--bone-dim); font-size: .88rem; }
 .cardx.hasart > :first-child { margin-top: auto; }
 .cardx.hasart .actions { margin-top: .4rem; padding-top: 0; }
 .cardx.hasart.wonder { padding-top: 8.5rem; }
+.status .al { background: var(--brass); color: var(--ink); padding: .1rem .6rem; border-radius: 6px; font-weight: 500; }
+.status .al b { color: var(--ink); font-size: 1.15em; font-weight: 800; }
+.status .al.zero { background: transparent; border: 1px solid var(--line); color: var(--bone-dim); }
+.status .al.zero b { color: var(--bone-dim); }
+.al-num { color: var(--moss); }
+
+/* admin cheat button: far right of the wonder card */
+.cardx.wonder { position: relative; }
+.cardx.wonder .cheat { position: absolute; top: .4rem; right: .4rem; z-index: 2; font-size: .7rem; padding: .15rem .45rem; opacity: .85; }

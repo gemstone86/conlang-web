@@ -200,6 +200,7 @@ public final class Game {
         if (names.isEmpty() || names.size() > 6) throw new GameException("A game needs 1 to 6 players.");
         this.content = content;
         this.rng = new Random(seed);
+        this.seed = seed;
         Content.Rules r = content.rules;
         for (TerritoryDef t : content.territories.values()) {
             if (!t.special) for (int i = 0; i < t.copies; i++) worldDeck.add(new Territory(nextId++, t));
@@ -294,6 +295,11 @@ public final class Game {
     }
 
     private void startEra() {
+        startEra(false);
+    }
+
+    /** Builds the era's deck; unless {@code keepQueue}, the queue is cleared and filled from it. */
+    private void startEra(boolean keepQueue) {
         EraDef e = era();
         eraDeck.clear();
         // the era's cards, sorted by kind; the deck takes a set number of each kind (rules: eraDeck, per player count)
@@ -327,12 +333,19 @@ public final class Game {
             int from = eraDeck.size() * (100 - content.rules.eraTriggerBottomShare) / 100;
             eraDeck.add(from + rng.nextInt(eraDeck.size() - from + 1), t);
         }
-        queue.clear();
-        refillQueue();
+        if (!keepQueue) {
+            queue.clear();
+            refillQueue();
+        }
         log("The " + e.name + " era begins. Era deck: " + eraDeck.size() + " cards.");
     }
 
     private void advanceEra() {
+        advanceEra(false);
+    }
+
+    /** Ends the era and starts the next; {@code keepQueue}: the cards in the queue stay (the deck ran out while drawing). */
+    private void advanceEra(boolean keepQueue) {
         eraEnding = false;
         for (WonderProgress w : greatWonders) {
             if (w.done) continue;
@@ -348,6 +361,7 @@ public final class Game {
         for (Player p : players) {
             if (p.leader != null) log(p.leader.name + " leaves with the era.");
             p.leader = null;
+            p.pendingLeader = null;
         }
         // an era's trigger event only ends its own era: leftovers are retired
         for (List<CardInst> deck : List.of(currentEvents, futureEvents)) {
@@ -359,7 +373,7 @@ public final class Game {
             }
         }
         eraIndex++;
-        startEra();
+        startEra(keepQueue);
     }
 
     // ------------------------------------------------------------------------------------------------ round flow
@@ -432,10 +446,13 @@ public final class Game {
                 if (bonus != null) bonus.forEach((r, v) -> gain.merge(r, v * w, Integer::sum));
             }
             m.income.forEach((r, v) -> gain.merge(r, v, Integer::sum));
+            int wonderUpkeep = wonderUpkeep(p);
+            if (wonderUpkeep > 0) gain.merge(Res.PRODUCTION, -wonderUpkeep, Integer::sum);
             gain.forEach((r, v) -> p.res.put(r, Math.max(0, p.res.get(r) + v)));
             int upkeep = p.population() * content.rules.foodUpkeepPerPop + troopUpkeep(p);
             int food = p.res.get(Res.FOOD);
-            String msg = p.name + " produces " + Res.describe(gain) + "; feeds " + p.population() + " Population.";
+            String msg = p.name + " produces " + Res.describe(gain)
+                    + (wonderUpkeep > 0 ? " (after " + wonderUpkeep + " production upkeep for wonders of earlier eras)" : "") + "; feeds " + p.population() + " Population.";
             if (food >= upkeep) {
                 p.res.put(Res.FOOD, food - upkeep);
             } else {
@@ -480,6 +497,7 @@ public final class Game {
     /** Every player starts the round at once: their actions, and one blind card each from the era deck. */
     private void beginTurns() {
         phase = Phase.TURNS;
+        snapshot("start of round " + round + " (before cards are drawn)");
         picksLocked = false;
         roundStartedAt = System.currentTimeMillis();
         for (Player p : players) {
@@ -540,6 +558,10 @@ public final class Game {
     /** A player is done with the round (the hand is kept to its limit); when everyone is, the events come. */
     private void endRoundFor(Player p) {
         if (p.away) while (p.hand.size() > handLimit(p)) p.hand.remove(p.hand.size() - 1);
+        if (p.pendingLeader != null) {                  // undecided: the current great person stays
+            log(p.name + " keeps " + p.leader.name + ".");
+            p.pendingLeader = null;
+        }
         p.done = true;
         log(p.name + " is done for the round.");
         if (phase == Phase.TURNS && players.stream().allMatch(x -> x.done)) startEvents();
@@ -696,7 +718,14 @@ public final class Game {
      * its enemies to the threat massing against the realm, and the next card is taken.
      */
     private CardInst nextFromEraDeck() {
-        while (!eraDeck.isEmpty()) {
+        while (true) {
+            if (eraDeck.isEmpty()) {
+                // the deck ran out: drawing goes on in the next era (in the last era there is nothing more to draw)
+                if (result != null || eraIndex + 1 >= content.eras.size()) return null;
+                log("The era deck is empty: the " + content.eras.get(eraIndex + 1).name + " era begins and its cards are drawn.");
+                advanceEra(true);
+                if (eraDeck.isEmpty()) return null;
+            }
             CardInst c = eraDeck.remove(0);
             if (c.def.type != CardType.HOSTILITY) return c;
             int n = c.def.effects.stream().filter(e -> e.containsKey("hostility")).mapToInt(e -> Y.toInt(e.get("hostility"))).sum();
@@ -704,13 +733,42 @@ public final class Game {
             pastEvents.add(c);
             log("HOSTILITY: " + c.def.name + " — +" + n + " enemies massing (now " + threat + "). The next invasion brings them.");
         }
-        return null;
     }
 
     // ------------------------------------------------------------------------------------------------ actions
 
     /** Runs one player action. Throws {@link GameException} if it isn't allowed; then nothing has changed. */
     public void act(int seat, Map<String, Object> a) {
+        if (!journalOn) {
+            doAct(seat, a);
+            return;
+        }
+        Player pl = seat >= 0 && seat < players.size() ? players.get(seat) : null;
+        Map<String, Object> e = entry("action");
+        e.put("seat", seat);
+        e.put("player", pl == null ? null : pl.name);
+        e.put("do", new LinkedHashMap<>(a));
+        if (pl != null) {
+            e.put("actionsBefore", pl.actions);
+            e.put("resourcesBefore", View.res(pl.res));
+        }
+        try {
+            doAct(seat, a);
+            e.put("ok", true);
+        } catch (RuntimeException ex) {
+            e.put("ok", false);
+            e.put("error", ex.getMessage());
+            journal.add(e);
+            throw ex;
+        }
+        if (pl != null) {
+            e.put("actionsAfter", pl.actions);
+            e.put("resourcesAfter", View.res(pl.res));
+        }
+        journal.add(e);
+    }
+
+    private void doAct(int seat, Map<String, Object> a) {
         if (result != null) throw new GameException("The game is over.");
         if (seat < 0 || seat >= players.size()) throw new GameException("Not a player in this game.");
         String type = Y.s(a, "type", "");
@@ -725,6 +783,8 @@ public final class Game {
             case "troops" -> troops(p, a);
             case "decide" -> decide(p, a);
             case "ready" -> ready(p);
+            case "leader" -> chooseLeader(p, a);
+            case "removeBonus" -> removeBonus(p, a);
             case "chooseLand" -> chooseLand(p, a);
             case "colonize" -> colonize(p, a);
             case "starve" -> starve(p, a);
@@ -807,7 +867,8 @@ public final class Game {
         }
         b.cost.forEach((r, v) -> {
             int c = v + (r == Res.PRODUCTION ? levels * content.rules.buildingEscalation : 0);
-            cost.put(r, Math.max(0, c - (c > 0 ? m.buildDiscount.get(r) : 0)));
+            int off = m.buildDiscount.get(r) + (m.buildingDiscount.containsKey(b.id) ? m.buildingDiscount.get(b.id).get(r) : 0);
+            cost.put(r, Math.max(0, c - (c > 0 ? off : 0)));
         });
         return cost;
     }
@@ -899,14 +960,49 @@ public final class Game {
         if (under != null) take(p, under);
     }
 
+    private void installLeader(Player p, CardDef d) {
+        if (p.leader != null) log(p.leader.name + " steps down.");
+        p.leader = d;
+        p.pendingLeader = null;
+        p.freeTechUsed = false;
+        log(p.name + " has the great person " + d.name + ": " + d.text);
+    }
+
+    /** Drops one of the player's bonuses (a minor wonder) for good: the card goes with it. */
+    private void removeBonus(Player p, Map<String, Object> a) {
+        String id = Y.s(a, "card", "");
+        CardDef d = p.minorWonders.stream().filter(x -> x.id.equals(id)).findFirst()
+                .orElseThrow(() -> new GameException("You have no such bonus."));
+        p.minorWonders.remove(d);
+        log(p.name + " gives up " + d.name + ".");
+    }
+
+    private void chooseLeader(Player p, Map<String, Object> a) {
+        if (p.pendingLeader == null) throw new GameException("You have no new great person to decide on.");
+        if (Y.b(a, "replace")) installLeader(p, p.pendingLeader);
+        else {
+            log(p.name + " keeps " + p.leader.name + " and turns " + p.pendingLeader.name + " away.");
+            p.pendingLeader = null;
+        }
+    }
+
     /** A card a player gets: into their hand, except great wonders, which go on the board for the whole team to build. */
     private void take(Player p, CardInst c) {
         if (c.def.type == CardType.LEADER) {
-            // a leader plays at once and replaces the one before
-            if (p.leader != null) log(p.leader.name + " steps down.");
-            p.leader = c.def;
-            p.freeTechUsed = false;
-            log(p.name + " has the great person " + c.def.name + ": " + c.def.text);
+            if (p.leader != null) {                       // the player decides whether the newcomer replaces them
+                p.pendingLeader = c.def;
+                log(p.name + " draws the great person " + c.def.name + " and may choose to replace " + p.leader.name + ".");
+                return;
+            }
+            installLeader(p, c.def);
+            return;
+        }
+        if (c.def.type == CardType.CITY_STATE) {
+            TerritoryDef def = content.territories.get(c.def.land);
+            Frontier f = new Frontier(new Territory(nextId++, def), false, -1);
+            f.opened = true;                              // open for the whole tribe to pay toward
+            frontier.add(f);
+            log(p.name + " finds the city state " + def.name + ": it waits among the lands to settle (" + def.text + ").");
             return;
         }
         if (c.def.type != CardType.GREAT_WONDER) {
@@ -1034,6 +1130,21 @@ public final class Game {
     }
 
     /** Food the troops eat each round (Spear Men): half a food per troop, rounded up. */
+    /** How many eras ago the wonder's era was (0 for this era). */
+    private int eraAge(String era) {
+        for (int i = 0; i < content.eras.size(); i++) if (content.eras.get(i).id.equals(era)) return Math.max(0, eraIndex - i);
+        return 0;
+    }
+
+    /** Production a player pays each round for wonders (great and minor) of earlier eras: 1 per era they are removed from. */
+    public int wonderUpkeep(Player p) {
+        int total = 0;
+        for (WonderDef w : builtWonders) if (!obsolete(w)) total += eraAge(w.era);
+        for (CardDef c : p.minorWonders) if (!obsolete(c)) total += eraAge(c.era);
+        if (mods(p).halveWonderUpkeep) total = (total + 1) / 2;
+        return total;
+    }
+
     public int troopUpkeep(Player p) {
         return (int) Math.ceil(p.army * mods(p).troopUpkeep - 1e-9);
     }
@@ -1066,7 +1177,11 @@ public final class Game {
             if (give.get(r) * factor > left) give.put(r, (left + factor - 1) / factor);
             credit.put(r, Math.min(left, give.get(r) * factor));
         }
-        if (Res.isZero(give)) throw new GameException("Give at least one resource the wonder still needs.");
+        if (Res.isZero(give)) {
+            EnumMap<Res, Integer> still = Res.empty();
+            for (Res r : Res.values()) still.put(r, cost.get(r) - w.paid.get(r));
+            throw new GameException(w.def.name + " still needs " + Res.describe(still) + ". Enter an amount of one of those.");
+        }
         if (fromPool) payFromPool(give); else pay(p, give);
         credit.forEach((r, v) -> w.paid.merge(r, v, Integer::sum));
         EnumMap<Res, Integer> mine = w.bySeat.computeIfAbsent(p.seat, x -> Res.empty());
@@ -1074,6 +1189,17 @@ public final class Game {
         log(p.name + " gives " + Res.describe(give) + (fromPool ? " from the shared pool" : "") + " to " + w.def.name
                 + (factor > 1 ? " (counts double: " + Res.describe(credit) + ")" : "") + ".");
         if (w.paid.equals(cost)) completeWonder(w, p, Y.i(a, "territory", -1));
+    }
+
+    /** Admin cheat: finish a great wonder at once, paid in full, standing in the given territory. */
+    public void cheatCompleteWonder(int seat, String id, int tid) {
+        WonderProgress w = greatWonders.stream().filter(x -> x.def.id.equals(id) && !x.done).findFirst()
+                .orElseThrow(() -> new GameException("That great wonder can't be built now."));
+        Player p = players.get(seat);
+        EnumMap<Res, Integer> cost = w.def.cost(players.size());
+        cost.forEach((r, v) -> w.paid.put(r, v));
+        log(p.name + " (admin) completes " + w.def.name + " with a cheat.");
+        completeWonder(w, p, tid);
     }
 
     private void completeWonder(WonderProgress w, Player p, int tid) {
@@ -1971,6 +2097,7 @@ public final class Game {
         phase = Phase.OVER;
         pending = null;
         log((result.equals("victory") ? "VICTORY: " : "DEFEAT: ") + reason + " Score: " + score() + ".");
+        snapshot("game over");
     }
 
     private static String plural(int n, String word) {
@@ -1998,9 +2125,51 @@ public final class Game {
     /** When set (by the balance simulation), every log line is kept here, uncut. */
     List<String> audit;
 
+    // ---- the detailed game journal (kept only for real rooms, for export) ----
+    public boolean journalOn;
+    public long seed;
+    public final List<Map<String, Object>> journal = new ArrayList<>();
+
+    private Map<String, Object> entry(String kind) {
+        Map<String, Object> e = new LinkedHashMap<>();
+        e.put("n", journal.size() + 1);
+        e.put("round", round);
+        e.put("era", eraIndex);
+        e.put("phase", phase.name().toLowerCase());
+        e.put("kind", kind);
+        return e;
+    }
+
+    /** Everything on the table, as a player at seat 0 sees it, plus every hand. */
+    private void snapshot(String why) {
+        if (!journalOn) return;
+        Map<String, Object> e = entry("snapshot");
+        e.put("why", why);
+        Map<String, Object> v = new LinkedHashMap<>(View.of(this, 0));
+        v.remove("log");
+        v.remove("version");
+        e.put("table", v);
+        Map<String, Object> hands = new LinkedHashMap<>();
+        for (Player p : players) {
+            Map<String, Object> h = new LinkedHashMap<>();
+            h.put("hand", p.hand.stream().map(c -> c.def.name).toList());
+            h.put("resources", View.res(p.res));
+            h.put("leader", p.leader == null ? null : p.leader.name);
+            h.put("pendingLeader", p.pendingLeader == null ? null : p.pendingLeader.name);
+            hands.put(p.name, h);
+        }
+        e.put("players", hands);
+        journal.add(e);
+    }
+
     void log(String s) {
         if (audit != null) audit.add(s);
         if (collect != null) collect.add(s);
+        if (journalOn) {
+            Map<String, Object> e = entry("log");
+            e.put("text", s);
+            journal.add(e);
+        }
         log.add(s);
         if (log.size() > 400) log.remove(0);
     }

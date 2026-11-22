@@ -3,6 +3,7 @@ package com.dawnofmankind.core;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -396,7 +397,14 @@ class GameTest {
         assertEquals("Hammurabi", p.leader.name);
         assertFalse(p.hand.contains(a), "a leader never sits in the hand");
         g.act(p.seat, Map.of("type", "pick", "slot", 1));
-        assertEquals("Gilgamesh", p.leader.name, "the new leader replaces the old");
+        assertEquals("Hammurabi", p.leader.name, "a second great person waits for the player's choice");
+        assertEquals("Gilgamesh", p.pendingLeader.name);
+        g.act(p.seat, Map.of("type", "leader", "replace", false));
+        assertEquals("Hammurabi", p.leader.name);
+        assertNull(p.pendingLeader);
+        p.pendingLeader = b.def;
+        g.act(p.seat, Map.of("type", "leader", "replace", true));
+        assertEquals("Gilgamesh", p.leader.name, "the new great person replaces the old one when chosen");
     }
 
     @Test
@@ -498,10 +506,12 @@ class GameTest {
             for (Player p : g.players) all.addAll(p.hand);                 // what they drew blind
             for (Game.CardInst c : all) n.merge(c.def.eraTrigger ? "era_trigger" : c.def.type.name().toLowerCase(), 1, Integer::sum);
             // leaders and great wonders play or go to the board as soon as they are drawn; hostility cards are spent
-            int ledBy = (int) g.log.stream().filter(l -> l.contains(" has the great person ")).count();
+            int ledBy = (int) g.log.stream().filter(l -> l.contains(" has the great person ") || l.contains(" draws the great person ")).count();
             assertEquals(x + 1, n.getOrDefault("leader", 0) + ledBy, "leaders, " + x + " players");
             assertEquals(x, n.getOrDefault("great_wonder", 0) + g.greatWonders.size(), "great wonders");
-            assertEquals(x + 2, n.getOrDefault("tech", 0), "techs");
+            assertEquals(6 + x, n.getOrDefault("tech", 0), "techs");
+            long cityStates = g.frontier.stream().filter(fr -> fr.land.def.id.equals("city_state")).count();
+            assertEquals(1, n.getOrDefault("city_state", 0) + cityStates, "one city state");
             assertEquals(24 + 2 * x, n.getOrDefault("action", 0), "actions");
             assertEquals(x, n.getOrDefault("response", 0), "responses");
             assertEquals(12 + x, n.getOrDefault("event", 0), "events");
@@ -529,6 +539,73 @@ class GameTest {
     }
 
     @Test
+    void contributingCultureToThePyramids() {
+        Game g = game(2, 73);
+        Player p = g.players.get(0);
+        p.leader = null;
+        Game.WonderProgress w = new Game.WonderProgress(C.greatWonders.get("pyramids"));
+        g.greatWonders.add(w);
+        w.paid.put(Res.PRODUCTION, 26);
+        p.res.put(Res.CULTURE, 8);
+        g.act(p.seat, Map.of("type", "contribute", "wonder", "pyramids", "resources", Map.of("culture", 8, "production", 0)));
+        assertEquals(8, w.paid.get(Res.CULTURE));
+    }
+
+    @Test
+    void theJournalRecordsActionsLogAndSnapshots() {
+        Game g = game(2, 74);
+        g.journalOn = true;
+        Player p = g.players.get(0);
+        try { g.act(p.seat, Map.of("type", "contribute", "wonder", "nope", "resources", Map.of())); } catch (GameException e) { /* refused, and recorded */ }
+        assertTrue(g.journal.stream().anyMatch(e -> "action".equals(e.get("kind")) && Boolean.FALSE.equals(e.get("ok"))));
+        Game.WonderProgress w = new Game.WonderProgress(C.greatWonders.get("pyramids"));
+        g.greatWonders.add(w);
+        g.cheatCompleteWonder(0, "pyramids", -1);
+        assertTrue(w.done);
+        assertTrue(g.builtWonders.contains(w.def));
+        assertTrue(g.journal.stream().anyMatch(e -> "log".equals(e.get("kind")) && String.valueOf(e.get("text")).contains("cheat")));
+    }
+
+    @Test
+    void wonderUpkeepGrowsWithEachEraAndAncientsCustomsHalvesIt() {
+        Game g = game(1, 75);
+        Player p = g.players.get(0);
+        p.leader = null;
+        g.builtWonders.add(C.greatWonders.get("pyramids"));          // an ancient wonder
+        g.builtWonders.add(C.greatWonders.get("skara_brae"));        // a prehistoric one
+        p.minorWonders.add(C.cards.get("first_farms"));              // a prehistoric minor wonder
+        g.eraIndex = 1;
+        assertEquals(2, g.wonderUpkeep(p), "no upkeep this era; 1 each for the two prehistoric ones");
+        g.eraIndex = 2;
+        assertEquals(3, g.wonderUpkeep(p), "pyramids 1 + Skara Brae 2; The First Farms has faded and costs nothing");
+        p.techs.add(C.cards.get("ancients_customs"));
+        assertEquals(2, g.wonderUpkeep(p), "halved, rounded up");
+    }
+
+    @Test
+    void aBonusCanBeRemovedForGood() {
+        Game g = game(1, 76);
+        Player p = g.players.get(0);
+        p.minorWonders.add(C.cards.get("first_farms"));
+        g.act(p.seat, Map.of("type", "removeBonus", "card", "first_farms"));
+        assertTrue(p.minorWonders.isEmpty());
+        assertThrows(GameException.class, () -> g.act(p.seat, Map.of("type", "removeBonus", "card", "first_farms")));
+    }
+
+    @Test
+    void aCityStateGoesAmongTheLandsToSettleAndCostsInfluence() {
+        Game g = game(2, 77);
+        Player p = g.players.get(0);
+        Game.CardInst c = card(g, "city_state");
+        g.queue.add(0, new Game.Slot(c, null));
+        g.act(p.seat, Map.of("type", "pick", "slot", 0));
+        Game.Frontier f = g.frontier.stream().filter(x -> x.land.def.id.equals("city_state")).findFirst().orElseThrow();
+        assertEquals(6, g.settleCost(f).get(Res.INFLUENCE), "3 influence per player");
+        assertEquals(0, g.settleSettlers(f));
+        assertEquals(0, g.settleTroops(f));
+    }
+
+    @Test
     void theConquerorAndAlexanderChangeEnemyStrength() {
         Game g = game(1, 72);
         Player p = g.players.get(0);
@@ -548,7 +625,9 @@ class GameTest {
         Player p = g.players.get(0);
         p.leader = null;
         p.minorWonders.add(C.cards.get("first_religion"));
-        assertEquals(3, g.mods(p).income.get(Res.CULTURE));
+        assertEquals(2, g.mods(p).income.get(Res.CULTURE));
+        int temple = g.buildCost(p, C.buildings.get("temple")).get(Res.PRODUCTION);
+        assertEquals(C.buildings.get("temple").cost.get(Res.PRODUCTION) - 1, temple, "temples cost 1 less");
         g.eraIndex = 1;
         assertEquals(0, g.mods(p).income.get(Res.CULTURE), "obsolete");
     }
@@ -656,6 +735,20 @@ class GameTest {
             assertEquals(2, g.realm.size(), n + " players");
             assertEquals(total, g.worldDeck.size() + g.realm.size() + (int) g.frontier.stream().filter(f -> !f.fromEvent).count(), "no land was lost");
         }
+    }
+
+    @Test
+    void anEmptyDeckKeepsDrawingFromTheNextEra() {
+        Game g = game(1, 95);
+        Player p = g.players.get(0);
+        g.eraDeck.clear();
+        g.act(p.seat, Map.of("type", "endTurn"));
+        for (int i = 0; i < 10 && g.phase == Game.Phase.EVENTS; i++) {
+            try { g.act(p.seat, Map.of("type", "ready")); } catch (GameException e) { break; }
+        }
+        assertEquals(1, g.eraIndex, "the next era has begun");
+        assertTrue(g.log.stream().anyMatch(l -> l.contains("The era deck is empty")), "it began by itself while drawing");
+        assertTrue(g.queue.size() >= 1 && g.eraDeck.size() > 0, "the queue and deck are filled from the new era");
     }
 
     @Test

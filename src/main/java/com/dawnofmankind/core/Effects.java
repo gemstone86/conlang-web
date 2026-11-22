@@ -21,7 +21,8 @@ import java.util.Set;
  * (fewer settlers needed per land), strengthPerTwoTroops (military strength +n for every 2 troops), giveCards (the
  * owner may give up to n cards to teammates for 1 action), freeRecruit (leader: the first troop trained each round takes no action),
  * freeTech (leader: the next technology played is free), healthMod (a land: Health counts n more or less while it is held), troopStrength (every troop is worth n more strength), recruitExtra (troops cost this much more to train),
- * troopUpkeep (food per troop each round, may be 0.5),
+ * troopUpkeep (food per troop each round, may be 0.5), buildingDiscount ({building: temple, production: 1}: that building costs less),
+ * halveWonderUpkeep (the upkeep of wonders from earlier eras is halved),
  * growthDiscount (growing costs n less food), wonderDouble (resources given to great wonders count double), incomePerTerritory ({food: 1}: per territory in the realm),
  * noEnemy and halveEnemy (leaders: enemy strength on lands to settle is 0 / halved),
  * strengthBonus (leader: +n military strength), ownStrengthPerTwoTroops (leader: the owner's military strength +n per 2 troops), maxSlots ({farm: 1}: more worker slots a
@@ -43,7 +44,7 @@ public final class Effects {
             "threat", "invadeIfStronger", "raidAll", "invasion", "healthTest", "trade");
     static final Set<String> LASTING = Set.of("income", "perWorker", "handLimit", "actionsPerTurn", "raidDefense",
             "mitigate", "buildDiscount", "sharedPool", "victoryPoints", "invasionDefense", "faceUpLands", "settleDiscount", "freeSettlers", "strengthPerTwoTroops", "giveCards", "freeRecruit", "strengthBonus", "ownStrengthPerTwoTroops", "maxSlots", "buildCost", "wonderGrowth", "eventUnder", "actionsToHand",
-            "growthDiscount", "wonderDouble", "incomePerTerritory", "noEnemy", "halveEnemy", "healthMod", "troopStrength", "recruitExtra", "troopUpkeep", "freeTech");
+            "growthDiscount", "wonderDouble", "incomePerTerritory", "noEnemy", "halveEnemy", "healthMod", "troopStrength", "recruitExtra", "troopUpkeep", "freeTech", "buildingDiscount", "halveWonderUpkeep");
     static final Set<String> RESPONSE = Set.of("defense", "halve", "cancel", "healthBonus");
 
     static String key(Map<String, Object> e) {
@@ -76,6 +77,10 @@ public final class Effects {
         public final Map<String, EnumMap<Res, Integer>> fixedCost = new HashMap<>();
         public final EnumMap<Res, Integer> settleDiscount = Res.empty();
         public boolean sharedPool;
+        /** A cheaper building type (The First Religion's temples: -1 production). */
+        public final Map<String, EnumMap<Res, Integer>> buildingDiscount = new HashMap<>();
+        /** Ancients Customs: the upkeep of wonders from earlier eras is halved. */
+        public boolean halveWonderUpkeep;
 
         void add(List<Map<String, Object>> effects) {
             for (Map<String, Object> e : effects) add(e);
@@ -118,6 +123,13 @@ public final class Effects {
                     String building = String.valueOf(m.remove("building"));
                     fixedCost.put(building, Res.parse(m));
                 }
+                case "buildingDiscount" -> {
+                    Map<String, Object> m = new HashMap<>(Y.map(v));
+                    String building = String.valueOf(m.remove("building"));
+                    EnumMap<Res, Integer> cur = buildingDiscount.computeIfAbsent(building, x -> Res.empty());
+                    Res.parse(m).forEach((r, n) -> cur.merge(r, n, Integer::sum));
+                }
+                case "halveWonderUpkeep" -> halveWonderUpkeep = true;
                 case "settleDiscount" -> Res.parse(v).forEach((r, n) -> settleDiscount.merge(r, n, Integer::sum));
                 case "victoryPoints" -> victoryPoints += Y.toInt(v);
                 case "mitigate" -> mitigate.addAll(Y.strings(v));

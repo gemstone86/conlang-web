@@ -2,6 +2,55 @@
 
 Newest first. Versions from 1.x on are the combined app (Root and Rune + Weather generator).
 
+## v1.71.4 (combined app)
+
+- Dawn: pictures for ten prehistoric action cards.
+
+## v1.71.3 (combined app)
+
+- Dawn: pictures for nine more techs (Agriculture, Bronze Working, Writing, Masonry, Medicine, Currency, Calendar, Code of Laws, Horseback Riding).
+
+## v1.71.2 (combined app)
+
+- Dawn: a new picture for Stone Tools.
+
+## v1.71.1 (combined app)
+
+- Dawn: pictures for eight prehistoric techs (Fire, Stone Tools, Hunting, Animal Husbandry, Pottery, Mysticism, Spearmen, Herbalism).
+
+## v1.71.0 (combined app)
+
+- Dawn: The First Religion is now +2 culture per turn and temples cost 1 less production (the -1 action is gone).
+- Dawn: bonuses (minor wonders) can be removed with a Remove button, after an "Are you sure?" popup; the card goes with it.
+- Dawn: wonders of earlier eras cost upkeep: 1 production per round for each era they are removed from, for each player. Wonders of the current era cost nothing. Your realm panel shows what you pay.
+- Dawn: new card kind, City State: one waits in every era deck; when picked it goes among the lands to settle and costs 3 influence per player (no people or troops). It gives +2 village slots and +1 culture per turn.
+- Dawn: each era deck now holds 6 + players techs.
+- Dawn: "Spear Men" is now "Spearmen".
+- Dawn: new techs Wanderlust (one more land to settle), The Wheel (settling costs 1 less population) and, in the Ancient era, Ancients Customs (halves the upkeep of wonders from earlier eras).
+
+## v1.70.0 (combined app)
+
+- Dawn: admins get a "Complete (admin)" button in the top right corner of every great wonder under construction; it finishes the wonder at once, in the territory chosen on the card.
+- Dawn: a "Game log" button in the header downloads a detailed JSON journal of the game: every action (with the player's resources and actions before and after, and refused actions with the reason), every log line, and a full table snapshot at the start of each round and at the end. Send it after a game for review.
+
+## v1.69.0 (combined app)
+
+- Dawn: your great person now has its own panel above the tribe, with its card.
+- Dawn: when you draw a great person while you already have one, you choose whether they replace the current one (undecided at the end of your turn keeps the current one).
+- Dawn: the "give at least one resource" error on great wonders now says what the wonder still needs.
+
+## v1.68.0 (combined app)
+
+- Dawn: when the era deck runs out while cards are being drawn (the queue refilling, a blind draw, the face-down card), the next era begins at once and drawing goes on from its deck. The cards already in the queue stay. As at any era end, unfinished great wonders are lost (half returned) and great people leave. In the last era nothing changes: it goes on until the queue is empty at the end of a round.
+
+## v1.67.2 (combined app)
+
+- Dawn: The First Farms becomes obsolete after the Ancient era. (Ancient is the last era for now, so this only matters once a later era exists.)
+
+## v1.67.1 (combined app)
+
+- Dawn: "Actions left" has its own highlighted box in the top bar (it used to share a spot with "Events"; that spot now says Events / Your turn / waiting). The Tribe panel shows how many actions each player has left this round.
+
 ## v1.67.0 (combined app)
 
 - Dawn: pictures for all 10 great wonders, shown on the wonder cards in the queue, the "Great wonders" board and the All cards list.

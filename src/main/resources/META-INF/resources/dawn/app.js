@@ -130,6 +130,7 @@ function render(m) {
   renderSetup();
   renderTechs();
   renderHand();
+  renderLeader();
   renderTeam();
   renderDecks();
   renderLog();
@@ -176,9 +177,12 @@ function renderStatus() {
   const s = state, waiting = s.players.filter(o => !o.done && !o.away).map(o => esc(o.name));
   const phase = s.result ? (s.result === 'victory' ? 'Victory' : 'Defeat')
     : s.phase === 'setup' ? 'Choosing starting lands'
-    : s.phase === 'events' ? 'Events' : s.phase === 'starvation' ? 'Starvation — choosing who goes' : myTurn() ? `<span class="turn">${s.actionsLeft} action${s.actionsLeft === 1 ? '' : 's'} left</span>` : `You are done — waiting for ${waiting.join(', ') || 'the others'}`;
+    : s.phase === 'events' ? 'Events' : s.phase === 'starvation' ? 'Starvation — choosing who goes' : myTurn() ? '<span class="turn">Your turn</span>' : `You are done — waiting for ${waiting.join(', ') || 'the others'}`;
+  // actions left get a box of their own, always shown, because they were hard to find
+  const left = s.phase === 'turns' && !s.result ? (myTurn() ? s.actionsLeft : 0) : null;
+  const actions = `<span class="al ${left === 0 ? 'zero' : ''}" title="Actions you have left this round">Actions left <b>${left == null ? '–' : left}</b></span>`;
   $('status').innerHTML = `<span>${esc(s.era)} era (${s.eraIndex + 1}/${s.eraCount})</span><span>Round <b>${s.round}</b></span>
-    <span>${phase}</span><span>Stability <b class="${s.stability <= 3 ? 'bad' : ''}">${s.stability}</b></span>
+    <span>${phase}</span>${actions}<span>Stability <b class="${s.stability <= 3 ? 'bad' : ''}">${s.stability}</b></span>
     <span>Health <b>${s.health}</b></span><span class="${s.threat ? 'threat' : ''}">Enemies massing <b>${s.threat}</b></span><span>Era deck <b>${s.eraDeck}</b></span><span>Points <b>${s.score}</b></span>
     <span class="muted small">Room ${esc(room.code)}</span>`;
 }
@@ -247,7 +251,7 @@ function checkTurnDraw() {
   try { sessionStorage.setItem(key, String(m.turnSeq)); } catch (e) {}
   const ev = m.turnEvents ? `<p class="muted small">${m.turnEvents} event${m.turnEvents > 1 ? 's' : ''} came up first and went face down into the future deck.</p>` : '';
   const body = m.turnDraw
-    ? `<div class="cards">${cardHtml(m.turnDraw)}</div>${m.turnDraw.type === 'great_wonder' ? '<p class="muted small">A great wonder: it goes on the board for the whole tribe to build.</p>' : ''}${m.turnDraw.type === 'leader' ? '<p class="muted small">A great person: they take over at once and leave when the era ends.</p>' : ''}`
+    ? `<div class="cards">${cardHtml(m.turnDraw)}</div>${m.turnDraw.type === 'great_wonder' ? '<p class="muted small">A great wonder: it goes on the board for the whole tribe to build.</p>' : ''}${m.turnDraw.type === 'leader' ? '<p class="muted small">A great person: they take over at once (or you choose, if you already have one) and leave when the era ends.</p>' : ''}`
     : '<p class="muted">The era deck is empty: nothing to draw.</p>';
   $('gotBox').innerHTML = `<h2>Round ${state.round}: your turn. You drew</h2>${ev}${body}<div class="row"><button class="primary" data-gotok>OK</button></div>`;
   $('gotModal').hidden = false;
@@ -397,7 +401,8 @@ function renderWonders() {
     const form = w.done ? '' : `<div class="row small">${need.map(k => `<label class="res r-${k}" style="margin:0">${RES_SHORT[k]} <input type="number" min="0" value="0" data-keep="w-${w.key}-${k}" data-wres="${k}"></label>`).join('')}</div>
       <div class="row small">If this finishes it, place it in <select data-keep="w-${w.key}-where" data-wwhere>${s.realm.map(t => `<option value="${t.id}">${esc(t.name)}${t.wonders.length ? ' (' + t.wonders.length + ' wonder' + (t.wonders.length > 1 ? 's' : '') + ')' : ''}</option>`).join('')}</select></div>
       <div class="row">${s.sharedPool ? `<label class="small" style="margin:0"><input type="checkbox" data-keep="w-${w.key}-pool" data-wpool> from shared pool</label>` : ''}
-      <button ${myTurn() ? '' : 'disabled'} data-wonder="${w.key}">Contribute (free)</button></div>`;
+      <button ${myTurn() ? '' : 'disabled'} data-wonder="${w.key}">Contribute (free)</button></div>
+      ${room.admin ? `<button class="cheat" title="Admin: finish this wonder now" data-cheat="${w.key}">Complete (admin)</button>` : ''}`;
     const by = Object.entries(w.bySeat).map(([n, r]) => `<div class="small muted">${esc(n)}: ${resList(r)}</div>`).join('');
     return `<div class="cardx wonder ${w.done ? 'done' : ''}${w.art ? ` hasart" style="--art:url('${w.art}')` : ''}" data-w="${w.key}"><div class="type">Great wonder · ${w.victoryPoints} points</div>
       <div class="name">${esc(w.name)}${w.done ? ' ✓' : ''}</div><div class="text">${esc(w.text)}</div>
@@ -407,6 +412,12 @@ function renderWonders() {
   $('wonderPanel').innerHTML = `<h2>Great wonders</h2><p class="muted small">Great wonders turn up in the queue; take one to start building it together. Each stands in a territory: lose the territory, lose the wonder. Their points, plus 1 per territory, are your final score. Unfinished wonders are lost when the era ends (half is returned).</p>${built}<div class="cards">${list || '<p class="muted">None under construction.</p>'}</div>`;
 }
 $('wonderPanel').onclick = e => {
+  const c = e.target.closest('[data-cheat]');
+  if (c) {
+    const where = c.closest('[data-w]').querySelector('[data-wwhere]');
+    send({ type: 'cheatWonder', wonder: c.dataset.cheat, territory: where ? +where.value : -1 });
+    return;
+  }
   const b = e.target.closest('[data-wonder]'); if (!b) return;
   const box = b.closest('[data-w]'), resources = {};
   box.querySelectorAll('[data-wres]').forEach(i => { resources[i.dataset.wres] = Math.max(0, +i.value || 0); });
@@ -492,11 +503,16 @@ function renderTechs() {
     ? list.map(({ t, by }) => `<div class="techrow"><b>${esc(t.name)}</b> <span class="muted small">by ${esc(by)}</span><div class="small">${esc(t.text)}</div></div>`).join('')
     : '<p class="muted small">None yet. Technologies help every player once anyone has researched them.</p>');
   // the lasting bonuses that aren't technologies: minor wonders such as Roman Roads
-  const bonus = s.players.flatMap(o => o.minorWonders.map(t => ({ t, by: o.name })));
+  const bonus = s.players.flatMap(o => o.minorWonders.map(t => ({ t, by: o.name, mine: o.seat === s.you })));
   $('bonusPanel').innerHTML = `<h2>Bonuses <span class="muted small">(${bonus.length})</span></h2>` + (bonus.length
-    ? bonus.map(({ t, by }) => `<div class="techrow"><b>★ ${esc(t.name)}</b> <span class="muted small">by ${esc(by)}</span><div class="small">${esc(t.text)}</div></div>`).join('')
+    ? bonus.map(({ t, by, mine }) => `<div class="techrow"><b>★ ${esc(t.name)}</b> <span class="muted small">by ${esc(by)}</span>${mine ? ` <button class="secondary small" data-removebonus="${t.key}" data-bname="${esc(t.name)}">Remove</button>` : ''}<div class="small">${esc(t.text)}</div></div>`).join('')
     : '<p class="muted small">None yet. Minor wonders (like Roman Roads) and other lasting bonuses show here.</p>');
 }
+$('bonusPanel').onclick = e => {
+  const b = e.target.closest('[data-removebonus]'); if (!b) return;
+  if (!confirm(`Are you sure you want to remove ${b.dataset.bname}? The bonus and its card are gone for good.`)) return;
+  send({ type: 'removeBonus', card: b.dataset.removebonus });
+};
 let growCb = null;
 function openGrowChoice(free, cb) {
   growCb = cb || (id => send({ type: 'grow', building: id }));
@@ -548,6 +564,7 @@ function renderCiv() {
     <div class="row small muted">Per round: ${resList(p.income, { signed: true })} (food after feeding your people)</div>
     <div class="row small">Population <b>${p.population}</b> · idle ${p.idle} · Army <b>${p.army}</b>${p.strength !== p.army ? ` (strength ${p.strength})` : ''}${p.committed ? ` (${p.committed} away at war)` : ''} · raid defense +${p.raidDefense} · hand ${p.handSize}/${p.handLimit}</div>
     ${(() => { const techs = s.players.flatMap(o => o.techs); return techs.length ? `<div class="small">Technologies (they help everyone): ${techs.map(t => `<span class="chip" title="${esc(t.text)}">${esc(t.name)}</span>`).join('')}</div>` : ''; })()}
+    ${p.wonderUpkeep ? `<div class="small">Upkeep for wonders of earlier eras: <b>${p.wonderUpkeep} production</b> every round.</div>` : ''}
     ${p.leader ? `<div class="small">Great person: <span class="chip" title="${esc(p.leader.text)}">♛ ${esc(p.leader.name)}</span> <span class="muted">${esc(p.leader.text)} Leaves when the era ends.</span></div>` : ''}
     ${p.minorWonders.length ? `<div class="small">${p.minorWonders.map(t => `<span class="chip" title="${esc(t.text)}">★ ${esc(t.name)}</span>`).join('')}</div>` : ''}
     ${s.strengthPerTwoTroops || s.freeSettlers ? `<div class="small muted">${s.strengthPerTwoTroops ? `Military strength +${s.strengthPerTwoTroops} per 2 troops. ` : ''}${s.freeSettlers ? `Settling takes ${s.freeSettlers} settler${s.freeSettlers > 1 ? 's' : ''} less.` : ''}</div>` : ''}
@@ -634,13 +651,26 @@ $('handPanel').onclick = e => {
   }
 };
 
+function renderLeader() {
+  const m = me(), el = $('leaderPanel');
+  const pend = m.pendingLeader
+    ? `<div class="small"><b>You drew a new great person.</b> Replace ${esc(m.leader.name)}?</div><div class="cards">${cardHtml(m.pendingLeader)}</div>
+       <div class="row"><button data-leader="1">Replace ${esc(m.leader.name)}</button> <button class="secondary" data-leader="0">Keep ${esc(m.leader.name)}</button></div>` : '';
+  el.hidden = false;
+  el.innerHTML = `<h2>Your great person</h2>${m.leader ? `<div class="cards">${cardHtml(m.leader)}</div><p class="muted small">Leaves when the era ends.</p>` : '<p class="muted small">None yet. A great person you draw takes over at once.</p>'}${pend}`;
+}
+$('leaderPanel').onclick = e => {
+  const b = e.target.closest('[data-leader]'); if (!b) return;
+  send({ type: 'leader', replace: b.dataset.leader === '1' });
+};
+
 function renderTeam() {
   const s = state;
   const others = s.players.filter(o => o.seat !== s.you);
   const list = s.players.map(o => `<div class="teammate ${s.phase === 'turns' && !o.done ? 'active' : ''}">
       <div class="tname">${s.phase === 'turns' ? (o.done ? '✔ ' : '▶ ') : ''}${esc(o.name)}${o.seat === s.you ? ' (you)' : ''}${room.players[o.seat]?.ai ? ' <span class="chip">AI</span>' : ''}${o.seat === s.firstPlayer ? ' <span class="chip">first</span>' : ''}${o.away ? ' <span class="chip">away</span>' : ''}</div>
       <div class="small">${resList(o.resources)}</div>
-      <div class="small muted">Pop ${o.population} · Army ${o.army}${o.strength !== o.army ? ` (strength ${o.strength})` : ''} · Hand ${o.handSize} · ${o.buildings.map(b => esc(b.name) + ' ' + b.workers + '/' + b.slots).join(', ')}</div>
+      <div class="small muted">${s.phase === 'turns' ? `<b class="${o.done || !o.actions ? 'muted' : 'al-num'}">${o.done ? 'done' : o.actions + ' action' + (o.actions === 1 ? '' : 's') + ' left'}</b> · ` : ''}Pop ${o.population} · Army ${o.army}${o.strength !== o.army ? ` (strength ${o.strength})` : ''} · Hand ${o.handSize} · ${o.buildings.map(b => esc(b.name) + ' ' + b.workers + '/' + b.slots).join(', ')}</div>
       ${o.techs.length || o.minorWonders.length ? `<div>${o.techs.map(t => `<span class="chip" title="${esc(t.text)}">${esc(t.name)}</span>`).join('')}${o.minorWonders.map(t => `<span class="chip">★ ${esc(t.name)}</span>`).join('')}</div>` : ''}
       ${o.leader ? `<div class="small"><span class="chip" title="${esc(o.leader.text)}">♛ ${esc(o.leader.name)}</span></div>` : ''}
     </div>`).join('');
@@ -716,7 +746,7 @@ async function openAllCards() {
       item(c.name, [c.type === 'leader' ? 'great person' : c.type.replace('_', ' '), c.era, cost(c.cost) && 'cost ' + cost(c.cost), c.minPlayers && c.minPlayers + '+ players only'].filter(Boolean).join(' · '), c.text, c.art)).join('')}</div>` : '';
   };
   const types = [...new Set(catalogue.cards.map(c => c.type))].filter(t => t !== 'great_wonder');
-  const names = { leader: 'Great people', era_trigger: 'Era-trigger events', hostility: 'Hostility cards', tech: 'Techs', action: 'Actions', response: 'Responses', minor_wonder: 'Minor wonders', great_wonder: 'Great wonders', event: 'Events' };
+  const names = { leader: 'Great people', era_trigger: 'Era-trigger events', hostility: 'Hostility cards', tech: 'Techs', action: 'Actions', response: 'Responses', minor_wonder: 'Minor wonders', great_wonder: 'Great wonders', city_state: 'City states', event: 'Events' };
   const nice = k => names[k] || k;
   const per = x => !x ? '-' : [x.base ? String(x.base) : '', x.perPlayer ? (x.perPlayer === 1 ? 'X' : x.perPlayer + 'X') : ''].filter(Boolean).join(' + ') || '0';
   const eraNames = catalogue.counts[0].eras.map(e => e.era);
@@ -736,4 +766,15 @@ async function openAllCards() {
     <h3>Great wonders (${catalogue.wonders.length})</h3><div class="catalog">${catalogue.wonders.map(w => item(w.name, w.era || '', w.text, w.art)).join('')}</div>`;
 }
 $('allCards').onclick = openAllCards;
+$('gameLog').onclick = async () => {
+  try {
+    const r = await fetch(`${API}/rooms/${code}/gamelog?token=${encodeURIComponent(token)}`);
+    if (!r.ok) return toast((await r.json().catch(() => ({}))).error || 'No game log yet.');
+    const url = URL.createObjectURL(await r.blob());
+    const a = document.createElement('a');
+    a.href = url; a.download = `dawn-game-${code}.json`;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+  } catch (e) { toast('Could not download the log.'); }
+};
 $('cardsModal').onclick = e => { if (e.target === $('cardsModal') || e.target.closest('[data-close]')) $('cardsModal').hidden = true; };
