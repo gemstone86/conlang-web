@@ -1883,7 +1883,11 @@ public final class Game {
     private int noticeSeq;
     private List<String> collect;
 
+    /** When set (by the balance simulation), every log line is kept here, uncut. */
+    List<String> audit;
+
     void log(String s) {
+        if (audit != null) audit.add(s);
         if (collect != null) collect.add(s);
         log.add(s);
         if (log.size() > 400) log.remove(0);
