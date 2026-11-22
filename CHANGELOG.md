@@ -2,6 +2,10 @@
 
 Newest first. Versions from 1.x on are the combined app (Root and Rune + Weather generator).
 
+## v1.66.1 (combined app)
+
+- Dawn: on cards with a picture, the text now sits at the bottom, on the dark part of the picture.
+
 ## v1.66.0 (combined app)
 
 - Dawn: cards can have a background picture. A card shows `dawn/cards/<id>.jpg` behind its text (darkened so the text stays readable) if the file exists, in the queue, your hand, pop-ups and the All cards list. The 14 great people have pictures.

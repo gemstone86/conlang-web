@@ -150,7 +150,9 @@ details summary { cursor: pointer; color: var(--bone-dim); font-size: .88rem; }
 .counts th, .counts td { border: 1px solid var(--line); padding: .2rem .6rem; text-align: right; }
 .counts th:first-child, .counts td:first-child { text-align: left; }
 .counts tr.total td { font-weight: 700; color: var(--brass); }
-.cardx.hasart { background-image: linear-gradient(rgba(18,24,32,.35), rgba(18,24,32,.80) 70%), var(--art); background-size: cover; background-position: center; }
-.cardx.hasart .text, .cardx.hasart .name, .cardx.hasart .type { text-shadow: 0 1px 3px rgba(0,0,0,.85); }
-.catalog > div.hasart { background-image: linear-gradient(rgba(18,24,32,.35), rgba(18,24,32,.82) 70%), var(--art); background-size: cover; background-position: center; min-height: 9rem; }
+.cardx.hasart { display: flex; flex-direction: column; justify-content: flex-end; min-height: 16rem; background-image: linear-gradient(rgba(18,24,32,0) 0%, rgba(18,24,32,.15) 30%, rgba(18,24,32,.88) 62%), var(--art); background-size: cover; background-position: center top; }
+.cardx.hasart .text, .cardx.hasart .name, .cardx.hasart .type, .cardx.hasart .small { text-shadow: 0 1px 3px rgba(0,0,0,.9); }
+.catalog > div.hasart { display: flex; flex-direction: column; justify-content: flex-end; min-height: 12rem; background-image: linear-gradient(rgba(18,24,32,0) 0%, rgba(18,24,32,.15) 30%, rgba(18,24,32,.88) 62%), var(--art); background-size: cover; background-position: center top; }
 .catalog > div.hasart > div { text-shadow: 0 1px 3px rgba(0,0,0,.9); }
+.cardx.hasart > :first-child { margin-top: auto; }
+.cardx.hasart .actions { margin-top: .4rem; padding-top: 0; }
