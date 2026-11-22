@@ -2,6 +2,10 @@
 
 Newest first. Versions from 1.x on are the combined app (Root and Rune + Weather generator).
 
+## v1.67.0 (combined app)
+
+- Dawn: pictures for all 10 great wonders, shown on the wonder cards in the queue, the "Great wonders" board and the All cards list.
+
 ## v1.66.3 (combined app)
 
 - Dawn: new picture for The First Architect.

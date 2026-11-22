@@ -156,3 +156,4 @@ details summary { cursor: pointer; color: var(--bone-dim); font-size: .88rem; }
 .catalog > div.hasart > div { text-shadow: 0 1px 3px rgba(0,0,0,.9); }
 .cardx.hasart > :first-child { margin-top: auto; }
 .cardx.hasart .actions { margin-top: .4rem; padding-top: 0; }
+.cardx.hasart.wonder { padding-top: 8.5rem; }

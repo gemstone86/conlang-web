@@ -399,7 +399,7 @@ function renderWonders() {
       <div class="row">${s.sharedPool ? `<label class="small" style="margin:0"><input type="checkbox" data-keep="w-${w.key}-pool" data-wpool> from shared pool</label>` : ''}
       <button ${myTurn() ? '' : 'disabled'} data-wonder="${w.key}">Contribute (free)</button></div>`;
     const by = Object.entries(w.bySeat).map(([n, r]) => `<div class="small muted">${esc(n)}: ${resList(r)}</div>`).join('');
-    return `<div class="cardx wonder ${w.done ? 'done' : ''}" data-w="${w.key}"><div class="type">Great wonder · ${w.victoryPoints} points</div>
+    return `<div class="cardx wonder ${w.done ? 'done' : ''}${w.art ? ` hasart" style="--art:url('${w.art}')` : ''}" data-w="${w.key}"><div class="type">Great wonder · ${w.victoryPoints} points</div>
       <div class="name">${esc(w.name)}${w.done ? ' ✓' : ''}</div><div class="text">${esc(w.text)}</div>
       <div class="small">Paid ${resList(w.paid, { all: false })} of ${resList(w.cost)}</div><div class="prog"><div style="width:${total ? 100 * paid / total : 0}%"></div></div>${by}${form}</div>`;
   }).join('');
@@ -733,7 +733,7 @@ async function openAllCards() {
     ${countTable}
     ${types.map(t => group(t === 'leader' ? 'Great people' : t.charAt(0).toUpperCase() + t.slice(1).replace('_', ' ') + ' cards', [t])).join('')}
     <h3>Lands (${catalogue.lands.length})</h3><div class="catalog">${catalogue.lands.map(l => item(l.name, l.special ? 'special land' : 'land', l.text)).join('')}</div>
-    <h3>Great wonders (${catalogue.wonders.length})</h3><div class="catalog">${catalogue.wonders.map(w => item(w.name, w.era || '', w.text)).join('')}</div>`;
+    <h3>Great wonders (${catalogue.wonders.length})</h3><div class="catalog">${catalogue.wonders.map(w => item(w.name, w.era || '', w.text, w.art)).join('')}</div>`;
 }
 $('allCards').onclick = openAllCards;
 $('cardsModal').onclick = e => { if (e.target === $('cardsModal') || e.target.closest('[data-close]')) $('cardsModal').hidden = true; };

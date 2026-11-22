@@ -100,6 +100,7 @@ public final class View {
         List<Object> wonders = new ArrayList<>();
         for (WonderProgress w : g.greatWonders) {
             Map<String, Object> m = wonder(w.def);
+            if (hasArt(w.def.id)) m.put("art", "cards/" + w.def.id + ".jpg");
             m.put("cost", res(w.def.cost(g.players.size())));
             m.put("paid", res(w.paid));
             m.put("done", w.done);
@@ -370,6 +371,7 @@ public final class View {
             m.put("name", w.name);
             m.put("text", w.text);
             m.put("era", w.era);
+            if (hasArt(w.id)) m.put("art", "cards/" + w.id + ".jpg");
             wonders.add(m);
         }
         out.put("wonders", wonders);
