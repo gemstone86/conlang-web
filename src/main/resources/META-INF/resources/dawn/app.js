@@ -34,6 +34,7 @@ async function boot() {
 
 function show(which) {
   for (const id of ['start', 'lobby', 'game']) $(id).hidden = id !== which;
+  $('gameLog').hidden = which !== 'game';          // the log only exists once a game has started
 }
 
 async function post(url, body) {
@@ -264,7 +265,7 @@ function renderSetup() {
   const offer = s.setupOffer || [];
   box.innerHTML = offer.length
     ? `<h2>Choose your starting land</h2><p class="muted small">Each player is offered two lands and keeps one. The realm starts with two of the chosen lands; the rest go back on top of the land deck.</p>
-       <div class="catalog">${offer.map(l => `<div><div class="nm">${esc(l.name)}</div><div>${esc(l.text)}</div><div class="actions"><button class="primary" data-land="${l.id}">Start here</button></div></div>`).join('')}</div>`
+       <div class="catalog">${offer.map(l => `<div${l.art ? ` class="hasart" style="--art:url('${l.art}')"` : ''}><div class="nm">${esc(l.name)}</div><div>${esc(l.text)}</div><div class="actions"><button class="primary" data-land="${l.id}">Start here</button></div></div>`).join('')}</div>`
     : `<h2>Waiting for the others</h2><p class="muted">Still choosing: ${(s.setupWaiting || []).map(esc).join(', ') || '…'}</p>`;
   $('setupModal').hidden = false;
 }
@@ -346,7 +347,7 @@ const slotText = slots => Object.entries(slots || {}).map(([b, n]) => `+${n} ${b
 let landCardFn;                       // the land card drawing of renderRealm, also used in the event pop-up
 function renderRealm() {
   const s = state;
-  const lands = s.realm.map(t => `<div class="cardx territory ${t.cored ? 'cored' : ''}"><div class="type">Territory${t.cored ? ' · core' : ''}</div><div class="name">${esc(t.name)}</div>
+  const lands = s.realm.map(t => `<div class="cardx territory ${t.cored ? 'cored' : ''}${t.art ? ` hasart" style="--art:url('${t.art}')` : ''}"><div class="type">Territory${t.cored ? ' · core' : ''}</div><div class="name">${esc(t.name)}</div>
       <div class="text">${esc(t.text)}</div>${t.wonders.length ? `<div class="small">${t.wonders.map(w => `<span class="chip">★ ${esc(w)}</span>`).join('')}</div>` : ''}</div>`).join('');
   const settleCard = (me().hand || []).find(c => c.target === 'land');
   const landCard = landCardFn = f => {
@@ -363,7 +364,7 @@ function renderRealm() {
         ? `<button ${myTurn() ? '' : 'disabled'} data-colonize="${f.id}">Send (free)</button>`
         : `<button ${canAct() && settleCard ? '' : 'disabled'} data-settle="${f.id}" title="${settleCard ? '' : 'You need a Settle card'}">Play Settle: make it a colony (1 action)</button>${settleCard ? '' : ' <span class="small muted">needs a Settle card</span>'}`;
     const by = Object.entries(f.bySeat).map(([n, r]) => `<div class="small muted">${esc(n)}: ${resList(r)}</div>`).join('');
-    return `<div class="cardx frontier ${f.fromEvent ? 'eventland' : ''}" data-f="${f.id}">
+    return `<div class="cardx frontier ${f.fromEvent ? 'eventland' : ''}${f.art ? ` hasart" style="--art:url('${f.art}')` : ''}" data-f="${f.id}">
       <div class="type">${f.fromEvent ? 'Found by this event · settle it now or lose it' : f.opened ? 'Colony · being settled' : 'Face-up land'}${f.enemy ? ` · enemy strength ${f.enemy}` : ''}</div>
       <div class="name">${esc(f.name)}</div><div class="text">${esc(f.text)}</div>
       <div class="small">Paid ${resList(f.paid)} of ${resList(f.cost)}${f.troops ? ` · military strength ${f.troopsPaid}/${f.troops}` : ''}${f.settlers ? ` · settlers ${f.settlersPaid}/${f.settlers}` : ''}</div>

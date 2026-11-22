@@ -41,6 +41,7 @@ public final class View {
                 Map<String, Object> m = new LinkedHashMap<>();
                 m.put("id", t.id);
                 m.put("name", t.def.name);
+                if (hasArt(t.def.id)) m.put("art", "cards/" + t.def.id + ".jpg");
                 m.put("text", t.def.text);
                 offer.add(m);
             }
@@ -311,6 +312,7 @@ public final class View {
         Map<String, Object> m = new LinkedHashMap<>();
         m.put("id", t.id);
         m.put("key", t.def.id);
+        if (hasArt(t.def.id)) m.put("art", "cards/" + t.def.id + ".jpg");
         m.put("name", t.def.name);
         m.put("text", t.def.text);
         m.put("slots", t.def.slots);

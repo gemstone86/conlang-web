@@ -2,6 +2,11 @@
 
 Newest first. Versions from 1.x on are the combined app (Root and Rune + Weather generator).
 
+## v1.72.0 (combined app)
+
+- Dawn: lands have pictures now (Plains, Mountains, Steppe, Jungle, Coast, Forest, Ocean, Rich Land, Fortified Land, Wondrous Land): on the realm and lands-to-settle cards and in the starting-land popup. Fertile Delta and the City State still need one.
+- Dawn: the Game log button now only shows once a game has started.
+
 ## v1.71.5 (combined app)
 
 - Dawn: pictures for twelve more action cards (the rest of the prehistoric ones and the Ancient era actions).
