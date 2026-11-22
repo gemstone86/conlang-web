@@ -761,8 +761,9 @@ cards:
     name: The First Farms
     type: minor_wonder
     cost: {production: 3, food: 2}
+    obsoleteAfter: ancient
     effects: [{maxSlots: {farm: 2}}, {income: {food: 1}}]
-    text: +2 farm slots and +1 food per turn.
+    text: +2 farm slots and +1 food per turn. Fades after the Ancient era.
   first_mine:
     name: The First Mine
     type: minor_wonder

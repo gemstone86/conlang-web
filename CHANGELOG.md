@@ -2,6 +2,10 @@
 
 Newest first. Versions from 1.x on are the combined app (Root and Rune + Weather generator).
 
+## v1.67.2 (combined app)
+
+- Dawn: The First Farms becomes obsolete after the Ancient era. (Ancient is the last era for now, so this only matters once a later era exists.)
+
 ## v1.67.1 (combined app)
 
 - Dawn: "Actions left" has its own highlighted box in the top bar (it used to share a spot with "Events"; that spot now says Events / Your turn / waiting). The Tribe panel shows how many actions each player has left this round.
