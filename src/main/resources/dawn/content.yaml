@@ -32,7 +32,17 @@ rules:
   queueExtra: 4                           # queue size = players + 4
   removedPerRound: {1: 1, 2: 1, 3: 2, 4: 2, 5: 3, 6: 3}
   startingEventsPerPlayer: 2
-  eraDeckSize: {base: 20, perPlayer: 12}
+  # what an era deck holds: base + perPlayer × players cards of each kind, drawn at random from that era's list below
+  eraDeck:
+    leader: {base: 1, perPlayer: 1}
+    great_wonder: {base: 0, perPlayer: 1}
+    minor_wonder: {base: 1, perPlayer: 1}
+    hostility: {base: 0, perPlayer: 1}
+    tech: {base: 2, perPlayer: 1}
+    action: {base: 24, perPlayer: 2}
+    response: {base: 0, perPlayer: 1}
+    event: {base: 12, perPlayer: 1}
+    era_trigger: {base: 1, perPlayer: 0}
   eraTriggerBottomPercent: 30             # era-trigger events are placed in the bottom 30% of the era deck
   # fights: troops spent (up to the enemy's strength) must reach that strength (response cards add to it);
   # the troops spent settling a land are all lost; in invasions half of them, rounded up
@@ -92,8 +102,8 @@ territories:
     name: Jungle
     copies: 2
     slots: {farm: 1}
-    effects: [{income: {research: 1}}]
-    text: +1 farm worker slot. +1 research per turn.
+    effects: [{income: {research: 1}}, {healthMod: -2}]
+    text: "+1 farm worker slot. +1 research per turn. Unhealthy: -2 Health while you hold it."
   coast:
     name: Coast
     copies: 3
@@ -127,13 +137,20 @@ territories:
     effects: [{raidDefense: 1}, {invasionDefense: 3}]
     costPerPlayer: {production: 3, army: 4}
     text: +2 mine worker slots. +1 raid defense for every player, +3 against invasions.
+  wondrous_land:
+    name: Wondrous Land
+    special: true
+    hasWonder: true                      # a great wonder of the era that is not in the game stands here; it is built when the land is settled
+    enemy: 4
+    costPerPlayer: {food: 6, production: 6, population: 1}
+    text: "A land with a great wonder on it (one not yet in the game): the wonder is built the moment the land is settled. Costly: 4 extra food and production per player, and +4 enemy strength."
   fertile_delta:
     name: Fertile Delta
     special: true
     slots: {farm: 4}
-    effects: [{income: {food: 1}}]
+    effects: [{income: {food: 1}}, {healthMod: -2}]
     costPerPlayer: {food: 4, production: 2, population: 1}
-    text: +4 farm worker slots, +1 food per turn.
+    text: "+4 farm worker slots, +1 food per turn. Unhealthy: -2 Health while you hold it."
 
 greatWonders:
   stonehenge:
@@ -143,6 +160,27 @@ greatWonders:
     effects: [{actionsPerTurn: 1}]
     victoryPoints: 2
     text: Every player gets +1 action per turn.
+  gobekli_tepe:
+    name: Göbekli Tepe
+    era: prehistoric
+    costPerPlayer: {production: 9, culture: 3, research: 2}
+    effects: [{income: {culture: 2}}, {growthDiscount: 1}, {maxSlots: {farm: 1}}]
+    victoryPoints: 2
+    text: Every player gets +2 culture per turn, growing costs 1 less food, and +1 farm slot.
+  ggantija_temples:
+    name: Ġgantija Temples
+    era: prehistoric
+    costPerPlayer: {production: 10, culture: 3}
+    effects: [{wonderDouble: 1}, {maxSlots: {mine: 1}}]
+    victoryPoints: 2
+    text: Resources given to other great wonders count double. Every player gets +1 mine slot.
+  skara_brae:
+    name: Skara Brae
+    era: prehistoric
+    costPerPlayer: {production: 8, food: 6}
+    effects: [{incomePerTerritory: {food: 1}}]
+    victoryPoints: 2
+    text: Every player gets +1 food per turn for each territory in the realm.
   pyramids:
     name: The Pyramids
     era: ancient
@@ -194,6 +232,16 @@ eras:
       # great wonders (taking one puts it on the board for the team to build)
       stonehenge: 1
       nomadic_living: 1
+      gobekli_tepe: 1
+      ggantija_temples: 1
+      skara_brae: 1
+      first_farms: 1
+      first_mine: 1
+      oral_tradition: 1
+      first_religion: 1
+      first_ruler: 1
+      first_conqueror: 1
+      first_architect: 1
       # leaders (play themselves; replace the current leader; leave with the era)
       first_shaman: 1
       great_hunter: 1
@@ -209,7 +257,7 @@ eras:
       animal_husbandry: 1
       pottery: 1
       mysticism: 1
-      spear_throwing: 1
+      spear_men: 1
       herbalism: 1
       # actions
       foraging: 3
@@ -247,6 +295,7 @@ eras:
       free_colony: 1
       rich_land_found: 1
       fertile_delta_found: 1
+      wondrous_land_found: 1
       hostile_tribes: 2
       rivals_claim: 1
       dawn_of_agriculture: 1
@@ -259,7 +308,13 @@ eras:
       great_lighthouse: 1
       colossus: 1
       roman_roads: 1
+      great_tomb: 1
+      epic_wall: 1
+      great_trade_route: 1
+      tomyris: 1
+      alexander_the_great: 1
       julius_caesar: 1
+      archimedes: 1
       gilgamesh: 1
       hammurabi: 1
       ramses: 1
@@ -318,6 +373,7 @@ eras:
       rich_land_found: 1
       fortified_land_found: 1
       fertile_delta_found: 1
+      wondrous_land_found: 1
       hostile_tribes: 1
       warlord: 2
       rivals_claim: 1
@@ -363,7 +419,32 @@ cards:
     type: leader
     effects: [{handLimit: -2}, {actionsToHand: 1}]
     text: Hand size -2. Action cards that leave the queue go into your hand instead.
+  first_ruler:
+    name: The First Ruler
+    type: leader
+    effects: [{income: {culture: 1}}, {income: {production: 1}}]
+    text: +1 culture and +1 production per turn.
+  first_conqueror:
+    name: The First Conqueror
+    type: leader
+    effects: [{halveEnemy: 1}]
+    text: Enemy strength on lands to settle is halved (rounded up).
+  first_architect:
+    name: The First Architect
+    type: leader
+    effects: [{actionsPerTurn: 1}]
+    text: +1 action per turn.
   # Ancient leaders
+  tomyris:
+    name: Tomyris
+    type: leader
+    effects: [{invasionDefense: 4}]
+    text: +4 defense for the whole team against invasions.
+  alexander_the_great:
+    name: Alexander the Great
+    type: leader
+    effects: [{noEnemy: 1}]
+    text: Enemy strength is always 0 on new lands and colonies.
   julius_caesar:
     name: Julius Caesar
     type: leader
@@ -374,6 +455,11 @@ cards:
     type: leader
     effects: [{freeRecruit: 1}, {strengthBonus: 2}]
     text: The first troop you train each round takes no action (it still costs resources). +2 military strength.
+  archimedes:
+    name: Archimedes
+    type: leader
+    effects: [{income: {research: 1}}, {freeTech: 1}]
+    text: +1 research per turn, and your next technology is played for free.
   hammurabi:
     name: Hammurabi
     type: leader
@@ -421,18 +507,18 @@ cards:
     cost: {research: 3, culture: 1}
     effects: [{perWorker: {building: temple, culture: 1}}]
     text: Your temple workers produce +1 culture.
-  spear_throwing:
-    name: Spear Throwing
+  spear_men:
+    name: Spear Men
     type: tech
     cost: {research: 2, production: 2}
-    effects: [{raidDefense: 2}]
-    text: +2 defense against raids.
+    effects: [{troopStrength: 1}, {recruitExtra: {production: 1}}, {troopUpkeep: 0.5}]
+    text: Every troop counts for +1 more strength, but training one costs +1 production and each troop eats half a food per round.
   herbalism:
     name: Herbalism
     type: tech
     cost: {research: 3}
-    effects: [{health: 2}]
-    text: +2 Health.
+    effects: [{health: 2}, {income: {research: 1}}]
+    text: +2 Health and +1 research per turn.
   agriculture:
     name: Agriculture
     type: tech
@@ -669,6 +755,51 @@ cards:
     cost: {culture: 3, production: 2}
     effects: [{income: {culture: 1}}, {handLimit: 1}]
     text: +1 culture per turn, +1 max hand size.
+
+  # ---- minor wonders (a card you play for its cost; the bonus is yours)
+  first_farms:
+    name: The First Farms
+    type: minor_wonder
+    cost: {production: 3, food: 2}
+    effects: [{maxSlots: {farm: 2}}, {income: {food: 1}}]
+    text: +2 farm slots and +1 food per turn.
+  first_mine:
+    name: The First Mine
+    type: minor_wonder
+    cost: {production: 4}
+    effects: [{maxSlots: {mine: 2}}, {income: {production: 1}}]
+    text: +2 mine slots and +1 production per turn.
+  oral_tradition:
+    name: Oral Tradition
+    type: minor_wonder
+    cost: {culture: 2, production: 2}
+    effects: [{income: {culture: 1}}, {income: {research: 1}}, {freeBuilding: village}]
+    text: +1 culture and +1 research per turn, and a free village level (more village slots).
+  first_religion:
+    name: The First Religion
+    type: minor_wonder
+    cost: {culture: 2}
+    obsoleteAfter: prehistoric
+    effects: [{income: {culture: 3}}, {actionsPerTurn: -1}]
+    text: +3 culture per turn, -1 action per turn. Fades after the Prehistoric era.
+  great_tomb:
+    name: The Great Tomb
+    type: minor_wonder
+    cost: {production: 5, culture: 3}
+    effects: [{stability: 1}, {actionsPerTurn: 1}]
+    text: +1 stability (happiness) and +1 action per turn.
+  epic_wall:
+    name: The Epic Wall
+    type: minor_wonder
+    cost: {production: 6, culture: 1}
+    effects: [{raidDefense: 2}, {army: 3}]
+    text: +2 defense against raids and 3 troops.
+  great_trade_route:
+    name: The Great Trade Route
+    type: minor_wonder
+    cost: {production: 5, food: 3, culture: 2}
+    effects: [{income: {food: -2}}, {income: {production: 4}}, {maxSlots: {farm: 1}}, {maxSlots: {mine: 1}}]
+    text: -2 food and +4 production per turn, +1 farm slot and +1 mine slot.
 
   new_trading_route:
     name: New Trading Route
@@ -977,6 +1108,12 @@ cards:
     category: discovery
     effects: [{discover: fortified_land}]
     text: "A Fortified Land is found: settling it takes 3 production and 4 troops per player, at once."
+  wondrous_land_found:
+    name: Wondrous Land
+    type: event
+    category: discovery
+    effects: [{discover: wondrous_land}]
+    text: "A Wondrous Land is found, with a great wonder (one not in the game yet) on it: settling it takes 6 food, 6 production and 1 settler per player, and +4 enemy strength. Settle it at once, and the wonder is built."
   fertile_delta_found:
     name: Fertile Delta
     type: event

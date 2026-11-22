@@ -23,6 +23,7 @@ public final class AiPlayer {
     /** Makes one move for whoever needs to move. Returns false if nothing could be done. */
     public boolean step(Game g) {
         if (g.result != null) return false;
+        if (g.phase == Game.Phase.SETUP) { for (int seat : List.copyOf(g.setupOffers.keySet())) return stepFor(g, seat); return false; }
         if (g.phase == Game.Phase.STARVATION) { for (int seat : List.copyOf(g.starving.keySet())) { starveFor(g, seat); return true; } return false; }
         if (g.phase == Game.Phase.EVENTS) {
             for (Player p : g.players) if (respond(g, p)) return true;
@@ -35,6 +36,7 @@ public final class AiPlayer {
     /** True if this seat has something to do now (its turn, or an event waiting for its response). */
     public static boolean needsToAct(Game g, int seat) {
         if (g.result != null) return false;
+        if (g.phase == Game.Phase.SETUP) return g.setupOffers.containsKey(seat);
         if (g.phase == Game.Phase.STARVATION) return g.starving.containsKey(seat);
         if (g.phase == Game.Phase.EVENTS) return g.pending != null && !Boolean.TRUE.equals(g.pending.ready.get(seat));
         return g.phase == Game.Phase.TURNS && !g.players.get(seat).done;
@@ -44,6 +46,11 @@ public final class AiPlayer {
     public boolean stepFor(Game g, int seat) {
         if (!needsToAct(g, seat)) return false;
         Player p = g.players.get(seat);
+        if (g.phase == Game.Phase.SETUP) {
+            var offer = g.setupOffers.get(seat);
+            g.act(seat, Map.of("type", "chooseLand", "land", offer.get(rng.nextInt(offer.size())).id));
+            return true;
+        }
         if (g.phase == Game.Phase.STARVATION) { starveFor(g, seat); return true; }
         if (g.phase == Game.Phase.EVENTS) return respond(g, p);
         if (p.actions > 0 && takeAction(g, p)) return true;

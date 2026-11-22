@@ -35,6 +35,18 @@ public final class View {
             notices.add(m);
         }
         v.put("notices", notices);
+        if (g.phase == Game.Phase.SETUP) {
+            List<Object> offer = new ArrayList<>();
+            for (Game.Territory t : g.setupOffers.getOrDefault(seat, List.of())) {
+                Map<String, Object> m = new LinkedHashMap<>();
+                m.put("id", t.id);
+                m.put("name", t.def.name);
+                m.put("text", t.def.text);
+                offer.add(m);
+            }
+            v.put("setupOffer", offer);
+            v.put("setupWaiting", g.setupOffers.keySet().stream().filter(s -> s != seat).map(s -> g.players.get(s).name).toList());
+        }
         v.put("round", g.round);
         v.put("era", g.era().name);
         v.put("eraIndex", g.eraIndex);
@@ -44,7 +56,7 @@ public final class View {
         v.put("pickSeconds", g.pickSeconds);
         v.put("pickLeftMs", g.pickLeftMillis());
         v.put("stability", g.stability);
-        v.put("health", g.health);
+        v.put("health", g.effectiveHealth());
         v.put("threat", g.threat);
         v.put("territoryPoints", g.realm.size());
         v.put("you", seat);
@@ -88,6 +100,7 @@ public final class View {
         List<Object> wonders = new ArrayList<>();
         for (WonderProgress w : g.greatWonders) {
             Map<String, Object> m = wonder(w.def);
+            if (hasArt(w.def.id)) m.put("art", "cards/" + w.def.id + ".jpg");
             m.put("cost", res(w.def.cost(g.players.size())));
             m.put("paid", res(w.paid));
             m.put("done", w.done);
@@ -119,6 +132,9 @@ public final class View {
         List<Object> frontier = new ArrayList<>();
         for (Game.Frontier f : g.frontier) {
             Map<String, Object> m = territory(f.land);
+            if (f.land.pendingWonder != null) {
+                m.put("text", f.land.def.text + " The wonder here: " + f.land.pendingWonder.name + " (" + f.land.pendingWonder.text + ")");
+            }
             m.put("enemy", f.enemy);
             m.put("cost", res(g.settleCost(f)));
             m.put("paid", res(f.paid));
@@ -184,6 +200,7 @@ public final class View {
             pm.put("buildings", bs);
             pm.put("techs", p.techs.stream().map(View::def).toList());
             if (p.leader != null) pm.put("leader", def(p.leader));
+            pm.put("freeTech", g.freeTechAvailable(p));
             pm.put("minorWonders", p.minorWonders.stream().map(View::def).toList());
             if (p.seat == seat) pm.put("hand", p.hand.stream().map(View::card).toList());
             pm.put("done", p.done);
@@ -218,7 +235,7 @@ public final class View {
         }
         Map<String, Object> rules = new LinkedHashMap<>();
         rules.put("growthCost", res(seat >= 0 && seat < g.players.size() ? g.growthCost(g.players.get(seat)) : g.content.rules.growthCost));
-        rules.put("recruitCost", res(g.content.rules.recruitCost));
+        rules.put("recruitCost", res(seat >= 0 && seat < g.players.size() ? g.recruitCost(g.players.get(seat)) : g.content.rules.recruitCost));
         v.put("rules", rules);
 
         if (g.pending != null) {
@@ -259,7 +276,7 @@ public final class View {
                         : "Defenders " + sent + " vs strength " + pe.strength + ": " + (pe.strength - sent) + " short" + half + ".";
             }
             case "test" -> {
-                int val = ("stability".equals(d.stat) ? g.stability : g.health) + pe.healthBonus;
+                int val = ("stability".equals(d.stat) ? g.stability : g.effectiveHealth()) + pe.healthBonus;
                 yield val >= d.threshold ? "The civilization withstands it (" + d.stat + " " + val + " vs " + d.threshold + ")."
                         : d.stat + " " + val + " vs " + d.threshold + ": " + (d.threshold - val) + " short" + half + ".";
             }
@@ -277,7 +294,7 @@ public final class View {
             var bonus = m.perWorker.get(b.def.id);
             if (bonus != null) bonus.forEach((r, n) -> out.merge(r.key(), n * w, Integer::sum));
         }
-        out.merge(Res.FOOD.key(), -p.population() * g.content.rules.foodUpkeepPerPop, Integer::sum);
+        out.merge(Res.FOOD.key(), -(p.population() * g.content.rules.foodUpkeepPerPop + g.troopUpkeep(p)), Integer::sum);
         return out;
     }
 
@@ -310,6 +327,35 @@ public final class View {
             cards.add(m);
         }
         out.put("cards", cards);
+        // how many cards there are of each kind: different cards, copies in each era's list, and what a deck takes
+        List<Object> counts = new ArrayList<>();
+        Map<String, Integer> distinct = new LinkedHashMap<>();
+        for (CardDef d : content.cards.values()) {
+            if (d.helper) continue;
+            distinct.merge(d.eraTrigger ? "era_trigger" : d.type.name().toLowerCase(), 1, Integer::sum);
+        }
+        for (Map.Entry<String, Integer> en : distinct.entrySet()) {
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("kind", en.getKey());
+            m.put("different", en.getValue());
+            List<Object> perEra = new ArrayList<>();
+            for (Content.EraDef e : content.eras) {
+                int n = 0;
+                for (Map.Entry<String, Integer> c : e.cards.entrySet()) {
+                    CardDef d = content.cards.get(c.getKey());
+                    if (d != null && en.getKey().equals(d.eraTrigger ? "era_trigger" : d.type.name().toLowerCase())) n += c.getValue();
+                }
+                Map<String, Object> pe = new LinkedHashMap<>();
+                pe.put("era", e.name);
+                pe.put("copies", n);
+                perEra.add(pe);
+            }
+            m.put("eras", perEra);
+            int[] rule = content.rules.eraDeck.get(en.getKey());
+            if (rule != null) m.put("deck", Map.of("base", rule[0], "perPlayer", rule[1]));
+            counts.add(m);
+        }
+        out.put("counts", counts);
         List<Object> lands = new ArrayList<>();
         for (Content.TerritoryDef t : content.territories.values()) {
             Map<String, Object> m = new LinkedHashMap<>();
@@ -325,6 +371,7 @@ public final class View {
             m.put("name", w.name);
             m.put("text", w.text);
             m.put("era", w.era);
+            if (hasArt(w.id)) m.put("art", "cards/" + w.id + ".jpg");
             wonders.add(m);
         }
         out.put("wonders", wonders);
@@ -337,9 +384,17 @@ public final class View {
         return m;
     }
 
+    private static final Map<String, Boolean> ART = new java.util.concurrent.ConcurrentHashMap<>();
+
+    /** True if there is a picture for this card in /dawn/cards/ (id.jpg). */
+    static boolean hasArt(String id) {
+        return ART.computeIfAbsent(id, k -> View.class.getResource("/META-INF/resources/dawn/cards/" + k + ".jpg") != null);
+    }
+
     static Map<String, Object> def(CardDef d) {
         Map<String, Object> m = new LinkedHashMap<>();
         m.put("key", d.id);
+        if (hasArt(d.id)) m.put("art", "cards/" + d.id + ".jpg");
         m.put("name", d.name);
         m.put("type", d.type.name().toLowerCase());
         m.put("text", d.text);

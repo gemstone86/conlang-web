@@ -134,7 +134,7 @@ public final class Room {
             case "start" -> {
                 if (seat != host) throw new GameException("Only the host can start the game.");
                 if (game != null) throw new GameException("The game has already started.");
-                game = new Game(content, seats.stream().map(s -> s.name).toList(), RANDOM.nextLong());
+                game = new Game(content, seats.stream().map(s -> s.name).toList(), RANDOM.nextLong(), true);
                 for (int i = 0; i < seats.size(); i++) if (!seats.get(i).connected()) game.setAway(i, true);
             }
             case "addAi" -> {

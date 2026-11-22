@@ -26,7 +26,7 @@ import java.util.Random;
  */
 public final class Game {
 
-    public enum Phase { TURNS, EVENTS, STARVATION, OVER }
+    public enum Phase { SETUP, TURNS, EVENTS, STARVATION, OVER }
 
     /** One physical card. */
     public static final class CardInst {
@@ -71,6 +71,8 @@ public final class Game {
         public final List<WonderDef> wonders = new ArrayList<>();
         /** A cored territory is not lost to a broken invasion: it loses its core status instead. */
         public boolean cored;
+        /** The Wondrous Land: a great wonder that is built here the moment the land is settled. */
+        public WonderDef pendingWonder;
 
         Territory(int id, TerritoryDef def) {
             this.id = id;
@@ -184,7 +186,17 @@ public final class Game {
     public final List<String> log = new ArrayList<>();
     public long version;
 
+    /** Setup: each player is offered 2 lands and keeps 1 as the start of the realm (seat -> the lands offered). */
+    public final Map<Integer, List<Territory>> setupOffers = new LinkedHashMap<>();
+    private int startEvents;
+    private final List<Territory> setupChosen = new ArrayList<>(), setupReturned = new ArrayList<>();
+
     public Game(Content content, List<String> names, long seed) {
+        this(content, names, seed, false);
+    }
+
+    /** With {@code chooseLands}, the game starts in a setup phase where every player picks one of two lands. */
+    public Game(Content content, List<String> names, long seed, boolean chooseLands) {
         if (names.isEmpty() || names.size() > 6) throw new GameException("A game needs 1 to 6 players.");
         this.content = content;
         this.rng = new Random(seed);
@@ -193,8 +205,10 @@ public final class Game {
             if (!t.special) for (int i = 0; i < t.copies; i++) worldDeck.add(new Territory(nextId++, t));
         }
         Collections.shuffle(worldDeck, rng);
-        for (int i = 0; i < r.startTerritories && !worldDeck.isEmpty(); i++) realm.add(worldDeck.remove(0));
-        refillLands();
+        if (!chooseLands) {
+            for (int i = 0; i < r.startTerritories && !worldDeck.isEmpty(); i++) realm.add(worldDeck.remove(0));
+            refillLands();
+        }
         for (int i = 0; i < names.size(); i++) {
             Player p = new Player(i, names.get(i));
             r.startResources.forEach((k, v) -> p.res.put(k, v));
@@ -216,10 +230,53 @@ public final class Game {
         Collections.shuffle(start, rng);
         int n = Math.min(start.size(), r.startingEventsPerPlayer * players.size());
         currentEvents.addAll(start.subList(0, n));
+        startEvents = n;
+        if (chooseLands) {
+            for (Player p : players) {
+                List<Territory> offer = new ArrayList<>();
+                for (int i = 0; i < 2 && !worldDeck.isEmpty(); i++) offer.add(worldDeck.remove(0));
+                setupOffers.put(p.seat, offer);
+            }
+            phase = Phase.SETUP;
+            log("Each player is offered two lands and keeps one to start with.");
+            return;
+        }
+        beginGame();
+    }
+
+    private void beginGame() {
         log("The tribes gather in a land of " + String.join(" and ", realm.stream().map(t -> t.def.name).toList())
-                + ". " + plural(n, "event") + " wait in the event deck.");
+                + ". " + plural(startEvents, "event") + " wait in the event deck.");
         startEra();
         startRound();
+    }
+
+    /** A player keeps one of the two lands offered; when everyone has, the game begins (the other lands go back in the world deck). */
+    private void chooseLand(Player p, Map<String, Object> a) {
+        if (phase != Phase.SETUP) throw new GameException("The lands have been chosen.");
+        List<Territory> offer = setupOffers.get(p.seat);
+        if (offer == null) throw new GameException("You have already chosen your land.");
+        int id = Y.i(a, "land", -1);
+        Territory pick = offer.stream().filter(t -> t.id == id).findFirst().orElseThrow(() -> new GameException("Choose one of the two lands offered."));
+        offer.remove(pick);
+        setupChosen.add(pick);
+        setupReturned.addAll(offer);
+        setupOffers.remove(p.seat);
+        log(p.name + " picks the " + pick.def.name + ".");
+        if (setupOffers.isEmpty()) {
+            // the realm starts with 2 of the chosen lands (more are drawn from the deck if fewer were chosen);
+            // all the other lands go back on top of the land deck in random order
+            Collections.shuffle(setupChosen, rng);
+            int keep = Math.min(2, setupChosen.size());
+            realm.addAll(setupChosen.subList(0, keep));
+            List<Territory> rest = new ArrayList<>(setupChosen.subList(keep, setupChosen.size()));
+            rest.addAll(setupReturned);
+            Collections.shuffle(rest, rng);
+            worldDeck.addAll(0, rest);
+            while (realm.size() < 2 && !worldDeck.isEmpty()) realm.add(worldDeck.remove(0));
+            refillLands();
+            beginGame();
+        }
     }
 
     // ------------------------------------------------------------------------------------------------ setup & eras
@@ -239,28 +296,32 @@ public final class Game {
     private void startEra() {
         EraDef e = era();
         eraDeck.clear();
-        List<CardInst> pool = new ArrayList<>(), triggers = new ArrayList<>();
+        // the era's cards, sorted by kind; the deck takes a set number of each kind (rules: eraDeck, per player count)
+        Map<String, List<CardInst>> pools = new LinkedHashMap<>();
         e.cards.forEach((id, copies) -> {
             CardDef d = content.cards.get(id);
             if (d.minPlayers > players.size()) return;                 // e.g. trading needs a teammate
-            for (int i = 0; i < copies; i++) (d.eraTrigger ? triggers : pool).add(inst(d));
+            String kind = d.eraTrigger ? "era_trigger" : d.type.name().toLowerCase();
+            for (int i = 0; i < copies; i++) pools.computeIfAbsent(kind, k -> new ArrayList<>()).add(inst(d));
         });
-        int size = content.rules.deckBase + content.rules.deckPerPlayer * players.size() - triggers.size();
-        // the deck is filled from the era's cards, going round again if needed; great wonders appear only once
-        List<CardInst> bag = new ArrayList<>();
-        boolean firstPass = true;
-        while (eraDeck.size() < size && !pool.isEmpty()) {
-            if (bag.isEmpty()) {
-                // great wonders and hostility cards come in the numbers listed, once per deck
-                for (CardInst c : pool) {
-                    if (firstPass || (c.def.type != CardType.GREAT_WONDER && c.def.type != CardType.HOSTILITY)) bag.add(inst(c.def));
+        List<CardInst> triggers = new ArrayList<>();
+        content.rules.eraDeck.forEach((kind, n) -> {
+            List<CardInst> pool = pools.getOrDefault(kind, List.of());
+            int want = n[0] + n[1] * players.size();
+            // great wonders and hostility cards come at most once each; other kinds go round again if the pool is short
+            boolean cycle = !kind.equals("great_wonder") && !kind.equals("hostility");
+            List<CardInst> picked = new ArrayList<>(), bag = new ArrayList<>();
+            while (picked.size() < want && !pool.isEmpty()) {
+                if (bag.isEmpty()) {
+                    if (!picked.isEmpty() && !cycle) break;
+                    for (CardInst c : pool) bag.add(inst(c.def));
+                    Collections.shuffle(bag, rng);
                 }
-                Collections.shuffle(bag, rng);
-                firstPass = false;
-                if (bag.isEmpty()) break;
+                picked.add(bag.remove(bag.size() - 1));
             }
-            eraDeck.add(bag.remove(bag.size() - 1));
-        }
+            if (kind.equals("era_trigger")) triggers.addAll(picked); else eraDeck.addAll(picked);
+        });
+        Collections.shuffle(eraDeck, rng);
         // era-trigger events go into the bottom part of the deck: they can end the era early, but not at once
         for (CardInst t : triggers) {
             int from = eraDeck.size() * (100 - content.rules.eraTriggerBottomShare) / 100;
@@ -372,7 +433,7 @@ public final class Game {
             }
             m.income.forEach((r, v) -> gain.merge(r, v, Integer::sum));
             gain.forEach((r, v) -> p.res.put(r, Math.max(0, p.res.get(r) + v)));
-            int upkeep = p.population() * content.rules.foodUpkeepPerPop;
+            int upkeep = p.population() * content.rules.foodUpkeepPerPop + troopUpkeep(p);
             int food = p.res.get(Res.FOOD);
             String msg = p.name + " produces " + Res.describe(gain) + "; feeds " + p.population() + " Population.";
             if (food >= upkeep) {
@@ -422,7 +483,7 @@ public final class Game {
         picksLocked = false;
         roundStartedAt = System.currentTimeMillis();
         for (Player p : players) {
-            p.actions = content.rules.actionsPerTurn + mods(p).actionsPerTurn;
+            p.actions = Math.max(1, content.rules.actionsPerTurn + mods(p).actionsPerTurn);
             p.done = false;
             p.freeRecruitUsed = false;
             p.turnEvents = 0;
@@ -664,6 +725,7 @@ public final class Game {
             case "troops" -> troops(p, a);
             case "decide" -> decide(p, a);
             case "ready" -> ready(p);
+            case "chooseLand" -> chooseLand(p, a);
             case "colonize" -> colonize(p, a);
             case "starve" -> starve(p, a);
             case "contribute" -> { myTurn(p); contribute(p, a); }          // paying toward a great wonder is free
@@ -779,7 +841,8 @@ public final class Game {
     public EnumMap<Res, Integer> growthCost(Player p) {
         EnumMap<Res, Integer> c = new EnumMap<>(content.rules.growthCost);
         int extra = Math.max(0, p.population() - 1) / Math.max(1, content.rules.growthStep);
-        c.merge(Res.FOOD, extra, Integer::sum);
+        c.merge(Res.FOOD, extra - mods(p).growthDiscount, Integer::sum);
+        c.put(Res.FOOD, Math.max(0, c.get(Res.FOOD)));
         return c;
     }
 
@@ -842,7 +905,8 @@ public final class Game {
             // a leader plays at once and replaces the one before
             if (p.leader != null) log(p.leader.name + " steps down.");
             p.leader = c.def;
-            log(p.name + " is now led by " + c.def.name + ": " + c.def.text);
+            p.freeTechUsed = false;
+            log(p.name + " has the great person " + c.def.name + ": " + c.def.text);
             return;
         }
         if (c.def.type != CardType.GREAT_WONDER) {
@@ -900,7 +964,12 @@ public final class Game {
             if (land.opened) throw new GameException("The " + land.land.def.name + " is already open for settling.");
         }
         if (cores) core = ownTerritory(a);
-        pay(p, d.cost);
+        if (d.type == CardType.TECH && freeTechAvailable(p)) {
+            p.freeTechUsed = true;
+            log(p.leader.name + ": " + d.name + " is researched for free.");
+        } else {
+            pay(p, d.cost);
+        }
         p.hand.remove(c);
         if (d.type == CardType.TECH) {
             p.techs.add(d);
@@ -952,8 +1021,30 @@ public final class Game {
         log(p.name + " grows by 1 Population" + (into != null ? ", who goes to the " + into.def.name : "") + ".");
     }
 
+    /** True if the player's great person (Archimedes) lets their next technology be played free. */
+    public boolean freeTechAvailable(Player p) {
+        return p.leader != null && !p.freeTechUsed && p.leader.effects.stream().anyMatch(e -> e.containsKey("freeTech"));
+    }
+
+    /** What training a troop costs: the rule's price, plus Spear Men's extra. */
+    public EnumMap<Res, Integer> recruitCost(Player p) {
+        EnumMap<Res, Integer> c = new EnumMap<>(content.rules.recruitCost);
+        mods(p).recruitExtra.forEach((r, v) -> c.merge(r, v, Integer::sum));
+        return c;
+    }
+
+    /** Food the troops eat each round (Spear Men): half a food per troop, rounded up. */
+    public int troopUpkeep(Player p) {
+        return (int) Math.ceil(p.army * mods(p).troopUpkeep - 1e-9);
+    }
+
+    /** Health as the world sees it: the stat, less what unhealthy lands (jungle, deltas) take off while held. */
+    public int effectiveHealth() {
+        return Math.max(0, health + civMods().healthMod);
+    }
+
     private void recruit(Player p) {
-        pay(p, content.rules.recruitCost);
+        pay(p, recruitCost(p));
         p.army++;
         boolean free = !p.freeRecruitUsed && mods(p).freeRecruit > 0;
         if (free) p.freeRecruitUsed = true;
@@ -967,17 +1058,21 @@ public final class Game {
         EnumMap<Res, Integer> give = Res.parse(a.get("resources"));
         EnumMap<Res, Integer> cost = w.def.cost(players.size());
         boolean fromPool = Y.b(a, "fromPool");
+        int factor = 1 + mods(p).wonderDouble;                 // Ġgantija Temples: what is given counts double
+        EnumMap<Res, Integer> credit = Res.empty();
         for (Res r : Res.values()) {
             int left = cost.get(r) - w.paid.get(r);
             if (give.get(r) < 0) throw new GameException("Amounts can't be negative.");
-            if (give.get(r) > left) give.put(r, left);
+            if (give.get(r) * factor > left) give.put(r, (left + factor - 1) / factor);
+            credit.put(r, Math.min(left, give.get(r) * factor));
         }
         if (Res.isZero(give)) throw new GameException("Give at least one resource the wonder still needs.");
         if (fromPool) payFromPool(give); else pay(p, give);
-        give.forEach((r, v) -> w.paid.merge(r, v, Integer::sum));
+        credit.forEach((r, v) -> w.paid.merge(r, v, Integer::sum));
         EnumMap<Res, Integer> mine = w.bySeat.computeIfAbsent(p.seat, x -> Res.empty());
-        give.forEach((r, v) -> mine.merge(r, v, Integer::sum));
-        log(p.name + " gives " + Res.describe(give) + (fromPool ? " from the shared pool" : "") + " to " + w.def.name + ".");
+        credit.forEach((r, v) -> mine.merge(r, v, Integer::sum));
+        log(p.name + " gives " + Res.describe(give) + (fromPool ? " from the shared pool" : "") + " to " + w.def.name
+                + (factor > 1 ? " (counts double: " + Res.describe(credit) + ")" : "") + ".");
         if (w.paid.equals(cost)) completeWonder(w, p, Y.i(a, "territory", -1));
     }
 
@@ -1051,7 +1146,10 @@ public final class Game {
 
     /** Troops needed: the land's enemy strength plus a special land's own troop cost. Troops sent are spent. */
     public int settleTroops(Frontier f) {
-        return f.enemy + f.land.def.armyPerPlayer * players.size();
+        int enemy = f.enemy;
+        if (leaderWith("noEnemy") != null) enemy = 0;                      // Alexander the Great
+        else if (leaderWith("halveEnemy") != null) enemy = (enemy + 1) / 2;   // The First Conqueror
+        return enemy + f.land.def.armyPerPlayer * players.size();
     }
 
     /** Settlers needed: per player (special lands their own number, other lands the rule's), minus free settlers. */
@@ -1062,12 +1160,13 @@ public final class Game {
 
     /** Military strength of a number of troops: Bronze Working adds 1 for every 2. */
     public int strength(int troops) {
-        return troops + (troops / 2) * civMods().strengthPerTwoTroops;
+        Mods m = civMods();
+        return troops * (1 + m.troopStrength) + (troops / 2) * m.strengthPerTwoTroops;
     }
 
     /** A player's strength for settling lands: Bronze Working's bonus plus a leader like Julius Caesar's. */
     public int strength(Player p, int troops) {
-        return troops + (troops / 2) * (civMods().strengthPerTwoTroops + mods(p).ownStrengthPerTwoTroops);
+        return strength(troops) + (troops / 2) * mods(p).ownStrengthPerTwoTroops;
     }
 
     /** A player's strength in a raid or invasion: the above plus a leader's flat bonus (Gilgamesh). */
@@ -1138,6 +1237,11 @@ public final class Game {
             frontier.remove(f);
             realm.add(f.land);
             log("The " + f.land.def.name + " is settled and joins the realm! " + f.land.def.text);
+            if (f.land.pendingWonder != null) {
+                WonderDef w = f.land.pendingWonder;
+                f.land.pendingWonder = null;
+                completeWonder(new WonderProgress(w), p, f.land.id);       // the wonder on the land is built at once
+            }
             refillLands();
         }
     }
@@ -1160,17 +1264,35 @@ public final class Game {
     }
 
     /** An event (or Send Scouts) finds a land: it must be settled at once. */
+    /** A great wonder of this era that is not in the game yet: not built, not being built, not in the deck or the queue. */
+    private WonderDef unusedWonder() {
+        List<WonderDef> free = new ArrayList<>();
+        for (WonderDef w : content.greatWonders.values()) {
+            if (!era().id.equals(w.era) || builtWonders.contains(w)) continue;
+            if (greatWonders.stream().anyMatch(x -> x.def == w)) continue;
+            if (frontier.stream().anyMatch(f -> f.land.pendingWonder == w)) continue;
+            boolean inDeck = eraDeck.stream().anyMatch(c -> w.id.equals(c.def.wonder))
+                    || queue.stream().anyMatch(sl -> w.id.equals(sl.card.def.wonder) || (sl.under != null && w.id.equals(sl.under.def.wonder)))
+                    || players.stream().anyMatch(p -> p.turnDraw != null && w.id.equals(p.turnDraw.def.wonder));
+            if (!inDeck) free.add(w);
+        }
+        return free.isEmpty() ? null : free.get(rng.nextInt(free.size()));
+    }
+
     private void discover(TerritoryDef def) {
         Territory land;
         if (def.special) {
             land = new Territory(nextId++, def);
+            if (def.hasWonder) land.pendingWonder = unusedWonder();
         } else {
             land = worldDeck.stream().filter(t -> t.def == def).findFirst().orElse(null);
             if (land == null) return;
             worldDeck.remove(land);
         }
         if (phase == Phase.EVENTS && pending != null) {
-            frontier.add(new Frontier(land, true, pending.event.id));
+            Frontier found = new Frontier(land, true, pending.event.id);
+            found.enemy = def.enemy;
+            frontier.add(found);
             log("Found: " + def.name + " (" + def.text + "). Settle it before this event is resolved, or it is lost.");
         } else {
             frontier.add(new Frontier(land, false, -1));
@@ -1334,6 +1456,8 @@ public final class Game {
             } else if (phase == Phase.EVENTS && pending != null) {
                 pending.ready.put(seat, true);
                 maybeResolve();
+            } else if (phase == Phase.SETUP && setupOffers.containsKey(seat)) {
+                chooseLand(p, Map.of("land", setupOffers.get(seat).get(0).id));
             } else if (phase == Phase.STARVATION && starving.containsKey(seat)) {
                 losePopulation(p, starving.remove(seat));
                 starvationDone();
@@ -1375,7 +1499,7 @@ public final class Game {
             case "raid" -> raid(pe, players.get(pe.target), factor);
             case "invasion" -> invasion(pe, factor);
             case "test" -> {
-                int value = ("stability".equals(d.stat) ? stability : health) + pe.healthBonus;
+                int value = ("stability".equals(d.stat) ? stability : effectiveHealth()) + pe.healthBonus;
                 int shortfall = Math.max(0, d.threshold - value);
                 int times = (int) Math.floor(shortfall * factor);
                 log(d.name + ": " + d.stat + " " + value + " against " + d.threshold
@@ -1433,7 +1557,7 @@ public final class Game {
         CardDef d = c.card.def;
         if (c.roundsDone >= d.lastsRounds) return true;
         Object h = d.endWhen.get("health");
-        if (h != null && health >= Y.toInt(h)) return true;
+        if (h != null && effectiveHealth() >= Y.toInt(h)) return true;
         Object st = d.endWhen.get("stability");
         return st != null && stability >= Y.toInt(st);
     }
@@ -1613,9 +1737,9 @@ public final class Game {
                 case "invasion" -> attacks.add(new Attack(inst(content.cards.get(String.valueOf(v))), -1, 0));
                 case "healthTest" -> {
                     Map<String, Object> m = Y.map(v);
-                    int shortfall = Math.max(0, Y.i(m, "threshold", 0) - health);
+                    int shortfall = Math.max(0, Y.i(m, "threshold", 0) - effectiveHealth());
                     int loss = (int) Math.floor(shortfall * Y.i(m, "populationLoss", 1) * factor);
-                    log("Health " + health + " against " + Y.i(m, "threshold", 0) + (loss == 0 ? ": no one dies." : ": " + loss + " Population lost."));
+                    log("Health " + effectiveHealth() + " against " + Y.i(m, "threshold", 0) + (loss == 0 ? ": no one dies." : ": " + loss + " Population lost."));
                     for (int i = 0; i < loss; i++) {
                         Player most = players.stream().max((x, y) -> x.population() - y.population()).orElseThrow();
                         if (most.population() == 0) break;
@@ -1771,11 +1895,12 @@ public final class Game {
     public Mods mods(Player p) {
         Mods m = new Mods();
         for (Player o : players) for (CardDef t : o.techs) m.add(t.effects);
-        for (CardDef w : p.minorWonders) m.add(w.effects);
+        for (CardDef w : p.minorWonders) if (!obsolete(w)) m.add(w.effects);
         if (p.leader != null) m.add(p.leader.effects);
         for (WonderDef w : builtWonders) if (!obsolete(w)) m.add(w.effects);
         for (CardInst e : persistentEvents) m.add(e.def.ongoing);
         for (Territory t : realm) m.add(t.def.effects);
+        m.perTerritory.forEach((r, n) -> m.income.merge(r, n * realm.size(), Integer::sum));
         return m;
     }
 
@@ -1784,7 +1909,9 @@ public final class Game {
         Mods m = new Mods();
         for (Player p : players) {
             for (CardDef t : p.techs) m.add(t.effects);
-            for (CardDef w : p.minorWonders) m.add(w.effects);
+            for (CardDef w : p.minorWonders) if (!obsolete(w)) m.add(w.effects);
+            // a leader like Tomyris defends the whole team
+            if (p.leader != null) for (Map<String, Object> e : p.leader.effects) if (e.containsKey("invasionDefense")) m.add(e);
         }
         for (WonderDef w : builtWonders) if (!obsolete(w)) m.add(w.effects);
         for (Territory t : realm) m.add(t.def.effects);
@@ -1793,8 +1920,17 @@ public final class Game {
 
     /** A wonder that belongs to an earlier era's way of life (e.g. Nomadic Living) stops working after that era. */
     public boolean obsolete(WonderDef w) {
-        if (w.obsoleteAfter == null) return false;
-        for (int i = 0; i < content.eras.size(); i++) if (content.eras.get(i).id.equals(w.obsoleteAfter)) return eraIndex > i;
+        return pastEra(w.obsoleteAfter);
+    }
+
+    /** A minor wonder (like The First Religion) can stop working after an era too. */
+    public boolean obsolete(CardDef c) {
+        return pastEra(c.obsoleteAfter);
+    }
+
+    private boolean pastEra(String era) {
+        if (era == null) return false;
+        for (int i = 0; i < content.eras.size(); i++) if (content.eras.get(i).id.equals(era)) return eraIndex > i;
         return false;
     }
 
@@ -1859,7 +1995,11 @@ public final class Game {
     private int noticeSeq;
     private List<String> collect;
 
+    /** When set (by the balance simulation), every log line is kept here, uncut. */
+    List<String> audit;
+
     void log(String s) {
+        if (audit != null) audit.add(s);
         if (collect != null) collect.add(s);
         log.add(s);
         if (log.size() > 400) log.remove(0);

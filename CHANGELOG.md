@@ -2,6 +2,71 @@
 
 Newest first. Versions from 1.x on are the combined app (Root and Rune + Weather generator).
 
+## v1.67.0 (combined app)
+
+- Dawn: pictures for all 10 great wonders, shown on the wonder cards in the queue, the "Great wonders" board and the All cards list.
+
+## v1.66.3 (combined app)
+
+- Dawn: new picture for The First Architect.
+
+## v1.66.2 (combined app)
+
+- Dawn: new picture for The First Conqueror.
+
+## v1.66.1 (combined app)
+
+- Dawn: on cards with a picture, the text now sits at the bottom, on the dark part of the picture.
+
+## v1.66.0 (combined app)
+
+- Dawn: cards can have a background picture. A card shows `dawn/cards/<id>.jpg` behind its text (darkened so the text stays readable) if the file exists, in the queue, your hand, pop-ups and the All cards list. The 14 great people have pictures.
+
+## v1.65.2 (combined app)
+
+- Dawn: the "All cards" window starts with a table of how many cards there are of each kind: different cards, copies in each era's list, and how many a deck takes (with the total).
+
+## v1.65.1 (combined app)
+
+- Dawn: the Wondrous Land now carries a real great wonder of the era that is not in the game yet (not built, not being built, not in the deck or queue). The wonder is built, with its bonuses and points, the moment the land is settled; face-up it shows which wonder it is. The land's own made-up bonuses are gone.
+- Starting lands: the realm always starts with 2 lands. They are drawn from the lands the players chose (more are drawn from the deck if fewer than 2 were chosen); all other lands, chosen or not, go on top of the land deck in random order.
+
+## v1.65.0 (combined app)
+
+- Dawn: the game now starts with a pop-up where each player is offered two lands and keeps one. The chosen lands are the realm's start (one per player); the others go back into the world deck. AI players choose by themselves and a player who is away gets the first land.
+- New event card, Wondrous Land: an event land with a wonder on it (+1 farm slot, +1 mine slot, +2 culture, +2 research per turn). It costs 6 food, 6 production and 1 settler per player (4 more food and production than an ordinary land) and starts with +4 enemy strength.
+- "Leaders" are now called great people in the game.
+- New Ancient great person, Archimedes: +1 research per turn, and your next technology is played for free (once).
+
+## v1.64.0 (combined app)
+
+- Dawn: Herbalism also gives +1 research per turn. Spear Throwing is now Spear Men: every troop counts for +1 more strength, but training one costs +1 production and each troop eats half a food per round (rounded up per player; shown in your per-round income and the Train button).
+- Jungle and Fertile Delta are unhealthy: while held, each takes 2 off Health (it can't go below 0). Health starts at 2.
+
+## v1.63.4 (combined app)
+
+- Dawn: Göbekli Tepe no longer gives +2 research. The First Architect no longer costs 1 food per turn (just +1 action per turn).
+
+## v1.63.3 (combined app)
+
+- Dawn: a balance simulation for development (`BalanceSim`, skipped in normal test runs): bots play thousands of games and it ranks which leaders, techs, wonders and actions go with winning. Run with `mvn -q test -Dtest=BalanceSim -Dbalance=1`. No gameplay change.
+
+## v1.63.2 (combined app)
+
+- Dawn: era decks hold 24+2X action cards (was 18+2X), 9X+41 cards in all.
+
+## v1.63.1 (combined app)
+
+- Dawn: the pick-time countdown is now shown as the queue's background darkening from right to left (hover for the seconds left), instead of text.
+
+## v1.63.0 (combined app)
+
+- Dawn: each era's deck now holds a set number of each kind of card (X = players): leaders X+1, great wonders X, minor wonders X+1, hostility X, techs X+2, actions 18+2X, responses X, events 12+X, and 1 era-trigger event (9X+35 cards in all). The cards are drawn at random from that era's list; if a list is shorter than the number needed, great wonders and hostility cards stop at what exists and other kinds go round again.
+- New leaders: Prehistoric: The First Ruler, The First Conqueror, The First Architect. Ancient: Tomyris, Alexander the Great.
+- New great wonders (Prehistoric): Göbekli Tepe, Ġgantija Temples, Skara Brae.
+- New minor wonders: The First Farms, The First Mine, Oral Tradition, The First Religion (Prehistoric; fades after it), The Great Tomb, The Epic Wall, The Great Trade Route (Ancient).
+- New effects: growing costs less food, great-wonder contributions count double, income per territory, minor wonders that go obsolete, enemy strength halved or zero on lands, extra slots per building type.
+
 ## v1.62.0 (combined app)
 
 - Dawn leaders reworked. Prehistoric: The First Shaman (+1 culture/turn, temples cost 1 production), The Great Hunter (+1 food/turn, +1 max farm slot), The Storyteller (an event leaving the queue gives you the face-down card under it), The Great Mother (hand size -2, action cards leaving the queue go to your hand). Ancient: Julius Caesar (+1 military strength per 2 troops, for you), Gilgamesh (first troop each round takes no action, +2 military strength), Hammurabi (+1 research/turn, +1 hand size), Ramses (every unfinished great wonder gains 1 of each resource it needs, every round).

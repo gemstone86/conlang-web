@@ -488,6 +488,177 @@ class GameTest {
     }
 
     @Test
+    void theEraDeckHoldsASetNumberOfEachKind() {
+        for (int x = 1; x <= 4; x++) {
+            Game g = game(x, 70 + x);
+            Map<String, Integer> n = new java.util.HashMap<>();
+            List<Game.CardInst> all = new ArrayList<>(g.eraDeck);
+            g.queue.forEach(sl -> { all.add(sl.card); if (sl.under != null) all.add(sl.under); });
+            all.addAll(g.futureEvents);                                      // events drawn blind go face down here
+            for (Player p : g.players) all.addAll(p.hand);                 // what they drew blind
+            for (Game.CardInst c : all) n.merge(c.def.eraTrigger ? "era_trigger" : c.def.type.name().toLowerCase(), 1, Integer::sum);
+            // leaders and great wonders play or go to the board as soon as they are drawn; hostility cards are spent
+            int ledBy = (int) g.log.stream().filter(l -> l.contains(" has the great person ")).count();
+            assertEquals(x + 1, n.getOrDefault("leader", 0) + ledBy, "leaders, " + x + " players");
+            assertEquals(x, n.getOrDefault("great_wonder", 0) + g.greatWonders.size(), "great wonders");
+            assertEquals(x + 2, n.getOrDefault("tech", 0), "techs");
+            assertEquals(24 + 2 * x, n.getOrDefault("action", 0), "actions");
+            assertEquals(x, n.getOrDefault("response", 0), "responses");
+            assertEquals(12 + x, n.getOrDefault("event", 0), "events");
+            assertEquals(1, n.getOrDefault("era_trigger", 0), "one era-trigger event");
+        }
+    }
+
+    @Test
+    void goebekliTepeAndTheGgantijaTemples() {
+        Game g = game(1, 71);
+        Player p = g.players.get(0);
+        p.leader = null;
+        int cost = g.growthCost(p).get(Res.FOOD);
+        g.builtWonders.add(C.greatWonders.get("gobekli_tepe"));
+        assertEquals(cost - 1, g.growthCost(p).get(Res.FOOD));
+        g.builtWonders.add(C.greatWonders.get("skara_brae"));
+        assertEquals(g.realm.size(), g.mods(p).income.get(Res.FOOD), "+1 food per territory");
+        g.builtWonders.add(C.greatWonders.get("ggantija_temples"));
+        Game.WonderProgress w = new Game.WonderProgress(C.greatWonders.get("pyramids"));
+        g.greatWonders.add(w);
+        p.res.put(Res.PRODUCTION, 10);
+        g.act(p.seat, Map.of("type", "contribute", "wonder", "pyramids", "resources", Map.of("production", 4)));
+        assertEquals(8, w.paid.get(Res.PRODUCTION), "given resources count double");
+        assertEquals(6, p.res.get(Res.PRODUCTION), "but cost only what was given");
+    }
+
+    @Test
+    void theConquerorAndAlexanderChangeEnemyStrength() {
+        Game g = game(1, 72);
+        Player p = g.players.get(0);
+        Game.Frontier f = g.frontier.get(0);
+        f.enemy = 5;
+        p.leader = null;
+        int base = g.settleTroops(f) - 5;
+        p.leader = C.cards.get("first_conqueror");
+        assertEquals(base + 3, g.settleTroops(f));
+        p.leader = C.cards.get("alexander_the_great");
+        assertEquals(base, g.settleTroops(f));
+    }
+
+    @Test
+    void theFirstReligionFadesAfterThePrehistoricEra() {
+        Game g = game(1, 73);
+        Player p = g.players.get(0);
+        p.leader = null;
+        p.minorWonders.add(C.cards.get("first_religion"));
+        assertEquals(3, g.mods(p).income.get(Res.CULTURE));
+        g.eraIndex = 1;
+        assertEquals(0, g.mods(p).income.get(Res.CULTURE), "obsolete");
+    }
+
+    @Test
+    void spearMenMakeTroopsStrongerButCostlier() {
+        Game g = game(1, 80);
+        Player p = g.players.get(0);
+        p.leader = null;
+        int cost = g.recruitCost(p).get(Res.PRODUCTION), strength = g.strength(p, 4);
+        p.techs.add(C.cards.get("spear_men"));
+        assertEquals(cost + 1, g.recruitCost(p).get(Res.PRODUCTION));
+        assertEquals(strength + 4, g.strength(p, 4), "+1 strength per troop");
+        p.army = 3;
+        assertEquals(2, g.troopUpkeep(p), "half a food per troop, rounded up");
+        p.army = 4;
+        assertEquals(2, g.troopUpkeep(p));
+    }
+
+    @Test
+    void unhealthyLandsTakeHealthOffWhileHeld() {
+        Game g = game(1, 81);
+        g.realm.clear();
+        int plain = g.effectiveHealth();
+        Game.Territory jungle = new Game.Territory(9000, C.territories.get("jungle"));
+        g.realm.add(jungle);
+        assertEquals(Math.max(0, plain - 2), g.effectiveHealth());
+        g.realm.remove(jungle);
+        assertEquals(plain, g.effectiveHealth());
+    }
+
+    @Test
+    void everyPlayerPicksOneOfTwoLandsToStart() {
+        Game g = new Game(C, List.of("A", "B"), 90, true);
+        assertEquals(Game.Phase.SETUP, g.phase);
+        assertEquals(0, g.realm.size());
+        for (Player p : g.players) assertEquals(2, g.setupOffers.get(p.seat).size());
+        int deck = g.worldDeck.size();
+        Game.Territory first = g.setupOffers.get(0).get(1);
+        assertThrows(GameException.class, () -> g.act(0, Map.of("type", "chooseLand", "land", -5)), "must be one of the two");
+        assertThrows(GameException.class, () -> g.act(0, Map.of("type", "recruit")), "nothing else until the lands are chosen");
+        g.act(0, Map.of("type", "chooseLand", "land", first.id));
+        assertEquals(Game.Phase.SETUP, g.phase, "still waiting for the other player");
+        assertThrows(GameException.class, () -> g.act(0, Map.of("type", "chooseLand", "land", first.id)), "only once");
+        g.act(1, Map.of("type", "chooseLand", "land", g.setupOffers.get(1).get(0).id));
+        assertEquals(Game.Phase.TURNS, g.phase);
+        assertEquals(2, g.realm.size(), "one land per player");
+        assertTrue(g.realm.contains(first));
+        assertEquals(2, g.frontier.size(), "the face-up lands are laid out once the game starts");
+        assertTrue(g.worldDeck.size() + g.frontier.size() >= deck, "unchosen lands went back into the deck");
+    }
+
+    @Test
+    void archimedesLetsTheNextTechnologyBeFree() {
+        Game g = game(1, 91);
+        Player p = g.players.get(0);
+        p.leader = C.cards.get("archimedes");
+        p.freeTechUsed = false;
+        assertEquals(1, g.mods(p).income.get(Res.RESEARCH));
+        for (Res r : Res.values()) p.res.put(r, 0);
+        Game.CardInst t1 = card(g, "fire"), t2 = card(g, "hunting");
+        p.hand.add(t1);
+        p.hand.add(t2);
+        g.act(p.seat, Map.of("type", "play", "card", t1.id));
+        assertTrue(p.techs.contains(t1.def), "played with no research at all");
+        assertThrows(GameException.class, () -> g.act(p.seat, Map.of("type", "play", "card", t2.id)), "only the next one is free");
+    }
+
+    @Test
+    void theWondrousLandStartsWithFourEnemyStrength() {
+        Game g = game(1, 92);
+        Player p = g.players.get(0);
+        for (Player q : g.players) q.leader = null;
+        g.currentEvents.clear();
+        g.futureEvents.clear();
+        g.futureEvents.add(card(g, "cold_night"));            // the number of events drawn is the future deck's size
+        g.currentEvents.add(card(g, "wondrous_land_found"));
+        g.act(p.seat, Map.of("type", "endTurn"));
+        Game.Frontier f = g.frontier.stream().filter(x -> x.land.def.id.equals("wondrous_land")).findFirst().orElse(null);
+        assertNotNull(f, "the land lies there during its event");
+        assertEquals(4, f.enemy);
+        assertEquals(6, g.settleCost(f).get(Res.FOOD));
+        assertEquals(6, g.settleCost(f).get(Res.PRODUCTION));
+        Content.WonderDef w = f.land.pendingWonder;
+        assertNotNull(w, "a wonder of this era that was not in the game");
+        assertEquals(g.era().id, w.era);
+        assertFalse(g.eraDeck.stream().anyMatch(c -> w.id.equals(c.def.wonder)), "not in the deck");
+        p.res.put(Res.FOOD, 50);
+        p.res.put(Res.PRODUCTION, 50);
+        p.army = 10;
+        p.idle += 3;
+        g.act(p.seat, Map.of("type", "colonize", "land", f.land.id, "resources", Map.of("food", 6, "production", 6), "army", 4, "population", 1));
+        assertTrue(g.builtWonders.contains(w), "the wonder is built when the land is settled");
+        assertTrue(g.realm.stream().anyMatch(t -> t.wonders.contains(w)));
+    }
+
+    @Test
+    void theRealmAlwaysStartsWithTwoLands() {
+        for (int n = 1; n <= 4; n++) {
+            List<String> names = new ArrayList<>();
+            for (int i = 0; i < n; i++) names.add("P" + i);
+            Game g = new Game(C, names, 100 + n, true);
+            int total = g.worldDeck.size() + g.setupOffers.values().stream().mapToInt(List::size).sum();
+            for (int seat = 0; seat < n; seat++) g.act(seat, Map.of("type", "chooseLand", "land", g.setupOffers.get(seat).get(0).id));
+            assertEquals(2, g.realm.size(), n + " players");
+            assertEquals(total, g.worldDeck.size() + g.realm.size() + (int) g.frontier.stream().filter(f -> !f.fromEvent).count(), "no land was lost");
+        }
+    }
+
+    @Test
     void theTradingRouteIsOnlyInTheDeckWithTeammates() {
         for (int players : new int[]{1, 2}) {
             Game g = game(players, 50 + players);
@@ -539,6 +710,7 @@ class GameTest {
     @Test
     void settleCardOpensALandThenAnyonePays() {
         Game g = game(2, 11);
+        for (Player q : g.players) q.leader = null;           // a drawn leader (Alexander, the Conqueror) would change the enemy strength
         assertEquals(2, g.frontier.size(), "two lands face up at the start");
         Player p = g.players.get(0);
         Game.Frontier f = g.frontier.get(0);

@@ -41,6 +41,8 @@ public final class Player {
     public CardDef leader;
     /** The free troop a leader like Gilgamesh allows has been trained this round. */
     public boolean freeRecruitUsed;
+    /** A great person like Archimedes lets the next science card be played free; this says it has been used. */
+    public boolean freeTechUsed;
     /** Population with no building to work in. */
     public int idle;
     public int army;
