@@ -360,6 +360,7 @@ public final class Game {
         for (Player p : players) {
             if (p.leader != null) log(p.leader.name + " leaves with the era.");
             p.leader = null;
+            p.pendingLeader = null;
         }
         // an era's trigger event only ends its own era: leftovers are retired
         for (List<CardInst> deck : List.of(currentEvents, futureEvents)) {
@@ -552,6 +553,10 @@ public final class Game {
     /** A player is done with the round (the hand is kept to its limit); when everyone is, the events come. */
     private void endRoundFor(Player p) {
         if (p.away) while (p.hand.size() > handLimit(p)) p.hand.remove(p.hand.size() - 1);
+        if (p.pendingLeader != null) {                  // undecided: the current great person stays
+            log(p.name + " keeps " + p.leader.name + ".");
+            p.pendingLeader = null;
+        }
         p.done = true;
         log(p.name + " is done for the round.");
         if (phase == Phase.TURNS && players.stream().allMatch(x -> x.done)) startEvents();
@@ -743,6 +748,7 @@ public final class Game {
             case "troops" -> troops(p, a);
             case "decide" -> decide(p, a);
             case "ready" -> ready(p);
+            case "leader" -> chooseLeader(p, a);
             case "chooseLand" -> chooseLand(p, a);
             case "colonize" -> colonize(p, a);
             case "starve" -> starve(p, a);
@@ -917,14 +923,32 @@ public final class Game {
         if (under != null) take(p, under);
     }
 
+    private void installLeader(Player p, CardDef d) {
+        if (p.leader != null) log(p.leader.name + " steps down.");
+        p.leader = d;
+        p.pendingLeader = null;
+        p.freeTechUsed = false;
+        log(p.name + " has the great person " + d.name + ": " + d.text);
+    }
+
+    private void chooseLeader(Player p, Map<String, Object> a) {
+        if (p.pendingLeader == null) throw new GameException("You have no new great person to decide on.");
+        if (Y.b(a, "replace")) installLeader(p, p.pendingLeader);
+        else {
+            log(p.name + " keeps " + p.leader.name + " and turns " + p.pendingLeader.name + " away.");
+            p.pendingLeader = null;
+        }
+    }
+
     /** A card a player gets: into their hand, except great wonders, which go on the board for the whole team to build. */
     private void take(Player p, CardInst c) {
         if (c.def.type == CardType.LEADER) {
-            // a leader plays at once and replaces the one before
-            if (p.leader != null) log(p.leader.name + " steps down.");
-            p.leader = c.def;
-            p.freeTechUsed = false;
-            log(p.name + " has the great person " + c.def.name + ": " + c.def.text);
+            if (p.leader != null) {                       // the player decides whether the newcomer replaces them
+                p.pendingLeader = c.def;
+                log(p.name + " draws the great person " + c.def.name + " and may choose to replace " + p.leader.name + ".");
+                return;
+            }
+            installLeader(p, c.def);
             return;
         }
         if (c.def.type != CardType.GREAT_WONDER) {
@@ -1084,7 +1108,11 @@ public final class Game {
             if (give.get(r) * factor > left) give.put(r, (left + factor - 1) / factor);
             credit.put(r, Math.min(left, give.get(r) * factor));
         }
-        if (Res.isZero(give)) throw new GameException("Give at least one resource the wonder still needs.");
+        if (Res.isZero(give)) {
+            EnumMap<Res, Integer> still = Res.empty();
+            for (Res r : Res.values()) still.put(r, cost.get(r) - w.paid.get(r));
+            throw new GameException(w.def.name + " still needs " + Res.describe(still) + ". Enter an amount of one of those.");
+        }
         if (fromPool) payFromPool(give); else pay(p, give);
         credit.forEach((r, v) -> w.paid.merge(r, v, Integer::sum));
         EnumMap<Res, Integer> mine = w.bySeat.computeIfAbsent(p.seat, x -> Res.empty());

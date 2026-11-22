@@ -3,6 +3,7 @@ package com.dawnofmankind.core;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -396,7 +397,14 @@ class GameTest {
         assertEquals("Hammurabi", p.leader.name);
         assertFalse(p.hand.contains(a), "a leader never sits in the hand");
         g.act(p.seat, Map.of("type", "pick", "slot", 1));
-        assertEquals("Gilgamesh", p.leader.name, "the new leader replaces the old");
+        assertEquals("Hammurabi", p.leader.name, "a second great person waits for the player's choice");
+        assertEquals("Gilgamesh", p.pendingLeader.name);
+        g.act(p.seat, Map.of("type", "leader", "replace", false));
+        assertEquals("Hammurabi", p.leader.name);
+        assertNull(p.pendingLeader);
+        p.pendingLeader = b.def;
+        g.act(p.seat, Map.of("type", "leader", "replace", true));
+        assertEquals("Gilgamesh", p.leader.name, "the new great person replaces the old one when chosen");
     }
 
     @Test
@@ -498,7 +506,7 @@ class GameTest {
             for (Player p : g.players) all.addAll(p.hand);                 // what they drew blind
             for (Game.CardInst c : all) n.merge(c.def.eraTrigger ? "era_trigger" : c.def.type.name().toLowerCase(), 1, Integer::sum);
             // leaders and great wonders play or go to the board as soon as they are drawn; hostility cards are spent
-            int ledBy = (int) g.log.stream().filter(l -> l.contains(" has the great person ")).count();
+            int ledBy = (int) g.log.stream().filter(l -> l.contains(" has the great person ") || l.contains(" draws the great person ")).count();
             assertEquals(x + 1, n.getOrDefault("leader", 0) + ledBy, "leaders, " + x + " players");
             assertEquals(x, n.getOrDefault("great_wonder", 0) + g.greatWonders.size(), "great wonders");
             assertEquals(x + 2, n.getOrDefault("tech", 0), "techs");
@@ -526,6 +534,19 @@ class GameTest {
         g.act(p.seat, Map.of("type", "contribute", "wonder", "pyramids", "resources", Map.of("production", 4)));
         assertEquals(8, w.paid.get(Res.PRODUCTION), "given resources count double");
         assertEquals(6, p.res.get(Res.PRODUCTION), "but cost only what was given");
+    }
+
+    @Test
+    void contributingCultureToThePyramids() {
+        Game g = game(2, 73);
+        Player p = g.players.get(0);
+        p.leader = null;
+        Game.WonderProgress w = new Game.WonderProgress(C.greatWonders.get("pyramids"));
+        g.greatWonders.add(w);
+        w.paid.put(Res.PRODUCTION, 26);
+        p.res.put(Res.CULTURE, 8);
+        g.act(p.seat, Map.of("type", "contribute", "wonder", "pyramids", "resources", Map.of("culture", 8, "production", 0)));
+        assertEquals(8, w.paid.get(Res.CULTURE));
     }
 
     @Test

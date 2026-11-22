@@ -130,6 +130,7 @@ function render(m) {
   renderSetup();
   renderTechs();
   renderHand();
+  renderLeader();
   renderTeam();
   renderDecks();
   renderLog();
@@ -250,7 +251,7 @@ function checkTurnDraw() {
   try { sessionStorage.setItem(key, String(m.turnSeq)); } catch (e) {}
   const ev = m.turnEvents ? `<p class="muted small">${m.turnEvents} event${m.turnEvents > 1 ? 's' : ''} came up first and went face down into the future deck.</p>` : '';
   const body = m.turnDraw
-    ? `<div class="cards">${cardHtml(m.turnDraw)}</div>${m.turnDraw.type === 'great_wonder' ? '<p class="muted small">A great wonder: it goes on the board for the whole tribe to build.</p>' : ''}${m.turnDraw.type === 'leader' ? '<p class="muted small">A great person: they take over at once and leave when the era ends.</p>' : ''}`
+    ? `<div class="cards">${cardHtml(m.turnDraw)}</div>${m.turnDraw.type === 'great_wonder' ? '<p class="muted small">A great wonder: it goes on the board for the whole tribe to build.</p>' : ''}${m.turnDraw.type === 'leader' ? '<p class="muted small">A great person: they take over at once (or you choose, if you already have one) and leave when the era ends.</p>' : ''}`
     : '<p class="muted">The era deck is empty: nothing to draw.</p>';
   $('gotBox').innerHTML = `<h2>Round ${state.round}: your turn. You drew</h2>${ev}${body}<div class="row"><button class="primary" data-gotok>OK</button></div>`;
   $('gotModal').hidden = false;
@@ -635,6 +636,19 @@ $('handPanel').onclick = e => {
     send({ type: 'giveCards', to: +$('giveCardsTo').value, cards });
     document.querySelectorAll('[data-pickgive]').forEach(i => { i.checked = false; });
   }
+};
+
+function renderLeader() {
+  const m = me(), el = $('leaderPanel');
+  const pend = m.pendingLeader
+    ? `<div class="small"><b>You drew a new great person.</b> Replace ${esc(m.leader.name)}?</div><div class="cards">${cardHtml(m.pendingLeader)}</div>
+       <div class="row"><button data-leader="1">Replace ${esc(m.leader.name)}</button> <button class="secondary" data-leader="0">Keep ${esc(m.leader.name)}</button></div>` : '';
+  el.hidden = false;
+  el.innerHTML = `<h2>Your great person</h2>${m.leader ? `<div class="cards">${cardHtml(m.leader)}</div><p class="muted small">Leaves when the era ends.</p>` : '<p class="muted small">None yet. A great person you draw takes over at once.</p>'}${pend}`;
+}
+$('leaderPanel').onclick = e => {
+  const b = e.target.closest('[data-leader]'); if (!b) return;
+  send({ type: 'leader', replace: b.dataset.leader === '1' });
 };
 
 function renderTeam() {

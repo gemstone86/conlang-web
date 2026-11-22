@@ -39,6 +39,8 @@ public final class Player {
     public final List<CardDef> minorWonders = new ArrayList<>();
     /** The leader in play (drawn leaders play themselves and replace the old one; a leader leaves when its era ends). */
     public CardDef leader;
+    /** A great person just drawn while another is in play: the player chooses whether they take over. */
+    public CardDef pendingLeader;
     /** The free troop a leader like Gilgamesh allows has been trained this round. */
     public boolean freeRecruitUsed;
     /** A great person like Archimedes lets the next science card be played free; this says it has been used. */

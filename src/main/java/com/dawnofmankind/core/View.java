@@ -200,6 +200,7 @@ public final class View {
             pm.put("buildings", bs);
             pm.put("techs", p.techs.stream().map(View::def).toList());
             if (p.leader != null) pm.put("leader", def(p.leader));
+            if (p.pendingLeader != null) pm.put("pendingLeader", def(p.pendingLeader));
             pm.put("freeTech", g.freeTechAvailable(p));
             pm.put("minorWonders", p.minorWonders.stream().map(View::def).toList());
             if (p.seat == seat) pm.put("hand", p.hand.stream().map(View::card).toList());

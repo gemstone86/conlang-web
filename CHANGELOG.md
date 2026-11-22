@@ -2,6 +2,12 @@
 
 Newest first. Versions from 1.x on are the combined app (Root and Rune + Weather generator).
 
+## v1.69.0 (combined app)
+
+- Dawn: your great person now has its own panel above the tribe, with its card.
+- Dawn: when you draw a great person while you already have one, you choose whether they replace the current one (undecided at the end of your turn keeps the current one).
+- Dawn: the "give at least one resource" error on great wonders now says what the wonder still needs.
+
 ## v1.68.0 (combined app)
 
 - Dawn: when the era deck runs out while cards are being drawn (the queue refilling, a blind draw, the face-down card), the next era begins at once and drawing goes on from its deck. The cards already in the queue stay. As at any era end, unfinished great wonders are lost (half returned) and great people leave. In the last era nothing changes: it goes on until the queue is empty at the end of a round.
