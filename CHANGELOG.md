@@ -2,6 +2,10 @@
 
 Newest first. Versions from 1.x on are the combined app (Root and Rune + Weather generator).
 
+## v1.63.2 (combined app)
+
+- Dawn: era decks hold 24+2X action cards (was 18+2X), 9X+41 cards in all.
+
 ## v1.63.1 (combined app)
 
 - Dawn: the pick-time countdown is now shown as the queue's background darkening from right to left (hover for the seconds left), instead of text.

@@ -39,7 +39,7 @@ rules:
     minor_wonder: {base: 1, perPlayer: 1}
     hostility: {base: 0, perPlayer: 1}
     tech: {base: 2, perPlayer: 1}
-    action: {base: 18, perPlayer: 2}
+    action: {base: 24, perPlayer: 2}
     response: {base: 0, perPlayer: 1}
     event: {base: 12, perPlayer: 1}
     era_trigger: {base: 1, perPlayer: 0}

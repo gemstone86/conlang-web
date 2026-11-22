@@ -502,7 +502,7 @@ class GameTest {
             assertEquals(x + 1, n.getOrDefault("leader", 0) + ledBy, "leaders, " + x + " players");
             assertEquals(x, n.getOrDefault("great_wonder", 0) + g.greatWonders.size(), "great wonders");
             assertEquals(x + 2, n.getOrDefault("tech", 0), "techs");
-            assertEquals(18 + 2 * x, n.getOrDefault("action", 0), "actions");
+            assertEquals(24 + 2 * x, n.getOrDefault("action", 0), "actions");
             assertEquals(x, n.getOrDefault("response", 0), "responses");
             assertEquals(12 + x, n.getOrDefault("event", 0), "events");
             assertEquals(1, n.getOrDefault("era_trigger", 0), "one era-trigger event");
