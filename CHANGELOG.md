@@ -2,6 +2,10 @@
 
 Newest first. Versions from 1.x on are the combined app (Root and Rune + Weather generator).
 
+## v1.66.3 (combined app)
+
+- Dawn: new picture for The First Architect.
+
 ## v1.66.2 (combined app)
 
 - Dawn: new picture for The First Conqueror.
