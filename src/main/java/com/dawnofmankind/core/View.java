@@ -35,6 +35,18 @@ public final class View {
             notices.add(m);
         }
         v.put("notices", notices);
+        if (g.phase == Game.Phase.SETUP) {
+            List<Object> offer = new ArrayList<>();
+            for (Game.Territory t : g.setupOffers.getOrDefault(seat, List.of())) {
+                Map<String, Object> m = new LinkedHashMap<>();
+                m.put("id", t.id);
+                m.put("name", t.def.name);
+                m.put("text", t.def.text);
+                offer.add(m);
+            }
+            v.put("setupOffer", offer);
+            v.put("setupWaiting", g.setupOffers.keySet().stream().filter(s -> s != seat).map(s -> g.players.get(s).name).toList());
+        }
         v.put("round", g.round);
         v.put("era", g.era().name);
         v.put("eraIndex", g.eraIndex);
@@ -184,6 +196,7 @@ public final class View {
             pm.put("buildings", bs);
             pm.put("techs", p.techs.stream().map(View::def).toList());
             if (p.leader != null) pm.put("leader", def(p.leader));
+            pm.put("freeTech", g.freeTechAvailable(p));
             pm.put("minorWonders", p.minorWonders.stream().map(View::def).toList());
             if (p.seat == seat) pm.put("hand", p.hand.stream().map(View::card).toList());
             pm.put("done", p.done);

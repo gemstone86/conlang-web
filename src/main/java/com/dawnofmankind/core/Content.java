@@ -125,6 +125,8 @@ public final class Content {
         public boolean special;
         public EnumMap<Res, Integer> costPerPlayer;
         public int populationPerPlayer, armyPerPlayer;
+        /** Enemy strength a found land starts with (the Wondrous Land). */
+        public int enemy;
     }
 
     public static final class EraDef {
@@ -301,6 +303,7 @@ public final class Content {
         Y.map(m.get("slots")).forEach((k, v) -> t.slots.put(k, Y.toInt(v)));
         t.effects = effects(m.get("effects"));
         t.special = Y.b(m, "special");
+        t.enemy = Y.i(m, "enemy", 0);
         Map<String, Object> cost = new LinkedHashMap<>(Y.map(m.get("costPerPlayer")));
         t.populationPerPlayer = Y.toInt(cost.remove("population"));
         t.armyPerPlayer = Y.toInt(cost.remove("army"));

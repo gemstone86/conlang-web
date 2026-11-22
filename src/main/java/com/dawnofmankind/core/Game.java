@@ -26,7 +26,7 @@ import java.util.Random;
  */
 public final class Game {
 
-    public enum Phase { TURNS, EVENTS, STARVATION, OVER }
+    public enum Phase { SETUP, TURNS, EVENTS, STARVATION, OVER }
 
     /** One physical card. */
     public static final class CardInst {
@@ -184,7 +184,16 @@ public final class Game {
     public final List<String> log = new ArrayList<>();
     public long version;
 
+    /** Setup: each player is offered 2 lands and keeps 1 as the start of the realm (seat -> the lands offered). */
+    public final Map<Integer, List<Territory>> setupOffers = new LinkedHashMap<>();
+    private int startEvents;
+
     public Game(Content content, List<String> names, long seed) {
+        this(content, names, seed, false);
+    }
+
+    /** With {@code chooseLands}, the game starts in a setup phase where every player picks one of two lands. */
+    public Game(Content content, List<String> names, long seed, boolean chooseLands) {
         if (names.isEmpty() || names.size() > 6) throw new GameException("A game needs 1 to 6 players.");
         this.content = content;
         this.rng = new Random(seed);
@@ -193,8 +202,10 @@ public final class Game {
             if (!t.special) for (int i = 0; i < t.copies; i++) worldDeck.add(new Territory(nextId++, t));
         }
         Collections.shuffle(worldDeck, rng);
-        for (int i = 0; i < r.startTerritories && !worldDeck.isEmpty(); i++) realm.add(worldDeck.remove(0));
-        refillLands();
+        if (!chooseLands) {
+            for (int i = 0; i < r.startTerritories && !worldDeck.isEmpty(); i++) realm.add(worldDeck.remove(0));
+            refillLands();
+        }
         for (int i = 0; i < names.size(); i++) {
             Player p = new Player(i, names.get(i));
             r.startResources.forEach((k, v) -> p.res.put(k, v));
@@ -216,10 +227,44 @@ public final class Game {
         Collections.shuffle(start, rng);
         int n = Math.min(start.size(), r.startingEventsPerPlayer * players.size());
         currentEvents.addAll(start.subList(0, n));
+        startEvents = n;
+        if (chooseLands) {
+            for (Player p : players) {
+                List<Territory> offer = new ArrayList<>();
+                for (int i = 0; i < 2 && !worldDeck.isEmpty(); i++) offer.add(worldDeck.remove(0));
+                setupOffers.put(p.seat, offer);
+            }
+            phase = Phase.SETUP;
+            log("Each player is offered two lands and keeps one to start with.");
+            return;
+        }
+        beginGame();
+    }
+
+    private void beginGame() {
         log("The tribes gather in a land of " + String.join(" and ", realm.stream().map(t -> t.def.name).toList())
-                + ". " + plural(n, "event") + " wait in the event deck.");
+                + ". " + plural(startEvents, "event") + " wait in the event deck.");
         startEra();
         startRound();
+    }
+
+    /** A player keeps one of the two lands offered; when everyone has, the game begins (the other lands go back in the world deck). */
+    private void chooseLand(Player p, Map<String, Object> a) {
+        if (phase != Phase.SETUP) throw new GameException("The lands have been chosen.");
+        List<Territory> offer = setupOffers.get(p.seat);
+        if (offer == null) throw new GameException("You have already chosen your land.");
+        int id = Y.i(a, "land", -1);
+        Territory pick = offer.stream().filter(t -> t.id == id).findFirst().orElseThrow(() -> new GameException("Choose one of the two lands offered."));
+        realm.add(pick);
+        offer.remove(pick);
+        worldDeck.addAll(offer);
+        setupOffers.remove(p.seat);
+        log(p.name + " starts with the " + pick.def.name + ".");
+        if (setupOffers.isEmpty()) {
+            Collections.shuffle(worldDeck, rng);
+            refillLands();
+            beginGame();
+        }
     }
 
     // ------------------------------------------------------------------------------------------------ setup & eras
@@ -668,6 +713,7 @@ public final class Game {
             case "troops" -> troops(p, a);
             case "decide" -> decide(p, a);
             case "ready" -> ready(p);
+            case "chooseLand" -> chooseLand(p, a);
             case "colonize" -> colonize(p, a);
             case "starve" -> starve(p, a);
             case "contribute" -> { myTurn(p); contribute(p, a); }          // paying toward a great wonder is free
@@ -847,7 +893,8 @@ public final class Game {
             // a leader plays at once and replaces the one before
             if (p.leader != null) log(p.leader.name + " steps down.");
             p.leader = c.def;
-            log(p.name + " is now led by " + c.def.name + ": " + c.def.text);
+            p.freeTechUsed = false;
+            log(p.name + " has the great person " + c.def.name + ": " + c.def.text);
             return;
         }
         if (c.def.type != CardType.GREAT_WONDER) {
@@ -905,7 +952,12 @@ public final class Game {
             if (land.opened) throw new GameException("The " + land.land.def.name + " is already open for settling.");
         }
         if (cores) core = ownTerritory(a);
-        pay(p, d.cost);
+        if (d.type == CardType.TECH && freeTechAvailable(p)) {
+            p.freeTechUsed = true;
+            log(p.leader.name + ": " + d.name + " is researched for free.");
+        } else {
+            pay(p, d.cost);
+        }
         p.hand.remove(c);
         if (d.type == CardType.TECH) {
             p.techs.add(d);
@@ -955,6 +1007,11 @@ public final class Game {
         pay(p, growthCost(p));
         if (into != null) into.workers++; else addPopulation(p, 1);
         log(p.name + " grows by 1 Population" + (into != null ? ", who goes to the " + into.def.name : "") + ".");
+    }
+
+    /** True if the player's great person (Archimedes) lets their next technology be played free. */
+    public boolean freeTechAvailable(Player p) {
+        return p.leader != null && !p.freeTechUsed && p.leader.effects.stream().anyMatch(e -> e.containsKey("freeTech"));
     }
 
     /** What training a troop costs: the rule's price, plus Spear Men's extra. */
@@ -1200,7 +1257,9 @@ public final class Game {
             worldDeck.remove(land);
         }
         if (phase == Phase.EVENTS && pending != null) {
-            frontier.add(new Frontier(land, true, pending.event.id));
+            Frontier found = new Frontier(land, true, pending.event.id);
+            found.enemy = def.enemy;
+            frontier.add(found);
             log("Found: " + def.name + " (" + def.text + "). Settle it before this event is resolved, or it is lost.");
         } else {
             frontier.add(new Frontier(land, false, -1));
@@ -1364,6 +1423,8 @@ public final class Game {
             } else if (phase == Phase.EVENTS && pending != null) {
                 pending.ready.put(seat, true);
                 maybeResolve();
+            } else if (phase == Phase.SETUP && setupOffers.containsKey(seat)) {
+                chooseLand(p, Map.of("land", setupOffers.get(seat).get(0).id));
             } else if (phase == Phase.STARVATION && starving.containsKey(seat)) {
                 losePopulation(p, starving.remove(seat));
                 starvationDone();

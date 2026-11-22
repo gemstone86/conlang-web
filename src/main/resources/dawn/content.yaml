@@ -137,6 +137,14 @@ territories:
     effects: [{raidDefense: 1}, {invasionDefense: 3}]
     costPerPlayer: {production: 3, army: 4}
     text: +2 mine worker slots. +1 raid defense for every player, +3 against invasions.
+  wondrous_land:
+    name: Wondrous Land
+    special: true
+    enemy: 4
+    slots: {farm: 1, mine: 1}
+    effects: [{income: {culture: 2}}, {income: {research: 2}}]
+    costPerPlayer: {food: 6, production: 6, population: 1}
+    text: "A land with a wonder on it: +1 farm slot, +1 mine slot, +2 culture and +2 research per turn. Costly to take: 4 extra food and production per player, and +4 enemy strength."
   fertile_delta:
     name: Fertile Delta
     special: true
@@ -288,6 +296,7 @@ eras:
       free_colony: 1
       rich_land_found: 1
       fertile_delta_found: 1
+      wondrous_land_found: 1
       hostile_tribes: 2
       rivals_claim: 1
       dawn_of_agriculture: 1
@@ -306,6 +315,7 @@ eras:
       tomyris: 1
       alexander_the_great: 1
       julius_caesar: 1
+      archimedes: 1
       gilgamesh: 1
       hammurabi: 1
       ramses: 1
@@ -364,6 +374,7 @@ eras:
       rich_land_found: 1
       fortified_land_found: 1
       fertile_delta_found: 1
+      wondrous_land_found: 1
       hostile_tribes: 1
       warlord: 2
       rivals_claim: 1
@@ -445,6 +456,11 @@ cards:
     type: leader
     effects: [{freeRecruit: 1}, {strengthBonus: 2}]
     text: The first troop you train each round takes no action (it still costs resources). +2 military strength.
+  archimedes:
+    name: Archimedes
+    type: leader
+    effects: [{income: {research: 1}}, {freeTech: 1}]
+    text: +1 research per turn, and your next technology is played for free.
   hammurabi:
     name: Hammurabi
     type: leader
@@ -1093,6 +1109,12 @@ cards:
     category: discovery
     effects: [{discover: fortified_land}]
     text: "A Fortified Land is found: settling it takes 3 production and 4 troops per player, at once."
+  wondrous_land_found:
+    name: Wondrous Land
+    type: event
+    category: discovery
+    effects: [{discover: wondrous_land}]
+    text: "A Wondrous Land is found, with a wonder on it: settling it takes 6 food, 6 production and 1 settler per player, and has +4 enemy strength. At once."
   fertile_delta_found:
     name: Fertile Delta
     type: event

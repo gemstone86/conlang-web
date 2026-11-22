@@ -127,6 +127,7 @@ function render(m) {
   checkNotices();
   checkTurnDraw();
   renderStarvation();
+  renderSetup();
   renderTechs();
   renderHand();
   renderTeam();
@@ -174,6 +175,7 @@ const affordable = cost => !cost || RES.every(k => (me().resources[k] || 0) >= (
 function renderStatus() {
   const s = state, waiting = s.players.filter(o => !o.done && !o.away).map(o => esc(o.name));
   const phase = s.result ? (s.result === 'victory' ? 'Victory' : 'Defeat')
+    : s.phase === 'setup' ? 'Choosing starting lands'
     : s.phase === 'events' ? 'Events' : s.phase === 'starvation' ? 'Starvation — choosing who goes' : myTurn() ? `<span class="turn">${s.actionsLeft} action${s.actionsLeft === 1 ? '' : 's'} left</span>` : `You are done — waiting for ${waiting.join(', ') || 'the others'}`;
   $('status').innerHTML = `<span>${esc(s.era)} era (${s.eraIndex + 1}/${s.eraCount})</span><span>Round <b>${s.round}</b></span>
     <span>${phase}</span><span>Stability <b class="${s.stability <= 3 ? 'bad' : ''}">${s.stability}</b></span>
@@ -184,7 +186,7 @@ function renderStatus() {
 function cardHtml(c, extra = '', cls = '') {
   const kind = c.type === 'event' ? `event ${c.category || ''} ${c.crisis ? 'crisis' : ''}` : c.type;
   const typeLabel = c.type === 'event' ? (c.crisis ? 'Crisis' : 'Event · ' + (c.category || ''))
-    : c.type === 'great_wonder' ? `Great wonder · ${c.victoryPoints} points` : c.type.replace('_', ' ');
+    : c.type === 'great_wonder' ? `Great wonder · ${c.victoryPoints} points` : c.type === 'leader' ? 'great person' : c.type.replace('_', ' ');
   return `<div class="cardx ${kind} ${cls}"><div class="type">${esc(typeLabel)}</div><div class="name">${esc(c.name)}</div>
     ${c.cost ? `<div class="small">${c.type === 'great_wonder' ? 'Team cost' : 'Cost'}: ${resList(c.cost)}</div>` : ''}<div class="text">${esc(c.text)}</div>${extra}</div>`;
 }
@@ -244,12 +246,27 @@ function checkTurnDraw() {
   try { sessionStorage.setItem(key, String(m.turnSeq)); } catch (e) {}
   const ev = m.turnEvents ? `<p class="muted small">${m.turnEvents} event${m.turnEvents > 1 ? 's' : ''} came up first and went face down into the future deck.</p>` : '';
   const body = m.turnDraw
-    ? `<div class="cards">${cardHtml(m.turnDraw)}</div>${m.turnDraw.type === 'great_wonder' ? '<p class="muted small">A great wonder: it goes on the board for the whole tribe to build.</p>' : ''}${m.turnDraw.type === 'leader' ? '<p class="muted small">A leader: they take over at once and leave when the era ends.</p>' : ''}`
+    ? `<div class="cards">${cardHtml(m.turnDraw)}</div>${m.turnDraw.type === 'great_wonder' ? '<p class="muted small">A great wonder: it goes on the board for the whole tribe to build.</p>' : ''}${m.turnDraw.type === 'leader' ? '<p class="muted small">A great person: they take over at once and leave when the era ends.</p>' : ''}`
     : '<p class="muted">The era deck is empty: nothing to draw.</p>';
   $('gotBox').innerHTML = `<h2>Round ${state.round}: your turn. You drew</h2>${ev}${body}<div class="row"><button class="primary" data-gotok>OK</button></div>`;
   $('gotModal').hidden = false;
 }
 // Starvation: when food runs short and your people are in more than one place, you choose who starves.
+// Start of the game: each player picks one of two lands to start with.
+function renderSetup() {
+  const s = state, box = $('setupBox');
+  if (s.phase !== 'setup') { $('setupModal').hidden = true; return; }
+  const offer = s.setupOffer || [];
+  box.innerHTML = offer.length
+    ? `<h2>Choose your starting land</h2><p class="muted small">Each player is offered two lands and keeps one; together they are where the tribe starts. The other goes back into the world deck.</p>
+       <div class="catalog">${offer.map(l => `<div><div class="nm">${esc(l.name)}</div><div>${esc(l.text)}</div><div class="actions"><button class="primary" data-land="${l.id}">Start here</button></div></div>`).join('')}</div>`
+    : `<h2>Waiting for the others</h2><p class="muted">Still choosing: ${(s.setupWaiting || []).map(esc).join(', ') || '…'}</p>`;
+  $('setupModal').hidden = false;
+}
+$('setupModal').onclick = e => {
+  const b = e.target.closest('[data-land]');
+  if (b) send({ type: 'chooseLand', land: +b.dataset.land });
+};
 function renderStarvation() {
   const s = state, need = s.starving && s.starving[s.you];
   if (s.phase !== 'starvation' || !need) { $('starveModal').hidden = true; return; }
@@ -309,7 +326,7 @@ function checkPickReveal() {
   if (!pickWatch) return;
   if (Date.now() - pickWatch.at > 5000) { pickWatch = null; return; }
   const got = (me().hand || []).filter(c => !pickWatch.ids.has(c.id));
-  if (me().leader && me().leader.name !== pickWatch.leader) got.push(me().leader);      // a leader plays at once
+  if (me().leader && me().leader.name !== pickWatch.leader) got.push(me().leader);      // a great person plays at once
   if (!got.length) return;
   const ev = pickWatch.event;
   pickWatch = null;
@@ -530,7 +547,7 @@ function renderCiv() {
     <div class="row small muted">Per round: ${resList(p.income, { signed: true })} (food after feeding your people)</div>
     <div class="row small">Population <b>${p.population}</b> · idle ${p.idle} · Army <b>${p.army}</b>${p.strength !== p.army ? ` (strength ${p.strength})` : ''}${p.committed ? ` (${p.committed} away at war)` : ''} · raid defense +${p.raidDefense} · hand ${p.handSize}/${p.handLimit}</div>
     ${(() => { const techs = s.players.flatMap(o => o.techs); return techs.length ? `<div class="small">Technologies (they help everyone): ${techs.map(t => `<span class="chip" title="${esc(t.text)}">${esc(t.name)}</span>`).join('')}</div>` : ''; })()}
-    ${p.leader ? `<div class="small">Leader: <span class="chip" title="${esc(p.leader.text)}">♛ ${esc(p.leader.name)}</span> <span class="muted">${esc(p.leader.text)} Leaves when the era ends.</span></div>` : ''}
+    ${p.leader ? `<div class="small">Great person: <span class="chip" title="${esc(p.leader.text)}">♛ ${esc(p.leader.name)}</span> <span class="muted">${esc(p.leader.text)} Leaves when the era ends.</span></div>` : ''}
     ${p.minorWonders.length ? `<div class="small">${p.minorWonders.map(t => `<span class="chip" title="${esc(t.text)}">★ ${esc(t.name)}</span>`).join('')}</div>` : ''}
     ${s.strengthPerTwoTroops || s.freeSettlers ? `<div class="small muted">${s.strengthPerTwoTroops ? `Military strength +${s.strengthPerTwoTroops} per 2 troops. ` : ''}${s.freeSettlers ? `Settling takes ${s.freeSettlers} settler${s.freeSettlers > 1 ? 's' : ''} less.` : ''}</div>` : ''}
     <h3 style="margin-top:.5rem">Buildings</h3><p class="small muted" style="margin:0">● worker · ○ empty slot · <span style="opacity:.5">●</span> room on your land, not built yet</p>${blds}
@@ -584,7 +601,7 @@ function renderHand() {
     const tradeText = o => `pay ${resList(o.give)} → your teammate gets ${resList(o.get)}`;
     const tradeInputs = c.trade ? `<div class="row small"><select id="opt-${c.id}" data-keep="opt-${c.id}">${c.trade.map((o, k) => `<option value="${k}">${RES.filter(r => o.give[r]).map(r => o.give[r] + ' ' + r).join(', ')} → ${RES.filter(r => o.get[r]).map(r => '+' + o.get[r] + ' ' + r).join(', ')} for them</option>`).join('')}</select></div>` : '';
     const pickTarget = opts ? `<select id="tgt-${c.id}" data-keep="tgt-${c.id}">${opts.map(([v, t]) => `<option value="${v}">${esc(t)}</option>`).join('')}</select>` : '';
-    return cardHtml(c, `${tradeInputs}<div class="actions">${pickTarget}${playable ? `<button ${act && affordable(c.cost) && (!opts || opts.length) ? '' : 'disabled'} data-play="${c.id}" data-target="${c.target || ''}">Play (1 action)</button>` : '<span class="small muted">Play it when an event strikes.</span>'}
+    return cardHtml(c, `${tradeInputs}<div class="actions">${pickTarget}${playable ? `<button ${act && (affordable(c.cost) || (c.type === 'tech' && me().freeTech)) && (!opts || opts.length) ? '' : 'disabled'} data-play="${c.id}" data-target="${c.target || ''}">Play (1 action)</button>` : '<span class="small muted">Play it when an event strikes.</span>'}
       <button class="tiny" data-discard="${c.id}">Discard</button>${give}</div>`);
   }).join('');
   const giveBar = others.length && p.giveCards ? `<div class="row small">Roman Roads: give up to ${p.giveCards} ticked cards to
@@ -699,7 +716,7 @@ async function openAllCards() {
   };
   const types = [...new Set(catalogue.cards.map(c => c.type))].filter(t => t !== 'great_wonder');
   box.innerHTML = `<div class="row"><h2 style="margin:0">All cards</h2><button data-close style="margin-left:auto">Close</button></div>
-    ${types.map(t => group(t.charAt(0).toUpperCase() + t.slice(1).replace('_', ' ') + ' cards', [t])).join('')}
+    ${types.map(t => group(t === 'leader' ? 'Great people' : t.charAt(0).toUpperCase() + t.slice(1).replace('_', ' ') + ' cards', [t])).join('')}
     <h3>Lands (${catalogue.lands.length})</h3><div class="catalog">${catalogue.lands.map(l => item(l.name, l.special ? 'special land' : 'land', l.text)).join('')}</div>
     <h3>Great wonders (${catalogue.wonders.length})</h3><div class="catalog">${catalogue.wonders.map(w => item(w.name, w.era || '', w.text)).join('')}</div>`;
 }

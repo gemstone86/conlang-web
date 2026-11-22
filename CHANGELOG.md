@@ -2,6 +2,13 @@
 
 Newest first. Versions from 1.x on are the combined app (Root and Rune + Weather generator).
 
+## v1.65.0 (combined app)
+
+- Dawn: the game now starts with a pop-up where each player is offered two lands and keeps one. The chosen lands are the realm's start (one per player); the others go back into the world deck. AI players choose by themselves and a player who is away gets the first land.
+- New event card, Wondrous Land: an event land with a wonder on it (+1 farm slot, +1 mine slot, +2 culture, +2 research per turn). It costs 6 food, 6 production and 1 settler per player (4 more food and production than an ordinary land) and starts with +4 enemy strength.
+- "Leaders" are now called great people in the game.
+- New Ancient great person, Archimedes: +1 research per turn, and your next technology is played for free (once).
+
 ## v1.64.0 (combined app)
 
 - Dawn: Herbalism also gives +1 research per turn. Spear Throwing is now Spear Men: every troop counts for +1 more strength, but training one costs +1 production and each troop eats half a food per round (rounded up per player; shown in your per-round income and the Train button).

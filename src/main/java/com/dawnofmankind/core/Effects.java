@@ -20,7 +20,7 @@ import java.util.Set;
  * victoryPoints, faceUpLands (more lands face up), settleDiscount (off every land's settling cost), freeSettlers
  * (fewer settlers needed per land), strengthPerTwoTroops (military strength +n for every 2 troops), giveCards (the
  * owner may give up to n cards to teammates for 1 action), freeRecruit (leader: the first troop trained each round takes no action),
- * healthMod (a land: Health counts n more or less while it is held), troopStrength (every troop is worth n more strength), recruitExtra (troops cost this much more to train),
+ * freeTech (leader: the next technology played is free), healthMod (a land: Health counts n more or less while it is held), troopStrength (every troop is worth n more strength), recruitExtra (troops cost this much more to train),
  * troopUpkeep (food per troop each round, may be 0.5),
  * growthDiscount (growing costs n less food), wonderDouble (resources given to great wonders count double), incomePerTerritory ({food: 1}: per territory in the realm),
  * noEnemy and halveEnemy (leaders: enemy strength on lands to settle is 0 / halved),
@@ -43,7 +43,7 @@ public final class Effects {
             "threat", "invadeIfStronger", "raidAll", "invasion", "healthTest", "trade");
     static final Set<String> LASTING = Set.of("income", "perWorker", "handLimit", "actionsPerTurn", "raidDefense",
             "mitigate", "buildDiscount", "sharedPool", "victoryPoints", "invasionDefense", "faceUpLands", "settleDiscount", "freeSettlers", "strengthPerTwoTroops", "giveCards", "freeRecruit", "strengthBonus", "ownStrengthPerTwoTroops", "maxSlots", "buildCost", "wonderGrowth", "eventUnder", "actionsToHand",
-            "growthDiscount", "wonderDouble", "incomePerTerritory", "noEnemy", "halveEnemy", "healthMod", "troopStrength", "recruitExtra", "troopUpkeep");
+            "growthDiscount", "wonderDouble", "incomePerTerritory", "noEnemy", "halveEnemy", "healthMod", "troopStrength", "recruitExtra", "troopUpkeep", "freeTech");
     static final Set<String> RESPONSE = Set.of("defense", "halve", "cancel", "healthBonus");
 
     static String key(Map<String, Object> e) {

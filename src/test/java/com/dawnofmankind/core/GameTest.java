@@ -498,7 +498,7 @@ class GameTest {
             for (Player p : g.players) all.addAll(p.hand);                 // what they drew blind
             for (Game.CardInst c : all) n.merge(c.def.eraTrigger ? "era_trigger" : c.def.type.name().toLowerCase(), 1, Integer::sum);
             // leaders and great wonders play or go to the board as soon as they are drawn; hostility cards are spent
-            int ledBy = (int) g.log.stream().filter(l -> l.contains(" is now led by ")).count();
+            int ledBy = (int) g.log.stream().filter(l -> l.contains(" has the great person ")).count();
             assertEquals(x + 1, n.getOrDefault("leader", 0) + ledBy, "leaders, " + x + " players");
             assertEquals(x, n.getOrDefault("great_wonder", 0) + g.greatWonders.size(), "great wonders");
             assertEquals(x + 2, n.getOrDefault("tech", 0), "techs");
@@ -578,6 +578,60 @@ class GameTest {
         assertEquals(Math.max(0, plain - 2), g.effectiveHealth());
         g.realm.remove(jungle);
         assertEquals(plain, g.effectiveHealth());
+    }
+
+    @Test
+    void everyPlayerPicksOneOfTwoLandsToStart() {
+        Game g = new Game(C, List.of("A", "B"), 90, true);
+        assertEquals(Game.Phase.SETUP, g.phase);
+        assertEquals(0, g.realm.size());
+        for (Player p : g.players) assertEquals(2, g.setupOffers.get(p.seat).size());
+        int deck = g.worldDeck.size();
+        Game.Territory first = g.setupOffers.get(0).get(1);
+        assertThrows(GameException.class, () -> g.act(0, Map.of("type", "chooseLand", "land", -5)), "must be one of the two");
+        assertThrows(GameException.class, () -> g.act(0, Map.of("type", "recruit")), "nothing else until the lands are chosen");
+        g.act(0, Map.of("type", "chooseLand", "land", first.id));
+        assertEquals(Game.Phase.SETUP, g.phase, "still waiting for the other player");
+        assertThrows(GameException.class, () -> g.act(0, Map.of("type", "chooseLand", "land", first.id)), "only once");
+        g.act(1, Map.of("type", "chooseLand", "land", g.setupOffers.get(1).get(0).id));
+        assertEquals(Game.Phase.TURNS, g.phase);
+        assertEquals(2, g.realm.size(), "one land per player");
+        assertTrue(g.realm.contains(first));
+        assertEquals(2, g.frontier.size(), "the face-up lands are laid out once the game starts");
+        assertTrue(g.worldDeck.size() + g.frontier.size() >= deck, "unchosen lands went back into the deck");
+    }
+
+    @Test
+    void archimedesLetsTheNextTechnologyBeFree() {
+        Game g = game(1, 91);
+        Player p = g.players.get(0);
+        p.leader = C.cards.get("archimedes");
+        p.freeTechUsed = false;
+        assertEquals(1, g.mods(p).income.get(Res.RESEARCH));
+        for (Res r : Res.values()) p.res.put(r, 0);
+        Game.CardInst t1 = card(g, "fire"), t2 = card(g, "hunting");
+        p.hand.add(t1);
+        p.hand.add(t2);
+        g.act(p.seat, Map.of("type", "play", "card", t1.id));
+        assertTrue(p.techs.contains(t1.def), "played with no research at all");
+        assertThrows(GameException.class, () -> g.act(p.seat, Map.of("type", "play", "card", t2.id)), "only the next one is free");
+    }
+
+    @Test
+    void theWondrousLandStartsWithFourEnemyStrength() {
+        Game g = game(1, 92);
+        Player p = g.players.get(0);
+        for (Player q : g.players) q.leader = null;
+        g.currentEvents.clear();
+        g.futureEvents.clear();
+        g.futureEvents.add(card(g, "cold_night"));            // the number of events drawn is the future deck's size
+        g.currentEvents.add(card(g, "wondrous_land_found"));
+        g.act(p.seat, Map.of("type", "endTurn"));
+        Game.Frontier f = g.frontier.stream().filter(x -> x.land.def.id.equals("wondrous_land")).findFirst().orElse(null);
+        assertNotNull(f, "the land lies there during its event");
+        assertEquals(4, f.enemy);
+        assertEquals(6, g.settleCost(f).get(Res.FOOD));
+        assertEquals(6, g.settleCost(f).get(Res.PRODUCTION));
     }
 
     @Test
