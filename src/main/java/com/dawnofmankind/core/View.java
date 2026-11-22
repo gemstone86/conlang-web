@@ -202,6 +202,7 @@ public final class View {
             if (p.leader != null) pm.put("leader", def(p.leader));
             if (p.pendingLeader != null) pm.put("pendingLeader", def(p.pendingLeader));
             pm.put("freeTech", g.freeTechAvailable(p));
+            pm.put("wonderUpkeep", g.wonderUpkeep(p));
             pm.put("minorWonders", p.minorWonders.stream().map(View::def).toList());
             if (p.seat == seat) pm.put("hand", p.hand.stream().map(View::card).toList());
             pm.put("done", p.done);

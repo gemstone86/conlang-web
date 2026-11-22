@@ -16,7 +16,7 @@ import org.yaml.snakeyaml.Yaml;
  */
 public final class Content {
 
-    public enum CardType { TECH, ACTION, RESPONSE, MINOR_WONDER, GREAT_WONDER, EVENT, HOSTILITY, LEADER }
+    public enum CardType { TECH, ACTION, RESPONSE, MINOR_WONDER, GREAT_WONDER, EVENT, HOSTILITY, LEADER, CITY_STATE }
 
     /** Rule numbers from the {@code rules:} block. */
     public static final class Rules {
@@ -53,6 +53,8 @@ public final class Content {
         public CardType type;
         /** For great wonder cards: the wonder it starts. */
         public String wonder;
+        /** For city state cards: the special land (territories:) that goes to the lands to settle. */
+        public String land;
         public EnumMap<Res, Integer> cost;
         /** What playing the card does (tech, action, wonder) or, for events, what happens on resolution. */
         public List<Map<String, Object>> effects = new ArrayList<>();
@@ -283,6 +285,7 @@ public final class Content {
         c.ongoing = effects(pers.get("ongoing"));
         c.cleanseCost = Res.parse(pers.get("cleanse"));
         c.eraTrigger = Y.b(m, "eraTrigger");
+        c.land = Y.s(m, "land", null);
         c.minPlayers = Y.i(m, "minPlayers", 1);
         c.obsoleteAfter = Y.s(m, "obsoleteAfter", null);
         c.helper = Y.b(m, "helper");
@@ -328,6 +331,14 @@ public final class Content {
     }
 
     private void validate() {
+        // a card belongs to the first era that lists it (the age of a wonder is counted from there)
+        for (EraDef e : eras) for (String id : e.cards.keySet()) {
+            CardDef d = cards.get(id);
+            if (d != null && d.era == null) d.era = e.id;
+        }
+        for (CardDef c : cards.values()) {
+            if (c.type == CardType.CITY_STATE && (c.land == null || !territories.containsKey(c.land))) throw new IllegalStateException("City state card " + c.id + " needs a land: from territories");
+        }
         for (EraDef e : eras) {
             for (String id : e.cards.keySet()) if (!cards.containsKey(id)) throw new IllegalStateException("Era " + e.id + " lists unknown card " + id);
         }

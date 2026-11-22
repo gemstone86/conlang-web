@@ -503,11 +503,16 @@ function renderTechs() {
     ? list.map(({ t, by }) => `<div class="techrow"><b>${esc(t.name)}</b> <span class="muted small">by ${esc(by)}</span><div class="small">${esc(t.text)}</div></div>`).join('')
     : '<p class="muted small">None yet. Technologies help every player once anyone has researched them.</p>');
   // the lasting bonuses that aren't technologies: minor wonders such as Roman Roads
-  const bonus = s.players.flatMap(o => o.minorWonders.map(t => ({ t, by: o.name })));
+  const bonus = s.players.flatMap(o => o.minorWonders.map(t => ({ t, by: o.name, mine: o.seat === s.you })));
   $('bonusPanel').innerHTML = `<h2>Bonuses <span class="muted small">(${bonus.length})</span></h2>` + (bonus.length
-    ? bonus.map(({ t, by }) => `<div class="techrow"><b>★ ${esc(t.name)}</b> <span class="muted small">by ${esc(by)}</span><div class="small">${esc(t.text)}</div></div>`).join('')
+    ? bonus.map(({ t, by, mine }) => `<div class="techrow"><b>★ ${esc(t.name)}</b> <span class="muted small">by ${esc(by)}</span>${mine ? ` <button class="secondary small" data-removebonus="${t.key}" data-bname="${esc(t.name)}">Remove</button>` : ''}<div class="small">${esc(t.text)}</div></div>`).join('')
     : '<p class="muted small">None yet. Minor wonders (like Roman Roads) and other lasting bonuses show here.</p>');
 }
+$('bonusPanel').onclick = e => {
+  const b = e.target.closest('[data-removebonus]'); if (!b) return;
+  if (!confirm(`Are you sure you want to remove ${b.dataset.bname}? The bonus and its card are gone for good.`)) return;
+  send({ type: 'removeBonus', card: b.dataset.removebonus });
+};
 let growCb = null;
 function openGrowChoice(free, cb) {
   growCb = cb || (id => send({ type: 'grow', building: id }));
@@ -559,6 +564,7 @@ function renderCiv() {
     <div class="row small muted">Per round: ${resList(p.income, { signed: true })} (food after feeding your people)</div>
     <div class="row small">Population <b>${p.population}</b> · idle ${p.idle} · Army <b>${p.army}</b>${p.strength !== p.army ? ` (strength ${p.strength})` : ''}${p.committed ? ` (${p.committed} away at war)` : ''} · raid defense +${p.raidDefense} · hand ${p.handSize}/${p.handLimit}</div>
     ${(() => { const techs = s.players.flatMap(o => o.techs); return techs.length ? `<div class="small">Technologies (they help everyone): ${techs.map(t => `<span class="chip" title="${esc(t.text)}">${esc(t.name)}</span>`).join('')}</div>` : ''; })()}
+    ${p.wonderUpkeep ? `<div class="small">Upkeep for wonders of earlier eras: <b>${p.wonderUpkeep} production</b> every round.</div>` : ''}
     ${p.leader ? `<div class="small">Great person: <span class="chip" title="${esc(p.leader.text)}">♛ ${esc(p.leader.name)}</span> <span class="muted">${esc(p.leader.text)} Leaves when the era ends.</span></div>` : ''}
     ${p.minorWonders.length ? `<div class="small">${p.minorWonders.map(t => `<span class="chip" title="${esc(t.text)}">★ ${esc(t.name)}</span>`).join('')}</div>` : ''}
     ${s.strengthPerTwoTroops || s.freeSettlers ? `<div class="small muted">${s.strengthPerTwoTroops ? `Military strength +${s.strengthPerTwoTroops} per 2 troops. ` : ''}${s.freeSettlers ? `Settling takes ${s.freeSettlers} settler${s.freeSettlers > 1 ? 's' : ''} less.` : ''}</div>` : ''}
@@ -740,7 +746,7 @@ async function openAllCards() {
       item(c.name, [c.type === 'leader' ? 'great person' : c.type.replace('_', ' '), c.era, cost(c.cost) && 'cost ' + cost(c.cost), c.minPlayers && c.minPlayers + '+ players only'].filter(Boolean).join(' · '), c.text, c.art)).join('')}</div>` : '';
   };
   const types = [...new Set(catalogue.cards.map(c => c.type))].filter(t => t !== 'great_wonder');
-  const names = { leader: 'Great people', era_trigger: 'Era-trigger events', hostility: 'Hostility cards', tech: 'Techs', action: 'Actions', response: 'Responses', minor_wonder: 'Minor wonders', great_wonder: 'Great wonders', event: 'Events' };
+  const names = { leader: 'Great people', era_trigger: 'Era-trigger events', hostility: 'Hostility cards', tech: 'Techs', action: 'Actions', response: 'Responses', minor_wonder: 'Minor wonders', great_wonder: 'Great wonders', city_state: 'City states', event: 'Events' };
   const nice = k => names[k] || k;
   const per = x => !x ? '-' : [x.base ? String(x.base) : '', x.perPlayer ? (x.perPlayer === 1 ? 'X' : x.perPlayer + 'X') : ''].filter(Boolean).join(' + ') || '0';
   const eraNames = catalogue.counts[0].eras.map(e => e.era);

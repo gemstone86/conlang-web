@@ -2,6 +2,16 @@
 
 Newest first. Versions from 1.x on are the combined app (Root and Rune + Weather generator).
 
+## v1.71.0 (combined app)
+
+- Dawn: The First Religion is now +2 culture per turn and temples cost 1 less production (the -1 action is gone).
+- Dawn: bonuses (minor wonders) can be removed with a Remove button, after an "Are you sure?" popup; the card goes with it.
+- Dawn: wonders of earlier eras cost upkeep: 1 production per round for each era they are removed from, for each player. Wonders of the current era cost nothing. Your realm panel shows what you pay.
+- Dawn: new card kind, City State: one waits in every era deck; when picked it goes among the lands to settle and costs 3 influence per player (no people or troops). It gives +2 village slots and +1 culture per turn.
+- Dawn: each era deck now holds 6 + players techs.
+- Dawn: "Spear Men" is now "Spearmen".
+- Dawn: new techs Wanderlust (one more land to settle), The Wheel (settling costs 1 less population) and, in the Ancient era, Ancients Customs (halves the upkeep of wonders from earlier eras).
+
 ## v1.70.0 (combined app)
 
 - Dawn: admins get a "Complete (admin)" button in the top right corner of every great wonder under construction; it finishes the wonder at once, in the territory chosen on the card.

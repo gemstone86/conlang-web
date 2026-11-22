@@ -446,10 +446,13 @@ public final class Game {
                 if (bonus != null) bonus.forEach((r, v) -> gain.merge(r, v * w, Integer::sum));
             }
             m.income.forEach((r, v) -> gain.merge(r, v, Integer::sum));
+            int wonderUpkeep = wonderUpkeep(p);
+            if (wonderUpkeep > 0) gain.merge(Res.PRODUCTION, -wonderUpkeep, Integer::sum);
             gain.forEach((r, v) -> p.res.put(r, Math.max(0, p.res.get(r) + v)));
             int upkeep = p.population() * content.rules.foodUpkeepPerPop + troopUpkeep(p);
             int food = p.res.get(Res.FOOD);
-            String msg = p.name + " produces " + Res.describe(gain) + "; feeds " + p.population() + " Population.";
+            String msg = p.name + " produces " + Res.describe(gain)
+                    + (wonderUpkeep > 0 ? " (after " + wonderUpkeep + " production upkeep for wonders of earlier eras)" : "") + "; feeds " + p.population() + " Population.";
             if (food >= upkeep) {
                 p.res.put(Res.FOOD, food - upkeep);
             } else {
@@ -781,6 +784,7 @@ public final class Game {
             case "decide" -> decide(p, a);
             case "ready" -> ready(p);
             case "leader" -> chooseLeader(p, a);
+            case "removeBonus" -> removeBonus(p, a);
             case "chooseLand" -> chooseLand(p, a);
             case "colonize" -> colonize(p, a);
             case "starve" -> starve(p, a);
@@ -863,7 +867,8 @@ public final class Game {
         }
         b.cost.forEach((r, v) -> {
             int c = v + (r == Res.PRODUCTION ? levels * content.rules.buildingEscalation : 0);
-            cost.put(r, Math.max(0, c - (c > 0 ? m.buildDiscount.get(r) : 0)));
+            int off = m.buildDiscount.get(r) + (m.buildingDiscount.containsKey(b.id) ? m.buildingDiscount.get(b.id).get(r) : 0);
+            cost.put(r, Math.max(0, c - (c > 0 ? off : 0)));
         });
         return cost;
     }
@@ -963,6 +968,15 @@ public final class Game {
         log(p.name + " has the great person " + d.name + ": " + d.text);
     }
 
+    /** Drops one of the player's bonuses (a minor wonder) for good: the card goes with it. */
+    private void removeBonus(Player p, Map<String, Object> a) {
+        String id = Y.s(a, "card", "");
+        CardDef d = p.minorWonders.stream().filter(x -> x.id.equals(id)).findFirst()
+                .orElseThrow(() -> new GameException("You have no such bonus."));
+        p.minorWonders.remove(d);
+        log(p.name + " gives up " + d.name + ".");
+    }
+
     private void chooseLeader(Player p, Map<String, Object> a) {
         if (p.pendingLeader == null) throw new GameException("You have no new great person to decide on.");
         if (Y.b(a, "replace")) installLeader(p, p.pendingLeader);
@@ -981,6 +995,14 @@ public final class Game {
                 return;
             }
             installLeader(p, c.def);
+            return;
+        }
+        if (c.def.type == CardType.CITY_STATE) {
+            TerritoryDef def = content.territories.get(c.def.land);
+            Frontier f = new Frontier(new Territory(nextId++, def), false, -1);
+            f.opened = true;                              // open for the whole tribe to pay toward
+            frontier.add(f);
+            log(p.name + " finds the city state " + def.name + ": it waits among the lands to settle (" + def.text + ").");
             return;
         }
         if (c.def.type != CardType.GREAT_WONDER) {
@@ -1108,6 +1130,21 @@ public final class Game {
     }
 
     /** Food the troops eat each round (Spear Men): half a food per troop, rounded up. */
+    /** How many eras ago the wonder's era was (0 for this era). */
+    private int eraAge(String era) {
+        for (int i = 0; i < content.eras.size(); i++) if (content.eras.get(i).id.equals(era)) return Math.max(0, eraIndex - i);
+        return 0;
+    }
+
+    /** Production a player pays each round for wonders (great and minor) of earlier eras: 1 per era they are removed from. */
+    public int wonderUpkeep(Player p) {
+        int total = 0;
+        for (WonderDef w : builtWonders) if (!obsolete(w)) total += eraAge(w.era);
+        for (CardDef c : p.minorWonders) if (!obsolete(c)) total += eraAge(c.era);
+        if (mods(p).halveWonderUpkeep) total = (total + 1) / 2;
+        return total;
+    }
+
     public int troopUpkeep(Player p) {
         return (int) Math.ceil(p.army * mods(p).troopUpkeep - 1e-9);
     }
