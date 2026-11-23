@@ -46,7 +46,7 @@ public final class Content {
         public boolean buildable;
         /** Cannot be built until a tech with {@code unlockBuilding} for it has been researched. */
         public boolean locked;
-        public EnumMap<Res, Integer> cost, perWorker;
+        public EnumMap<Res, Integer> cost, perWorker, upkeep;
     }
 
     /** One card in a deck: a technology, action, response, minor wonder or event (crisis cards are events). */
@@ -246,6 +246,7 @@ public final class Content {
         b.locked = Y.b(m, "locked");
         b.cost = Res.parse(m.get("cost"));
         b.perWorker = Res.parse(m.get("perWorker"));
+        b.upkeep = Res.parse(m.get("upkeep"));
         return b;
     }
 

@@ -74,7 +74,8 @@ buildings:
     cost: {production: 4, culture: 2}
     slots: 2
     perWorker: {influence: 1, culture: 1}
-    text: Each worker produces 1 influence and 1 culture. Available once Markets has been researched.
+    upkeep: {food: 1, production: 1}    # paid every round while you own one
+    text: Each worker produces 1 influence and 1 culture. Upkeep 1 food and 1 production every round. Available once Markets has been researched.
   village:
     name: Village
     cost: {production: 3}
@@ -718,7 +719,7 @@ cards:
     required: true                       # always in the Ancient era deck
     cost: {research: 4, culture: 1}
     effects: [{unlockBuilding: market}]
-    text: Unlocks a new building for everyone, the Market (4 production and 2 culture). Each worker in it produces 1 influence and 1 culture.
+    text: Unlocks a new building for everyone, the Market (4 production and 2 culture; upkeep 1 food and 1 production per round). Each worker in it produces 1 influence and 1 culture.
   ancients_customs:
     name: Ancients Customs
     type: tech

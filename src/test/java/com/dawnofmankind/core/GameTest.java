@@ -675,6 +675,20 @@ class GameTest {
     }
 
     @Test
+    void aMarketCostsUpkeepEveryRound() {
+        Game g = game(1, 82);
+        Player p = g.players.get(0);
+        p.leader = null;
+        assertTrue(Res.isZero(g.buildingUpkeep(p)));
+        p.techs.add(C.cards.get("markets"));
+        p.res.put(Res.PRODUCTION, 10);
+        p.res.put(Res.CULTURE, 5);
+        g.act(p.seat, Map.of("type", "build", "building", "market"));
+        assertEquals(1, g.buildingUpkeep(p).get(Res.FOOD));
+        assertEquals(1, g.buildingUpkeep(p).get(Res.PRODUCTION));
+    }
+
+    @Test
     void theConquerorAndAlexanderChangeEnemyStrength() {
         Game g = game(1, 72);
         Player p = g.players.get(0);

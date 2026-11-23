@@ -458,11 +458,14 @@ public final class Game {
             m.income.forEach((r, v) -> gain.merge(r, v, Integer::sum));
             int wonderUpkeep = wonderUpkeep(p);
             if (wonderUpkeep > 0) gain.merge(Res.PRODUCTION, -wonderUpkeep, Integer::sum);
+            EnumMap<Res, Integer> running = buildingUpkeep(p);               // e.g. the Market: 1 food and 1 production
+            for (Res r : Res.values()) if (r != Res.FOOD && running.get(r) > 0) gain.merge(r, -running.get(r), Integer::sum);
             gain.forEach((r, v) -> p.res.put(r, Math.max(0, p.res.get(r) + v)));
-            int upkeep = p.population() * content.rules.foodUpkeepPerPop + troopUpkeep(p);
+            int upkeep = p.population() * content.rules.foodUpkeepPerPop + troopUpkeep(p) + running.get(Res.FOOD);
             int food = p.res.get(Res.FOOD);
             String msg = p.name + " produces " + Res.describe(gain)
-                    + (wonderUpkeep > 0 ? " (after " + wonderUpkeep + " production upkeep for wonders of earlier eras)" : "") + "; feeds " + p.population() + " Population.";
+                    + (wonderUpkeep > 0 ? " (after " + wonderUpkeep + " production upkeep for wonders of earlier eras)" : "")
+                    + (!Res.isZero(running) ? " (building upkeep " + Res.describe(running) + ")" : "") + "; feeds " + p.population() + " Population.";
             if (food >= upkeep) {
                 p.res.put(Res.FOOD, food - upkeep);
             } else {
@@ -1146,6 +1149,13 @@ public final class Game {
     }
 
     /** Food the troops eat each round (Spear Men): half a food per troop, rounded up. */
+    /** What a player's buildings cost to keep every round (the Market: 1 food and 1 production). */
+    public EnumMap<Res, Integer> buildingUpkeep(Player p) {
+        EnumMap<Res, Integer> total = Res.empty();
+        for (Building b : p.buildings) b.def.upkeep.forEach((r, v) -> total.merge(r, v, Integer::sum));
+        return total;
+    }
+
     /** How many eras ago the wonder's era was (0 for this era). */
     private int eraAge(String era) {
         for (int i = 0; i < content.eras.size(); i++) if (content.eras.get(i).id.equals(era)) return Math.max(0, eraIndex - i);

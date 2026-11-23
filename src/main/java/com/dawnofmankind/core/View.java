@@ -181,6 +181,7 @@ public final class View {
             pm.put("income", inc);
             Map<String, Integer> net = new LinkedHashMap<>(inc);          // after what the round takes: upkeep for wonders of earlier eras
             net.merge(Res.PRODUCTION.key(), -g.wonderUpkeep(p), Integer::sum);
+            g.buildingUpkeep(p).forEach((r, v) -> net.merge(r.key(), -v, Integer::sum));
             pm.put("net", net);
             List<Object> bs = new ArrayList<>();
             for (Player.Building b : p.buildings) {
