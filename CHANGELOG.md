@@ -2,6 +2,10 @@
 
 Newest first. Versions from 1.x on are the combined app (Root and Rune + Weather generator).
 
+## v1.73.1 (combined app)
+
+- Dawn: pictures for the three new techs and six response cards (batch A).
+
 ## v1.73.0 (combined app)
 
 - Dawn: the event pop-up shows how much of the asked-for resource you have ("Costs 2 Food · You have 1 Food", red when short), your resources, and the cost on each response button.
