@@ -107,7 +107,11 @@ function toast(text, ok) {
 
 // ------------------------------------------------------------------ render
 
+let tipCards = [];
+function tipAttr(c) { tipCards.push(c); return ` data-tipcard="${tipCards.length - 1}"`; }
+
 function render(m) {
+  tipCards = [];
   room = m.room;
   state = m.game;
   renderChat(m.chat);
@@ -172,7 +176,7 @@ const me = () => state.players[state.you];
 const myTurn = () => state.phase === 'turns' && !me().done && !state.result;
 const canAct = () => myTurn() && state.actionsLeft > 0;
 const resList = (r, opts = {}) => RES.filter(k => (r?.[k] ?? 0) !== 0 || opts.all)
-  .map(k => `<span class="res r-${k}">${opts.signed && r[k] > 0 ? '+' : ''}${r[k] ?? 0}<i>${RES_SHORT[k]}</i></span>`).join('') || '<span class="muted">—</span>';
+  .map(k => `<span class="res r-${k}"${opts.src ? ` data-tipsrc="${k}"` : ''}>${opts.signed && r[k] > 0 ? '+' : ''}${r[k] ?? 0}<i>${RES_SHORT[k]}</i></span>`).join('') || '<span class="muted">—</span>';
 const affordable = cost => !cost || RES.every(k => (me().resources[k] || 0) >= (cost[k] || 0));
 
 function renderStatus() {
@@ -182,7 +186,7 @@ function renderStatus() {
     : s.phase === 'events' ? 'Events' : s.phase === 'starvation' ? 'Starvation — choosing who goes' : myTurn() ? '<span class="turn">Your turn</span>' : `You are done — waiting for ${waiting.join(', ') || 'the others'}`;
   // actions left get a box of their own, always shown, because they were hard to find
   const left = s.phase === 'turns' && !s.result ? (myTurn() ? s.actionsLeft : 0) : null;
-  const actions = `<span class="al ${left === 0 ? 'zero' : ''}" title="Actions you have left this round">Actions left <b>${left == null ? '–' : left}</b></span>`;
+  const actions = `<span class="al ${left === 0 ? 'zero' : ''}" data-tipactions>Actions left <b>${left == null ? '–' : left}</b></span>`;
   $('status').innerHTML = `<span>${esc(s.era)} era (${s.eraIndex + 1}/${s.eraCount})</span><span>Round <b>${s.round}</b></span>
     <span>${phase}</span>${actions}<span>Stability <b class="${s.stability <= 3 ? 'bad' : ''}">${s.stability}</b></span>
     <span>Health <b>${s.health}</b></span><span class="${s.threat ? 'threat' : ''}">Enemies massing <b>${s.threat}</b></span><span>Era deck <b>${s.eraDeck}</b></span><span>Points <b>${s.score}</b></span>
@@ -410,7 +414,7 @@ function renderWonders() {
       <div class="name">${esc(w.name)}${w.done ? ' ✓' : ''}</div><div class="text">${esc(w.text)}</div>
       <div class="small">Paid ${resList(w.paid, { all: false })} of ${resList(w.cost)}</div><div class="prog"><div style="width:${total ? 100 * paid / total : 0}%"></div></div>${by}${form}</div>`;
   }).join('');
-  const built = s.builtWonders.length ? `<p class="small">Built: ${s.builtWonders.map(w => `<span class="chip" title="${esc(w.text)}">${esc(w.name)} (${w.victoryPoints})${w.obsolete ? ' · obsolete' : ''}</span>`).join('')}</p>` : '';
+  const built = s.builtWonders.length ? `<p class="small">Built: ${s.builtWonders.map(w => `<span class="chip"${tipAttr({ type: 'great_wonder', ...w })}>${esc(w.name)} (${w.victoryPoints})${w.obsolete ? ' · obsolete' : ''}</span>`).join('')}</p>` : '';
   $('wonderPanel').innerHTML = `<h2>Great wonders</h2><p class="muted small">Great wonders turn up in the queue; take one to start building it together. Each stands in a territory: lose the territory, lose the wonder. Their points, plus 1 per territory, are your final score. Unfinished wonders are lost when the era ends (half is returned).</p>${built}<div class="cards">${list || '<p class="muted">None under construction.</p>'}</div>`;
 }
 $('wonderPanel').onclick = e => {
@@ -509,12 +513,12 @@ $('eventPanel').onclick = e => {
 function renderTechs() {
   const s = state, list = s.players.flatMap(o => o.techs.map(t => ({ t, by: o.name })));
   $('techPanel').innerHTML = `<h2>Technologies <span class="muted small">(${list.length})</span></h2>` + (list.length
-    ? list.map(({ t, by }) => `<div class="techrow"><b>${esc(t.name)}</b> <span class="muted small">by ${esc(by)}</span><div class="small">${esc(t.text)}</div></div>`).join('')
+    ? list.map(({ t, by }) => `<div class="techrow"${tipAttr(t)}><b>${esc(t.name)}</b> <span class="muted small">by ${esc(by)}</span><div class="small">${esc(t.text)}</div></div>`).join('')
     : '<p class="muted small">None yet. Technologies help every player once anyone has researched them.</p>');
   // the lasting bonuses that aren't technologies: minor wonders such as Roman Roads
   const bonus = s.players.flatMap(o => o.minorWonders.map(t => ({ t, by: o.name, mine: o.seat === s.you })));
   $('bonusPanel').innerHTML = `<h2>Bonuses <span class="muted small">(${bonus.length})</span></h2>` + (bonus.length
-    ? bonus.map(({ t, by, mine }) => `<div class="techrow"><b>★ ${esc(t.name)}</b> <span class="muted small">by ${esc(by)}</span>${mine ? ` <button class="secondary small" data-removebonus="${t.key}" data-bname="${esc(t.name)}">Remove</button>` : ''}<div class="small">${esc(t.text)}</div></div>`).join('')
+    ? bonus.map(({ t, by, mine }) => `<div class="techrow"${tipAttr(t)}><b>★ ${esc(t.name)}</b> <span class="muted small">by ${esc(by)}</span>${mine ? ` <button class="secondary small" data-removebonus="${t.key}" data-bname="${esc(t.name)}">Remove</button>` : ''}<div class="small">${esc(t.text)}</div></div>`).join('')
     : '<p class="muted small">None yet. Minor wonders (like Roman Roads) and other lasting bonuses show here.</p>');
 }
 $('bonusPanel').onclick = e => {
@@ -570,12 +574,12 @@ function renderCiv() {
   $('civPanel').className = 'panel mine';
   $('civPanel').innerHTML = `<h2>Your people — ${esc(p.name)}</h2>
     <div class="row">${resList(p.resources, { all: true })}</div>
-    <div class="row small muted">Per round: ${resList(p.income, { signed: true })} (food after feeding your people)</div>
-    <div class="row small">Net per round, after upkeep: ${resList(p.net, { signed: true })}</div>
+    <div class="row small muted">Per round: ${resList(p.income, { signed: true, src: true })} (food after feeding your people)</div>
+    <div class="row small">Net per round, after upkeep: ${resList(p.net, { signed: true, src: true })}</div>
     <div class="row small">Population <b>${p.population}</b> · idle ${p.idle} · Army <b>${p.army}</b>${p.strength !== p.army ? ` (strength ${p.strength})` : ''}${p.committed ? ` (${p.committed} away at war)` : ''} · raid defense +${p.raidDefense} · hand ${p.handSize}/${p.handLimit}</div>
-    ${(() => { const techs = s.players.flatMap(o => o.techs); return techs.length ? `<div class="small">Technologies (they help everyone): ${techs.map(t => `<span class="chip" title="${esc(t.text)}">${esc(t.name)}</span>`).join('')}</div>` : ''; })()}
+    ${(() => { const techs = s.players.flatMap(o => o.techs); return techs.length ? `<div class="small">Technologies (they help everyone): ${techs.map(t => `<span class="chip"${tipAttr(t)}>${esc(t.name)}</span>`).join('')}</div>` : ''; })()}
     ${p.wonderUpkeep ? `<div class="small">Upkeep for wonders of earlier eras: <b>${p.wonderUpkeep} production</b> every round.</div>` : ''}
-    ${p.minorWonders.length ? `<div class="small">${p.minorWonders.map(t => `<span class="chip" title="${esc(t.text)}">★ ${esc(t.name)}</span>`).join('')}</div>` : ''}
+    ${p.minorWonders.length ? `<div class="small">${p.minorWonders.map(t => `<span class="chip"${tipAttr(t)}>★ ${esc(t.name)}</span>`).join('')}</div>` : ''}
     ${s.strengthPerTwoTroops || s.freeSettlers ? `<div class="small muted">${s.strengthPerTwoTroops ? `Military strength +${s.strengthPerTwoTroops} per 2 troops. ` : ''}${s.freeSettlers ? `Settling takes ${s.freeSettlers} settler${s.freeSettlers > 1 ? 's' : ''} less.` : ''}</div>` : ''}
     <h3 style="margin-top:.5rem">Buildings</h3><p class="small muted" style="margin:0">● worker · ○ empty slot · <span style="opacity:.5">●</span> room on your land, not built yet</p>${blds}
     <div class="row small">Move a worker <select id="mvFrom" data-keep="mvFrom">${moveOpts}</select> → <select id="mvTo" data-keep="mvTo">${moveOpts}</select><button ${act ? '' : 'disabled'} data-move>Move (1 action)</button></div>
@@ -687,8 +691,8 @@ function renderTeam() {
       <div class="tname">${s.phase === 'turns' ? (o.done ? '✔ ' : '▶ ') : ''}${esc(o.name)}${o.seat === s.you ? ' (you)' : ''}${room.players[o.seat]?.ai ? ' <span class="chip">AI</span>' : ''}${o.seat === s.firstPlayer ? ' <span class="chip">first</span>' : ''}${o.away ? ' <span class="chip">away</span>' : ''}</div>
       <div class="small">${resList(o.resources)}</div>
       <div class="small muted">${s.phase === 'turns' ? `<b class="${o.done || !o.actions ? 'muted' : 'al-num'}">${o.done ? 'done' : o.actions + ' action' + (o.actions === 1 ? '' : 's') + ' left'}</b> · ` : ''}Pop ${o.population} · Army ${o.army}${o.strength !== o.army ? ` (strength ${o.strength})` : ''} · Hand ${o.handSize} · ${o.buildings.map(b => esc(b.name) + ' ' + b.workers + '/' + b.slots).join(', ')}</div>
-      ${o.techs.length || o.minorWonders.length ? `<div>${o.techs.map(t => `<span class="chip" title="${esc(t.text)}">${esc(t.name)}</span>`).join('')}${o.minorWonders.map(t => `<span class="chip">★ ${esc(t.name)}</span>`).join('')}</div>` : ''}
-      ${o.leader ? `<div class="small"><span class="chip" title="${esc(o.leader.text)}">♛ ${esc(o.leader.name)}</span></div>` : ''}
+      ${o.techs.length || o.minorWonders.length ? `<div>${o.techs.map(t => `<span class="chip"${tipAttr(t)}>${esc(t.name)}</span>`).join('')}${o.minorWonders.map(t => `<span class="chip"${tipAttr(t)}>★ ${esc(t.name)}</span>`).join('')}</div>` : ''}
+      ${o.leader ? `<div class="small"><span class="chip"${tipAttr(o.leader)}>♛ ${esc(o.leader.name)}</span></div>` : ''}
     </div>`).join('');
   $('teamPanel').innerHTML = `<h2>The tribe</h2><p class="small" style="margin:0 0 .3rem">Army ${s.players.reduce((t, o) => t + o.army, 0)} (total strength against an invasion: <b>${s.tribeStrength}</b>)</p>${list}`;
 }
@@ -801,15 +805,40 @@ document.body.appendChild(kwTip);
 function showKw(el) {
   const k = (catalogue?.keywords || []).find(x => x.id === el.dataset.kw);
   if (!k) return;
+  kwTip.className = 'kwtip';
   kwTip.innerHTML = `<b>${esc(k.name)}</b><div>${esc(k.text)}</div>`;
   kwTip.hidden = false;
+  placeTip(el);
+}
+// hover boxes: a card (techs, bonuses, wonders, great people), where a resource per round comes from, where actions come from
+const TIP = '.kw, [data-tipcard], [data-tipsrc], [data-tipactions]';
+function showTip(el) {
+  if (el.classList.contains('kw')) return showKw(el);
+  let html = '', wide = false;
+  if (el.dataset.tipcard != null) {
+    const c = tipCards[+el.dataset.tipcard];
+    if (!c) return;
+    html = cardHtml(c); wide = true;
+  } else {
+    const rows = el.dataset.tipactions != null ? me().actionSources : (me().incomeSources || {})[el.dataset.tipsrc];
+    const title = el.dataset.tipactions != null ? 'Where your actions come from' : 'Where it comes from: ' + el.dataset.tipsrc;
+    if (!rows || !rows.length) return;
+    const total = rows.reduce((a, r) => a + r.n, 0);
+    html = `<b>${esc(title)}</b>${rows.map(r => `<div class="srcrow"><span>${esc(r.from)}</span><span class="${r.n < 0 ? 'bad' : ''}">${r.n > 0 ? '+' : ''}${r.n}</span></div>`).join('')}<div class="srcrow total"><span>Total</span><span>${total > 0 ? '+' : ''}${total}</span></div>`;
+  }
+  kwTip.className = 'kwtip' + (wide ? ' cardtip' : '');
+  kwTip.innerHTML = html;
+  kwTip.hidden = false;
+  placeTip(el);
+}
+function placeTip(el) {
   const r = el.getBoundingClientRect(), w = kwTip.offsetWidth, h = kwTip.offsetHeight;
   kwTip.style.left = Math.max(6, Math.min(innerWidth - w - 6, r.left + r.width / 2 - w / 2)) + 'px';
   kwTip.style.top = (r.bottom + h + 10 > innerHeight ? Math.max(6, r.top - h - 8) : r.bottom + 6) + 'px';
 }
-document.addEventListener('mouseover', e => { const el = e.target.closest?.('.kw'); if (el) showKw(el); });
-document.addEventListener('mouseout', e => { if (e.target.closest?.('.kw')) kwTip.hidden = true; });
-document.addEventListener('click', e => { const el = e.target.closest?.('.kw'); if (el) showKw(el); else kwTip.hidden = true; });
+document.addEventListener('mouseover', e => { const el = e.target.closest?.(TIP); if (el) showTip(el); });
+document.addEventListener('mouseout', e => { if (e.target.closest?.(TIP)) kwTip.hidden = true; });
+document.addEventListener('click', e => { const el = e.target.closest?.(TIP); if (el) showTip(el); else kwTip.hidden = true; });
 
 async function openAllCards() {
   const box = $('cardsBox');

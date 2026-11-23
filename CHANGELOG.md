@@ -1,5 +1,10 @@
 # Changes
 
+## v1.80.0 (combined app)
+
+- Dawn: hover your actions to see where they come from; hover per-round resources to see their sources; hover techs, bonuses, wonders, minor wonders and great people to see the card.
+
+
 Newest first. Versions from 1.x on are the combined app (Root and Rune + Weather generator).
 
 ## v1.79.3 (combined app)

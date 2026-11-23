@@ -705,6 +705,22 @@ class GameTest {
         assertTrue(g.realm.stream().anyMatch(t -> t.def.id.equals("city_state")), "the city state joins the realm");
     }
 
+    @SuppressWarnings("unchecked")
+    @Test
+    void theViewSaysWhereIncomeAndActionsComeFrom() {
+        Game g = game(1, 84);
+        Player p = g.players.get(0);
+        p.leader = C.cards.get("first_architect");                 // +1 action per turn
+        p.techs.add(C.cards.get("herbalism"));                     // +1 research per turn
+        Map<String, Object> me = (Map<String, Object>) ((List<Object>) View.of(g, 0).get("players")).get(0);
+        List<Map<String, Object>> actions = (List<Map<String, Object>>) me.get("actionSources");
+        assertEquals("Base", actions.get(0).get("from"));
+        assertTrue(actions.stream().anyMatch(a -> "The First Architect".equals(a.get("from")) && ((Number) a.get("n")).intValue() == 1));
+        Map<String, List<Map<String, Object>>> inc = (Map<String, List<Map<String, Object>>>) me.get("incomeSources");
+        assertTrue(inc.get("research").stream().anyMatch(a -> "Herbalism".equals(a.get("from"))));
+        assertTrue(inc.get("food").stream().anyMatch(a -> String.valueOf(a.get("from")).startsWith("Feeding")));
+    }
+
     @Test
     void theConquerorAndAlexanderChangeEnemyStrength() {
         Game g = game(1, 72);

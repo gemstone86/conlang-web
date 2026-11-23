@@ -8,6 +8,7 @@ import com.dawnofmankind.core.Game.CardInst;
 import com.dawnofmankind.core.Game.Slot;
 import com.dawnofmankind.core.Game.WonderProgress;
 import java.util.ArrayList;
+import java.util.EnumMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -183,6 +184,8 @@ public final class View {
             net.merge(Res.PRODUCTION.key(), -g.wonderUpkeep(p), Integer::sum);
             g.buildingUpkeep(p).forEach((r, amount) -> net.merge(r.key(), -amount, Integer::sum));
             pm.put("net", net);
+            pm.put("incomeSources", incomeSources(g, p));
+            pm.put("actionSources", actionSources(g, p));
             List<Object> bs = new ArrayList<>();
             for (Player.Building b : p.buildings) {
                 Map<String, Object> bm = new LinkedHashMap<>();
@@ -293,6 +296,79 @@ public final class View {
             case "opportunity" -> g.players.get(pe.target).name + " decides: pay " + Res.describe(d.offerCost) + "?";
             default -> d.text + half;
         };
+    }
+
+    /** Where each resource per round comes from (and goes to): buildings, techs, wonders, great people, upkeep. */
+    static Map<String, List<Object>> incomeSources(Game g, Player p) {
+        Map<String, List<Object>> out = new LinkedHashMap<>();
+        for (Res r : Res.values()) out.put(r.key(), new ArrayList<>());
+        java.util.function.BiConsumer<String, Map<Res, Integer>> add = (from, amounts) -> amounts.forEach((r, n) -> {
+            if (n == 0) return;
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("from", from);
+            m.put("n", n);
+            out.get(r.key()).add(m);
+        });
+        for (Player.Building b : p.buildings) {
+            int w = g.working(p, b);
+            EnumMap<Res, Integer> made = Res.empty();
+            b.def.perWorker.forEach((r, n) -> made.put(r, n * w));
+            add.accept(b.def.name + " (" + w + " working)", made);
+        }
+        for (var src : g.effectSources(p)) {
+            for (Map<String, Object> e : src.getValue()) {
+                String k = e.keySet().iterator().next();
+                Object v = e.get(k);
+                if (k.equals("income")) add.accept(src.getKey(), Res.parse(v));
+                else if (k.equals("incomePerTerritory")) {
+                    EnumMap<Res, Integer> x = Res.parse(v);
+                    x.replaceAll((r, n) -> n * g.realm.size());
+                    add.accept(src.getKey() + " (" + g.realm.size() + " territories)", x);
+                } else if (k.equals("perWorker")) {
+                    Map<String, Object> mm = new LinkedHashMap<>(Y.map(v));
+                    String building = String.valueOf(mm.remove("building"));
+                    Player.Building b = p.ofType(building);
+                    int w = b == null ? 0 : g.working(p, b);
+                    EnumMap<Res, Integer> x = Res.parse(mm);
+                    x.replaceAll((r, n) -> n * w);
+                    add.accept(src.getKey() + " (" + w + " workers)", x);
+                }
+            }
+        }
+        EnumMap<Res, Integer> feed = Res.empty();
+        feed.put(Res.FOOD, -(p.population() * g.content.rules.foodUpkeepPerPop));
+        add.accept("Feeding " + p.population() + " people", feed);
+        EnumMap<Res, Integer> troops = Res.empty();
+        troops.put(Res.FOOD, -g.troopUpkeep(p));
+        add.accept("Upkeep for troops", troops);
+        EnumMap<Res, Integer> wonders = Res.empty();
+        wonders.put(Res.PRODUCTION, -g.wonderUpkeep(p));
+        add.accept("Upkeep for wonders of earlier eras", wonders);
+        for (Player.Building b : p.buildings) {
+            EnumMap<Res, Integer> up = Res.empty();
+            b.def.upkeep.forEach((r, n) -> up.put(r, -n));
+            add.accept("Upkeep: " + b.def.name, up);
+        }
+        return out;
+    }
+
+    /** Where a player's actions each round come from. */
+    static List<Object> actionSources(Game g, Player p) {
+        List<Object> out = new ArrayList<>();
+        Map<String, Object> base = new LinkedHashMap<>();
+        base.put("from", "Base");
+        base.put("n", g.content.rules.actionsPerTurn);
+        out.add(base);
+        for (var src : g.effectSources(p)) {
+            int n = 0;
+            for (Map<String, Object> e : src.getValue()) if (e.containsKey("actionsPerTurn")) n += Y.toInt(e.get("actionsPerTurn"));
+            if (n == 0) continue;
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("from", src.getKey());
+            m.put("n", n);
+            out.add(m);
+        }
+        return out;
     }
 
     static Map<String, Integer> income(Game g, Player p, Mods m) {

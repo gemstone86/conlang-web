@@ -2056,6 +2056,18 @@ public final class Game {
         return m;
     }
 
+    /** Everything that adds lasting effects for a player, by name: techs (everyone's), their minor wonders, their great person, built wonders, lasting events, territories. */
+    public List<Map.Entry<String, List<Map<String, Object>>>> effectSources(Player p) {
+        List<Map.Entry<String, List<Map<String, Object>>>> out = new ArrayList<>();
+        for (Player o : players) for (CardDef t : o.techs) out.add(Map.entry(t.name, t.effects));
+        for (CardDef w : p.minorWonders) if (!obsolete(w)) out.add(Map.entry(w.name, w.effects));
+        if (p.leader != null) out.add(Map.entry(p.leader.name, p.leader.effects));
+        for (WonderDef w : builtWonders) if (!obsolete(w)) out.add(Map.entry(w.name, w.effects));
+        for (CardInst e : persistentEvents) out.add(Map.entry(e.def.name, e.def.ongoing));
+        for (Territory t : realm) out.add(Map.entry(t.def.name, t.def.effects));
+        return out;
+    }
+
     /** Lasting effects that any player has, for team-wide things (shared pool, mitigations). */
     public Mods civMods() {
         Mods m = new Mods();
