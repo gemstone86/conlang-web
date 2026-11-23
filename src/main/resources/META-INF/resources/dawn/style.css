@@ -176,3 +176,5 @@ details summary { cursor: pointer; color: var(--bone-dim); font-size: .88rem; }
 .kwtip .srcrow { display: flex; justify-content: space-between; gap: 1rem; }
 .kwtip .srcrow.total { border-top: 1px solid var(--line); margin-top: .2rem; padding-top: .2rem; font-weight: 600; }
 [data-tipcard], [data-tipsrc], [data-tipactions] { cursor: help; }
+
+.status .resline { flex-basis: 100%; display: flex; gap: .7rem; align-items: baseline; flex-wrap: wrap; }

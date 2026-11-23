@@ -1,5 +1,9 @@
 # Changes
 
+## v1.80.1 (combined app)
+
+- Dawn: your resources (and net per round) now sit on a second line in the top bar.
+
 ## v1.80.0 (combined app)
 
 - Dawn: hover your actions to see where they come from; hover per-round resources to see their sources; hover techs, bonuses, wonders, minor wonders and great people to see the card.

@@ -187,10 +187,12 @@ function renderStatus() {
   // actions left get a box of their own, always shown, because they were hard to find
   const left = s.phase === 'turns' && !s.result ? (myTurn() ? s.actionsLeft : 0) : null;
   const actions = `<span class="al ${left === 0 ? 'zero' : ''}" data-tipactions>Actions left <b>${left == null ? '–' : left}</b></span>`;
+  const you = me();
+  const resLine = you && you.resources ? `<span class="resline">Resources: ${resList(you.resources, { all: true })}<span class="muted small">per round</span> ${resList(you.net || you.income, { signed: true, src: true })}</span>` : '';
   $('status').innerHTML = `<span>${esc(s.era)} era (${s.eraIndex + 1}/${s.eraCount})</span><span>Round <b>${s.round}</b></span>
     <span>${phase}</span>${actions}<span>Stability <b class="${s.stability <= 3 ? 'bad' : ''}">${s.stability}</b></span>
     <span>Health <b>${s.health}</b></span><span class="${s.threat ? 'threat' : ''}">Enemies massing <b>${s.threat}</b></span><span>Era deck <b>${s.eraDeck}</b></span><span>Points <b>${s.score}</b></span>
-    <span class="muted small">Room ${esc(room.code)}</span>`;
+    <span class="muted small">Room ${esc(room.code)}</span>${resLine}`;
 }
 
 function cardHtml(c, extra = '', cls = '') {
