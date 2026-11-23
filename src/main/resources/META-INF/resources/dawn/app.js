@@ -376,7 +376,7 @@ function renderRealm() {
   const front = s.frontier.filter(f => !f.opened && !inPopup(f)).map(landCard).join('');
   $('realmPanel').innerHTML = `<h2>The realm</h2>
     <p class="muted small">Shared land. Each territory gives every player room for buildings and its bonus. A broken invasion takes a territory (a core territory only loses its core status); with none left, the game is lost.
-    World deck: ${s.worldDeck} lands · colonization value ${s.colonizationValue} (settlers needed per ordinary land: −${s.colonizationValue}).</p>
+    World deck: ${s.worldDeck} lands · colonization value ${s.colonizationValue}.</p>
     <div class="cards">${lands}</div>
     ${colonies ? `<h3 style="margin-top:.6rem">Colonies</h3><p class="muted small">Lands being settled. Anyone can send to them (free, on their turn) until the whole cost is paid; then they join the realm.</p><div class="cards">${colonies}</div>` : ''}
     <h3 style="margin-top:.6rem">Lands to settle</h3><p class="muted small">Pay toward a land until its whole cost is met: resources, troops against its enemy strength (all the troops sent are lost), settlers. Play a Settle card on a face-up land to make it a colony (a new land is turned up in its place). A land found by an event must be paid for at once, before the event resolves (anyone, free), or it is lost with everything sent.</p>

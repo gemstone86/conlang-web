@@ -2,9 +2,9 @@
 
 Newest first. Versions from 1.x on are the combined app (Root and Rune + Weather generator).
 
-## v1.76.0 (combined app)
+## v1.76.1 (combined app)
 
-- Dawn: colonization value (coast, ocean) now does what its card says: every point means 1 settler fewer needed to settle an ordinary land. It used to take resources off the cost, which was hard to notice. The realm panel shows the effect.
+- Dawn: colonization value is back to lowering a land's resource cost (production first, then food, 1 per player per point); the settler change of v1.76.0 is undone.
 
 ## v1.75.2 (combined app)
 
