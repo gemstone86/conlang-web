@@ -166,3 +166,4 @@ details summary { cursor: pointer; color: var(--bone-dim); font-size: .88rem; }
 /* admin cheat button: far right of the wonder card */
 .cardx.wonder { position: relative; }
 .cardx.wonder .cheat { position: absolute; top: .4rem; right: .4rem; z-index: 2; font-size: .7rem; padding: .15rem .45rem; opacity: .85; }
+.bad { color: var(--err); }

@@ -255,6 +255,7 @@ public final class View {
             pm.put("halve", pe.halve);
             pm.put("cancel", pe.cancel);
             pm.put("accept", pe.accept);
+            if (pe.event.def.offerCost != null && !Res.isZero(pe.event.def.offerCost)) pm.put("offerCost", res(pe.event.def.offerCost));
             pm.put("preview", preview(g, pe));
             v.put("pending", pm);
         }

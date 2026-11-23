@@ -449,7 +449,7 @@ function renderEvents() {
     const matching = (me().hand || []).filter(c => c.type === 'response' && (c.respondsTo.includes('any') || c.respondsTo.includes(p.category) || c.respondsTo.includes(p.key)));
     let controls = '';
     if (!amReady) {
-      controls += matching.map(c => `<button data-respond="${c.id}" ${affordable(c.cost) ? '' : 'disabled'}>Play ${esc(c.name)}</button>`).join('');
+      controls += matching.map(c => `<button data-respond="${c.id}" ${affordable(c.cost) ? '' : 'disabled'}>Play ${esc(c.name)}${c.cost && !RES.every(k => !c.cost[k]) ? ' (' + RES.filter(k => c.cost[k]).map(k => c.cost[k] + ' ' + RES_SHORT[k]).join(', ') + ')' : ''}</button>`).join('');
       if (p.kind === 'invasion') {
         const free = me().army - me().committed;
         controls += `<label class="small" style="margin:0">Send troops <input type="number" min="0" max="${free}" value="${p.troops[s.you] ?? 0}" id="troopIn"> of ${free}</label><button data-troops>Set</button>`;
@@ -463,7 +463,14 @@ function renderEvents() {
     }
     const waiting = Object.entries(p.ready).filter(([, r]) => !r).map(([seat]) => esc(s.players[seat].name));
     const found = s.frontier.filter(f => f.duringEvent);
+    const have = me().resources;
+    const wanted = {};                                    // what the event or the responses in hand ask for
+    if (p.offerCost) RES.forEach(k => { if (p.offerCost[k]) wanted[k] = Math.max(wanted[k] || 0, p.offerCost[k]); });
+    matching.forEach(c => RES.forEach(k => { if (c.cost && c.cost[k]) wanted[k] = Math.max(wanted[k] || 0, c.cost[k]); }));
+    const askLine = Object.keys(wanted).length
+      ? `<div class="small">${p.offerCost ? `Costs ${resList(p.offerCost)} · ` : ''}You have ${RES.filter(k => wanted[k]).map(k => `<span class="${have[k] >= wanted[k] ? '' : 'bad'}">${have[k]} ${RES_SHORT[k]}</span>`).join(', ')}</div>` : '';
     html += cardHtml(p, `${target}<div class="preview">${esc(p.preview)}</div>
+      ${askLine}<div class="small muted">Your resources: ${resList(have, { all: true })}</div>
       ${found.length ? `<div class="small" style="color:var(--brass)">New land found: ${found.map(f => esc(f.name)).join(', ')}. Settle it before everyone is done, or it is lost.</div>${popup && landCardFn ? '<div class="cards">' + found.map(landCardFn).join('') + '</div>' : ''}` : ''}
       ${p.responses.length ? `<div class="small">Responses: ${p.responses.map(esc).join(', ')}</div>` : ''}
       ${p.kind === 'invasion' ? `<div class="small">Troops sent: ${Object.entries(p.troops).map(([seat, n]) => esc(s.players[seat].name) + ' ' + n).join(', ') || 'none yet'}</div>` : ''}
