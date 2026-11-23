@@ -689,6 +689,23 @@ class GameTest {
     }
 
     @Test
+    void twoPlayersPayForACityStateTogether() {
+        Game g = game(2, 83);
+        Player a = g.players.get(0), b = g.players.get(1);
+        a.leader = null;
+        b.leader = null;
+        g.queue.add(0, new Game.Slot(card(g, "city_state"), null));
+        g.act(a.seat, Map.of("type", "pick", "slot", 0));
+        Game.Frontier f = g.frontier.stream().filter(x -> x.land.def.id.equals("city_state")).findFirst().orElseThrow();
+        a.res.put(Res.INFLUENCE, 4);
+        b.res.put(Res.INFLUENCE, 2);
+        g.act(a.seat, Map.of("type", "colonize", "land", f.land.id, "resources", Map.of("influence", 4)));
+        assertEquals(2, g.settleLeft(f).get(Res.INFLUENCE));
+        g.act(b.seat, Map.of("type", "colonize", "land", f.land.id, "resources", Map.of("influence", 2)));
+        assertTrue(g.realm.stream().anyMatch(t -> t.def.id.equals("city_state")), "the city state joins the realm");
+    }
+
+    @Test
     void theConquerorAndAlexanderChangeEnemyStrength() {
         Game g = game(1, 72);
         Player p = g.players.get(0);

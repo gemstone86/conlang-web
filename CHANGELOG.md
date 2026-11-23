@@ -2,6 +2,10 @@
 
 Newest first. Versions from 1.x on are the combined app (Root and Rune + Weather generator).
 
+## v1.79.3 (combined app)
+
+- Test only: two players paying for a city state together (no change in behaviour).
+
 ## v1.79.2 (combined app)
 
 - Fix: v1.79.1 did not compile (a variable name clash in the net income line); this version does.
