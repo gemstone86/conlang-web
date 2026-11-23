@@ -24,7 +24,7 @@ rules:
     extraPerTerritoryPerPlayer: {production: 1}   # for each territory beyond the first 2
     territoriesBeforeExtra: 2
     settlersPerPlayer: 1                          # people who move to the new land (idle people first, then workers)
-    # each point of colonization value (coasts, oceans) takes 1 per player off: production first, then food
+    # each point of colonization value (coasts, oceans) means 1 settler fewer needed on every ordinary land
   recruitCost: {production: 2}            # action "recruit": +1 troop
   foodUpkeepPerPop: 1
   startStability: 10
@@ -110,7 +110,7 @@ territories:
     copies: 3
     slots: {farm: 1}
     colonization: 1
-    text: +1 farm worker slot. +1 colonization value.
+    text: +1 farm worker slot. +1 colonization value (1 settler fewer needed to settle a land).
   forest:
     name: Forest
     copies: 3
@@ -122,7 +122,7 @@ territories:
     copies: 2
     colonization: 1
     effects: [{income: {food: 1}}]
-    text: +1 food per turn (fishing). +1 colonization value.
+    text: +1 food per turn (fishing). +1 colonization value (1 settler fewer needed to settle a land).
   # special lands: not in the world deck, found by events, with their own (higher) cost per player
   rich_land:
     name: Rich Land

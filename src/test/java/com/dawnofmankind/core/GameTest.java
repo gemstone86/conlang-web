@@ -324,6 +324,7 @@ class GameTest {
     @Test
     void nomadicLivingGivesAFreeSettlerUntilTheEraEnds() {
         Game g = game(2, 20);
+        g.realm.clear();                                  // no coast or ocean: no colonization value
         Game.Frontier f = g.frontier.get(0);
         assertEquals(2, g.settleSettlers(f));
         g.builtWonders.add(C.greatWonders.get("nomadic_living"));
@@ -627,6 +628,22 @@ class GameTest {
             assertFalse(Y.strings(k.get("match")).isEmpty(), id + " needs words to match");
             assertFalse(Y.s(k, "text", "").isBlank(), id + " needs a rules text");
         });
+    }
+
+    @Test
+    void colonizationValueMeansFewerSettlers() {
+        Game g = game(3, 79);
+        Game.Frontier f = g.frontier.stream().filter(x -> !x.land.def.special).findFirst().orElseThrow();
+        g.realm.clear();
+        int base = g.settleSettlers(f);
+        assertEquals(3, base, "1 settler per player");
+        Content.TerritoryDef coast = C.territories.get("coast");
+        g.realm.add(new Game.Territory(9001, coast));
+        assertEquals(base - 1, g.settleSettlers(f), "each point of colonization value: 1 settler fewer");
+        g.realm.add(new Game.Territory(9002, coast));
+        g.realm.add(new Game.Territory(9003, coast));
+        g.realm.add(new Game.Territory(9004, coast));
+        assertEquals(0, g.settleSettlers(f), "never below zero");
     }
 
     @Test

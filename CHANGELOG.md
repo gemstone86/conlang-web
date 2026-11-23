@@ -2,6 +2,10 @@
 
 Newest first. Versions from 1.x on are the combined app (Root and Rune + Weather generator).
 
+## v1.76.0 (combined app)
+
+- Dawn: colonization value (coast, ocean) now does what its card says: every point means 1 settler fewer needed to settle an ordinary land. It used to take resources off the cost, which was hard to notice. The realm panel shows the effect.
+
 ## v1.75.2 (combined app)
 
 - Dawn: the last pictures (batch H: Rise of Empires, the crises and the four hostility cards). The four "land found" events use the pictures of their lands. Every card now has art.

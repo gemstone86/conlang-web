@@ -1248,7 +1248,7 @@ public final class Game {
         }
     }
 
-    /** The full resource cost of a land now: per player, rising with the realm, lowered by colonization value. */
+    /** The full resource cost of a land now: per player, rising with the realm. (Colonization value lowers the settlers, not the resources.) */
     public EnumMap<Res, Integer> settleCost(Frontier f) {
         int n = players.size();
         TerritoryDef def = f.land.def;
@@ -1259,13 +1259,7 @@ public final class Game {
         }
         Content.Rules r = content.rules;
         int extra = Math.max(0, realm.size() - r.colonizeFreeTerritories);
-        int discount = colonizationValue();
         for (Res x : Res.values()) cost.put(x, r.colonizeCostPerPlayer.get(x) + extra * r.colonizeEscalationPerPlayer.get(x));
-        for (Res x : List.of(Res.PRODUCTION, Res.FOOD)) {
-            int c = Math.min(discount, cost.get(x));
-            cost.put(x, cost.get(x) - c);
-            discount -= c;
-        }
         cost.replaceAll((x, v) -> v * n);
         return discounted(cost);
     }
@@ -1284,10 +1278,11 @@ public final class Game {
         return enemy + f.land.def.armyPerPlayer * players.size();
     }
 
-    /** Settlers needed: per player (special lands their own number, other lands the rule's), minus free settlers. */
+    /** Settlers needed: per player (special lands their own number, other lands the rule's), minus free settlers and, on ordinary lands, 1 per point of colonization value. */
     public int settleSettlers(Frontier f) {
         int per = f.land.def.special ? f.land.def.populationPerPlayer : content.rules.colonizeSettlersPerPlayer;
-        return Math.max(0, per * players.size() - civMods().freeSettlers);
+        int value = f.land.def.special ? 0 : colonizationValue();           // each point of colonization value: 1 settler fewer
+        return Math.max(0, per * players.size() - civMods().freeSettlers - value);
     }
 
     /** Military strength of a number of troops: Bronze Working adds 1 for every 2. */
