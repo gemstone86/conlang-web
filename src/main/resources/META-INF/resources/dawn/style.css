@@ -31,6 +31,9 @@ label { display: block; font-size: .85rem; color: var(--bone-dim); margin: .6rem
 .status b { color: var(--brass); font-weight: 500; }
 .status .turn { color: var(--moss); font-weight: 700; }
 .status .bad { color: var(--err); }
+.kw { border-bottom: 1px dotted var(--brass); cursor: help; }
+.kwtip { position: fixed; z-index: 1000; max-width: 300px; padding: .5rem .65rem; background: #0f1620; border: 1px solid var(--brass); border-radius: 8px; box-shadow: 0 6px 20px rgba(0,0,0,.5); font-size: .8rem; line-height: 1.35; pointer-events: none; }
+.kwtip b { color: var(--brass); display: block; margin-bottom: .15rem; }
 .status .threat b { color: var(--err); }
 .threat-note { color: var(--err); font-size: .9rem; margin: .3rem 0; }
 

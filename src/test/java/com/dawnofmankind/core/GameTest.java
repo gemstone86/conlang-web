@@ -621,6 +621,15 @@ class GameTest {
     }
 
     @Test
+    void keywordsAreWellFormed() {
+        assertFalse(C.keywords.isEmpty());
+        C.keywords.forEach((id, k) -> {
+            assertFalse(Y.strings(k.get("match")).isEmpty(), id + " needs words to match");
+            assertFalse(Y.s(k, "text", "").isBlank(), id + " needs a rules text");
+        });
+    }
+
+    @Test
     void theConquerorAndAlexanderChangeEnemyStrength() {
         Game g = game(1, 72);
         Player p = g.players.get(0);

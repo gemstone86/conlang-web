@@ -381,6 +381,16 @@ public final class View {
             wonders.add(m);
         }
         out.put("wonders", wonders);
+        List<Object> kws = new ArrayList<>();
+        content.keywords.forEach((id, k) -> {
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("id", id);
+            m.put("name", Y.s(k, "name", id));
+            m.put("match", Y.strings(k.get("match")));
+            m.put("text", Y.s(k, "text", ""));
+            kws.add(m);
+        });
+        out.put("keywords", kws);
         return out;
     }
 

@@ -136,6 +136,7 @@ function render(m) {
   renderDecks();
   renderLog();
   renderOver();
+  applyKeywords();
   document.querySelectorAll('#game [data-keep]').forEach(el => {
     if (el.dataset.keep in kept) { if (el.type === 'checkbox') el.checked = kept[el.dataset.keep]; else el.value = kept[el.dataset.keep]; }
   });
@@ -739,6 +740,70 @@ boot();
 
 // ---- the list of every card in the game ----
 let catalogue = null;
+
+// ------------------------------------------------------------------ keywords: hover a marked word to see its rule
+let kwRe = null, kwById = {}, kwLoading = false;
+const KW_ROOTS = '#game, #setupModal, #noticeModal, #gotModal, #starveModal, #growModal, #over, #cardsModal, #eventBackdrop';
+const KW_SKIP = 'button, input, select, textarea, option, script, style, label, h1, h2, h3, .kw, .name, .nm, .type, #chat, .chat, .readylist';
+async function loadKeywords() {
+  if (kwRe || kwLoading) return;
+  kwLoading = true;
+  try {
+    if (!catalogue) catalogue = await (await fetch(API + '/cards')).json();
+    const words = [];
+    for (const k of catalogue.keywords || []) for (const m of k.match) { kwById[m.toLowerCase()] = k; words.push(m); }
+    words.sort((a, b) => b.length - a.length);
+    if (words.length) kwRe = new RegExp('\\b(' + words.map(w => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|') + ')\\b', 'gi');
+    applyKeywords();
+  } catch (e) { /* the rules boxes are a bonus: the game works without them */ }
+  kwLoading = false;
+}
+function applyKeywords() {
+  if (!kwRe) return loadKeywords();
+  const seen = new Map();                                   // the first appearance of a word in each card or panel is marked
+  document.querySelectorAll(KW_ROOTS).forEach(root => {
+    if (root.hidden) return;
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+    const nodes = [];
+    for (let n = walker.nextNode(); n; n = walker.nextNode()) if (n.nodeValue.trim() && !n.parentElement.closest(KW_SKIP)) nodes.push(n);
+    for (const node of nodes) {
+      const box = node.parentElement.closest('.cardx, .panel, .catalog > div, .card') || root;
+      if (!seen.has(box)) seen.set(box, new Set([...box.querySelectorAll('.kw')].map(e => e.dataset.kw)));   // safe to run twice
+      const done = seen.get(box);
+      const text = node.nodeValue;
+      kwRe.lastIndex = 0;
+      let last = 0, m, frag = null;
+      while ((m = kwRe.exec(text))) {
+        const k = kwById[m[1].toLowerCase()];
+        if (!k || done.has(k.id)) continue;
+        done.add(k.id);
+        frag = frag || document.createDocumentFragment();
+        frag.append(text.slice(last, m.index));
+        const span = document.createElement('span');
+        span.className = 'kw'; span.dataset.kw = k.id; span.textContent = m[1];
+        frag.append(span);
+        last = m.index + m[1].length;
+      }
+      if (frag) { frag.append(text.slice(last)); node.replaceWith(frag); }
+    }
+  });
+}
+const kwTip = document.createElement('div');
+kwTip.className = 'kwtip'; kwTip.hidden = true;
+document.body.appendChild(kwTip);
+function showKw(el) {
+  const k = (catalogue?.keywords || []).find(x => x.id === el.dataset.kw);
+  if (!k) return;
+  kwTip.innerHTML = `<b>${esc(k.name)}</b><div>${esc(k.text)}</div>`;
+  kwTip.hidden = false;
+  const r = el.getBoundingClientRect(), w = kwTip.offsetWidth, h = kwTip.offsetHeight;
+  kwTip.style.left = Math.max(6, Math.min(innerWidth - w - 6, r.left + r.width / 2 - w / 2)) + 'px';
+  kwTip.style.top = (r.bottom + h + 10 > innerHeight ? Math.max(6, r.top - h - 8) : r.bottom + 6) + 'px';
+}
+document.addEventListener('mouseover', e => { const el = e.target.closest?.('.kw'); if (el) showKw(el); });
+document.addEventListener('mouseout', e => { if (e.target.closest?.('.kw')) kwTip.hidden = true; });
+document.addEventListener('click', e => { const el = e.target.closest?.('.kw'); if (el) showKw(el); else kwTip.hidden = true; });
+
 async function openAllCards() {
   const box = $('cardsBox');
   $('cardsModal').hidden = false;
@@ -773,7 +838,7 @@ async function openAllCards() {
     <h3>Lands (${catalogue.lands.length})</h3><div class="catalog">${catalogue.lands.map(l => item(l.name, l.special ? 'special land' : 'land', l.text)).join('')}</div>
     <h3>Great wonders (${catalogue.wonders.length})</h3><div class="catalog">${catalogue.wonders.map(w => item(w.name, w.era || '', w.text, w.art)).join('')}</div>`;
 }
-$('allCards').onclick = openAllCards;
+$('allCards').onclick = async () => { await openAllCards(); applyKeywords(); };
 $('gameLog').onclick = async () => {
   try {
     const r = await fetch(`${API}/rooms/${code}/gamelog?token=${encodeURIComponent(token)}`);
