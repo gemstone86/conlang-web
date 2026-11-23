@@ -381,6 +381,12 @@ public final class Game {
     private void startRound() {
         log("— Round " + round + " (" + era().name + ") —");
         starving.clear();
+        beginTurns();
+    }
+
+    /** Production comes at the end of the round, once everyone is done and before the events, so resources can still be spent on them. */
+    private void endOfTurns() {
+        starving.clear();
         production();
         if (checkDefeat()) return;
         if (!starving.isEmpty()) {
@@ -388,7 +394,7 @@ public final class Game {
             log("Some people must starve: " + starving.keySet().stream().map(i -> players.get(i).name).toList() + " choose who.");
             return;
         }
-        beginTurns();
+        startEvents();
     }
 
     /** Whether a player has a real choice of who starves: people in more than one place (idle, or in different buildings). */
@@ -431,7 +437,7 @@ public final class Game {
     private void starvationDone() {
         if (!starving.isEmpty() || phase != Phase.STARVATION) return;
         if (checkDefeat()) return;
-        beginTurns();
+        startEvents();
     }
 
     private void production() {
@@ -564,7 +570,7 @@ public final class Game {
         }
         p.done = true;
         log(p.name + " is done for the round.");
-        if (phase == Phase.TURNS && players.stream().allMatch(x -> x.done)) startEvents();
+        if (phase == Phase.TURNS && players.stream().allMatch(x -> x.done)) endOfTurns();
     }
 
     private void startEvents() {
