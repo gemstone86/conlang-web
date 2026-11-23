@@ -2,6 +2,10 @@
 
 Newest first. Versions from 1.x on are the combined app (Root and Rune + Weather generator).
 
+## v1.79.2 (combined app)
+
+- Fix: v1.79.1 did not compile (a variable name clash in the net income line); this version does.
+
 ## v1.79.1 (combined app)
 
 - Dawn: the Market has an upkeep of 1 food and 1 production every round (buildings can now have an `upkeep:` in `content.yaml`). It is part of production, shows in the net income line and is logged.
