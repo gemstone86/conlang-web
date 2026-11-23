@@ -2,6 +2,10 @@
 
 Newest first. Versions from 1.x on are the combined app (Root and Rune + Weather generator).
 
+## v1.77.0 (combined app)
+
+- Dawn: a Settle card in your hand can now be played from the hand: pick the land from the list and press "Play: make it a colony" (1 action). The old button on the land card still works.
+
 ## v1.76.1 (combined app)
 
 - Dawn: colonization value is back to lowering a land's resource cost (production first, then food, 1 per player per point); the settler change of v1.76.0 is undone.

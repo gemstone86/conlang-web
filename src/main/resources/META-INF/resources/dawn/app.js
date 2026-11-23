@@ -621,7 +621,10 @@ function renderHand() {
     const playable = c.type !== 'response';
     const give = others.length && p.giveCards ? `<label class="small" style="margin:0"><input type="checkbox" data-pickgive="${c.id}" data-keep="pg-${c.id}"> give</label>` : '';
     if (c.target === 'land') {
-      return cardHtml(c, `<div class="actions"><span class="small muted">Use it on a land in the realm panel.</span><button class="tiny" data-discard="${c.id}">Discard</button>${give}</div>`);
+      const faceUp = s.frontier.filter(f => !f.fromEvent && !f.opened);
+      const pick = faceUp.length ? `<select id="land-${c.id}" data-keep="land-${c.id}">${faceUp.map(f => `<option value="${f.id}">${esc(f.name)}</option>`).join('')}</select>` : '';
+      return cardHtml(c, `<div class="actions">${pick}<button ${act && faceUp.length && affordable(c.cost) ? '' : 'disabled'} data-playland="${c.id}">Play: make it a colony</button>
+        <button class="tiny" data-discard="${c.id}">Discard</button>${give}</div><div class="small muted">Or use it on a land in the realm panel.</div>`);
     }
     const opts = c.target === 'territory' ? s.realm.filter(t => !t.cored).map(t => [t.id, t.name])
       : c.target === 'player' ? others.map(o => [o.seat, o.name]) : null;
@@ -639,7 +642,11 @@ function renderHand() {
 }
 $('handPanel').onclick = e => {
   const t = e.target.closest('button'); if (!t) return;
-  if (t.dataset.play) {
+  if (t.dataset.playland) {
+    const sel = $('land-' + t.dataset.playland);
+    if (sel) send({ type: 'play', card: +t.dataset.playland, land: +sel.value });
+  }
+  else if (t.dataset.play) {
     const msg = { type: 'play', card: +t.dataset.play };
     const sel = $('tgt-' + t.dataset.play);
     if (t.dataset.target === 'territory') msg.territory = +sel.value;
