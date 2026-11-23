@@ -629,6 +629,20 @@ class GameTest {
         });
     }
 
+    @SuppressWarnings("unchecked")
+    @Test
+    void theViewShowsNetIncomeAfterWonderUpkeep() {
+        Game g = game(1, 80);
+        Player p = g.players.get(0);
+        p.leader = null;
+        g.builtWonders.add(C.greatWonders.get("skara_brae"));
+        g.eraIndex = 1;                                            // a prehistoric wonder in the Ancient era: 1 production upkeep
+        Map<String, Object> me = (Map<String, Object>) ((List<Object>) View.of(g, 0).get("players")).get(0);
+        Map<String, Integer> income = (Map<String, Integer>) me.get("income"), net = (Map<String, Integer>) me.get("net");
+        assertEquals(income.get("production") - 1, net.get("production"));
+        assertEquals(income.get("culture"), net.get("culture"));
+    }
+
     @Test
     void theConquerorAndAlexanderChangeEnemyStrength() {
         Game g = game(1, 72);

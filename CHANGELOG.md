@@ -2,6 +2,11 @@
 
 Newest first. Versions from 1.x on are the combined app (Root and Rune + Weather generator).
 
+## v1.78.0 (combined app)
+
+- Dawn: "Your people" shows the net income per round, after upkeep (for example the production lost to wonders of earlier eras), under the gross figures.
+- Dawn: the great person line is gone from "Your people" (it has its own panel).
+
 ## v1.77.0 (combined app)
 
 - Dawn: a Settle card in your hand can now be played from the hand: pick the land from the list and press "Play: make it a colony" (1 action). The old button on the land card still works.

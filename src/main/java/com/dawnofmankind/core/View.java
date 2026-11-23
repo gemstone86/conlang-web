@@ -177,7 +177,11 @@ public final class View {
             pm.put("giveCards", m.giveCards);
             pm.put("actionsPerTurn", g.content.rules.actionsPerTurn + m.actionsPerTurn);
             pm.put("away", p.away);
-            pm.put("income", income(g, p, m));
+            Map<String, Integer> inc = income(g, p, m);
+            pm.put("income", inc);
+            Map<String, Integer> net = new LinkedHashMap<>(inc);          // after what the round takes: upkeep for wonders of earlier eras
+            net.merge(Res.PRODUCTION.key(), -g.wonderUpkeep(p), Integer::sum);
+            pm.put("net", net);
             List<Object> bs = new ArrayList<>();
             for (Player.Building b : p.buildings) {
                 Map<String, Object> bm = new LinkedHashMap<>();
