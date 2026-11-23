@@ -2,6 +2,10 @@
 
 Newest first. Versions from 1.x on are the combined app (Root and Rune + Weather generator).
 
+## v1.75.1 (combined app)
+
+- Dawn: ten more event pictures (batch G).
+
 ## v1.75.0 (combined app)
 
 - Dawn: keywords. Rules words in card texts and panels (Stability, Health, Population, Raid, Invasion, Defense, Military strength, Troops, Settle, Colony, Territory, Great wonder, Minor wonder, Great person, Upkeep, Crisis, Response and more) are underlined with dots; hover (or tap) one to see a rules box. The first appearance in each card or panel is marked. The list lives in `content.yaml` under `keywords:`.
