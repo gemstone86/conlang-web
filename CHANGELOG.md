@@ -2,6 +2,10 @@
 
 Newest first. Versions from 1.x on are the combined app (Root and Rune + Weather generator).
 
+## v1.74.1 (combined app)
+
+- Dawn: more event and crisis pictures (batch F, partial).
+
 ## v1.74.0 (combined app)
 
 - Dawn: production (and feeding the people) now comes at the end of the round, once everyone is done and before the events, instead of at the start of the round. A round starts with what you have left, and resources can still be spent on the events. The first round now starts with only the starting resources.
