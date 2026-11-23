@@ -31,6 +31,9 @@ label { display: block; font-size: .85rem; color: var(--bone-dim); margin: .6rem
 .status b { color: var(--brass); font-weight: 500; }
 .status .turn { color: var(--moss); font-weight: 700; }
 .status .bad { color: var(--err); }
+.kw { border-bottom: 1px dotted var(--brass); cursor: help; }
+.kwtip { position: fixed; z-index: 1000; max-width: 300px; padding: .5rem .65rem; background: #0f1620; border: 1px solid var(--brass); border-radius: 8px; box-shadow: 0 6px 20px rgba(0,0,0,.5); font-size: .8rem; line-height: 1.35; pointer-events: none; }
+.kwtip b { color: var(--brass); display: block; margin-bottom: .15rem; }
 .status .threat b { color: var(--err); }
 .threat-note { color: var(--err); font-size: .9rem; margin: .3rem 0; }
 
@@ -156,7 +159,7 @@ details summary { cursor: pointer; color: var(--bone-dim); font-size: .88rem; }
 .catalog > div.hasart > div { text-shadow: 0 1px 3px rgba(0,0,0,.9); }
 .cardx.hasart > :first-child { margin-top: auto; }
 .cardx.hasart .actions { margin-top: .4rem; padding-top: 0; }
-.cardx.hasart.wonder { padding-top: 8.5rem; }
+.cardx.hasart.wonder, .cardx.hasart.frontier { padding-top: 8.5rem; }
 .status .al { background: var(--brass); color: var(--ink); padding: .1rem .6rem; border-radius: 6px; font-weight: 500; }
 .status .al b { color: var(--ink); font-size: 1.15em; font-weight: 800; }
 .status .al.zero { background: transparent; border: 1px solid var(--line); color: var(--bone-dim); }
@@ -166,3 +169,4 @@ details summary { cursor: pointer; color: var(--bone-dim); font-size: .88rem; }
 /* admin cheat button: far right of the wonder card */
 .cardx.wonder { position: relative; }
 .cardx.wonder .cheat { position: absolute; top: .4rem; right: .4rem; z-index: 2; font-size: .7rem; padding: .15rem .45rem; opacity: .85; }
+.bad { color: var(--err); }

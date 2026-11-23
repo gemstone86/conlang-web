@@ -233,6 +233,118 @@ greatWonders:
     victoryPoints: 2
     text: Every miner +1 production.
 
+# Keywords: words in card texts and panels that show a rules box when hovered. "match" lists the spellings that count
+# (whole words, any case; the longest match wins). Only the first appearance in a card or panel is marked.
+keywords:
+  stability:
+    name: "Stability"
+    match: [stability, happiness]
+    text: "The tribe's shared mood. It starts at 10 and the game is lost if it reaches 0. Raids, invasions, revolts, crises and starvation lower it; techs, wonders and some events raise it."
+  health_test:
+    name: "Health test"
+    match: [health test]
+    text: "The tribe's Health is compared with the test's number. Every point short costs the tribe 1 Population (or what the card says)."
+  health:
+    name: "Health"
+    match: [health]
+    text: "How well the tribe resists sickness; it starts at 2. Health tests compare it with a number. Unhealthy lands (jungle, river delta) lower it while you hold them."
+  population:
+    name: "Population"
+    match: [population]
+    text: "Your people. Each eats 1 food every round. Workers fill building slots and produce; idle people produce nothing. Grow with the Grow action; if food runs short people starve (you choose who)."
+  raid:
+    name: "Raid"
+    match: [raid, raids]
+    text: "A strike on one player. Their defense (troops they have not committed elsewhere, plus raid defense and response cards) must reach the raid's strength. Each point short repeats the raid's losses and costs 1 Stability. Half the troops that fought (rounded up) are lost."
+  invasion:
+    name: "Invasion"
+    match: [invasion, invasions]
+    text: "A strike on the whole tribe. Players send troops; their combined military strength plus invasion defense must reach the invasion's strength. Half the troops sent (rounded up) are lost. If it breaks through, the losses repeat, a random territory is lost and Stability drops by 2. Massing enemies join it."
+  defense:
+    name: "Defense"
+    match: [defense, raid defense, invasion defense]
+    text: "Added to your military strength when you face a raid or an invasion. Raid defense helps against raids, invasion defense against invasions."
+  strength:
+    name: "Military strength"
+    match: [military strength, strength]
+    text: "What your troops are worth in a fight or when settling. Each troop counts for 1; techs and great people can add more, for example +1 for every 2 troops."
+  troops:
+    name: "Troops"
+    match: [troop, troops, army]
+    text: "Trained with the Recruit action (production). Troops sent against a raid, an invasion or an enemy on a land are spent; half the troops in a fight (rounded up) are lost, all troops sent to settle a land are lost."
+  enemy:
+    name: "Enemy strength"
+    match: [enemy strength, enemies]
+    text: "The military strength your troops must reach to settle a land. Events can raise it; some great people lower it. Massing enemies add to the next invasion."
+  settle:
+    name: "Settle"
+    match: [settle, settling, settled]
+    text: "To settle a land, pay its whole cost: resources, troops against its enemy strength and settlers (people). A Settle card opens a face-up land as a colony; a land found by an event must be paid for at once or it is lost."
+  settlers:
+    name: "Settlers"
+    match: [settlers, settler]
+    text: "People who move to a new land when it is settled. Idle people go first, then workers."
+  colony:
+    name: "Colony"
+    match: [colony, colonies]
+    text: "A land opened for settling. Anyone can send resources, troops and settlers to it (free, on their turn) until its whole cost is paid; then it joins the realm."
+  core_territory:
+    name: "Core territory"
+    match: [core territory, core territories, core status]
+    text: "A core territory survives an invasion or a civil war: it only loses its core status instead of being lost."
+  territory:
+    name: "Territory"
+    match: [territory, territories]
+    text: "A land of the shared realm. It gives every player worker slots and its bonus, and counts 1 point at the end. Lose a territory and its slots, bonus and any great wonder on it are lost; with none left the game is lost."
+  great_wonder:
+    name: "Great wonder"
+    match: [great wonder, great wonders]
+    text: "A wonder the whole tribe builds by giving resources (free, no action). Everyone gets its bonus and the tribe its victory points. An unfinished one is lost when the era ends (half of what was given comes back)."
+  minor_wonder:
+    name: "Minor wonder"
+    match: [minor wonder, minor wonders]
+    text: "A personal wonder one player builds; its bonus is theirs. Some fade after an era. You can drop one with Remove in the Bonuses panel."
+  great_person:
+    name: "Great person"
+    match: [great person, great people]
+    text: "Plays itself the moment you draw it. If you already have one you choose whether the newcomer replaces them. A great person leaves when the era ends."
+  upkeep:
+    name: "Upkeep"
+    match: [upkeep]
+    text: "A cost paid every round. Wonders of earlier eras cost 1 production per era they are removed from (wonders of the current era are free). Some techs add food upkeep for troops."
+  obsolete:
+    name: "Fades"
+    match: [fades, obsolete]
+    text: "After the named era ends the bonus stops working (and costs no upkeep)."
+  crisis:
+    name: "Crisis"
+    match: [crisis, crises]
+    text: "A disaster that lasts for several rounds, striking again in every events phase until its time runs out or its end condition is met."
+  response:
+    name: "Response"
+    match: [response, responses]
+    text: "A card played during an event, before you press \"Done\". It helps against the event (more defense, less loss, cancelling a curse) and may cost resources."
+  future_deck:
+    name: "Future deck"
+    match: [future deck]
+    text: "Events that left the queue go face down here. After everyone's turn, as many events as it holds are drawn from the event deck and resolve."
+  idle:
+    name: "Idle"
+    match: [idle]
+    text: "People who have no building slot to work in. They eat but do not produce, and are the first to move away as settlers."
+  slots:
+    name: "Worker slots"
+    match: [worker slots, slots, slot]
+    text: "Room for workers in a building. Farms and mines have 2 slots per level; land and territories raise how many levels may work. A building above what your land allows is inactive until there is room."
+  hand_limit:
+    name: "Hand size"
+    match: [max hand size, hand size, hand limit]
+    text: "The most cards you may keep in your hand at the end of your turn."
+  lasting:
+    name: "Lasting event"
+    match: [lasting event, lasting events, lifted, lift]
+    text: "An event that stays in play with an ongoing effect until someone pays the cost to lift it (and 1 action)."
+
 eras:
   - id: prehistoric
     name: Prehistoric

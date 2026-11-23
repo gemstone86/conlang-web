@@ -34,9 +34,24 @@ class GameTest {
         assertEquals(8, g.currentEvents.size(), "2 starting events per player");
         assertEquals(8, g.queue.size(), "queue = players + 4");
         for (Slot s : g.queue) assertEquals(s.card.def.isEvent(), s.under != null, "events have a face-down card under them");
-        // round 1 production: 2 farmers make 4 food, 3 Population eat 3, the miner makes 2 production
-        assertEquals(3 + 4 - 3, p.res.get(Res.FOOD));
-        assertEquals(2 + 2, p.res.get(Res.PRODUCTION));
+        // production comes at the end of the round, so a round starts with what the tribe has left
+        assertEquals(3, p.res.get(Res.FOOD));
+        assertEquals(2, p.res.get(Res.PRODUCTION));
+    }
+
+    @Test
+    void productionComesAtTheEndOfTheRoundBeforeTheEvents() {
+        Game g = game(1, 78);
+        Player p = g.players.get(0);
+        p.leader = null;
+        g.act(p.seat, Map.of("type", "endTurn"));
+        int produced = -1, events = -1;
+        for (int i = 0; i < g.log.size(); i++) {
+            String l = g.log.get(i);
+            if (produced < 0 && l.contains(" produces ")) produced = i;
+            if (events < 0 && l.contains("in the future deck")) events = i;
+        }
+        assertTrue(produced >= 0 && events > produced, "production first, then the events");
     }
 
     @Test
@@ -603,6 +618,15 @@ class GameTest {
         assertEquals(6, g.settleCost(f).get(Res.INFLUENCE), "3 influence per player");
         assertEquals(0, g.settleSettlers(f));
         assertEquals(0, g.settleTroops(f));
+    }
+
+    @Test
+    void keywordsAreWellFormed() {
+        assertFalse(C.keywords.isEmpty());
+        C.keywords.forEach((id, k) -> {
+            assertFalse(Y.strings(k.get("match")).isEmpty(), id + " needs words to match");
+            assertFalse(Y.s(k, "text", "").isBlank(), id + " needs a rules text");
+        });
     }
 
     @Test

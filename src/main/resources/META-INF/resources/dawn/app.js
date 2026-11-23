@@ -34,6 +34,7 @@ async function boot() {
 
 function show(which) {
   for (const id of ['start', 'lobby', 'game']) $(id).hidden = id !== which;
+  $('gameLog').hidden = which !== 'game';          // the log only exists once a game has started
 }
 
 async function post(url, body) {
@@ -135,6 +136,7 @@ function render(m) {
   renderDecks();
   renderLog();
   renderOver();
+  applyKeywords();
   document.querySelectorAll('#game [data-keep]').forEach(el => {
     if (el.dataset.keep in kept) { if (el.type === 'checkbox') el.checked = kept[el.dataset.keep]; else el.value = kept[el.dataset.keep]; }
   });
@@ -264,7 +266,7 @@ function renderSetup() {
   const offer = s.setupOffer || [];
   box.innerHTML = offer.length
     ? `<h2>Choose your starting land</h2><p class="muted small">Each player is offered two lands and keeps one. The realm starts with two of the chosen lands; the rest go back on top of the land deck.</p>
-       <div class="catalog">${offer.map(l => `<div><div class="nm">${esc(l.name)}</div><div>${esc(l.text)}</div><div class="actions"><button class="primary" data-land="${l.id}">Start here</button></div></div>`).join('')}</div>`
+       <div class="catalog">${offer.map(l => `<div${l.art ? ` class="hasart" style="--art:url('${l.art}')"` : ''}><div class="nm">${esc(l.name)}</div><div>${esc(l.text)}</div><div class="actions"><button class="primary" data-land="${l.id}">Start here</button></div></div>`).join('')}</div>`
     : `<h2>Waiting for the others</h2><p class="muted">Still choosing: ${(s.setupWaiting || []).map(esc).join(', ') || '…'}</p>`;
   $('setupModal').hidden = false;
 }
@@ -346,7 +348,7 @@ const slotText = slots => Object.entries(slots || {}).map(([b, n]) => `+${n} ${b
 let landCardFn;                       // the land card drawing of renderRealm, also used in the event pop-up
 function renderRealm() {
   const s = state;
-  const lands = s.realm.map(t => `<div class="cardx territory ${t.cored ? 'cored' : ''}"><div class="type">Territory${t.cored ? ' · core' : ''}</div><div class="name">${esc(t.name)}</div>
+  const lands = s.realm.map(t => `<div class="cardx territory ${t.cored ? 'cored' : ''}${t.art ? ` hasart" style="--art:url('${t.art}')` : ''}"><div class="type">Territory${t.cored ? ' · core' : ''}</div><div class="name">${esc(t.name)}</div>
       <div class="text">${esc(t.text)}</div>${t.wonders.length ? `<div class="small">${t.wonders.map(w => `<span class="chip">★ ${esc(w)}</span>`).join('')}</div>` : ''}</div>`).join('');
   const settleCard = (me().hand || []).find(c => c.target === 'land');
   const landCard = landCardFn = f => {
@@ -363,7 +365,7 @@ function renderRealm() {
         ? `<button ${myTurn() ? '' : 'disabled'} data-colonize="${f.id}">Send (free)</button>`
         : `<button ${canAct() && settleCard ? '' : 'disabled'} data-settle="${f.id}" title="${settleCard ? '' : 'You need a Settle card'}">Play Settle: make it a colony (1 action)</button>${settleCard ? '' : ' <span class="small muted">needs a Settle card</span>'}`;
     const by = Object.entries(f.bySeat).map(([n, r]) => `<div class="small muted">${esc(n)}: ${resList(r)}</div>`).join('');
-    return `<div class="cardx frontier ${f.fromEvent ? 'eventland' : ''}" data-f="${f.id}">
+    return `<div class="cardx frontier ${f.fromEvent ? 'eventland' : ''}${f.art ? ` hasart" style="--art:url('${f.art}')` : ''}" data-f="${f.id}">
       <div class="type">${f.fromEvent ? 'Found by this event · settle it now or lose it' : f.opened ? 'Colony · being settled' : 'Face-up land'}${f.enemy ? ` · enemy strength ${f.enemy}` : ''}</div>
       <div class="name">${esc(f.name)}</div><div class="text">${esc(f.text)}</div>
       <div class="small">Paid ${resList(f.paid)} of ${resList(f.cost)}${f.troops ? ` · military strength ${f.troopsPaid}/${f.troops}` : ''}${f.settlers ? ` · settlers ${f.settlersPaid}/${f.settlers}` : ''}</div>
@@ -448,7 +450,7 @@ function renderEvents() {
     const matching = (me().hand || []).filter(c => c.type === 'response' && (c.respondsTo.includes('any') || c.respondsTo.includes(p.category) || c.respondsTo.includes(p.key)));
     let controls = '';
     if (!amReady) {
-      controls += matching.map(c => `<button data-respond="${c.id}" ${affordable(c.cost) ? '' : 'disabled'}>Play ${esc(c.name)}</button>`).join('');
+      controls += matching.map(c => `<button data-respond="${c.id}" ${affordable(c.cost) ? '' : 'disabled'}>Play ${esc(c.name)}${c.cost && !RES.every(k => !c.cost[k]) ? ' (' + RES.filter(k => c.cost[k]).map(k => c.cost[k] + ' ' + RES_SHORT[k]).join(', ') + ')' : ''}</button>`).join('');
       if (p.kind === 'invasion') {
         const free = me().army - me().committed;
         controls += `<label class="small" style="margin:0">Send troops <input type="number" min="0" max="${free}" value="${p.troops[s.you] ?? 0}" id="troopIn"> of ${free}</label><button data-troops>Set</button>`;
@@ -462,7 +464,14 @@ function renderEvents() {
     }
     const waiting = Object.entries(p.ready).filter(([, r]) => !r).map(([seat]) => esc(s.players[seat].name));
     const found = s.frontier.filter(f => f.duringEvent);
+    const have = me().resources;
+    const wanted = {};                                    // what the event or the responses in hand ask for
+    if (p.offerCost) RES.forEach(k => { if (p.offerCost[k]) wanted[k] = Math.max(wanted[k] || 0, p.offerCost[k]); });
+    matching.forEach(c => RES.forEach(k => { if (c.cost && c.cost[k]) wanted[k] = Math.max(wanted[k] || 0, c.cost[k]); }));
+    const askLine = Object.keys(wanted).length
+      ? `<div class="small">${p.offerCost ? `Costs ${resList(p.offerCost)} · ` : ''}You have ${RES.filter(k => wanted[k]).map(k => `<span class="${have[k] >= wanted[k] ? '' : 'bad'}">${have[k]} ${RES_SHORT[k]}</span>`).join(', ')}</div>` : '';
     html += cardHtml(p, `${target}<div class="preview">${esc(p.preview)}</div>
+      ${askLine}<div class="small muted">Your resources: ${resList(have, { all: true })}</div>
       ${found.length ? `<div class="small" style="color:var(--brass)">New land found: ${found.map(f => esc(f.name)).join(', ')}. Settle it before everyone is done, or it is lost.</div>${popup && landCardFn ? '<div class="cards">' + found.map(landCardFn).join('') + '</div>' : ''}` : ''}
       ${p.responses.length ? `<div class="small">Responses: ${p.responses.map(esc).join(', ')}</div>` : ''}
       ${p.kind === 'invasion' ? `<div class="small">Troops sent: ${Object.entries(p.troops).map(([seat, n]) => esc(s.players[seat].name) + ' ' + n).join(', ') || 'none yet'}</div>` : ''}
@@ -731,6 +740,70 @@ boot();
 
 // ---- the list of every card in the game ----
 let catalogue = null;
+
+// ------------------------------------------------------------------ keywords: hover a marked word to see its rule
+let kwRe = null, kwById = {}, kwLoading = false;
+const KW_ROOTS = '#game, #setupModal, #noticeModal, #gotModal, #starveModal, #growModal, #over, #cardsModal, #eventBackdrop';
+const KW_SKIP = 'button, input, select, textarea, option, script, style, label, h1, h2, h3, .kw, .name, .nm, .type, #chat, .chat, .readylist';
+async function loadKeywords() {
+  if (kwRe || kwLoading) return;
+  kwLoading = true;
+  try {
+    if (!catalogue) catalogue = await (await fetch(API + '/cards')).json();
+    const words = [];
+    for (const k of catalogue.keywords || []) for (const m of k.match) { kwById[m.toLowerCase()] = k; words.push(m); }
+    words.sort((a, b) => b.length - a.length);
+    if (words.length) kwRe = new RegExp('\\b(' + words.map(w => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|') + ')\\b', 'gi');
+    applyKeywords();
+  } catch (e) { /* the rules boxes are a bonus: the game works without them */ }
+  kwLoading = false;
+}
+function applyKeywords() {
+  if (!kwRe) return loadKeywords();
+  const seen = new Map();                                   // the first appearance of a word in each card or panel is marked
+  document.querySelectorAll(KW_ROOTS).forEach(root => {
+    if (root.hidden) return;
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+    const nodes = [];
+    for (let n = walker.nextNode(); n; n = walker.nextNode()) if (n.nodeValue.trim() && !n.parentElement.closest(KW_SKIP)) nodes.push(n);
+    for (const node of nodes) {
+      const box = node.parentElement.closest('.cardx, .panel, .catalog > div, .card') || root;
+      if (!seen.has(box)) seen.set(box, new Set([...box.querySelectorAll('.kw')].map(e => e.dataset.kw)));   // safe to run twice
+      const done = seen.get(box);
+      const text = node.nodeValue;
+      kwRe.lastIndex = 0;
+      let last = 0, m, frag = null;
+      while ((m = kwRe.exec(text))) {
+        const k = kwById[m[1].toLowerCase()];
+        if (!k || done.has(k.id)) continue;
+        done.add(k.id);
+        frag = frag || document.createDocumentFragment();
+        frag.append(text.slice(last, m.index));
+        const span = document.createElement('span');
+        span.className = 'kw'; span.dataset.kw = k.id; span.textContent = m[1];
+        frag.append(span);
+        last = m.index + m[1].length;
+      }
+      if (frag) { frag.append(text.slice(last)); node.replaceWith(frag); }
+    }
+  });
+}
+const kwTip = document.createElement('div');
+kwTip.className = 'kwtip'; kwTip.hidden = true;
+document.body.appendChild(kwTip);
+function showKw(el) {
+  const k = (catalogue?.keywords || []).find(x => x.id === el.dataset.kw);
+  if (!k) return;
+  kwTip.innerHTML = `<b>${esc(k.name)}</b><div>${esc(k.text)}</div>`;
+  kwTip.hidden = false;
+  const r = el.getBoundingClientRect(), w = kwTip.offsetWidth, h = kwTip.offsetHeight;
+  kwTip.style.left = Math.max(6, Math.min(innerWidth - w - 6, r.left + r.width / 2 - w / 2)) + 'px';
+  kwTip.style.top = (r.bottom + h + 10 > innerHeight ? Math.max(6, r.top - h - 8) : r.bottom + 6) + 'px';
+}
+document.addEventListener('mouseover', e => { const el = e.target.closest?.('.kw'); if (el) showKw(el); });
+document.addEventListener('mouseout', e => { if (e.target.closest?.('.kw')) kwTip.hidden = true; });
+document.addEventListener('click', e => { const el = e.target.closest?.('.kw'); if (el) showKw(el); else kwTip.hidden = true; });
+
 async function openAllCards() {
   const box = $('cardsBox');
   $('cardsModal').hidden = false;
@@ -765,7 +838,7 @@ async function openAllCards() {
     <h3>Lands (${catalogue.lands.length})</h3><div class="catalog">${catalogue.lands.map(l => item(l.name, l.special ? 'special land' : 'land', l.text)).join('')}</div>
     <h3>Great wonders (${catalogue.wonders.length})</h3><div class="catalog">${catalogue.wonders.map(w => item(w.name, w.era || '', w.text, w.art)).join('')}</div>`;
 }
-$('allCards').onclick = openAllCards;
+$('allCards').onclick = async () => { await openAllCards(); applyKeywords(); };
 $('gameLog').onclick = async () => {
   try {
     const r = await fetch(`${API}/rooms/${code}/gamelog?token=${encodeURIComponent(token)}`);

@@ -41,6 +41,7 @@ public final class View {
                 Map<String, Object> m = new LinkedHashMap<>();
                 m.put("id", t.id);
                 m.put("name", t.def.name);
+                if (hasArt(t.def.id)) m.put("art", "cards/" + t.def.id + ".jpg");
                 m.put("text", t.def.text);
                 offer.add(m);
             }
@@ -254,6 +255,7 @@ public final class View {
             pm.put("halve", pe.halve);
             pm.put("cancel", pe.cancel);
             pm.put("accept", pe.accept);
+            if (pe.event.def.offerCost != null && !Res.isZero(pe.event.def.offerCost)) pm.put("offerCost", res(pe.event.def.offerCost));
             pm.put("preview", preview(g, pe));
             v.put("pending", pm);
         }
@@ -311,6 +313,7 @@ public final class View {
         Map<String, Object> m = new LinkedHashMap<>();
         m.put("id", t.id);
         m.put("key", t.def.id);
+        if (hasArt(t.def.id)) m.put("art", "cards/" + t.def.id + ".jpg");
         m.put("name", t.def.name);
         m.put("text", t.def.text);
         m.put("slots", t.def.slots);
@@ -378,6 +381,16 @@ public final class View {
             wonders.add(m);
         }
         out.put("wonders", wonders);
+        List<Object> kws = new ArrayList<>();
+        content.keywords.forEach((id, k) -> {
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("id", id);
+            m.put("name", Y.s(k, "name", id));
+            m.put("match", Y.strings(k.get("match")));
+            m.put("text", Y.s(k, "text", ""));
+            kws.add(m);
+        });
+        out.put("keywords", kws);
         return out;
     }
 

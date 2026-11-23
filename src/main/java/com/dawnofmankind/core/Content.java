@@ -144,6 +144,8 @@ public final class Content {
     public final Map<String, CardDef> cards = new LinkedHashMap<>();
     public final Map<String, WonderDef> greatWonders = new LinkedHashMap<>();
     public final List<EraDef> eras = new ArrayList<>();
+    /** Words that show a rules box when hovered: id to {name, match, text}. */
+    public final Map<String, Map<String, Object>> keywords = new LinkedHashMap<>();
     public final Map<String, TerritoryDef> territories = new LinkedHashMap<>();
     public final Map<String, Integer> startingEvents = new LinkedHashMap<>();
     public final List<String> crisisCards = new ArrayList<>();
@@ -180,6 +182,7 @@ public final class Content {
             d.wonder = w.id;
             c.cards.put(w.id, d);
         }
+        Y.map(root.get("keywords")).forEach((id, v) -> c.keywords.put(id, Y.map(v)));
         Y.map(root.get("territories")).forEach((id, v) -> c.territories.put(id, territory(id, Y.map(v))));
         int order = 0;
         for (Object o : Y.list(root.get("eras"))) {
