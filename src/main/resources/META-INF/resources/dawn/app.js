@@ -16,6 +16,7 @@ async function boot() {
   code = (params.get('room') || '').toUpperCase() || null;
   try {
     const me = await (await fetch(API + '/me')).json();
+    if (me.admin) $('adminLogs').hidden = false;
     if (me.name) {
       $('name').value = me.name;
       $('name').disabled = true;
@@ -900,3 +901,16 @@ $('gameLog').onclick = async () => {
   } catch (e) { toast('Could not download the log.'); }
 };
 $('cardsModal').onclick = e => { if (e.target === $('cardsModal') || e.target.closest('[data-close]')) $('cardsModal').hidden = true; };
+
+$('adminLogs').onclick = async () => {
+  try {
+    const r = await fetch(`${API}/admin/gamelogs/download`);
+    if (!r.ok) return toast((await r.json().catch(() => ({}))).error || 'Could not fetch the logs.');
+    const url = URL.createObjectURL(await r.blob());
+    const a = document.createElement('a');
+    a.href = url; a.download = 'dawn-game-logs.zip';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+    toast('Downloaded. The saved logs are now deleted from the server.', true);
+  } catch (e) { toast('Could not fetch the logs.'); }
+};

@@ -35,6 +35,7 @@ public class DawnController {
     public Map<String, Object> me(HttpServletRequest req) {
         Map<String, Object> m = new LinkedHashMap<>();
         m.put("name", loggedInName(req).orElse(null));
+        m.put("admin", isAdmin(req));
         return m;
     }
 
@@ -61,6 +62,27 @@ public class DawnController {
         return ResponseEntity.ok()
                 .header("Content-Disposition", "attachment; filename=\"dawn-game-" + code + ".json\"")
                 .body(log);
+    }
+
+    /** Admins: how many saved game logs are waiting. */
+    @GetMapping("/admin/gamelogs")
+    public Map<String, Object> savedLogs(HttpServletRequest req) {
+        requireAdmin(req);
+        return Map.of("logs", rooms.savedLogs());
+    }
+
+    /** Admins: every saved game log (and the games running now) as one zip. The saved ones are deleted afterwards. */
+    @GetMapping("/admin/gamelogs/download")
+    public ResponseEntity<byte[]> downloadLogs(HttpServletRequest req) throws java.io.IOException {
+        requireAdmin(req);
+        return ResponseEntity.ok()
+                .header("Content-Type", "application/zip")
+                .header("Content-Disposition", "attachment; filename=\"dawn-game-logs.zip\"")
+                .body(rooms.collectLogs());
+    }
+
+    private void requireAdmin(HttpServletRequest req) {
+        if (!isAdmin(req)) throw new GameException("Only admins can do that.");
     }
 
     @GetMapping("/rooms/{code}")
