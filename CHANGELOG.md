@@ -2,6 +2,10 @@
 
 Newest first. Versions from 1.x on are the combined app (Root and Rune + Weather generator).
 
+## v1.75.2 (combined app)
+
+- Dawn: the last pictures (batch H: Rise of Empires, the crises and the four hostility cards). The four "land found" events use the pictures of their lands. Every card now has art.
+
 ## v1.75.1 (combined app)
 
 - Dawn: ten more event pictures (batch G).
