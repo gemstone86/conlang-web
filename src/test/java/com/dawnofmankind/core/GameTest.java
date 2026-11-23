@@ -644,6 +644,37 @@ class GameTest {
     }
 
     @Test
+    void theMarketWaitsForTheMarketsTechWhichIsAlwaysInTheAncientDeck() {
+        Game g = game(2, 81);
+        Player p = g.players.get(0);
+        p.leader = null;
+        p.res.put(Res.PRODUCTION, 20);
+        p.res.put(Res.CULTURE, 5);
+        assertThrows(GameException.class, () -> g.act(p.seat, Map.of("type", "build", "building", "market")), "locked at first");
+        p.techs.add(C.cards.get("markets"));
+        assertEquals(4, g.buildCost(p, C.buildings.get("market")).get(Res.PRODUCTION));
+        assertEquals(2, g.buildCost(p, C.buildings.get("market")).get(Res.CULTURE));
+        g.act(p.seat, Map.of("type", "build", "building", "market"));
+        assertNotNull(p.ofType("market"));
+        for (int players = 1; players <= 6; players++) {
+            for (long seed = 0; seed < 5; seed++) {
+                Game a = game(players, 900 + seed);
+                a.eraIndex = 1;
+                try {
+                    var m = Game.class.getDeclaredMethod("startEra", boolean.class);
+                    m.setAccessible(true);
+                    m.invoke(a, false);
+                } catch (ReflectiveOperationException e) {
+                    throw new IllegalStateException(e);
+                }
+                boolean inDeck = a.eraDeck.stream().anyMatch(c -> c.def.id.equals("markets"))
+                        || a.queue.stream().anyMatch(sl -> sl.card.def.id.equals("markets") || (sl.under != null && sl.under.def.id.equals("markets")));
+                assertTrue(inDeck, "Markets is always in the Ancient deck (" + players + " players, seed " + seed + ")");
+            }
+        }
+    }
+
+    @Test
     void theConquerorAndAlexanderChangeEnemyStrength() {
         Game g = game(1, 72);
         Player p = g.players.get(0);

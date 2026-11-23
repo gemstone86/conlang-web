@@ -225,7 +225,7 @@ public final class View {
             Player me = g.players.get(seat);
             List<Object> build = new ArrayList<>();
             for (BuildingDef b : g.content.buildings.values()) {
-                if (!b.buildable) continue;
+                if (!g.canBuild(b)) continue;
                 Map<String, Object> bm = new LinkedHashMap<>();
                 bm.put("id", b.id);
                 bm.put("name", b.name);

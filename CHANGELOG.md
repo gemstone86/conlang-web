@@ -2,6 +2,10 @@
 
 Newest first. Versions from 1.x on are the combined app (Root and Rune + Weather generator).
 
+## v1.79.0 (combined app)
+
+- Dawn: new Ancient tech Markets, which unlocks a new building for everyone: the Market (4 production and 2 culture; each worker produces 1 influence and 1 culture). Markets is a "required" card: it is always in the Ancient era deck (cards can now be marked `required: true` in `content.yaml`).
+
 ## v1.78.0 (combined app)
 
 - Dawn: "Your people" shows the net income per round, after upkeep (for example the production lost to wonders of earlier eras), under the gross figures.

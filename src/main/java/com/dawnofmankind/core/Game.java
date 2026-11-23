@@ -317,9 +317,13 @@ public final class Game {
             // great wonders and hostility cards come at most once each; other kinds go round again if the pool is short
             boolean cycle = !kind.equals("great_wonder") && !kind.equals("hostility");
             List<CardInst> picked = new ArrayList<>(), bag = new ArrayList<>();
+            // required cards (the Markets tech) are always in the deck, one copy each
+            for (CardInst c : pool) if (c.def.required && picked.stream().noneMatch(x -> x.def == c.def)) picked.add(inst(c.def));
+            boolean bagUsed = false;
             while (picked.size() < want && !pool.isEmpty()) {
                 if (bag.isEmpty()) {
-                    if (!picked.isEmpty() && !cycle) break;
+                    if (bagUsed && !cycle) break;
+                    bagUsed = true;
                     for (CardInst c : pool) bag.add(inst(c.def));
                     Collections.shuffle(bag, rng);
                 }
@@ -919,10 +923,16 @@ public final class Game {
         return v;
     }
 
+    /** Whether a building may be built now: locked ones (the market) wait for the tech that unlocks them. */
+    public boolean canBuild(BuildingDef b) {
+        return b.buildable && (!b.locked || civMods().unlocked.contains(b.id));
+    }
+
     private void build(Player p, Map<String, Object> a) {
         String id = Y.s(a, "building", "");
         BuildingDef b = content.buildings.get(id);
         if (b == null || !b.buildable) throw new GameException("You can't build that.");
+        if (!canBuild(b)) throw new GameException("The " + b.name + " isn't available yet: a technology must unlock it first.");
         Building existing = p.ofType(b.id);
         int cap = capacity(p, b.id);
         if ((existing == null ? 0 : existing.slots) >= cap) {

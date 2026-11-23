@@ -68,6 +68,13 @@ buildings:
     slots: 2
     perWorker: {culture: 2}
     text: Each worker produces 2 culture (and 1 happiness, coming later).
+  market:
+    name: Market
+    locked: true                         # built only after the Markets tech
+    cost: {production: 4, culture: 2}
+    slots: 2
+    perWorker: {influence: 1, culture: 1}
+    text: Each worker produces 1 influence and 1 culture. Available once Markets has been researched.
   village:
     name: Village
     cost: {production: 3}
@@ -454,6 +461,7 @@ eras:
       code_of_laws: 1
       horseback_riding: 1
       ancients_customs: 1
+      markets: 1
       city_state: 1
       irrigation: 2
       harvest_festival: 2
@@ -704,6 +712,13 @@ cards:
     cost: {research: 4, culture: 1}
     effects: [{income: {food: 1, culture: 1}}]
     text: +1 food and +1 culture per turn.
+  markets:
+    name: Markets
+    type: tech
+    required: true                       # always in the Ancient era deck
+    cost: {research: 4, culture: 1}
+    effects: [{unlockBuilding: market}]
+    text: Unlocks a new building for everyone, the Market (4 production and 2 culture). Each worker in it produces 1 influence and 1 culture.
   ancients_customs:
     name: Ancients Customs
     type: tech
