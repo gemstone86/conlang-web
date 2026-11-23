@@ -2,6 +2,10 @@
 
 Newest first. Versions from 1.x on are the combined app (Root and Rune + Weather generator).
 
+## v1.73.2 (combined app)
+
+- Dawn: pictures for all minor wonders and the City State (card and land), and for nine prehistoric events (batches B and C so far).
+
 ## v1.73.1 (combined app)
 
 - Dawn: pictures for the three new techs and six response cards (batch A).
