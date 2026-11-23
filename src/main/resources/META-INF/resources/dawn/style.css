@@ -170,3 +170,11 @@ details summary { cursor: pointer; color: var(--bone-dim); font-size: .88rem; }
 .cardx.wonder { position: relative; }
 .cardx.wonder .cheat { position: absolute; top: .4rem; right: .4rem; z-index: 2; font-size: .7rem; padding: .15rem .45rem; opacity: .85; }
 .bad { color: var(--err); }
+
+.kwtip.cardtip { width: 270px; padding: 0; background: transparent; border: 0; box-shadow: none; }
+.kwtip.cardtip .cardx { margin: 0; box-shadow: 0 6px 20px rgba(0,0,0,.6); }
+.kwtip .srcrow { display: flex; justify-content: space-between; gap: 1rem; }
+.kwtip .srcrow.total { border-top: 1px solid var(--line); margin-top: .2rem; padding-top: .2rem; font-weight: 600; }
+[data-tipcard], [data-tipsrc], [data-tipactions] { cursor: help; }
+
+.status .resline { flex-basis: 100%; display: flex; gap: .7rem; align-items: baseline; flex-wrap: wrap; }

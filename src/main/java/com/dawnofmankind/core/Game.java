@@ -317,9 +317,13 @@ public final class Game {
             // great wonders and hostility cards come at most once each; other kinds go round again if the pool is short
             boolean cycle = !kind.equals("great_wonder") && !kind.equals("hostility");
             List<CardInst> picked = new ArrayList<>(), bag = new ArrayList<>();
+            // required cards (the Markets tech) are always in the deck, one copy each
+            for (CardInst c : pool) if (c.def.required && picked.stream().noneMatch(x -> x.def == c.def)) picked.add(inst(c.def));
+            boolean bagUsed = false;
             while (picked.size() < want && !pool.isEmpty()) {
                 if (bag.isEmpty()) {
-                    if (!picked.isEmpty() && !cycle) break;
+                    if (bagUsed && !cycle) break;
+                    bagUsed = true;
                     for (CardInst c : pool) bag.add(inst(c.def));
                     Collections.shuffle(bag, rng);
                 }
@@ -362,6 +366,7 @@ public final class Game {
             if (p.leader != null) log(p.leader.name + " leaves with the era.");
             p.leader = null;
             p.pendingLeader = null;
+            p.hand.removeIf(c -> c.def.type == CardType.LEADER);
         }
         // an era's trigger event only ends its own era: leftovers are retired
         for (List<CardInst> deck : List.of(currentEvents, futureEvents)) {
@@ -454,11 +459,14 @@ public final class Game {
             m.income.forEach((r, v) -> gain.merge(r, v, Integer::sum));
             int wonderUpkeep = wonderUpkeep(p);
             if (wonderUpkeep > 0) gain.merge(Res.PRODUCTION, -wonderUpkeep, Integer::sum);
+            EnumMap<Res, Integer> running = buildingUpkeep(p);               // e.g. the Market: 1 food and 1 production
+            for (Res r : Res.values()) if (r != Res.FOOD && running.get(r) > 0) gain.merge(r, -running.get(r), Integer::sum);
             gain.forEach((r, v) -> p.res.put(r, Math.max(0, p.res.get(r) + v)));
-            int upkeep = p.population() * content.rules.foodUpkeepPerPop + troopUpkeep(p);
+            int upkeep = p.population() * content.rules.foodUpkeepPerPop + troopUpkeep(p) + running.get(Res.FOOD);
             int food = p.res.get(Res.FOOD);
             String msg = p.name + " produces " + Res.describe(gain)
-                    + (wonderUpkeep > 0 ? " (after " + wonderUpkeep + " production upkeep for wonders of earlier eras)" : "") + "; feeds " + p.population() + " Population.";
+                    + (wonderUpkeep > 0 ? " (after " + wonderUpkeep + " production upkeep for wonders of earlier eras)" : "")
+                    + (!Res.isZero(running) ? " (building upkeep " + Res.describe(running) + ")" : "") + "; feeds " + p.population() + " Population.";
             if (food >= upkeep) {
                 p.res.put(Res.FOOD, food - upkeep);
             } else {
@@ -919,10 +927,16 @@ public final class Game {
         return v;
     }
 
+    /** Whether a building may be built now: locked ones (the market) wait for the tech that unlocks them. */
+    public boolean canBuild(BuildingDef b) {
+        return b.buildable && (!b.locked || civMods().unlocked.contains(b.id));
+    }
+
     private void build(Player p, Map<String, Object> a) {
         String id = Y.s(a, "building", "");
         BuildingDef b = content.buildings.get(id);
         if (b == null || !b.buildable) throw new GameException("You can't build that.");
+        if (!canBuild(b)) throw new GameException("The " + b.name + " isn't available yet: a technology must unlock it first.");
         Building existing = p.ofType(b.id);
         int cap = capacity(p, b.id);
         if ((existing == null ? 0 : existing.slots) >= cap) {
@@ -994,15 +1008,6 @@ public final class Game {
 
     /** A card a player gets: into their hand, except great wonders, which go on the board for the whole team to build. */
     private void take(Player p, CardInst c) {
-        if (c.def.type == CardType.LEADER) {
-            if (p.leader != null) {                       // the player decides whether the newcomer replaces them
-                p.pendingLeader = c.def;
-                log(p.name + " draws the great person " + c.def.name + " and may choose to replace " + p.leader.name + ".");
-                return;
-            }
-            installLeader(p, c.def);
-            return;
-        }
         if (c.def.type == CardType.CITY_STATE) {
             TerritoryDef def = content.territories.get(c.def.land);
             Frontier f = new Frontier(new Territory(nextId++, def), false, -1);
@@ -1028,11 +1033,38 @@ public final class Game {
         throw new GameException("That card isn't in your hand.");
     }
 
+    /** What a great person costs, in any mix of resources. */
+    public static final int LEADER_COST = 4;
+
+    /** Plays a great person from the hand: it costs {@link #LEADER_COST} of any resources and replaces the current one. */
+    private void playLeader(Player p, CardInst c, Map<String, Object> a) {
+        EnumMap<Res, Integer> give = Res.parse(a.get("resources"));
+        if (give.values().stream().anyMatch(v -> v < 0)) throw new GameException("Amounts can't be negative.");
+        int sum = give.values().stream().mapToInt(Integer::intValue).sum();
+        if (sum == 0) {                                   // nothing chosen: take from what the player has most of
+            for (int i = 0; i < LEADER_COST; i++) {
+                Res top = null;
+                for (Res r : Res.values()) if (p.res.get(r) - give.get(r) > 0 && (top == null || p.res.get(r) - give.get(r) > p.res.get(top) - give.get(top))) top = r;
+                if (top == null) throw new GameException("A great person costs " + LEADER_COST + " resources, of any kind.");
+                give.merge(top, 1, Integer::sum);
+            }
+        } else if (sum != LEADER_COST) throw new GameException("A great person costs exactly " + LEADER_COST + " resources, of any kind.");
+        for (Res r : Res.values()) if (p.res.get(r) < give.get(r)) throw new GameException("Not enough " + r.key() + ".");
+        pay(p, give);
+        p.hand.remove(c);
+        log(p.name + " pays " + Res.describe(give) + " for " + c.def.name + ".");
+        installLeader(p, c.def);
+    }
+
     private void play(Player p, Map<String, Object> a) {
         CardInst c = handCard(p, a);
         CardDef d = c.def;
         if (d.type == CardType.RESPONSE) throw new GameException(d.name + " can only be played when an event resolves.");
         if (d.type == CardType.GREAT_WONDER) throw new GameException("Great wonders are built on the board.");
+        if (d.type == CardType.LEADER) {
+            playLeader(p, c, a);
+            return;
+        }
         if (p.owns(d)) throw new GameException("You already have " + d.name + ".");
         if (d.type == CardType.TECH) {
             for (Player o : players) if (o.techs.contains(d)) throw new GameException(o.name + " has already researched " + d.name + ": it helps everyone.");
@@ -1136,6 +1168,13 @@ public final class Game {
     }
 
     /** Food the troops eat each round (Spear Men): half a food per troop, rounded up. */
+    /** What a player's buildings cost to keep every round (the Market: 1 food and 1 production). */
+    public EnumMap<Res, Integer> buildingUpkeep(Player p) {
+        EnumMap<Res, Integer> total = Res.empty();
+        for (Building b : p.buildings) b.def.upkeep.forEach((r, v) -> total.merge(r, v, Integer::sum));
+        return total;
+    }
+
     /** How many eras ago the wonder's era was (0 for this era). */
     private int eraAge(String era) {
         for (int i = 0; i < content.eras.size(); i++) if (content.eras.get(i).id.equals(era)) return Math.max(0, eraIndex - i);
@@ -2034,6 +2073,18 @@ public final class Game {
         for (Territory t : realm) m.add(t.def.effects);
         m.perTerritory.forEach((r, n) -> m.income.merge(r, n * realm.size(), Integer::sum));
         return m;
+    }
+
+    /** Everything that adds lasting effects for a player, by name: techs (everyone's), their minor wonders, their great person, built wonders, lasting events, territories. */
+    public List<Map.Entry<String, List<Map<String, Object>>>> effectSources(Player p) {
+        List<Map.Entry<String, List<Map<String, Object>>>> out = new ArrayList<>();
+        for (Player o : players) for (CardDef t : o.techs) out.add(Map.entry(t.name, t.effects));
+        for (CardDef w : p.minorWonders) if (!obsolete(w)) out.add(Map.entry(w.name, w.effects));
+        if (p.leader != null) out.add(Map.entry(p.leader.name, p.leader.effects));
+        for (WonderDef w : builtWonders) if (!obsolete(w)) out.add(Map.entry(w.name, w.effects));
+        for (CardInst e : persistentEvents) out.add(Map.entry(e.def.name, e.def.ongoing));
+        for (Territory t : realm) out.add(Map.entry(t.def.name, t.def.effects));
+        return out;
     }
 
     /** Lasting effects that any player has, for team-wide things (shared pool, mitigations). */

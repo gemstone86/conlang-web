@@ -44,7 +44,9 @@ public final class Content {
         public String id, name, text;
         public int slots;
         public boolean buildable;
-        public EnumMap<Res, Integer> cost, perWorker;
+        /** Cannot be built until a tech with {@code unlockBuilding} for it has been researched. */
+        public boolean locked;
+        public EnumMap<Res, Integer> cost, perWorker, upkeep;
     }
 
     /** One card in a deck: a technology, action, response, minor wonder or event (crisis cards are events). */
@@ -71,6 +73,8 @@ public final class Content {
         public List<Map<String, Object>> ongoing = new ArrayList<>();
         public EnumMap<Res, Integer> cleanseCost;
         public boolean eraTrigger, crisis, persistent;
+        /** Always in the era deck of the era that lists it (it takes one of the places of its kind). */
+        public boolean required;
         /** Minor wonders: the era after which the bonuses stop. */
         public String obsoleteAfter;
         /** The card is only put in the era deck when at least this many play. */
@@ -239,8 +243,10 @@ public final class Content {
         b.text = Y.s(m, "text", "");
         b.slots = Y.i(m, "slots", 2);
         b.buildable = !m.containsKey("buildable") || Y.b(m, "buildable");
+        b.locked = Y.b(m, "locked");
         b.cost = Res.parse(m.get("cost"));
         b.perWorker = Res.parse(m.get("perWorker"));
+        b.upkeep = Res.parse(m.get("upkeep"));
         return b;
     }
 
@@ -289,6 +295,7 @@ public final class Content {
         c.cleanseCost = Res.parse(pers.get("cleanse"));
         c.eraTrigger = Y.b(m, "eraTrigger");
         c.land = Y.s(m, "land", null);
+        c.required = Y.b(m, "required");
         c.minPlayers = Y.i(m, "minPlayers", 1);
         c.obsoleteAfter = Y.s(m, "obsoleteAfter", null);
         c.helper = Y.b(m, "helper");

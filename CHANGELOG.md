@@ -1,6 +1,52 @@
 # Changes
 
+## v1.82.0 (combined app)
+
+- Dawn: finished (or abandoned) games now save their game log on the server. Admins get an "All game logs" button that downloads every saved log, plus games still running, as one zip; the saved ones are deleted after the download. Logs live in `dawn.log-dir` (default `./data/dawn-logs`).
+
+## v1.81.0 (combined app)
+
+- Dawn: great persons are no longer played when drawn. They go to your hand and are played for 1 action and 4 resources of any kind, replacing your current great person. Unplayed ones leave with the era.
+
+## v1.80.1 (combined app)
+
+- Dawn: your resources (and net per round) now sit on a second line in the top bar.
+
+## v1.80.0 (combined app)
+
+- Dawn: hover your actions to see where they come from; hover per-round resources to see their sources; hover techs, bonuses, wonders, minor wonders and great people to see the card.
+
+
 Newest first. Versions from 1.x on are the combined app (Root and Rune + Weather generator).
+
+## v1.79.3 (combined app)
+
+- Test only: two players paying for a city state together (no change in behaviour).
+
+## v1.79.2 (combined app)
+
+- Fix: v1.79.1 did not compile (a variable name clash in the net income line); this version does.
+
+## v1.79.1 (combined app)
+
+- Dawn: the Market has an upkeep of 1 food and 1 production every round (buildings can now have an `upkeep:` in `content.yaml`). It is part of production, shows in the net income line and is logged.
+
+## v1.79.0 (combined app)
+
+- Dawn: new Ancient tech Markets, which unlocks a new building for everyone: the Market (4 production and 2 culture; each worker produces 1 influence and 1 culture). Markets is a "required" card: it is always in the Ancient era deck (cards can now be marked `required: true` in `content.yaml`).
+
+## v1.78.0 (combined app)
+
+- Dawn: "Your people" shows the net income per round, after upkeep (for example the production lost to wonders of earlier eras), under the gross figures.
+- Dawn: the great person line is gone from "Your people" (it has its own panel).
+
+## v1.77.0 (combined app)
+
+- Dawn: a Settle card in your hand can now be played from the hand: pick the land from the list and press "Play: make it a colony" (1 action). The old button on the land card still works.
+
+## v1.76.1 (combined app)
+
+- Dawn: colonization value is back to lowering a land's resource cost (production first, then food, 1 per player per point); the settler change of v1.76.0 is undone.
 
 ## v1.75.2 (combined app)
 

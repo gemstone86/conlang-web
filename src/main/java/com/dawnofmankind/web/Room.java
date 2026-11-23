@@ -242,6 +242,9 @@ public final class Room {
         return !anyone && lastActivity < cutoff;
     }
 
+    /** Set once this game's journal has been saved for the admin. */
+    boolean archived;
+
     synchronized boolean finished() {
         return game != null && game.result != null;
     }
@@ -272,6 +275,12 @@ public final class Room {
     synchronized Map<String, Object> gameLog(String token) {
         if (seatOf(token) < 0) throw new GameException("You are not a player in this room.");
         if (game == null) throw new GameException("The game hasn't started yet.");
+        return fullLog();
+    }
+
+    /** The journal of a started game, or null before the start. */
+    synchronized Map<String, Object> fullLog() {
+        if (game == null) return null;
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("format", "dawn-of-mankind game log");
         out.put("room", code);

@@ -402,24 +402,32 @@ class GameTest {
     }
 
     @Test
-    void aLeaderPlaysItselfReplacesTheOldOneAndLeavesWithTheEra() {
+    void aLeaderIsPlayedFromTheHandForFourOfAnyResourcesAndLeavesWithTheEra() {
         Game g = game(2, 61);
         Player p = g.players.get(0);
         Game.CardInst a = card(g, "hammurabi"), b = card(g, "gilgamesh");
         g.queue.add(0, new Game.Slot(a, null));
         g.queue.add(1, new Game.Slot(b, null));
         g.act(p.seat, Map.of("type", "pick", "slot", 0));
+        assertNull(p.leader, "a great person is not played when drawn");
+        assertTrue(p.hand.contains(a));
+        p.res.put(Res.FOOD, 3);
+        p.res.put(Res.RESEARCH, 1);
+        p.res.put(Res.PRODUCTION, 0);
+        p.res.put(Res.CULTURE, 0);
+        p.res.put(Res.INFLUENCE, 0);
+        int actions = p.actions;
+        assertThrows(GameException.class, () -> g.act(p.seat, Map.of("type", "play", "card", a.id, "resources", Map.of("food", 2))), "must pay exactly 4");
+        g.act(p.seat, Map.of("type", "play", "card", a.id, "resources", Map.of("food", 3, "research", 1)));
         assertEquals("Hammurabi", p.leader.name);
-        assertFalse(p.hand.contains(a), "a leader never sits in the hand");
-        g.act(p.seat, Map.of("type", "pick", "slot", 1));
-        assertEquals("Hammurabi", p.leader.name, "a second great person waits for the player's choice");
-        assertEquals("Gilgamesh", p.pendingLeader.name);
-        g.act(p.seat, Map.of("type", "leader", "replace", false));
-        assertEquals("Hammurabi", p.leader.name);
-        assertNull(p.pendingLeader);
-        p.pendingLeader = b.def;
-        g.act(p.seat, Map.of("type", "leader", "replace", true));
-        assertEquals("Gilgamesh", p.leader.name, "the new great person replaces the old one when chosen");
+        assertFalse(p.hand.contains(a));
+        assertEquals(actions - 1, p.actions, "playing a great person takes an action");
+        assertEquals(0, p.res.get(Res.FOOD));
+        p.hand.add(b);
+        p.res.put(Res.CULTURE, 9);
+        g.act(p.seat, Map.of("type", "play", "card", b.id));
+        assertEquals("Gilgamesh", p.leader.name, "the new great person replaces the old one");
+        assertEquals(5, p.res.get(Res.CULTURE), "paid 4 from the largest pile");
     }
 
     @Test
@@ -627,6 +635,98 @@ class GameTest {
             assertFalse(Y.strings(k.get("match")).isEmpty(), id + " needs words to match");
             assertFalse(Y.s(k, "text", "").isBlank(), id + " needs a rules text");
         });
+    }
+
+    @SuppressWarnings("unchecked")
+    @Test
+    void theViewShowsNetIncomeAfterWonderUpkeep() {
+        Game g = game(1, 80);
+        Player p = g.players.get(0);
+        p.leader = null;
+        g.builtWonders.add(C.greatWonders.get("skara_brae"));
+        g.eraIndex = 1;                                            // a prehistoric wonder in the Ancient era: 1 production upkeep
+        Map<String, Object> me = (Map<String, Object>) ((List<Object>) View.of(g, 0).get("players")).get(0);
+        Map<String, Integer> income = (Map<String, Integer>) me.get("income"), net = (Map<String, Integer>) me.get("net");
+        assertEquals(income.get("production") - 1, net.get("production"));
+        assertEquals(income.get("culture"), net.get("culture"));
+    }
+
+    @Test
+    void theMarketWaitsForTheMarketsTechWhichIsAlwaysInTheAncientDeck() {
+        Game g = game(2, 81);
+        Player p = g.players.get(0);
+        p.leader = null;
+        p.res.put(Res.PRODUCTION, 20);
+        p.res.put(Res.CULTURE, 5);
+        assertThrows(GameException.class, () -> g.act(p.seat, Map.of("type", "build", "building", "market")), "locked at first");
+        p.techs.add(C.cards.get("markets"));
+        assertEquals(4, g.buildCost(p, C.buildings.get("market")).get(Res.PRODUCTION));
+        assertEquals(2, g.buildCost(p, C.buildings.get("market")).get(Res.CULTURE));
+        g.act(p.seat, Map.of("type", "build", "building", "market"));
+        assertNotNull(p.ofType("market"));
+        for (int players = 1; players <= 6; players++) {
+            for (long seed = 0; seed < 5; seed++) {
+                Game a = game(players, 900 + seed);
+                a.eraIndex = 1;
+                try {
+                    var m = Game.class.getDeclaredMethod("startEra", boolean.class);
+                    m.setAccessible(true);
+                    m.invoke(a, false);
+                } catch (ReflectiveOperationException e) {
+                    throw new IllegalStateException(e);
+                }
+                boolean inDeck = a.eraDeck.stream().anyMatch(c -> c.def.id.equals("markets"))
+                        || a.queue.stream().anyMatch(sl -> sl.card.def.id.equals("markets") || (sl.under != null && sl.under.def.id.equals("markets")));
+                assertTrue(inDeck, "Markets is always in the Ancient deck (" + players + " players, seed " + seed + ")");
+            }
+        }
+    }
+
+    @Test
+    void aMarketCostsUpkeepEveryRound() {
+        Game g = game(1, 82);
+        Player p = g.players.get(0);
+        p.leader = null;
+        assertTrue(Res.isZero(g.buildingUpkeep(p)));
+        p.techs.add(C.cards.get("markets"));
+        p.res.put(Res.PRODUCTION, 10);
+        p.res.put(Res.CULTURE, 5);
+        g.act(p.seat, Map.of("type", "build", "building", "market"));
+        assertEquals(1, g.buildingUpkeep(p).get(Res.FOOD));
+        assertEquals(1, g.buildingUpkeep(p).get(Res.PRODUCTION));
+    }
+
+    @Test
+    void twoPlayersPayForACityStateTogether() {
+        Game g = game(2, 83);
+        Player a = g.players.get(0), b = g.players.get(1);
+        a.leader = null;
+        b.leader = null;
+        g.queue.add(0, new Game.Slot(card(g, "city_state"), null));
+        g.act(a.seat, Map.of("type", "pick", "slot", 0));
+        Game.Frontier f = g.frontier.stream().filter(x -> x.land.def.id.equals("city_state")).findFirst().orElseThrow();
+        a.res.put(Res.INFLUENCE, 4);
+        b.res.put(Res.INFLUENCE, 2);
+        g.act(a.seat, Map.of("type", "colonize", "land", f.land.id, "resources", Map.of("influence", 4)));
+        assertEquals(2, g.settleLeft(f).get(Res.INFLUENCE));
+        g.act(b.seat, Map.of("type", "colonize", "land", f.land.id, "resources", Map.of("influence", 2)));
+        assertTrue(g.realm.stream().anyMatch(t -> t.def.id.equals("city_state")), "the city state joins the realm");
+    }
+
+    @SuppressWarnings("unchecked")
+    @Test
+    void theViewSaysWhereIncomeAndActionsComeFrom() {
+        Game g = game(1, 84);
+        Player p = g.players.get(0);
+        p.leader = C.cards.get("first_architect");                 // +1 action per turn
+        p.techs.add(C.cards.get("herbalism"));                     // +1 research per turn
+        Map<String, Object> me = (Map<String, Object>) ((List<Object>) View.of(g, 0).get("players")).get(0);
+        List<Map<String, Object>> actions = (List<Map<String, Object>>) me.get("actionSources");
+        assertEquals("Base", actions.get(0).get("from"));
+        assertTrue(actions.stream().anyMatch(a -> "The First Architect".equals(a.get("from")) && ((Number) a.get("n")).intValue() == 1));
+        Map<String, List<Map<String, Object>>> inc = (Map<String, List<Map<String, Object>>>) me.get("incomeSources");
+        assertTrue(inc.get("research").stream().anyMatch(a -> "Herbalism".equals(a.get("from"))));
+        assertTrue(inc.get("food").stream().anyMatch(a -> String.valueOf(a.get("from")).startsWith("Feeding")));
     }
 
     @Test

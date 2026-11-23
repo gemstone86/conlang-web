@@ -29,11 +29,14 @@ public class RoomService {
         return t;
     });
     private final long graceMillis, idleMillis, finishedMillis, aiDelayMillis;
+    private final java.nio.file.Path logDir;
 
     public RoomService(@Value("${dawn.away-grace-seconds:60}") long graceSeconds,
                        @Value("${dawn.idle-room-minutes:30}") long idleMinutes,
                        @Value("${dawn.finished-room-minutes:10}") long finishedMinutes,
-                       @Value("${dawn.ai-move-millis:900}") long aiMoveMillis) {
+                       @Value("${dawn.ai-move-millis:900}") long aiMoveMillis,
+                       @Value("${dawn.log-dir:./data/dawn-logs}") String logDir) {
+        this.logDir = java.nio.file.Path.of(logDir);
         aiDelayMillis = aiMoveMillis;
         graceMillis = graceSeconds * 1000;
         idleMillis = idleMinutes * 60_000;
@@ -94,12 +97,68 @@ public class RoomService {
         for (Room r : rooms.values()) {
             try {
                 r.tick(now, graceMillis);
+                if (r.finished()) archive(r);                       // a finished game's journal is kept for the admin
                 long limit = r.finished() ? finishedMillis : idleMillis;
-                if (r.idleSince(now - limit)) rooms.remove(r.code);
+                if (r.idleSince(now - limit)) {
+                    archive(r);                                      // so is one that was abandoned
+                    rooms.remove(r.code);
+                }
             } catch (RuntimeException e) {
                 // one broken room must not stop the others
             }
         }
+    }
+
+    /** Saves a started game's journal to disk, once, until an admin downloads (and so deletes) it. */
+    synchronized void archive(Room r) {
+        if (r.archived) return;
+        Map<String, Object> log = r.fullLog();
+        if (log == null) return;
+        r.archived = true;
+        try {
+            java.nio.file.Files.createDirectories(logDir);
+            String name = "dawn-game-" + r.code + "-" + java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss").format(java.time.LocalDateTime.now()) + ".json";
+            java.nio.file.Files.write(logDir.resolve(name), json.writeValueAsBytes(log));
+        } catch (java.io.IOException | RuntimeException e) {
+            r.archived = false;                                      // try again on the next tick
+        }
+    }
+
+    /** Names of the saved logs. */
+    synchronized java.util.List<String> savedLogs() {
+        try (var files = java.nio.file.Files.list(logDir)) {
+            return files.map(f -> f.getFileName().toString()).filter(n -> n.endsWith(".json")).sorted().toList();
+        } catch (java.io.IOException e) {
+            return java.util.List.of();
+        }
+    }
+
+    /**
+     * Everything for the admin as one zip: the saved logs (which are deleted once the zip is built) and the games still
+     * running right now (which stay).
+     */
+    synchronized byte[] collectLogs() throws java.io.IOException {
+        java.io.ByteArrayOutputStream bytes = new java.io.ByteArrayOutputStream();
+        java.util.List<java.nio.file.Path> done = new java.util.ArrayList<>();
+        try (java.util.zip.ZipOutputStream zip = new java.util.zip.ZipOutputStream(bytes)) {
+            for (String n : savedLogs()) {
+                java.nio.file.Path f = logDir.resolve(n);
+                zip.putNextEntry(new java.util.zip.ZipEntry(n));
+                zip.write(java.nio.file.Files.readAllBytes(f));
+                zip.closeEntry();
+                done.add(f);
+            }
+            for (Room r : rooms.values()) {
+                if (r.archived) continue;
+                Map<String, Object> log = r.fullLog();
+                if (log == null) continue;
+                zip.putNextEntry(new java.util.zip.ZipEntry("dawn-game-" + r.code + "-still-running.json"));
+                zip.write(json.writeValueAsBytes(log));
+                zip.closeEntry();
+            }
+        }
+        for (java.nio.file.Path f : done) java.nio.file.Files.deleteIfExists(f);
+        return bytes.toByteArray();
     }
 
     int size() {
