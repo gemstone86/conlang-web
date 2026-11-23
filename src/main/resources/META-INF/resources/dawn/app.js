@@ -632,6 +632,12 @@ function renderHand() {
       return cardHtml(c, `<div class="actions">${pick}<button ${act && faceUp.length && affordable(c.cost) ? '' : 'disabled'} data-playland="${c.id}">Play: make it a colony</button>
         <button class="tiny" data-discard="${c.id}">Discard</button>${give}</div><div class="small muted">Or use it on a land in the realm panel.</div>`);
     }
+    if (c.type === 'leader') {
+      const have = RES.reduce((n, k) => n + (p.resources[k] || 0), 0);
+      const inputs = RES.map(k => `<label class="small" style="margin:0 .4rem 0 0">${RES_SHORT[k]} <input type="number" min="0" value="0" style="width:3.2rem" data-lres="${c.id}:${k}" data-keep="lres-${c.id}-${k}"></label>`).join('');
+      return cardHtml(c, `<div class="small">Cost: ${c.anyCost} of any resources — leave blank to pay with what you have most of. It replaces ${p.leader ? esc(p.leader.name) : 'nobody'}.</div>
+        <div class="row">${inputs}</div><div class="actions"><button ${act && have >= c.anyCost ? '' : 'disabled'} data-playleader="${c.id}">Play (1 action)</button><button class="tiny" data-discard="${c.id}">Discard</button>${give}</div>`);
+    }
     const opts = c.target === 'territory' ? s.realm.filter(t => !t.cored).map(t => [t.id, t.name])
       : c.target === 'player' ? others.map(o => [o.seat, o.name]) : null;
     const tradeText = o => `pay ${resList(o.give)} → your teammate gets ${resList(o.get)}`;
@@ -651,6 +657,11 @@ $('handPanel').onclick = e => {
   if (t.dataset.playland) {
     const sel = $('land-' + t.dataset.playland);
     if (sel) send({ type: 'play', card: +t.dataset.playland, land: +sel.value });
+  }
+  else if (t.dataset.playleader) {
+    const id = +t.dataset.playleader, resources = {};
+    document.querySelectorAll(`[data-lres^="${id}:"]`).forEach(i => { resources[i.dataset.lres.split(':')[1]] = Math.max(0, +i.value || 0); });
+    send({ type: 'play', card: id, resources });
   }
   else if (t.dataset.play) {
     const msg = { type: 'play', card: +t.dataset.play };

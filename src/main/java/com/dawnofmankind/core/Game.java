@@ -366,6 +366,7 @@ public final class Game {
             if (p.leader != null) log(p.leader.name + " leaves with the era.");
             p.leader = null;
             p.pendingLeader = null;
+            p.hand.removeIf(c -> c.def.type == CardType.LEADER);
         }
         // an era's trigger event only ends its own era: leftovers are retired
         for (List<CardInst> deck : List.of(currentEvents, futureEvents)) {
@@ -1007,15 +1008,6 @@ public final class Game {
 
     /** A card a player gets: into their hand, except great wonders, which go on the board for the whole team to build. */
     private void take(Player p, CardInst c) {
-        if (c.def.type == CardType.LEADER) {
-            if (p.leader != null) {                       // the player decides whether the newcomer replaces them
-                p.pendingLeader = c.def;
-                log(p.name + " draws the great person " + c.def.name + " and may choose to replace " + p.leader.name + ".");
-                return;
-            }
-            installLeader(p, c.def);
-            return;
-        }
         if (c.def.type == CardType.CITY_STATE) {
             TerritoryDef def = content.territories.get(c.def.land);
             Frontier f = new Frontier(new Territory(nextId++, def), false, -1);
@@ -1041,11 +1033,38 @@ public final class Game {
         throw new GameException("That card isn't in your hand.");
     }
 
+    /** What a great person costs, in any mix of resources. */
+    public static final int LEADER_COST = 4;
+
+    /** Plays a great person from the hand: it costs {@link #LEADER_COST} of any resources and replaces the current one. */
+    private void playLeader(Player p, CardInst c, Map<String, Object> a) {
+        EnumMap<Res, Integer> give = Res.parse(a.get("resources"));
+        if (give.values().stream().anyMatch(v -> v < 0)) throw new GameException("Amounts can't be negative.");
+        int sum = give.values().stream().mapToInt(Integer::intValue).sum();
+        if (sum == 0) {                                   // nothing chosen: take from what the player has most of
+            for (int i = 0; i < LEADER_COST; i++) {
+                Res top = null;
+                for (Res r : Res.values()) if (p.res.get(r) - give.get(r) > 0 && (top == null || p.res.get(r) - give.get(r) > p.res.get(top) - give.get(top))) top = r;
+                if (top == null) throw new GameException("A great person costs " + LEADER_COST + " resources, of any kind.");
+                give.merge(top, 1, Integer::sum);
+            }
+        } else if (sum != LEADER_COST) throw new GameException("A great person costs exactly " + LEADER_COST + " resources, of any kind.");
+        for (Res r : Res.values()) if (p.res.get(r) < give.get(r)) throw new GameException("Not enough " + r.key() + ".");
+        pay(p, give);
+        p.hand.remove(c);
+        log(p.name + " pays " + Res.describe(give) + " for " + c.def.name + ".");
+        installLeader(p, c.def);
+    }
+
     private void play(Player p, Map<String, Object> a) {
         CardInst c = handCard(p, a);
         CardDef d = c.def;
         if (d.type == CardType.RESPONSE) throw new GameException(d.name + " can only be played when an event resolves.");
         if (d.type == CardType.GREAT_WONDER) throw new GameException("Great wonders are built on the board.");
+        if (d.type == CardType.LEADER) {
+            playLeader(p, c, a);
+            return;
+        }
         if (p.owns(d)) throw new GameException("You already have " + d.name + ".");
         if (d.type == CardType.TECH) {
             for (Player o : players) if (o.techs.contains(d)) throw new GameException(o.name + " has already researched " + d.name + ": it helps everyone.");

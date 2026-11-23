@@ -1,5 +1,9 @@
 # Changes
 
+## v1.81.0 (combined app)
+
+- Dawn: great persons are no longer played when drawn. They go to your hand and are played for 1 action and 4 resources of any kind, replacing your current great person. Unplayed ones leave with the era.
+
 ## v1.80.1 (combined app)
 
 - Dawn: your resources (and net per round) now sit on a second line in the top bar.

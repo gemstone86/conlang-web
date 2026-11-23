@@ -2,6 +2,7 @@ package com.dawnofmankind.core;
 
 import com.dawnofmankind.core.Content.BuildingDef;
 import com.dawnofmankind.core.Content.CardDef;
+import com.dawnofmankind.core.Content.CardType;
 import com.dawnofmankind.core.Content.WonderDef;
 import com.dawnofmankind.core.Effects.Mods;
 import com.dawnofmankind.core.Game.CardInst;
@@ -496,6 +497,7 @@ public final class View {
         m.put("type", d.type.name().toLowerCase());
         m.put("text", d.text);
         if (!Res.isZero(d.cost)) m.put("cost", res(d.cost));
+        if (d.type == CardType.LEADER) m.put("anyCost", Game.LEADER_COST);
         if (d.isEvent()) {
             m.put("category", d.category);
             m.put("kind", d.kind);

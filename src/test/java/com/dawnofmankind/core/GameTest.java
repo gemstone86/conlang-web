@@ -402,24 +402,32 @@ class GameTest {
     }
 
     @Test
-    void aLeaderPlaysItselfReplacesTheOldOneAndLeavesWithTheEra() {
+    void aLeaderIsPlayedFromTheHandForFourOfAnyResourcesAndLeavesWithTheEra() {
         Game g = game(2, 61);
         Player p = g.players.get(0);
         Game.CardInst a = card(g, "hammurabi"), b = card(g, "gilgamesh");
         g.queue.add(0, new Game.Slot(a, null));
         g.queue.add(1, new Game.Slot(b, null));
         g.act(p.seat, Map.of("type", "pick", "slot", 0));
+        assertNull(p.leader, "a great person is not played when drawn");
+        assertTrue(p.hand.contains(a));
+        p.res.put(Res.FOOD, 3);
+        p.res.put(Res.RESEARCH, 1);
+        p.res.put(Res.PRODUCTION, 0);
+        p.res.put(Res.CULTURE, 0);
+        p.res.put(Res.INFLUENCE, 0);
+        int actions = p.actions;
+        assertThrows(GameException.class, () -> g.act(p.seat, Map.of("type", "play", "card", a.id, "resources", Map.of("food", 2))), "must pay exactly 4");
+        g.act(p.seat, Map.of("type", "play", "card", a.id, "resources", Map.of("food", 3, "research", 1)));
         assertEquals("Hammurabi", p.leader.name);
-        assertFalse(p.hand.contains(a), "a leader never sits in the hand");
-        g.act(p.seat, Map.of("type", "pick", "slot", 1));
-        assertEquals("Hammurabi", p.leader.name, "a second great person waits for the player's choice");
-        assertEquals("Gilgamesh", p.pendingLeader.name);
-        g.act(p.seat, Map.of("type", "leader", "replace", false));
-        assertEquals("Hammurabi", p.leader.name);
-        assertNull(p.pendingLeader);
-        p.pendingLeader = b.def;
-        g.act(p.seat, Map.of("type", "leader", "replace", true));
-        assertEquals("Gilgamesh", p.leader.name, "the new great person replaces the old one when chosen");
+        assertFalse(p.hand.contains(a));
+        assertEquals(actions - 1, p.actions, "playing a great person takes an action");
+        assertEquals(0, p.res.get(Res.FOOD));
+        p.hand.add(b);
+        p.res.put(Res.CULTURE, 9);
+        g.act(p.seat, Map.of("type", "play", "card", b.id));
+        assertEquals("Gilgamesh", p.leader.name, "the new great person replaces the old one");
+        assertEquals(5, p.res.get(Res.CULTURE), "paid 4 from the largest pile");
     }
 
     @Test
