@@ -216,6 +216,7 @@ function renderQueue() {
     const fd = c.faceDown ? '<div class="facedown">+ a face-down card underneath</div>' : '';
     const label = c.type === 'event' ? 'Take on' : c.type === 'great_wonder' ? 'Start building' : 'Pick';
     if (c.taken) return `<div class="cardx gap" title="Taken; the queue closes up at the end of the round"><div class="muted small">taken</div></div>`;
+    if (c.type === 'era_end') return cardHtml(c, `${isLeaving ? '<div class="leave-x" title="Leaves the queue at the end of the round">✕</div>' : ''}<div class="small muted">Can't be taken.</div>`, isLeaving ? 'leaving' : '');
     const btn = `<div class="actions"><button ${canAct() && !pickClosed() ? '' : 'disabled'} data-pick="${i}">${label} (1 action)</button></div>`;
     return cardHtml(c, `${isLeaving ? '<div class="leave-x" title="Leaves the queue at the end of the round">✕</div>' : ''}${fd}${btn}`, isLeaving ? 'leaving' : '');
   }).reverse().join('');
@@ -872,7 +873,7 @@ async function openAllCards() {
       item(c.name, [c.type === 'leader' ? 'great person' : c.type.replace('_', ' '), c.era, cost(c.cost) && 'cost ' + cost(c.cost), c.minPlayers && c.minPlayers + '+ players only'].filter(Boolean).join(' · '), c.text, c.art)).join('')}</div>` : '';
   };
   const types = [...new Set(catalogue.cards.map(c => c.type))].filter(t => t !== 'great_wonder');
-  const names = { leader: 'Great people', era_trigger: 'Era-trigger events', hostility: 'Hostility cards', tech: 'Techs', action: 'Actions', response: 'Responses', minor_wonder: 'Minor wonders', great_wonder: 'Great wonders', city_state: 'City states', event: 'Events' };
+  const names = { leader: 'Great people', era_trigger: 'End-of-era cards', hostility: 'Hostility cards', tech: 'Techs', action: 'Actions', response: 'Responses', minor_wonder: 'Minor wonders', great_wonder: 'Great wonders', city_state: 'City states', event: 'Events' };
   const nice = k => names[k] || k;
   const per = x => !x ? '-' : [x.base ? String(x.base) : '', x.perPlayer ? (x.perPlayer === 1 ? 'X' : x.perPlayer + 'X') : ''].filter(Boolean).join(' + ') || '0';
   const eraNames = catalogue.counts[0].eras.map(e => e.era);

@@ -16,7 +16,7 @@ import org.yaml.snakeyaml.Yaml;
  */
 public final class Content {
 
-    public enum CardType { TECH, ACTION, RESPONSE, MINOR_WONDER, GREAT_WONDER, EVENT, HOSTILITY, LEADER, CITY_STATE }
+    public enum CardType { TECH, ACTION, RESPONSE, MINOR_WONDER, GREAT_WONDER, EVENT, HOSTILITY, LEADER, CITY_STATE, ERA_END }
 
     /** Rule numbers from the {@code rules:} block. */
     public static final class Rules {
@@ -73,6 +73,8 @@ public final class Content {
         public List<Map<String, Object>> ongoing = new ArrayList<>();
         public EnumMap<Res, Integer> cleanseCost;
         public boolean eraTrigger, crisis, persistent;
+        /** An era-end event: the era whose end it can be (listed under that era's endEvents). */
+        public String eraEnd;
         /** Always in the era deck of the era that lists it (it takes one of the places of its kind). */
         public boolean required;
         /** Minor wonders: the era after which the bonuses stop. */
@@ -141,6 +143,8 @@ public final class Content {
         public String id, name;
         public int order;
         public Map<String, Integer> cards = new LinkedHashMap<>();
+        /** The special events one of which strikes when the era's third end card is placed; their effects last through the next era. */
+        public List<String> endEvents = new ArrayList<>();
     }
 
     public final Rules rules = new Rules();
@@ -196,6 +200,7 @@ public final class Content {
             e.name = Y.s(m, "name", e.id);
             e.order = order++;
             Y.map(m.get("cards")).forEach((k, v) -> e.cards.put(k, Y.toInt(v)));
+            e.endEvents.addAll(Y.strings(m.get("endEvents")));
             c.eras.add(e);
         }
         Y.map(root.get("startingEvents")).forEach((k, v) -> c.startingEvents.put(k, Y.toInt(v)));
@@ -293,7 +298,8 @@ public final class Content {
         c.persistent = !pers.isEmpty();
         c.ongoing = effects(pers.get("ongoing"));
         c.cleanseCost = Res.parse(pers.get("cleanse"));
-        c.eraTrigger = Y.b(m, "eraTrigger");
+        c.eraTrigger = Y.b(m, "eraTrigger") || c.type == CardType.ERA_END;
+        c.eraEnd = Y.s(m, "eraEnd", null);
         c.land = Y.s(m, "land", null);
         c.required = Y.b(m, "required");
         c.minPlayers = Y.i(m, "minPlayers", 1);
@@ -345,6 +351,12 @@ public final class Content {
         for (EraDef e : eras) for (String id : e.cards.keySet()) {
             CardDef d = cards.get(id);
             if (d != null && d.era == null) d.era = e.id;
+        }
+        for (EraDef e : eras) for (String id : e.endEvents) {
+            CardDef d = cards.get(id);
+            if (d == null || !d.isEvent()) throw new IllegalStateException("Era " + e.id + " lists an unknown era-end event " + id);
+            if (d.era == null) d.era = e.id;
+            d.eraEnd = e.id;
         }
         for (CardDef c : cards.values()) {
             if (c.type == CardType.CITY_STATE && (c.land == null || !territories.containsKey(c.land))) throw new IllegalStateException("City state card " + c.id + " needs a land: from territories");

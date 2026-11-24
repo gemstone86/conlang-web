@@ -180,6 +180,12 @@ public final class Game {
     public Pending pending;
     public int eventsDrawnThisRound;
     private boolean eraEnding;
+    /** End-of-era cards placed on the queue in this era; the era-end event strikes when the last one is. */
+    private int endCardsPlaced;
+    /** The era-end events in force: their effects last through the era after the one they ended. */
+    public final List<EraBoon> eraBoons = new ArrayList<>();
+
+    public record EraBoon(CardDef def, int era) {}
 
     public String result; // null, "victory" or "defeat"
     public String endReason;
@@ -378,6 +384,8 @@ public final class Game {
             }
         }
         eraIndex++;
+        eraBoons.removeIf(b -> b.era() < eraIndex);
+        endCardsPlaced = 0;
         startEra(keepQueue);
     }
 
@@ -556,7 +564,7 @@ public final class Game {
     /** Draws for a player: events go to the future deck and the player draws again. Returns the card kept, or null. */
     private CardInst drawFromEraDeck(Player p) {
         CardInst c;
-        while ((c = nextFromEraDeck()) != null) {
+        while ((c = nextCard()) != null) {
             if (c.def.isEvent()) {
                 futureEvents.add(c);
                 p.turnEvents++;
@@ -605,7 +613,7 @@ public final class Game {
             CardDef d = e.def;
             int target = -1;
             if ("one".equals(d.target) || "raid".equals(d.kind) || "opportunity".equals(d.kind)) target = rng.nextInt(players.size());
-            int strength = d.strength(players.size(), realm.size()) + ("invasion".equals(d.kind) ? threat : 0);
+            int strength = d.strength(players.size(), realm.size()) + ("invasion".equals(d.kind) ? threat + civMods().invasionStrength : 0);
             if (attack != null) {
                 if (attack.target() >= 0) target = attack.target();
                 if (attack.strength() > 0) strength = attack.strength();
@@ -684,15 +692,16 @@ public final class Game {
                 futureEvents.add(s.card);
                 log(s.card.def.name + " leaves the bottom of the queue and goes to the future deck.");
                 Player teller = leaderWith("eventUnder");
+                String tellerLeader = teller == null ? null : teller.leader.name;      // an era could end while cards are drawn
                 CardInst under = s.under;
                 if (teller != null && under != null) {
                     while (under != null && under.def.isEvent()) {
                         futureEvents.add(under);
                         log("The face-down card was another event; it goes face down into the future deck.");
-                        under = nextFromEraDeck();
+                        under = nextCard();
                     }
                     if (under != null) {
-                        log(teller.leader.name + ": " + teller.name + " gets the face-down card.");
+                        log(tellerLeader + ": " + teller.name + " gets the face-down card.");
                         take(teller, under);
                     }
                 }
@@ -722,7 +731,12 @@ public final class Game {
         while (queue.size() < queueSize()) {
             CardInst c = nextFromEraDeck();
             if (c == null) break;
-            CardInst under = c.def.isEvent() ? nextFromEraDeck() : null;
+            if (c.def.type == CardType.ERA_END) {                  // turned up onto the queue; it can't be taken
+                queue.add(0, new Slot(c, null));
+                endCardPlaced(c);
+                continue;
+            }
+            CardInst under = c.def.isEvent() ? nextCard() : null;
             queue.add(0, new Slot(c, under));
         }
     }
@@ -731,6 +745,40 @@ public final class Game {
      * Takes the top card of the era deck. Hostility cards never stay anywhere: as soon as one is revealed it adds
      * its enemies to the threat massing against the realm, and the next card is taken.
      */
+    private CardInst nextCard() {
+        CardInst c;
+        while ((c = nextFromEraDeck()) != null) {
+            if (c.def.type != CardType.ERA_END) return c;
+            queue.add(0, new Slot(c, null));               // an end card drawn some other way still goes onto the queue
+            endCardPlaced(c);
+            if (result != null) return null;
+        }
+        return null;
+    }
+
+    /** Counts an end-of-era card; the third one brings the era-end event, and the next era's cards are drawn from then on. */
+    private void endCardPlaced(CardInst c) {
+        endCardsPlaced++;
+        int needed = content.rules.eraDeck.get("era_trigger")[0];
+        log(c.def.name + " is turned up on the queue (" + Math.min(endCardsPlaced, needed) + " of " + needed + ").");
+        if (endCardsPlaced < needed) return;
+        endCardsPlaced = 0;
+        boolean lastEra = eraIndex + 1 >= content.eras.size();
+        if (lastEra) {
+            eraEnding = true;                              // the game is won at the end of the round
+            log("The " + era().name + " era draws to its close.");
+            return;
+        }
+        List<String> options = era().endEvents;
+        if (!options.isEmpty()) {
+            CardDef d = content.cards.get(options.get(rng.nextInt(options.size())));
+            log("THE ERA ENDS: " + d.name + " — " + d.text);
+            eraBoons.add(new EraBoon(d, eraIndex + 1));
+            pastEvents.add(inst(d));
+        }
+        advanceEra(true);
+    }
+
     private CardInst nextFromEraDeck() {
         while (true) {
             if (eraDeck.isEmpty()) {
@@ -963,6 +1011,7 @@ public final class Game {
         }
         if (picksLocked) throw new GameException("The time to pick cards is over for this round.");
         if (s.taken) throw new GameException("That card was just taken.");
+        if (s.card.def.type == CardType.ERA_END) throw new GameException("An end-of-era card can't be taken: it only counts down the era.");
         s.taken = true;
         if (!s.card.def.isEvent()) {
             log(p.name + " takes " + s.card.def.name + " from the queue.");
@@ -975,7 +1024,7 @@ public final class Game {
         while (under != null && under.def.isEvent()) {
             futureEvents.add(under);
             log("The face-down card was another event; it goes face down into the future deck.");
-            under = nextFromEraDeck();
+            under = nextCard();
         }
         if (under != null) take(p, under);
     }
@@ -1326,7 +1375,7 @@ public final class Game {
     /** Settlers needed: per player (special lands their own number, other lands the rule's), minus free settlers. */
     public int settleSettlers(Frontier f) {
         int per = f.land.def.special ? f.land.def.populationPerPlayer : content.rules.colonizeSettlersPerPlayer;
-        return Math.max(0, per * players.size() - civMods().freeSettlers);
+        return Math.max(0, per * players.size() + civMods().settlerCost - civMods().freeSettlers);
     }
 
     /** Military strength of a number of troops: Bronze Working adds 1 for every 2. */
@@ -1693,10 +1742,6 @@ public final class Game {
             default -> applyImmediate(d.effects.stream().filter(x -> !x.containsKey("discover")).toList(), targets, null, factor, "civ".equals(d.target));
         }
         loseFoundLands(ev.id);
-        if (d.eraTrigger && era().cards.containsKey(d.id)) {
-            eraEnding = true;
-            log(d.name + ": this era will end at the end of the round.");
-        }
         if (d.persistent) {
             persistentEvents.add(ev);
             log(d.name + " lingers until lifted (" + Res.describe(d.cleanseCost) + ").");
@@ -2070,6 +2115,7 @@ public final class Game {
         if (p.leader != null) m.add(p.leader.effects);
         for (WonderDef w : builtWonders) if (!obsolete(w)) m.add(w.effects);
         for (CardInst e : persistentEvents) m.add(e.def.ongoing);
+        for (EraBoon b : eraBoons) m.add(b.def().effects);
         for (Territory t : realm) m.add(t.def.effects);
         m.perTerritory.forEach((r, n) -> m.income.merge(r, n * realm.size(), Integer::sum));
         return m;
@@ -2083,6 +2129,7 @@ public final class Game {
         if (p.leader != null) out.add(Map.entry(p.leader.name, p.leader.effects));
         for (WonderDef w : builtWonders) if (!obsolete(w)) out.add(Map.entry(w.name, w.effects));
         for (CardInst e : persistentEvents) out.add(Map.entry(e.def.name, e.def.ongoing));
+        for (EraBoon b : eraBoons) out.add(Map.entry(b.def().name, b.def().effects));
         for (Territory t : realm) out.add(Map.entry(t.def.name, t.def.effects));
         return out;
     }
@@ -2097,6 +2144,7 @@ public final class Game {
             if (p.leader != null) for (Map<String, Object> e : p.leader.effects) if (e.containsKey("invasionDefense")) m.add(e);
         }
         for (WonderDef w : builtWonders) if (!obsolete(w)) m.add(w.effects);
+        for (EraBoon b : eraBoons) m.add(b.def().effects);
         for (Territory t : realm) m.add(t.def.effects);
         return m;
     }

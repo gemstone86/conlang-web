@@ -43,8 +43,8 @@ rules:
     action: {base: 24, perPlayer: 2}
     response: {base: 0, perPlayer: 1}
     event: {base: 12, perPlayer: 1}
-    era_trigger: {base: 1, perPlayer: 0}
-  eraTriggerBottomPercent: 30             # era-trigger events are placed in the bottom 30% of the era deck
+    era_trigger: {base: 3, perPlayer: 0}       # the three end-of-era cards; when the third is turned up the era ends
+  eraTriggerBottomPercent: 30             # the end-of-era cards are placed in the bottom 30% of the era deck
   # fights: troops spent (up to the enemy's strength) must reach that strength (response cards add to it);
   # the troops spent settling a land are all lost; in invasions half of them, rounded up
 
@@ -429,7 +429,9 @@ eras:
       wondrous_land_found: 1
       hostile_tribes: 2
       rivals_claim: 1
-      dawn_of_agriculture: 1
+      end_of_prehistoric: 3
+    # when the third end card is turned up, one of these strikes; its effects last through the next era
+    endEvents: [dawn_of_agriculture, the_great_impact, cult_of_ancestors]
   - id: ancient
     name: Ancient
     cards:
@@ -511,7 +513,7 @@ eras:
       hostile_tribes: 1
       warlord: 2
       rivals_claim: 1
-      rise_of_empires: 1
+      end_of_ancient: 3
 
 # The starting event deck: 2 per player, drawn from these (number = copies in the pool).
 startingEvents:
@@ -1096,10 +1098,28 @@ cards:
     name: Dawn of Agriculture
     type: event
     category: era
-    eraTrigger: true
-    target: each
-    effects: [{gain: {food: 2}}]
-    text: Every player gains 2 food. The Prehistoric era ends at the end of this round.
+    effects: [{maxSlots: {farm: 1}}, {invasionStrength: 2}]
+    text: "Era end. For the whole next era: +1 farm slot, but every invasion is 2 stronger."
+  the_great_impact:
+    name: Meteor Impact
+    type: event
+    category: era
+    effects: [{maxSlots: {farm: 1}}, {settlerCost: 1}]
+    text: "Era end. For the whole next era: +1 farm slot, but every colony costs 1 more settler."
+  cult_of_ancestors:
+    name: Cult of the Ancestors
+    type: event
+    category: era
+    effects: [{income: {culture: 1}}, {handLimit: -1}]
+    text: "Era end. For the whole next era: every player gets +1 culture per turn, but hand size is 1 smaller."
+  end_of_prehistoric:
+    name: End of an Era
+    type: era_end
+    text: "The Prehistoric era is coming to an end. This card can't be taken. When the third one is turned up, a special event ends the era, and its effects last through the next one."
+  end_of_ancient:
+    name: End of an Era
+    type: era_end
+    text: "The Ancient era is coming to an end. This card can't be taken. When the third one is turned up, the civilization has endured and the game is won at the end of the round."
   barbarian_raid:
     name: Barbarian Raid
     type: event
@@ -1211,15 +1231,6 @@ cards:
     target: each
     effects: [{lose: {food: 1}}, {addCrisis: climate_change}]
     text: Every player loses 1 food. The Climate Change crisis is added to the future deck.
-  rise_of_empires:
-    name: Rise of Empires
-    type: event
-    category: era
-    eraTrigger: true
-    target: each
-    effects: [{gain: {culture: 2}}]
-    text: Every player gains 2 culture. The Ancient era ends at the end of this round.
-
   scouts_return:
     name: Scouts Return
     type: event

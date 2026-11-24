@@ -538,7 +538,7 @@ class GameTest {
             assertEquals(24 + 2 * x, n.getOrDefault("action", 0), "actions");
             assertEquals(x, n.getOrDefault("response", 0), "responses");
             assertEquals(12 + x, n.getOrDefault("event", 0), "events");
-            assertEquals(1, n.getOrDefault("era_trigger", 0), "one era-trigger event");
+            assertEquals(3, n.getOrDefault("era_trigger", 0) + (int) g.queue.stream().filter(sl -> sl.card.def.type == Content.CardType.ERA_END).count(), "three end-of-era cards");
         }
     }
 
@@ -857,7 +857,7 @@ class GameTest {
             int total = g.worldDeck.size() + g.setupOffers.values().stream().mapToInt(List::size).sum();
             for (int seat = 0; seat < n; seat++) g.act(seat, Map.of("type", "chooseLand", "land", g.setupOffers.get(seat).get(0).id));
             assertEquals(2, g.realm.size(), n + " players");
-            assertEquals(total, g.worldDeck.size() + g.realm.size() + (int) g.frontier.stream().filter(f -> !f.fromEvent).count(), "no land was lost");
+            assertEquals(total, g.worldDeck.size() + g.realm.size() + (int) g.frontier.stream().filter(f -> !f.fromEvent && !f.land.def.special).count(), "no land was lost");
         }
     }
 
@@ -1098,5 +1098,25 @@ class GameTest {
 
     private static String last(Game g) {
         return String.join("\n", g.log.subList(Math.max(0, g.log.size() - 15), g.log.size()));
+    }
+
+    @Test
+    void theThirdEndOfEraCardEndsTheEraAndItsEventLastsThroughTheNextOne() {
+        Game g = game(1, 91);
+        Player p = g.players.get(0);
+        assertEquals(0, g.eraIndex);
+        assertEquals(0, g.mods(p).maxSlots.getOrDefault("farm", 0));
+        for (int round = 1; round <= 3; round++) {
+            g.eraDeck.add(0, card(g, "end_of_prehistoric"));
+            while (p.hand.size() > g.handLimit(p)) g.act(p.seat, Map.of("type", "discard", "card", p.hand.get(0).id));
+            g.act(p.seat, Map.of("type", "endTurn"));
+            if (round < 3) assertEquals(0, g.eraIndex, "the era goes on until the third end card");
+        }
+        assertEquals(1, g.eraIndex, "the third end card ends the era");
+        assertEquals(1, g.eraBoons.size());
+        assertEquals(2, g.eraBoons.get(0).def().effects.size(), g.eraBoons.get(0).def().id);
+        assertTrue(g.queue.stream().anyMatch(sl -> sl.card.def.type == Content.CardType.ERA_END), "the end cards stay on the queue");
+        Game.Slot end = g.queue.stream().filter(sl -> sl.card.def.type == Content.CardType.ERA_END).findFirst().get();
+        assertThrows(GameException.class, () -> g.act(p.seat, Map.of("type", "pick", "slot", g.queue.indexOf(end))));
     }
 }

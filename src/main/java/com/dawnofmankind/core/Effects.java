@@ -44,7 +44,7 @@ public final class Effects {
             "threat", "invadeIfStronger", "raidAll", "invasion", "healthTest", "trade");
     static final Set<String> LASTING = Set.of("income", "perWorker", "handLimit", "actionsPerTurn", "raidDefense",
             "mitigate", "buildDiscount", "sharedPool", "victoryPoints", "invasionDefense", "faceUpLands", "settleDiscount", "freeSettlers", "strengthPerTwoTroops", "giveCards", "freeRecruit", "strengthBonus", "ownStrengthPerTwoTroops", "maxSlots", "buildCost", "wonderGrowth", "eventUnder", "actionsToHand",
-            "growthDiscount", "wonderDouble", "incomePerTerritory", "noEnemy", "halveEnemy", "healthMod", "troopStrength", "recruitExtra", "troopUpkeep", "freeTech", "buildingDiscount", "halveWonderUpkeep", "unlockBuilding");
+            "growthDiscount", "wonderDouble", "incomePerTerritory", "noEnemy", "halveEnemy", "healthMod", "troopStrength", "recruitExtra", "troopUpkeep", "freeTech", "buildingDiscount", "halveWonderUpkeep", "unlockBuilding", "invasionStrength", "settlerCost");
     static final Set<String> RESPONSE = Set.of("defense", "halve", "cancel", "healthBonus");
 
     static String key(Map<String, Object> e) {
@@ -65,7 +65,7 @@ public final class Effects {
         public final EnumMap<Res, Integer> buildDiscount = Res.empty();
         public final EnumMap<Res, Integer> poolIncome = Res.empty();
         public final Set<String> mitigate = new HashSet<>();
-        public int handLimit, actionsPerTurn, raidDefense, victoryPoints, invasionDefense, faceUpLands, freeSettlers, strengthPerTwoTroops, giveCards, freeRecruit, strengthBonus, ownStrengthPerTwoTroops, growthDiscount, wonderDouble, healthMod, troopStrength;
+        public int handLimit, actionsPerTurn, raidDefense, victoryPoints, invasionDefense, faceUpLands, freeSettlers, strengthPerTwoTroops, giveCards, freeRecruit, strengthBonus, ownStrengthPerTwoTroops, growthDiscount, wonderDouble, healthMod, troopStrength, invasionStrength, settlerCost;
         /** Spear Men: troops cost more to train and eat food. */
         public final EnumMap<Res, Integer> recruitExtra = Res.empty();
         public double troopUpkeep;
@@ -105,6 +105,8 @@ public final class Effects {
                 case "actionsPerTurn" -> actionsPerTurn += Y.toInt(v);
                 case "raidDefense" -> raidDefense += Y.toInt(v);
                 case "invasionDefense" -> invasionDefense += Y.toInt(v);
+                case "invasionStrength" -> invasionStrength += Y.toInt(v);
+                case "settlerCost" -> settlerCost += Y.toInt(v);
                 case "faceUpLands" -> faceUpLands += Y.toInt(v);
                 case "freeSettlers" -> freeSettlers += Y.toInt(v);
                 case "strengthPerTwoTroops" -> strengthPerTwoTroops += Y.toInt(v);
