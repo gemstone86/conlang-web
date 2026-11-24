@@ -1,5 +1,9 @@
 # Changes
 
+## v1.85.3 (combined app)
+
+- Dawn: new Prehistoric raid event, Legendary Predator: strength players + 2 (fixed, no enemy cards), each point short costs 2 food.
+
 ## v1.85.2 (combined app)
 
 - Dawn: twice as many hostility cards in each era deck: 2 per player (was 1). The cards keep their values (+1, +2, +3, +5); there are more copies of each to make up the numbers.

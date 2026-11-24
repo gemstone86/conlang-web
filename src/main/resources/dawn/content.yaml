@@ -414,6 +414,7 @@ eras:
       offering_to_the_spirits: 1
       # events
       wolf_pack: 2
+      legendary_predator: 1
       rival_tribe: 2
       wandering_horde: 1
       harsh_winter: 1
@@ -999,6 +1000,14 @@ cards:
     draws: {base: 0, perEra: 1}
     perShortfall: [{lose: {food: 1}}]
     text: "Raid: draw the Era number of enemy cards (Prehistoric 1, Ancient 2). Each point you fall short costs 1 food."
+  legendary_predator:
+    name: Legendary Predator
+    type: event
+    category: raid
+    kind: raid
+    strength: {base: 2, perPlayer: 1}
+    perShortfall: [{lose: {food: 2}}]
+    text: "Raid, strength = players + 2 (a fixed strength, no enemy cards are drawn). Each point you fall short costs 2 food."
   rival_tribe:
     name: Rival Tribe
     type: event

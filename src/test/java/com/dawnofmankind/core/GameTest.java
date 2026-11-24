@@ -1171,4 +1171,13 @@ class GameTest {
             }
         }
     }
+
+    @Test
+    void theLegendaryPredatorIsAPrehistoricRaidOfPlayersPlusTwo() {
+        assertTrue(C.eras.get(0).cards.containsKey("legendary_predator"));
+        Content.CardDef d = C.cards.get("legendary_predator");
+        assertEquals("raid", d.kind);
+        assertEquals(3, d.strength(1, 5));
+        assertEquals(6, d.strength(4, 5));
+    }
 }
