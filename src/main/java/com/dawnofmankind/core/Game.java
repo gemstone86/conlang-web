@@ -124,6 +124,8 @@ public final class Game {
         /** Target seat for one-player events, else -1. */
         public final int target;
         public final int strength;
+        /** The enemy cards drawn for this raid or invasion (their strengths); the rest of the strength is fixed. */
+        public final List<Integer> enemyCards = new ArrayList<>();
         public final Map<Integer, Boolean> ready = new LinkedHashMap<>();
         public final Map<Integer, Integer> troops = new LinkedHashMap<>();
         public final List<String> responses = new ArrayList<>();
@@ -623,15 +625,18 @@ public final class Game {
             if ("one".equals(d.target) || "raid".equals(d.kind) || "opportunity".equals(d.kind)) target = rng.nextInt(players.size());
             if (attack != null && attack.target() >= 0) target = attack.target();
             int strength;
+            List<Integer> cards = List.of();
             if (attack != null && attack.strength() > 0) strength = attack.strength();
             else if ("raid".equals(d.kind) && d.drawsBase >= 0) {
                 int n = d.drawsBase + d.drawsPerEra * (eraIndex + 1);
-                strength = drawEnemies(n, d.name + " draws " + n + " enemy cards");
+                cards = drawEnemies(n, d.name + " draws " + n + " enemy cards");
+                strength = cards.stream().mapToInt(Integer::intValue).sum();
             } else if ("invasion".equals(d.kind)) {
-                int massed = drawEnemies(threat, threat + " massed enemies join " + d.name);
-                strength = d.strength(players.size(), realm.size()) + massed + civMods().invasionStrength;
+                cards = drawEnemies(threat, threat + " massed enemies join " + d.name);
+                strength = d.strength(players.size(), realm.size()) + cards.stream().mapToInt(Integer::intValue).sum() + civMods().invasionStrength;
             } else strength = d.strength(players.size(), realm.size());
             pending = new Pending(e, target, strength);
+            pending.enemyCards.addAll(cards);
             pending.fromCrisis = attack != null;
             for (Player p : players) pending.ready.put(p.seat, p.away);
             log("Event: " + d.name + (target >= 0 ? " (" + players.get(target).name + ")" : "") + " — " + d.text);
@@ -1829,8 +1834,8 @@ public final class Game {
     }
 
     /** Draws {@code n} cards from the enemy deck and adds up their strength; they are shuffled back into it afterwards. */
-    private int drawEnemies(int n, String what) {
-        if (n <= 0 || enemyDeck.isEmpty()) return 0;
+    private List<Integer> drawEnemies(int n, String what) {
+        if (n <= 0 || enemyDeck.isEmpty()) return List.of();
         List<Integer> drawn = new ArrayList<>();
         while (drawn.size() < n) {
             List<Integer> bag = new ArrayList<>(enemyDeck);
@@ -1839,7 +1844,7 @@ public final class Game {
         }
         int sum = drawn.stream().mapToInt(Integer::intValue).sum();
         log(what + ": " + drawn + " = " + sum + " strength (the cards go back into the enemy deck).");
-        return sum;
+        return drawn;
     }
 
     /** One more card in the enemy deck. */

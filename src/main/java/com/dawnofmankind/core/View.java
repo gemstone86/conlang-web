@@ -261,6 +261,8 @@ public final class View {
             Map<String, Object> pm = card(pe.event);
             pm.put("target", pe.target);
             pm.put("strength", pe.strength);
+            pm.put("enemyCards", pe.enemyCards);
+            pm.put("enemyFixed", pe.strength - pe.enemyCards.stream().mapToInt(Integer::intValue).sum());
             pm.put("ready", pe.ready);
             pm.put("troops", pe.troops);
             pm.put("responses", pe.responses);

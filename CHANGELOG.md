@@ -1,5 +1,9 @@
 # Changes
 
+## v1.84.1 (combined app)
+
+- Dawn: when a raid or invasion strikes, the popup shows the enemy cards that were drawn (and the fixed part), with your troops on the left and your allies' troops on the right.
+
 ## v1.84.0 (combined app)
 
 - Dawn: enemy deck. Raids and invasions now draw cards from an enemy deck (it starts with six strength-1 and four strength-2 cards), add up their strength and shuffle them back. Massing enemies are a count: when an invasion comes, that many cards are drawn and added to players × territories. Raids draw Era number + a number written on the card (Wolf Pack +0, Rival Tribe +1, Barbarian Raid +2, Chariot Raiders +3); the Sea Peoples' raid draws 4 per era. The Sea Peoples crisis adds a strength-4 card to the deck every round it is active. The deck is shown in the status bar.

@@ -447,6 +447,26 @@ function eventPopupOpen() {
   const p = state && state.pending;
   return !!p && !p.ready[state.you] && popupHiddenFor !== pendingKey();
 }
+// the enemy cards drawn for a raid or an invasion, with your troops on the left and your allies' on the right
+function battleHtml(p) {
+  if (p.kind !== 'raid' && p.kind !== 'invasion') return '';
+  const s = state, you = s.you, mine = s.players[you];
+  const cards = (p.enemyCards || []).map(n => `<div class="ecard e${Math.min(n, 4)}" title="An enemy card of strength ${n}"><b>${n}</b><i>strength</i></div>`).join('');
+  const fixed = p.enemyFixed ? `<div class="efixed" title="${p.kind === 'invasion' ? 'Players × territories, plus any lasting bonus' : ''}"><b>+${p.enemyFixed}</b><i>${p.kind === 'invasion' ? 'tribes' : 'fixed'}</i></div>` : '';
+  const freeOf = o => Math.max(0, o.army - o.committed);
+  const sentOf = o => p.troops[o.seat] ?? 0;
+  const allies = s.players.filter(o => o.seat !== you);
+  const side = (title, free, sent, note) => `<div class="side"><div class="sidehead">${title}</div>
+    <div class="troops">⚔ <b>${free}</b> <span class="muted small">troops ready</span></div>
+    ${p.kind === 'invasion' ? `<div class="small">Sent to the fight: <b>${sent}</b></div>` : ''}${note ? `<div class="small muted">${note}</div>` : ''}</div>`;
+  const defends = p.kind === 'raid' && p.target === you;
+  const leftNote = p.kind === 'raid' ? (defends ? 'You defend alone.' : `${esc(s.players[p.target].name)} defends.`) : '';
+  return `<div class="battle">
+    <div class="enemies"><div class="enemyhead">The enemy comes with <b>${p.strength}</b></div><div class="ecards">${cards}${fixed}</div></div>
+    ${side('Your troops', freeOf(mine), sentOf(mine), leftNote)}
+    ${side(allies.length ? 'Your allies' : 'No allies', allies.reduce((n, o) => n + freeOf(o), 0), allies.reduce((n, o) => n + sentOf(o), 0), p.kind === 'raid' ? 'A raid is fought alone.' : '')}
+  </div>`;
+}
 function renderEvents() {
   const s = state, p = s.pending;
   if (!p) { popupHiddenFor = null; }
@@ -481,7 +501,7 @@ function renderEvents() {
     matching.forEach(c => RES.forEach(k => { if (c.cost && c.cost[k]) wanted[k] = Math.max(wanted[k] || 0, c.cost[k]); }));
     const askLine = Object.keys(wanted).length
       ? `<div class="small">${p.offerCost ? `Costs ${resList(p.offerCost)} · ` : ''}You have ${RES.filter(k => wanted[k]).map(k => `<span class="${have[k] >= wanted[k] ? '' : 'bad'}">${have[k]} ${RES_SHORT[k]}</span>`).join(', ')}</div>` : '';
-    html += cardHtml(p, `${target}<div class="preview">${esc(p.preview)}</div>
+    html += cardHtml(p, `${target}${battleHtml(p)}<div class="preview">${esc(p.preview)}</div>
       ${askLine}<div class="small muted">Your resources: ${resList(have, { all: true })}</div>
       ${found.length ? `<div class="small" style="color:var(--brass)">New land found: ${found.map(f => esc(f.name)).join(', ')}. Settle it before everyone is done, or it is lost.</div>${popup && landCardFn ? '<div class="cards">' + found.map(landCardFn).join('') + '</div>' : ''}` : ''}
       ${p.responses.length ? `<div class="small">Responses: ${p.responses.map(esc).join(', ')}</div>` : ''}
@@ -489,7 +509,7 @@ function renderEvents() {
       <div class="actions">${controls}</div><div class="readylist">${waiting.length ? 'Waiting for: ' + waiting.join(', ') : ''}</div>`, 'pending');
   } else {
     html += `<p class="muted small">After everyone's turn, as many events are drawn from the event deck as the future deck holds (now <b>${s.futureEvents}</b>).</p>`;
-    if (s.threat) html += `<p class="threat-note">⚔ ${s.threat} enemies are massing. The next invasion will be ${s.threat} stronger (players × territories = ${s.players.length * s.realm.length}, so ${s.players.length * s.realm.length + s.threat} now).</p>`;
+    if (s.threat) html += `<p class="threat-note">⚔ ${s.threat} enemies are massing. When the next invasion comes, ${s.threat} cards are drawn from the enemy deck and added to its strength (players × territories = ${s.players.length * s.realm.length}).</p>`;
   }
   if (s.crises.length) {
     html += '<h3>Crises in effect</h3><div class="cards">' + s.crises.map(c => cardHtml(c, `<div class="small" style="color:var(--err)">Round ${c.round} of ${c.rounds}</div>`)).join('') + '</div>';
