@@ -1,5 +1,9 @@
 # Changes
 
+## v1.87.0 (combined app)
+
+- Dawn (branch hunter-gatherer): the Prehistoric era has no farms or mines. You start with Gatherers (2 food per worker) and Hunters (1 food and 1 production per worker); they use the same land slots farms and mines will. Agriculture (always in the Prehistoric deck) unlocks the Farm, stops more Gatherers from being built and makes growing cost 3 less; Metalworking (always in the Ancient deck) unlocks the Mine and stops more Hunters. Existing ones stay. Growing now costs 6 food (+1 per 2 people beyond the first). Stone Tools now makes hunters +1 production. New effect retireBuilding.
+
 ## v1.86.0 (combined app)
 
 - Dawn: an era deck pile sits at the right end of the card queue (with the number of cards left). Cards drawn from it fly out of the pile into the queue, and the cards you draw each round fly into your hand. Nothing animates on the first load, and not when the browser asks for reduced motion.

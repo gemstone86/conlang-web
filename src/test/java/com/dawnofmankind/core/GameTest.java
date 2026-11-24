@@ -177,12 +177,12 @@ class GameTest {
         Game g = game(1, 33);
         Player p = g.players.get(0);
         p.res.put(Res.FOOD, 20);
-        Player.Building mine = p.ofType("mine");
+        Player.Building mine = p.ofType("hunter");
         assertTrue(mine.workers < mine.slots);
         int before = mine.workers;
         g.act(0, Map.of("type", "grow", "building", mine.id));
         assertEquals(before + 1, mine.workers);
-        Player.Building farm = p.ofType("farm");
+        Player.Building farm = p.ofType("gatherer");
         assertTrue(farm.workers >= farm.slots, "the farm was full");
         assertThrows(GameException.class, () -> g.act(0, Map.of("type", "grow", "building", farm.id)));
     }
@@ -226,7 +226,7 @@ class GameTest {
         Game g = game(1, 37);
         Player p = g.players.get(0);
         p.res.put(Res.FOOD, 10);
-        Player.Building mine = p.ofType("mine");
+        Player.Building mine = p.ofType("hunter");
         int before = mine.workers;
         Game.CardInst c = card(g, "gather_the_tribe");
         p.hand.add(c);
@@ -248,7 +248,7 @@ class GameTest {
         Player p = g.players.get(0);
         // people idle and in a mine, 2 food for 3 Population and a round about to start: one person must starve
         p.res.put(Res.FOOD, 2);
-        Player.Building farm = p.ofType("farm"), mine = p.ofType("mine");
+        Player.Building farm = p.ofType("gatherer"), mine = p.ofType("hunter");
         assertTrue(farm.workers > 0 && mine.workers > 0);
         p.idle += farm.workers;
         farm.workers = 0;                           // nobody farms: the food runs short
@@ -305,7 +305,7 @@ class GameTest {
     void techsAreGlobal() {
         Game g = game(2, 18);
         Player a = g.players.get(0), b = g.players.get(1);
-        Player.Building bMine = b.ofType("mine");
+        Player.Building bMine = b.ofType("hunter");
         int before = View.income(g, b, g.mods(b)).get("production");
         a.res.put(Res.RESEARCH, 10);
         a.res.put(Res.PRODUCTION, 10);
@@ -491,7 +491,7 @@ class GameTest {
         int cap = g.capacity(p, "farm");
         p.leader = C.cards.get("great_hunter");
         assertEquals(cap + 1, g.capacity(p, "farm"));
-        Player.Building farm = p.ofType("farm");
+        Player.Building farm = p.ofType("gatherer");
         farm.slots = cap + 1;
         farm.workers = cap + 1;
         assertEquals(cap + 1, g.working(p, farm));
@@ -917,11 +917,11 @@ class GameTest {
     void growthGetsDearer() {
         Game g = game(1, 9);
         Player p = g.players.get(0);
-        assertEquals(3, g.growthCost(p).get(Res.FOOD), "3 people: base cost");
+        assertEquals(7, g.growthCost(p).get(Res.FOOD), "3 people: 6 base, +1 for 2 beyond the first");
         p.idle += 2; // 5 people: 4 beyond the first
-        assertEquals(4, g.growthCost(p).get(Res.FOOD));
+        assertEquals(8, g.growthCost(p).get(Res.FOOD));
         p.idle += 4; // 9 people
-        assertEquals(5, g.growthCost(p).get(Res.FOOD));
+        assertEquals(10, g.growthCost(p).get(Res.FOOD));
     }
 
     @Test
@@ -929,12 +929,12 @@ class GameTest {
         Game g = game(1, 10);
         Player p = g.players.get(0);
         p.res.put(Res.PRODUCTION, 50);
-        Player.Building farm = p.ofType("farm");
-        int cap = g.capacity(p, "farm");
-        while (farm.slots < cap) g.act(0, Map.of("type", "build", "building", "farm"));
-        assertThrows(GameException.class, () -> g.act(0, Map.of("type", "build", "building", "farm")));
+        Player.Building farm = p.ofType("gatherer");
+        int cap = g.capacity(p, "gatherer");
+        while (farm.slots < cap) g.act(0, Map.of("type", "build", "building", "gatherer"));
+        assertThrows(GameException.class, () -> g.act(0, Map.of("type", "build", "building", "gatherer")));
         // building levels get dearer
-        assertTrue(g.buildCost(p, C.buildings.get("farm")).get(Res.PRODUCTION) > 2 || cap == 2);
+        assertTrue(g.buildCost(p, C.buildings.get("gatherer")).get(Res.PRODUCTION) > 2 || cap == 2);
         // lose every territory that gives farm slots: the farm shrinks back to the home slots
         for (Game.Territory t : List.copyOf(g.realm)) {
             if (t.def.slots.getOrDefault("farm", 0) > 0 && g.realm.size() > 1) {
@@ -1052,8 +1052,9 @@ class GameTest {
         Game g = game(1, 6);
         Player p = g.players.get(0);
         p.res.put(Res.PRODUCTION, 10);
-        Player.Building farm = p.ofType("farm");
-        g.act(0, Map.of("type", "build", "building", "farm"));
+        p.res.put(Res.FOOD, 20);
+        Player.Building farm = p.ofType("gatherer");
+        g.act(0, Map.of("type", "build", "building", "gatherer"));
         assertEquals(2, p.buildings.size(), "still one farm and one mine");
         assertEquals(4, farm.slots);
         assertEquals(2, farm.level());
@@ -1179,5 +1180,33 @@ class GameTest {
         assertEquals("raid", d.kind);
         assertEquals(3, d.strength(1, 5));
         assertEquals(6, d.strength(4, 5));
+    }
+
+    @Test
+    void agricultureUnlocksFarmsAndRetiresGatherers() {
+        Game g = game(1, 6);
+        Player p = g.players.get(0);
+        p.res.put(Res.PRODUCTION, 20);
+        assertNotNull(p.ofType("gatherer"));
+        assertThrows(GameException.class, () -> g.act(0, Map.of("type", "build", "building", "farm")), "locked before Agriculture");
+        int before = g.growthCost(p).get(Res.FOOD);
+        p.techs.add(C.cards.get("agriculture"));
+        assertThrows(GameException.class, () -> g.act(0, Map.of("type", "build", "building", "gatherer")), "no more gatherers");
+        g.act(0, Map.of("type", "build", "building", "farm"));
+        assertNotNull(p.ofType("farm"));
+        assertNotNull(p.ofType("gatherer"), "existing gatherers stay");
+        assertEquals(before - 3, g.growthCost(p).get(Res.FOOD));
+    }
+
+    @Test
+    void metalworkingUnlocksMinesAndRetiresHunters() {
+        Game g = game(1, 6);
+        Player p = g.players.get(0);
+        p.res.put(Res.PRODUCTION, 20);
+        assertThrows(GameException.class, () -> g.act(0, Map.of("type", "build", "building", "mine")));
+        p.techs.add(C.cards.get("metalworking"));
+        assertThrows(GameException.class, () -> g.act(0, Map.of("type", "build", "building", "hunter")));
+        g.act(0, Map.of("type", "build", "building", "mine"));
+        assertNotNull(p.ofType("mine"));
     }
 }

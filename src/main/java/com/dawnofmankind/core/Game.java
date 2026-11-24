@@ -955,10 +955,12 @@ public final class Game {
 
     /** Worker slots a player may have in a building type: home slots plus what the realm's territories add. */
     public int capacity(Player p, String type) {
-        Integer home = content.rules.homeSlots.get(type);
+        BuildingDef def = content.buildings.get(type);
+        String key = def == null ? type : def.slotKey;
+        Integer home = content.rules.homeSlots.get(key);
         if (home == null) return Integer.MAX_VALUE;
-        int cap = home + mods(p).maxSlots.getOrDefault(type, 0);
-        for (Territory t : realm) cap += t.def.slots.getOrDefault(type, 0);
+        int cap = home + mods(p).maxSlots.getOrDefault(key, 0);
+        for (Territory t : realm) cap += t.def.slots.getOrDefault(key, 0);
         return cap;
     }
 
@@ -978,7 +980,7 @@ public final class Game {
         return n;
     }
 
-    /** Food for 3 (base) more for every {@code growthStep} people beyond the first. */
+    /** Base food (6 until Agriculture takes 3 off), +1 for every {@code growthStep} people beyond the first. */
     public EnumMap<Res, Integer> growthCost(Player p) {
         EnumMap<Res, Integer> c = new EnumMap<>(content.rules.growthCost);
         int extra = Math.max(0, p.population() - 1) / Math.max(1, content.rules.growthStep);
@@ -995,14 +997,14 @@ public final class Game {
 
     /** Whether a building may be built now: locked ones (the market) wait for the tech that unlocks them. */
     public boolean canBuild(BuildingDef b) {
-        return b.buildable && (!b.locked || civMods().unlocked.contains(b.id));
+        return b.buildable && (!b.locked || civMods().unlocked.contains(b.id)) && !civMods().retired.contains(b.id);
     }
 
     private void build(Player p, Map<String, Object> a) {
         String id = Y.s(a, "building", "");
         BuildingDef b = content.buildings.get(id);
         if (b == null || !b.buildable) throw new GameException("You can't build that.");
-        if (!canBuild(b)) throw new GameException("The " + b.name + " isn't available yet: a technology must unlock it first.");
+        if (!canBuild(b)) throw new GameException(civMods().retired.contains(b.id) ? "No more " + b.name.toLowerCase() + "s can be built: a technology has made them obsolete." : "The " + b.name + " isn't available yet: a technology must unlock it first.");
         Building existing = p.ofType(b.id);
         int cap = capacity(p, b.id);
         if ((existing == null ? 0 : existing.slots) >= cap) {

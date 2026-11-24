@@ -48,6 +48,8 @@ public final class Content {
         public boolean buildable;
         /** Cannot be built until a tech with {@code unlockBuilding} for it has been researched. */
         public boolean locked;
+        /** The land slots this building uses (territories and maxSlots name it): gatherers use the farm slots, hunters the mine slots. */
+        public String slotKey;
         public EnumMap<Res, Integer> cost, perWorker, upkeep;
     }
 
@@ -254,6 +256,7 @@ public final class Content {
         b.slots = Y.i(m, "slots", 2);
         b.buildable = !m.containsKey("buildable") || Y.b(m, "buildable");
         b.locked = Y.b(m, "locked");
+        b.slotKey = Y.s(m, "slotKey", id);
         b.cost = Res.parse(m.get("cost"));
         b.perWorker = Res.parse(m.get("perWorker"));
         b.upkeep = Res.parse(m.get("upkeep"));

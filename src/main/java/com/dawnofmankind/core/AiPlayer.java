@@ -119,7 +119,10 @@ public final class AiPlayer {
         int food = p.res.get(Res.FOOD), pop = p.population();
         if (food >= 3 + pop && g.freeSlots(p) > 0 && tryAct(g, p, Map.of("type", "grow"))) return true;
         if (g.freeSlots(p) == 0) {
-            String b = countFarms(p) * 2 * 2 < pop + 3 ? "farm" : pick("village", "temple", "mine", "farm");
+            boolean farms = g.canBuild(g.content.buildings.get("farm")), mines = g.canBuild(g.content.buildings.get("mine"));
+            String foodB = farms ? "farm" : "gatherer", prod = mines ? "mine" : "hunter";
+            String b = countFarms(p) * 2 * 2 < pop + 3 ? foodB : pick("village", "temple", prod, foodB);
+            if (!g.canBuild(g.content.buildings.get(b))) b = pick("village", "temple");
             if (tryAct(g, p, Map.of("type", "build", "building", b))) return true;
         }
         if (p.army < 2 && tryAct(g, p, Map.of("type", "recruit"))) return true;
@@ -162,7 +165,7 @@ public final class AiPlayer {
     }
 
     private static int countFarms(Player p) {
-        return (int) p.buildings.stream().filter(b -> b.def.id.equals("farm")).count();
+        return (int) p.buildings.stream().filter(b -> b.def.id.equals("farm") || b.def.id.equals("gatherer")).count();
     }
 
     private final java.util.Set<String> freeDone = new java.util.HashSet<>();

@@ -10,10 +10,10 @@
 rules:
   actionsPerTurn: 4
   handLimit: 7
-  startWorkers: {farm: 2, mine: 1}        # start with a Farm and a Mine; 3 Population: 2 farmers, 1 miner
+  startWorkers: {gatherer: 2, hunter: 1}  # start with Gatherers and Hunters; 3 Population: 2 gatherers, 1 hunter
   startResources: {food: 3, production: 2}
-  growthCost: {food: 3}                   # action "grow": +1 Population ...
-  growthStep: 4                           # ... +1 food for every 4 people beyond the first
+  growthCost: {food: 6}                   # action "grow": +1 Population (Agriculture takes 3 off) ...
+  growthStep: 2                           # ... +1 food for every 2 people beyond the first
   buildingEscalation: 1                   # each level a building already has adds 1 production to the next
   homeSlots: {farm: 2, mine: 2}           # farm and mine worker slots each player has before any territory
   startTerritories: 2                     # territories drawn from the world deck at the start
@@ -52,14 +52,30 @@ rules:
 
 # A player has one building of each type. Building it again adds a level: 2 more worker slots.
 buildings:
+  gatherer:
+    name: Gatherers
+    cost: {production: 2}
+    slots: 2
+    slotKey: farm                        # uses the same land slots as farms
+    perWorker: {food: 2}
+    text: Each gatherer produces 2 food. No more can be built once Agriculture is known.
+  hunter:
+    name: Hunters
+    cost: {production: 2}
+    slots: 2
+    slotKey: mine                        # uses the same land slots as mines
+    perWorker: {food: 1, production: 1}
+    text: Each hunter produces 1 food and 1 production. No more can be built once Metalworking is known.
   farm:
     name: Farm
+    locked: true                         # built only after the Agriculture tech
     cost: {production: 2}
     slots: 2
     perWorker: {food: 2}
     text: Each farmer produces 2 food.
   mine:
     name: Mine
+    locked: true                         # built only after the Metalworking tech
     cost: {production: 2}
     slots: 2
     perWorker: {production: 2}
@@ -383,6 +399,7 @@ eras:
       # technologies
       fire: 1
       stone_tools: 1
+      agriculture: 1
       hunting: 1
       animal_husbandry: 1
       pottery: 1
@@ -457,7 +474,7 @@ eras:
       hostility_2: 3
       hostility_3: 3
       hostility_5: 2
-      agriculture: 1
+      metalworking: 1
       bronze_working: 1
       writing: 1
       masonry: 1
@@ -626,8 +643,8 @@ cards:
     name: Stone Tools
     type: tech
     cost: {research: 2, production: 1}
-    effects: [{perWorker: {building: mine, production: 1}}]
-    text: Your miners produce +1 production.
+    effects: [{perWorker: {building: hunter, production: 1}}]
+    text: Your hunters produce +1 production.
     required: true                       # always in the Prehistoric era deck
   hunting:
     name: Hunting
@@ -680,9 +697,17 @@ cards:
   agriculture:
     name: Agriculture
     type: tech
+    required: true                       # always in the Prehistoric era deck
     cost: {research: 4, food: 2}
-    effects: [{perWorker: {building: farm, food: 1}}]
-    text: Your farmers produce +1 food.
+    effects: [{unlockBuilding: farm}, {retireBuilding: gatherer}, {growthDiscount: 3}]
+    text: Unlocks the Farm for everyone and ends the building of more Gatherers (those you have stay). Growing costs 3 less food.
+  metalworking:
+    name: Metalworking
+    type: tech
+    required: true                       # always in the Ancient era deck
+    cost: {research: 4, production: 3}
+    effects: [{unlockBuilding: mine}, {retireBuilding: hunter}]
+    text: Unlocks the Mine for everyone and ends the building of more Hunters (those you have stay).
   bronze_working:
     name: Bronze Working
     type: tech
