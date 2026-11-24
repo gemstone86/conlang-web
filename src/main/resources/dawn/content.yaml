@@ -1305,23 +1305,23 @@ cards:
   hostility_1:
     name: Raiding Parties Gather
     type: hostility
-    effects: [{hostility: 1}]
-    text: +1 enemy massing. The next invasion brings them.
+    effects: [{hostility: 2}]
+    text: +2 enemies massing. The next invasion brings them.
   hostility_2:
     name: Warbands Gather
     type: hostility
-    effects: [{hostility: 2}]
-    text: +2 enemies massing. The next invasion brings them.
+    effects: [{hostility: 4}]
+    text: +4 enemies massing. The next invasion brings them.
   hostility_3:
     name: An Army Masses
     type: hostility
-    effects: [{hostility: 3}]
-    text: +3 enemies massing. The next invasion brings them.
+    effects: [{hostility: 6}]
+    text: +6 enemies massing. The next invasion brings them.
   hostility_5:
     name: A Great Horde Gathers
     type: hostility
-    effects: [{hostility: 5}]
-    text: +5 enemies massing. The next invasion brings them.
+    effects: [{hostility: 10}]
+    text: +10 enemies massing. The next invasion brings them.
 
   # ------------------------------------------------------------------ crisis cards
   # Crises last: they act when they resolve and again in each following events phase ("lasts"), until their rounds

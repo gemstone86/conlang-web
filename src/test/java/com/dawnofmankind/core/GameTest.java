@@ -144,7 +144,7 @@ class GameTest {
         Player p = g.players.get(0);
         p.hand.add(card(g, "storytelling"));
         g.act(p.seat, Map.of("type", "play", "card", p.hand.get(p.hand.size() - 1).id)); // draws 2: reveals the hostility card
-        assertEquals(before + 2, g.threat);
+        assertEquals(before + 4, g.threat);
         for (Game.CardInst c : p.hand) assertFalse(c.def.type == Content.CardType.HOSTILITY, "hostility never stays in a hand");
     }
 

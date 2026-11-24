@@ -1,5 +1,9 @@
 # Changes
 
+## v1.85.2 (combined app)
+
+- Dawn: hostility cards are twice as strong: +2, +4, +6 and +10 enemies massing (was +1, +2, +3, +5).
+
 ## v1.85.1 (combined app)
 
 - Dawn: a great person costs 4 per era (4 in the Prehistoric era, 8 in the Ancient era), not a flat 4. Stone Tools is now a required card: it is in every game. The great person rules text was updated too.
