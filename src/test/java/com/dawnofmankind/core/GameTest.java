@@ -312,6 +312,8 @@ class GameTest {
         Game.CardInst tools = card(g, "stone_tools");
         a.hand.add(tools);
         g.act(a.seat, Map.of("type", "play", "card", tools.id));
+        assertEquals(before, View.income(g, b, g.mods(b)).get("production"), "the bonus is off until it sits in an upgrade slot");
+        g.act(b.seat, Map.of("type", "slot", "card", "stone_tools", "building", bMine.id));
         assertEquals(before + bMine.workers, View.income(g, b, g.mods(b)).get("production"), "the other player's miners gain too");
     }
 
@@ -733,6 +735,7 @@ class GameTest {
         Player p = g.players.get(0);
         p.leader = C.cards.get("first_architect");                 // +1 action per turn
         p.techs.add(C.cards.get("herbalism"));                     // +1 research per turn
+        g.act(0, Map.of("type", "slot", "card", "herbalism", "building", p.buildings.get(0).id));
         Map<String, Object> me = (Map<String, Object>) ((List<Object>) View.of(g, 0).get("players")).get(0);
         List<Map<String, Object>> actions = (List<Map<String, Object>>) me.get("actionSources");
         assertEquals("Base", actions.get(0).get("from"));
@@ -762,6 +765,7 @@ class GameTest {
         Player p = g.players.get(0);
         p.leader = null;
         p.minorWonders.add(C.cards.get("first_religion"));
+        g.act(0, Map.of("type", "slot", "card", "first_religion", "building", p.buildings.get(0).id));
         assertEquals(2, g.mods(p).income.get(Res.CULTURE));
         int temple = g.buildCost(p, C.buildings.get("temple")).get(Res.PRODUCTION);
         assertEquals(C.buildings.get("temple").cost.get(Res.PRODUCTION) - 1, temple, "temples cost 1 less");
@@ -1208,5 +1212,30 @@ class GameTest {
         assertThrows(GameException.class, () -> g.act(0, Map.of("type", "build", "building", "hunter")));
         g.act(0, Map.of("type", "build", "building", "mine"));
         assertNotNull(p.ofType("mine"));
+    }
+
+    @Test
+    void upgradeSlotsGateBuildingBonuses() {
+        Game g = game(2, 18);
+        Player a = g.players.get(0), b = g.players.get(1);
+        Player.Building hunters = a.ofType("hunter"), gatherers = a.ofType("gatherer");
+        a.techs.add(C.cards.get("herbalism"));                       // +2 health (a rule) and +1 research (a building bonus)
+        assertEquals(0, g.mods(a).income.get(Res.RESEARCH), "not slotted: no research");
+        assertTrue(g.mods(a).healthMod >= 0);
+        assertEquals(1, g.slottable(a).size());
+        g.act(0, Map.of("type", "slot", "card", "herbalism", "building", hunters.id));
+        assertEquals(1, g.mods(a).income.get(Res.RESEARCH));
+        assertEquals(0, g.mods(b).income.get(Res.RESEARCH), "b has not slotted it");
+        assertTrue(g.slottable(b).stream().anyMatch(c -> c.id.equals("herbalism")), "everyone can slot a researched tech");
+        assertThrows(GameException.class, () -> g.act(0, Map.of("type", "slot", "card", "herbalism", "building", gatherers.id)), "already slotted");
+        a.techs.add(C.cards.get("pottery"));
+        assertThrows(GameException.class, () -> g.act(0, Map.of("type", "slot", "card", "pottery", "building", hunters.id)), "the hunters have only one slot");
+        int actions = a.actions;
+        g.act(0, Map.of("type", "unslot", "card", "herbalism"));
+        assertEquals(actions - 1, a.actions, "taking a card out costs an action");
+        assertEquals(0, g.mods(a).income.get(Res.RESEARCH));
+        hunters.slots += 2;
+        assertEquals(1, hunters.upgrades.size() + 1, "expanding does not add upgrade slots");
+        assertEquals(1, C.buildings.get("hunter").upgradeSlots);
     }
 }

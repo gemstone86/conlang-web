@@ -865,6 +865,7 @@ public final class Game {
             case "ready" -> ready(p);
             case "leader" -> chooseLeader(p, a);
             case "removeBonus" -> removeBonus(p, a);
+            case "slot" -> slot(p, a);                 // free
             case "chooseLand" -> chooseLand(p, a);
             case "colonize" -> colonize(p, a);
             case "starve" -> starve(p, a);
@@ -882,6 +883,7 @@ public final class Game {
                 boolean free = type.equals("recruit") && !p.freeRecruitUsed && mods(p).freeRecruit > 0;   // a leader's free troop
                 if (!free && p.actions <= 0) throw new GameException("No actions left. You can be done for the round.");
                 switch (type) {
+                    case "unslot" -> unslot(p, a);
                     case "move" -> move(p, a);
                     case "build" -> build(p, a);
                     case "pick" -> pick(p, a);
@@ -1063,6 +1065,7 @@ public final class Game {
         CardDef d = p.minorWonders.stream().filter(x -> x.id.equals(id)).findFirst()
                 .orElseThrow(() -> new GameException("You have no such bonus."));
         p.minorWonders.remove(d);
+        for (Building b : p.buildings) b.upgrades.remove(d);
         log(p.name + " gives up " + d.name + ".");
     }
 
@@ -2158,8 +2161,8 @@ public final class Game {
     /** Technologies are global: every player gets the lasting effects of every tech researched by anyone. */
     public Mods mods(Player p) {
         Mods m = new Mods();
-        for (Player o : players) for (CardDef t : o.techs) m.add(t.effects);
-        for (CardDef w : p.minorWonders) if (!obsolete(w)) m.add(w.effects);
+        for (Player o : players) for (CardDef t : o.techs) m.add(effectsFor(p, t));
+        for (CardDef w : p.minorWonders) if (!obsolete(w)) m.add(effectsFor(p, w));
         if (p.leader != null) m.add(p.leader.effects);
         for (WonderDef w : builtWonders) if (!obsolete(w)) m.add(w.effects);
         for (CardInst e : persistentEvents) m.add(e.def.ongoing);
@@ -2172,8 +2175,8 @@ public final class Game {
     /** Everything that adds lasting effects for a player, by name: techs (everyone's), their minor wonders, their great person, built wonders, lasting events, territories. */
     public List<Map.Entry<String, List<Map<String, Object>>>> effectSources(Player p) {
         List<Map.Entry<String, List<Map<String, Object>>>> out = new ArrayList<>();
-        for (Player o : players) for (CardDef t : o.techs) out.add(Map.entry(t.name, t.effects));
-        for (CardDef w : p.minorWonders) if (!obsolete(w)) out.add(Map.entry(w.name, w.effects));
+        for (Player o : players) for (CardDef t : o.techs) out.add(Map.entry(t.name, effectsFor(p, t)));
+        for (CardDef w : p.minorWonders) if (!obsolete(w)) out.add(Map.entry(w.name, effectsFor(p, w)));
         if (p.leader != null) out.add(Map.entry(p.leader.name, p.leader.effects));
         for (WonderDef w : builtWonders) if (!obsolete(w)) out.add(Map.entry(w.name, w.effects));
         for (CardInst e : persistentEvents) out.add(Map.entry(e.def.name, e.def.ongoing));
@@ -2182,12 +2185,72 @@ public final class Game {
         return out;
     }
 
+    /** Whether a card's building bonuses (per worker, income) need an upgrade slot to work. */
+    public boolean slottable(CardDef c) {
+        return (c.type == CardType.TECH || c.type == CardType.MINOR_WONDER) && c.effects.stream().anyMatch(Effects::needsSlot);
+    }
+
+    /** The researched techs and the player's own minor wonders that make a building better and are not in a slot yet. */
+    public List<CardDef> slottable(Player p) {
+        java.util.LinkedHashSet<CardDef> usable = new java.util.LinkedHashSet<>();
+        for (Player o : players) usable.addAll(o.techs);
+        usable.addAll(p.minorWonders);
+        List<CardDef> out = new ArrayList<>();
+        for (CardDef c : usable) if (slottable(c) && slottedIn(p, c) == null) out.add(c);
+        return out;
+    }
+
+    /** The building of {@code p} that has the card in an upgrade slot, or null. */
+    public Building slottedIn(Player p, CardDef c) {
+        for (Building b : p.buildings) if (b.upgrades.contains(c)) return b;
+        return null;
+    }
+
+    /** The effects of a tech or minor wonder that work for {@code p}: rule changes always, building bonuses only while slotted ({@code p == null}: rules only). */
+    public List<Map<String, Object>> effectsFor(Player p, CardDef c) {
+        if (!slottable(c)) return c.effects;
+        List<Map<String, Object>> out = new ArrayList<>();
+        boolean in = p != null && slottedIn(p, c) != null;
+        for (Map<String, Object> e : c.effects) if (in || !Effects.needsSlot(e)) out.add(e);
+        return out;
+    }
+
+    /** Puts a researched tech or one of your minor wonders into a free upgrade slot of one of your buildings. Free. */
+    private void slot(Player p, Map<String, Object> a) {
+        String id = Y.s(a, "card", "");
+        CardDef d = null;
+        for (Player o : players) for (CardDef t : o.techs) if (t.id.equals(id)) d = t;
+        for (CardDef w : p.minorWonders) if (w.id.equals(id)) d = w;
+        if (d == null) throw new GameException("That card isn't one you can use.");
+        if (!slottable(d)) throw new GameException(d.name + " needs no upgrade slot.");
+        if (slottedIn(p, d) != null) throw new GameException(d.name + " is already in one of your buildings.");
+        Building b = p.buildings.stream().filter(x -> x.id == Y.i(a, "building", -1)).findFirst().orElseThrow(() -> new GameException("You have no such building."));
+        if (b.upgrades.size() >= b.def.upgradeSlots) throw new GameException("The " + b.def.name + " has no free upgrade slot.");
+        b.upgrades.add(d);
+        log(p.name + " puts " + d.name + " into the " + b.def.name + ".");
+    }
+
+    /** Takes a card out of its upgrade slot (1 action). */
+    private void unslot(Player p, Map<String, Object> a) {
+        String id = Y.s(a, "card", "");
+        for (Building b : p.buildings) {
+            for (CardDef c : b.upgrades) {
+                if (c.id.equals(id)) {
+                    b.upgrades.remove(c);
+                    log(p.name + " takes " + c.name + " out of the " + b.def.name + ".");
+                    return;
+                }
+            }
+        }
+        throw new GameException("That card isn't in one of your buildings.");
+    }
+
     /** Lasting effects that any player has, for team-wide things (shared pool, mitigations). */
     public Mods civMods() {
         Mods m = new Mods();
         for (Player p : players) {
-            for (CardDef t : p.techs) m.add(t.effects);
-            for (CardDef w : p.minorWonders) if (!obsolete(w)) m.add(w.effects);
+            for (CardDef t : p.techs) m.add(effectsFor(null, t));
+            for (CardDef w : p.minorWonders) if (!obsolete(w)) m.add(effectsFor(null, w));
             // a leader like Tomyris defends the whole team
             if (p.leader != null) for (Map<String, Object> e : p.leader.effects) if (e.containsKey("invasionDefense")) m.add(e);
         }

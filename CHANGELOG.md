@@ -1,5 +1,9 @@
 # Changes
 
+## v1.88.0 (combined app)
+
+- Dawn: upgrade slots. Each building has upgrade slots (gatherers 1, hunters 1, farms 2, mines 2, temples, markets and villages 1) that never grow when the building is expanded. A tech or minor wonder that adds income or per-worker output now only works once you put it into a free slot of one of your buildings; its other effects (hand size, actions, health...) still work at once, and it counts for points either way. Every player can slot every researched tech, so players can end up with different bonuses. Slotting is free (pick the card in the building's slot menu); taking a card out costs 1 action. New actions slot and unslot; bots slot what they can.
+
 ## v1.87.0 (combined app)
 
 - Dawn (branch hunter-gatherer): the Prehistoric era has no farms or mines. You start with Gatherers (2 food per worker) and Hunters (1 food and 1 production per worker); they use the same land slots farms and mines will. Agriculture (always in the Prehistoric deck) unlocks the Farm, stops more Gatherers from being built and makes growing cost 3 less; Metalworking (always in the Ancient deck) unlocks the Mine and stops more Hunters. Existing ones stay. Growing now costs 6 food (+1 per 2 people beyond the first). Stone Tools now makes hunters +1 production. New effect retireBuilding.

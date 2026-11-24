@@ -98,6 +98,7 @@ public final class AiPlayer {
     }
 
     private boolean takeAction(Game g, Player p) {
+        slotUpgrades(g, p);
         // play techs, wonders and actions
         for (CardInst c : List.copyOf(p.hand)) {
             if (c.def.type == CardType.RESPONSE) continue;
@@ -173,6 +174,15 @@ public final class AiPlayer {
     /** True the first time for this seat, round and thing (a free payment that takes no action). */
     private boolean freeOnce(Game g, Player p, String what) {
         return freeDone.add(System.identityHashCode(g) + ":" + g.round + ":" + p.seat + ":" + what);
+    }
+
+    /** Free: put every researched card that makes a building better into a free upgrade slot. */
+    private static void slotUpgrades(Game g, Player p) {
+        for (Content.CardDef c : g.slottable(p)) {
+            for (Player.Building b : p.buildings) {
+                if (b.upgrades.size() < b.def.upgradeSlots && tryAct(g, p, Map.of("type", "slot", "card", c.id, "building", b.id))) break;
+            }
+        }
     }
 
     private static boolean tryAct(Game g, Player p, Map<String, Object> a) {

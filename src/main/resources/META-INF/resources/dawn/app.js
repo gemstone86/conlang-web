@@ -613,7 +613,10 @@ function renderCiv() {
     return `<div class="bld"><span class="bname">${esc(b.name)}${b.level > 1 ? ` <span class="chip">level ${b.level}</span>` : ''}</span>
       <span class="slots">${dots}</span>${controls}
       ${b.id != null ? `<span class="makes" title="${esc(Object.entries(b.each || {}).map(([r, n]) => `${n} ${r} per worker`).join(', ') || 'makes nothing')} (technologies included)">${Object.keys(b.makes || {}).length ? resList(b.makes, { signed: true }) : '<span class="muted">—</span>'}</span>` : ''}
-      ${cap != null ? `<span class="small muted">${b.slots}/${cap} slots built</span>` : ''}${b.inactive ? `<span class="small bad">${b.inactive} inactive (over the land limit)</span>` : ''}</div>`;
+      ${cap != null ? `<span class="small muted">${b.slots}/${cap} slots built</span>` : ''}${b.inactive ? `<span class="small bad">${b.inactive} inactive (over the land limit)</span>` : ''}
+      ${b.id != null ? `<div class="upgrades">${(b.upgrades || []).map(u => `<span class="upg"${tipAttr(u)}>${esc(u.name)} <button class="tiny" ${act ? '' : 'disabled'} data-unslot="${u.key}" title="Take it out (1 action)">×</button></span>`).join('')}${Array.from({ length: Math.max(0, (b.upgradeSlots || 0) - (b.upgrades || []).length) }, () => (p.slotCards || []).length
+        ? `<select class="upg empty" data-slot-into="${b.id}" title="Upgrade slot (free to fill, 1 action to empty)"><option value="">＋ upgrade slot</option>${p.slotCards.map(c => `<option value="${c.key}">${esc(c.name)}</option>`).join('')}</select>`
+        : '<span class="upg empty" title="An empty upgrade slot: technologies and minor wonders that make a building better go here">＋ upgrade slot</span>').join('')}</div>` : ''}</div>`;
   }).join('');
   const moveOpts = [['idle', `Idle (${p.idle})`], ...p.buildings.map(b => [b.id, `${b.name} #${b.id} (${b.workers}/${b.slots})`])]
     .map(([v, t]) => `<option value="${v}">${esc(t)}</option>`).join('');
@@ -646,10 +649,15 @@ function renderCiv() {
       <div class="row small">${RES.map(k => `<label class="res r-${k}" style="margin:0">${RES_SHORT[k]} <input type="number" min="0" value="0" data-keep="pool-${k}" data-pres="${k}"></label>`).join('')}</div>
       <div class="row"><button data-deposit>Put in</button><button data-withdraw>Take out</button></div>` : ''}`;
 }
+$('civPanel').onchange = e => {
+  const sel = e.target.closest('[data-slot-into]'); if (!sel || !sel.value) return;
+  send({ type: 'slot', card: sel.value, building: +sel.dataset.slotInto });
+};
 $('civPanel').onclick = e => {
   const t = e.target.closest('button'); if (!t) return;
   const d = t.dataset;
-  if (d.moveIn) send({ type: 'move', from: 'idle', to: +d.moveIn });
+  if (d.unslot) send({ type: 'unslot', card: d.unslot });
+  else if (d.moveIn) send({ type: 'move', from: 'idle', to: +d.moveIn });
   else if (d.moveOut) send({ type: 'move', from: +d.moveOut, to: 'idle' });
   else if ('move' in d) {
     const f = $('mvFrom').value, to = $('mvTo').value;

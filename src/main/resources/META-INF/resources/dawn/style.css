@@ -216,3 +216,8 @@ details summary { cursor: pointer; color: var(--bone-dim); font-size: .88rem; }
 .deckpile .dlabel { position: relative; font-size: .7rem; text-transform: uppercase; letter-spacing: .06em; color: var(--bone-dim); }
 .deckpile.empty .back { opacity: .25; }
 .queue-wrap .pick-shade { right: 104px; }
+
+.bld .upgrades { flex-basis: 100%; display: flex; flex-wrap: wrap; gap: .3rem; padding-left: .3rem; }
+.upg { font-size: .75rem; padding: 0 .45rem; border-radius: 9px; border: 1px solid var(--line); background: var(--ink); }
+.upg.empty { border-style: dashed; color: var(--muted, #888); }
+.upg button.tiny { padding: 0 .3rem; margin-left: .15rem; }

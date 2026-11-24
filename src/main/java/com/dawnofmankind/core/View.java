@@ -215,9 +215,15 @@ public final class View {
                 each.forEach((r, n) -> { if (n * g.working(p, b) != 0) makes.put(r, n * g.working(p, b)); });
                 bm.put("makes", makes);
                 bm.put("each", each);
+                bm.put("upgradeSlots", b.def.upgradeSlots);
+                bm.put("upgrades", b.upgrades.stream().map(View::def).toList());
                 bs.add(bm);
             }
             pm.put("buildings", bs);
+            // researched techs and your minor wonders that make a building better, and are not in a slot yet
+            List<Object> slotCards = new ArrayList<>();
+            for (Content.CardDef c : g.slottable(p)) slotCards.add(def(c));
+            pm.put("slotCards", slotCards);
             pm.put("techs", p.techs.stream().map(View::def).toList());
             if (p.leader != null) pm.put("leader", def(p.leader));
             if (p.pendingLeader != null) pm.put("pendingLeader", def(p.pendingLeader));

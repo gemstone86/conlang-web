@@ -50,6 +50,8 @@ public final class Content {
         public boolean locked;
         /** The land slots this building uses (territories and maxSlots name it): gatherers use the farm slots, hunters the mine slots. */
         public String slotKey;
+        /** Cards that change what this building produces (techs, minor wonders) each need one of these; they never grow with the building. */
+        public int upgradeSlots;
         public EnumMap<Res, Integer> cost, perWorker, upkeep;
     }
 
@@ -257,6 +259,7 @@ public final class Content {
         b.buildable = !m.containsKey("buildable") || Y.b(m, "buildable");
         b.locked = Y.b(m, "locked");
         b.slotKey = Y.s(m, "slotKey", id);
+        b.upgradeSlots = Y.i(m, "upgradeSlots", 1);
         b.cost = Res.parse(m.get("cost"));
         b.perWorker = Res.parse(m.get("perWorker"));
         b.upkeep = Res.parse(m.get("upkeep"));

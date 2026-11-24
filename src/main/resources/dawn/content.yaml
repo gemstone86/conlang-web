@@ -53,6 +53,7 @@ rules:
 # A player has one building of each type. Building it again adds a level: 2 more worker slots.
 buildings:
   gatherer:
+    upgradeSlots: 1
     name: Gatherers
     cost: {production: 2}
     slots: 2
@@ -60,6 +61,7 @@ buildings:
     perWorker: {food: 2}
     text: Each gatherer produces 2 food. No more can be built once Agriculture is known.
   hunter:
+    upgradeSlots: 1
     name: Hunters
     cost: {production: 2}
     slots: 2
@@ -67,6 +69,7 @@ buildings:
     perWorker: {food: 1, production: 1}
     text: Each hunter produces 1 food and 1 production. No more can be built once Metalworking is known.
   farm:
+    upgradeSlots: 2
     name: Farm
     locked: true                         # built only after the Agriculture tech
     cost: {production: 2}
@@ -74,6 +77,7 @@ buildings:
     perWorker: {food: 2}
     text: Each farmer produces 2 food.
   mine:
+    upgradeSlots: 2
     name: Mine
     locked: true                         # built only after the Metalworking tech
     cost: {production: 2}
@@ -81,12 +85,14 @@ buildings:
     perWorker: {production: 2}
     text: Each miner produces 2 production.
   temple:
+    upgradeSlots: 1
     name: Temple
     cost: {production: 3}
     slots: 2
     perWorker: {culture: 2}
     text: Each worker produces 2 culture (and 1 happiness, coming later).
   market:
+    upgradeSlots: 1
     name: Market
     locked: true                         # built only after the Markets tech
     cost: {production: 4, culture: 2}
@@ -95,6 +101,7 @@ buildings:
     upkeep: {food: 1, production: 1}    # paid every round while you own one
     text: Each worker produces 1 influence and 1 culture. Upkeep 1 food and 1 production every round. Available once Markets has been researched.
   village:
+    upgradeSlots: 1
     name: Village
     cost: {production: 3}
     slots: 2

@@ -18,6 +18,8 @@ public final class Player {
         public final BuildingDef def;
         public int workers;
         public int slots;
+        /** The cards slotted into this building: their per-worker and income bonuses work for the owner only while they sit here. */
+        public final List<CardDef> upgrades = new ArrayList<>();
 
         Building(int id, BuildingDef def) {
             this.id = id;

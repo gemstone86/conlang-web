@@ -59,6 +59,12 @@ public final class Effects {
     }
 
     /** Lasting bonuses for one player, summed from their techs and minor wonders, the team's great wonders and active curses. */
+    /** Effects that change what buildings produce need an upgrade slot; rule changes (hand size, actions, ...) always work. */
+    public static boolean needsSlot(Map<String, Object> e) {
+        String k = key(e);
+        return k.equals("income") || k.equals("perWorker");
+    }
+
     public static final class Mods {
         public final EnumMap<Res, Integer> income = Res.empty();
         public final Map<String, EnumMap<Res, Integer>> perWorker = new HashMap<>();
