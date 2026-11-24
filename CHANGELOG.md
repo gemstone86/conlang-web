@@ -1,5 +1,9 @@
 # Changes
 
+## v1.85.0 (combined app)
+
+- Dawn: a finished great wonder now stands as a miniature card on the territory it was built on (hover it for the full card), and leaves the great wonders panel.
+
 ## v1.84.1 (combined app)
 
 - Dawn: when a raid or invasion strikes, the popup shows the enemy cards that were drawn (and the fixed part), with your troops on the left and your allies' troops on the right.

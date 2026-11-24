@@ -846,6 +846,13 @@ class GameTest {
         g.act(p.seat, Map.of("type", "colonize", "land", f.land.id, "resources", Map.of("food", 6, "production", 6), "army", 4, "population", 1));
         assertTrue(g.builtWonders.contains(w), "the wonder is built when the land is settled");
         assertTrue(g.realm.stream().anyMatch(t -> t.wonders.contains(w)));
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> realmView = (List<Map<String, Object>>) (List<?>) View.of(g, 0).get("realm");
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> onLand = realmView.stream().flatMap(t -> ((List<Map<String, Object>>) t.get("wonders")).stream()).toList();
+        assertEquals(1, onLand.size(), "the built wonder is shown on its territory");
+        assertEquals(w.name, onLand.get(0).get("name"));
+        assertNotNull(onLand.get(0).get("text"), "with what the full card needs");
     }
 
     @Test

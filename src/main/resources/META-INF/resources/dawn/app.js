@@ -360,7 +360,7 @@ let landCardFn;                       // the land card drawing of renderRealm, a
 function renderRealm() {
   const s = state;
   const lands = s.realm.map(t => `<div class="cardx territory ${t.cored ? 'cored' : ''}${t.art ? ` hasart" style="--art:url('${t.art}')` : ''}"><div class="type">Territory${t.cored ? ' · core' : ''}</div><div class="name">${esc(t.name)}</div>
-      <div class="text">${esc(t.text)}</div>${t.wonders.length ? `<div class="small">${t.wonders.map(w => `<span class="chip">★ ${esc(w)}</span>`).join('')}</div>` : ''}</div>`).join('');
+      <div class="text">${esc(t.text)}</div>${t.wonders.length ? `<div class="minis">${t.wonders.map(w => `<div class="minicard${w.art ? ' hasart' : ''}${w.obsolete ? ' obsolete' : ''}"${w.art ? ` style="--art:url('${w.art}')"` : ''}${tipAttr({ type: 'great_wonder', ...w })}><span class="mname">${esc(w.name)}</span><span class="mvp">★ ${w.victoryPoints}</span></div>`).join('')}</div>` : ''}</div>`).join('');
   const settleCard = (me().hand || []).find(c => c.target === 'land');
   const landCard = landCardFn = f => {
     const need = RES.filter(k => f.left[k] > 0);
@@ -408,7 +408,7 @@ $('realmPanel').onclick = $('eventPanel').landClick = e => {
 
 function renderWonders() {
   const s = state;
-  const list = s.greatWonders.map(w => {
+  const list = s.greatWonders.filter(w => !w.done).map(w => {
     const total = RES.reduce((a, k) => a + w.cost[k], 0), paid = RES.reduce((a, k) => a + w.paid[k], 0);
     const need = RES.filter(k => w.cost[k] > 0);
     const form = w.done ? '' : `<div class="row small">${need.map(k => `<label class="res r-${k}" style="margin:0">${RES_SHORT[k]} <input type="number" min="0" value="0" data-keep="w-${w.key}-${k}" data-wres="${k}"></label>`).join('')}</div>

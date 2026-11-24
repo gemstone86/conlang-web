@@ -132,7 +132,11 @@ public final class View {
         List<Object> realm = new ArrayList<>();
         for (Game.Territory t : g.realm) {
             Map<String, Object> m = territory(t);
-            m.put("wonders", t.wonders.stream().map(w -> w.name).toList());
+            m.put("wonders", t.wonders.stream().map(w -> {
+                Map<String, Object> wm = wonder(w);
+                wm.put("obsolete", g.obsolete(w));
+                return wm;
+            }).toList());
             m.put("cored", t.cored);
             realm.add(m);
         }
@@ -537,6 +541,7 @@ public final class View {
         m.put("name", w.name);
         m.put("text", w.text);
         m.put("victoryPoints", w.victoryPoints);
+        if (hasArt(w.id)) m.put("art", "cards/" + w.id + ".jpg");
         return m;
     }
 
