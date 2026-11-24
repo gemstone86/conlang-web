@@ -2,7 +2,7 @@
 
 ## v1.85.2 (combined app)
 
-- Dawn: hostility cards are twice as strong: +2, +4, +6 and +10 enemies massing (was +1, +2, +3, +5).
+- Dawn: twice as many hostility cards in each era deck: 2 per player (was 1). The cards keep their values (+1, +2, +3, +5); there are more copies of each to make up the numbers.
 
 ## v1.85.1 (combined app)
 

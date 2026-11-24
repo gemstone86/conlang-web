@@ -37,7 +37,7 @@ rules:
     leader: {base: 1, perPlayer: 1}
     great_wonder: {base: 0, perPlayer: 1}
     minor_wonder: {base: 1, perPlayer: 1}
-    hostility: {base: 0, perPlayer: 1}
+    hostility: {base: 0, perPlayer: 2}
     tech: {base: 6, perPlayer: 1}
     city_state: {base: 1, perPlayer: 0}
     action: {base: 24, perPlayer: 2}
@@ -378,8 +378,8 @@ eras:
       storyteller: 1
       great_mother: 1
       # hostility: triggers when revealed, adding enemies to the next invasion
-      hostility_1: 3
-      hostility_2: 3
+      hostility_1: 4
+      hostility_2: 4
       # technologies
       fire: 1
       stone_tools: 1
@@ -453,9 +453,9 @@ eras:
       gilgamesh: 1
       hammurabi: 1
       ramses: 1
-      hostility_2: 2
-      hostility_3: 2
-      hostility_5: 1
+      hostility_2: 3
+      hostility_3: 3
+      hostility_5: 2
       agriculture: 1
       bronze_working: 1
       writing: 1
@@ -1305,23 +1305,23 @@ cards:
   hostility_1:
     name: Raiding Parties Gather
     type: hostility
-    effects: [{hostility: 2}]
-    text: +2 enemies massing. The next invasion brings them.
+    effects: [{hostility: 1}]
+    text: +1 enemy massing. The next invasion brings them.
   hostility_2:
     name: Warbands Gather
     type: hostility
-    effects: [{hostility: 4}]
-    text: +4 enemies massing. The next invasion brings them.
+    effects: [{hostility: 2}]
+    text: +2 enemies massing. The next invasion brings them.
   hostility_3:
     name: An Army Masses
     type: hostility
-    effects: [{hostility: 6}]
-    text: +6 enemies massing. The next invasion brings them.
+    effects: [{hostility: 3}]
+    text: +3 enemies massing. The next invasion brings them.
   hostility_5:
     name: A Great Horde Gathers
     type: hostility
-    effects: [{hostility: 10}]
-    text: +10 enemies massing. The next invasion brings them.
+    effects: [{hostility: 5}]
+    text: +5 enemies massing. The next invasion brings them.
 
   # ------------------------------------------------------------------ crisis cards
   # Crises last: they act when they resolve and again in each following events phase ("lasts"), until their rounds
