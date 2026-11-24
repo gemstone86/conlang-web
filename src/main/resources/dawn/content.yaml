@@ -317,7 +317,7 @@ keywords:
   great_person:
     name: "Great person"
     match: [great person, great people]
-    text: "Plays itself the moment you draw it. If you already have one you choose whether the newcomer replaces them. A great person leaves when the era ends."
+    text: "Goes to your hand. Play it for 1 action and 4 resources of any kind per era (4 in the Prehistoric era, 8 in the Ancient); it replaces your current great person. A great person leaves when the era ends."
   upkeep:
     name: "Upkeep"
     match: [upkeep]
@@ -627,6 +627,7 @@ cards:
     cost: {research: 2, production: 1}
     effects: [{perWorker: {building: mine, production: 1}}]
     text: Your miners produce +1 production.
+    required: true                       # always in the Prehistoric era deck
   hunting:
     name: Hunting
     type: tech

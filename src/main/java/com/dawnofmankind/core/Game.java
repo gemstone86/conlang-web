@@ -1101,21 +1101,26 @@ public final class Game {
     }
 
     /** What a great person costs, in any mix of resources. */
-    public static final int LEADER_COST = 4;
+    public static final int LEADER_COST_PER_ERA = 4;
 
-    /** Plays a great person from the hand: it costs {@link #LEADER_COST} of any resources and replaces the current one. */
+    /** 4 for each era counted from the first: 4 in the Prehistoric era, 8 in the Ancient. */
+    public int leaderCost() {
+        return LEADER_COST_PER_ERA * (eraIndex + 1);
+    }
+
+    /** Plays a great person from the hand: it costs {@link #leaderCost()} of any resources and replaces the current one. */
     private void playLeader(Player p, CardInst c, Map<String, Object> a) {
         EnumMap<Res, Integer> give = Res.parse(a.get("resources"));
         if (give.values().stream().anyMatch(v -> v < 0)) throw new GameException("Amounts can't be negative.");
         int sum = give.values().stream().mapToInt(Integer::intValue).sum();
         if (sum == 0) {                                   // nothing chosen: take from what the player has most of
-            for (int i = 0; i < LEADER_COST; i++) {
+            for (int i = 0; i < leaderCost(); i++) {
                 Res top = null;
                 for (Res r : Res.values()) if (p.res.get(r) - give.get(r) > 0 && (top == null || p.res.get(r) - give.get(r) > p.res.get(top) - give.get(top))) top = r;
-                if (top == null) throw new GameException("A great person costs " + LEADER_COST + " resources, of any kind.");
+                if (top == null) throw new GameException("A great person costs " + leaderCost() + " resources, of any kind.");
                 give.merge(top, 1, Integer::sum);
             }
-        } else if (sum != LEADER_COST) throw new GameException("A great person costs exactly " + LEADER_COST + " resources, of any kind.");
+        } else if (sum != leaderCost()) throw new GameException("A great person costs exactly " + leaderCost() + " resources, of any kind.");
         for (Res r : Res.values()) if (p.res.get(r) < give.get(r)) throw new GameException("Not enough " + r.key() + ".");
         pay(p, give);
         p.hand.remove(c);

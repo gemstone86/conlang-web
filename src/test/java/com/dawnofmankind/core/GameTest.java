@@ -428,6 +428,15 @@ class GameTest {
         g.act(p.seat, Map.of("type", "play", "card", b.id));
         assertEquals("Gilgamesh", p.leader.name, "the new great person replaces the old one");
         assertEquals(5, p.res.get(Res.CULTURE), "paid 4 from the largest pile");
+        assertEquals(4, g.leaderCost());
+        g.eraIndex = 1;
+        assertEquals(8, g.leaderCost(), "4 for each era: 8 in the Ancient era");
+        p.hand.add(a);
+        p.res.put(Res.CULTURE, 7);
+        assertThrows(GameException.class, () -> g.act(p.seat, Map.of("type", "play", "card", a.id)), "7 is not enough for 8");
+        p.res.put(Res.CULTURE, 9);
+        g.act(p.seat, Map.of("type", "play", "card", a.id));
+        assertEquals(1, p.res.get(Res.CULTURE));
     }
 
     @Test
@@ -1143,5 +1152,18 @@ class GameTest {
         assertTrue(g.enemyDeck.contains(4), "the Sea Peoples add a strength-4 card every round they are active");
         assertEquals(11, g.enemyDeck.size(), "cards that were drawn went back; one card was added");
         assertTrue(g.log.stream().anyMatch(l -> l.contains("enemy cards:") && l.contains("go back into the enemy deck")), String.join("\n", g.log));
+    }
+
+    @Test
+    void stoneToolsIsInEveryGame() {
+        for (int n = 1; n <= 4; n++) {
+            for (long seed = 1; seed <= 5; seed++) {
+                Game g = game(n, seed * 31 + n);
+                List<Game.CardInst> all = new ArrayList<>(g.eraDeck);
+                g.queue.forEach(sl -> { all.add(sl.card); if (sl.under != null) all.add(sl.under); });
+                for (Player p : g.players) { all.addAll(p.hand); all.addAll(p.techs.stream().map(t -> new Game.CardInst(0, t)).toList()); }
+                assertTrue(all.stream().anyMatch(c -> c.def.id.equals("stone_tools")), "Stone Tools is in the deck, " + n + " players, seed " + seed);
+            }
+        }
     }
 }

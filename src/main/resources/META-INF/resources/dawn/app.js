@@ -660,8 +660,8 @@ function renderHand() {
     if (c.type === 'leader') {
       const have = RES.reduce((n, k) => n + (p.resources[k] || 0), 0);
       const inputs = RES.map(k => `<label class="small" style="margin:0 .4rem 0 0">${RES_SHORT[k]} <input type="number" min="0" value="0" style="width:3.2rem" data-lres="${c.id}:${k}" data-keep="lres-${c.id}-${k}"></label>`).join('');
-      return cardHtml(c, `<div class="small">Cost: ${c.anyCost} of any resources — leave blank to pay with what you have most of. It replaces ${p.leader ? esc(p.leader.name) : 'nobody'}.</div>
-        <div class="row">${inputs}</div><div class="actions"><button ${act && have >= c.anyCost ? '' : 'disabled'} data-playleader="${c.id}">Play (1 action)</button><button class="tiny" data-discard="${c.id}">Discard</button>${give}</div>`);
+      return cardHtml(c, `<div class="small">Cost: ${s.leaderCost} of any resources (4 per era) — leave blank to pay with what you have most of. It replaces ${p.leader ? esc(p.leader.name) : 'nobody'}.</div>
+        <div class="row">${inputs}</div><div class="actions"><button ${act && have >= s.leaderCost ? '' : 'disabled'} data-playleader="${c.id}">Play (1 action)</button><button class="tiny" data-discard="${c.id}">Discard</button>${give}</div>`);
     }
     const opts = c.target === 'territory' ? s.realm.filter(t => !t.cored).map(t => [t.id, t.name])
       : c.target === 'player' ? others.map(o => [o.seat, o.name]) : null;

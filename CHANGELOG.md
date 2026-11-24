@@ -1,5 +1,9 @@
 # Changes
 
+## v1.85.1 (combined app)
+
+- Dawn: a great person costs 4 per era (4 in the Prehistoric era, 8 in the Ancient era), not a flat 4. Stone Tools is now a required card: it is in every game. The great person rules text was updated too.
+
 ## v1.85.0 (combined app)
 
 - Dawn: a finished great wonder now stands as a miniature card on the territory it was built on (hover it for the full card), and leaves the great wonders panel.

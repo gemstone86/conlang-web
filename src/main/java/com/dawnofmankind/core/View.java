@@ -61,6 +61,7 @@ public final class View {
         v.put("stability", g.stability);
         v.put("health", g.effectiveHealth());
         v.put("threat", g.threat);
+        v.put("leaderCost", g.leaderCost());
         Map<Integer, Integer> enemies = new java.util.TreeMap<>();
         for (int s : g.enemyDeck) enemies.merge(s, 1, Integer::sum);
         List<Object> enemyList = new ArrayList<>();
@@ -508,7 +509,6 @@ public final class View {
         m.put("type", d.type.name().toLowerCase());
         m.put("text", d.text);
         if (!Res.isZero(d.cost)) m.put("cost", res(d.cost));
-        if (d.type == CardType.LEADER) m.put("anyCost", Game.LEADER_COST);
         if (d.isEvent()) {
             m.put("category", d.category);
             m.put("kind", d.kind);
