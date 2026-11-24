@@ -538,7 +538,7 @@ class GameTest {
             assertEquals(24 + 2 * x, n.getOrDefault("action", 0), "actions");
             assertEquals(x, n.getOrDefault("response", 0), "responses");
             assertEquals(12 + x, n.getOrDefault("event", 0), "events");
-            assertEquals(3, n.getOrDefault("era_trigger", 0) + (int) g.queue.stream().filter(sl -> sl.card.def.type == Content.CardType.ERA_END).count(), "three end-of-era cards");
+            assertEquals(3, n.getOrDefault("era_trigger", 0), "three end-of-era cards");
         }
     }
 
@@ -1106,11 +1106,14 @@ class GameTest {
         Player p = g.players.get(0);
         assertEquals(0, g.eraIndex);
         assertEquals(0, g.mods(p).maxSlots.getOrDefault("farm", 0));
-        for (int round = 1; round <= 3; round++) {
+        g.eraDeck.removeIf(c -> c.def.type == Content.CardType.ERA_END);        // only the ones this test turns up count
+        g.queue.removeIf(sl -> sl.card.def.type == Content.CardType.ERA_END);
+        int need = 3 - g.endCardsTurnedUp();                // some may have been turned up already when the era began
+        for (int round = 1; round <= need; round++) {
             g.eraDeck.add(0, card(g, "end_of_prehistoric"));
             while (p.hand.size() > g.handLimit(p)) g.act(p.seat, Map.of("type", "discard", "card", p.hand.get(0).id));
             g.act(p.seat, Map.of("type", "endTurn"));
-            if (round < 3) assertEquals(0, g.eraIndex, "the era goes on until the third end card");
+            if (round < need) assertEquals(0, g.eraIndex, "the era goes on until the third end card");
         }
         assertEquals(1, g.eraIndex, "the third end card ends the era");
         assertEquals(1, g.eraBoons.size());

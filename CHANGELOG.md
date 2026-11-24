@@ -1,5 +1,9 @@
 # Changes
 
+## v1.83.1 (combined app)
+
+- Dawn: the End of an Era cards are shuffled through the whole era deck, not just the bottom part. The era-end event "Meteor Impact" is now called "Climate Crisis" (the Meteor Impact crisis card is unchanged).
+
 ## v1.83.0 (combined app)
 
 - Dawn: new way for eras to end. Each era has three "End of an Era" cards in the bottom of its deck. They are turned up onto the queue, can't be taken, and drift left like other cards. When the third is turned up, a special era-end event strikes (one of three per era) and the next era's cards are drawn from then on. The event's bonuses and penalties last through the whole next era. Prehistoric: Dawn of Agriculture (+1 farm slot, invasions +2), Meteor Impact (+1 farm slot, colonies cost +1 settler), Cult of the Ancestors (+1 culture per turn, hand size -1). In the last era the third end card wins the game at the end of the round. Replaces the old single era-trigger event (Rise of Empires is gone).

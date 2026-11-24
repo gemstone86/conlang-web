@@ -187,6 +187,11 @@ public final class Game {
 
     public record EraBoon(CardDef def, int era) {}
 
+    /** How many end-of-era cards have been turned up in this era so far. */
+    public int endCardsTurnedUp() {
+        return endCardsPlaced;
+    }
+
     public String result; // null, "victory" or "defeat"
     public String endReason;
     public final List<String> log = new ArrayList<>();

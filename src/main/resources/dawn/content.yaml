@@ -44,7 +44,7 @@ rules:
     response: {base: 0, perPlayer: 1}
     event: {base: 12, perPlayer: 1}
     era_trigger: {base: 3, perPlayer: 0}       # the three end-of-era cards; when the third is turned up the era ends
-  eraTriggerBottomPercent: 30             # the end-of-era cards are placed in the bottom 30% of the era deck
+  eraTriggerBottomPercent: 100            # the end-of-era cards are shuffled into the whole era deck (100%), not just the bottom part
   # fights: troops spent (up to the enemy's strength) must reach that strength (response cards add to it);
   # the troops spent settling a land are all lost; in invasions half of them, rounded up
 
@@ -431,7 +431,7 @@ eras:
       rivals_claim: 1
       end_of_prehistoric: 3
     # when the third end card is turned up, one of these strikes; its effects last through the next era
-    endEvents: [dawn_of_agriculture, the_great_impact, cult_of_ancestors]
+    endEvents: [dawn_of_agriculture, climate_crisis, cult_of_ancestors]
   - id: ancient
     name: Ancient
     cards:
@@ -1100,8 +1100,8 @@ cards:
     category: era
     effects: [{maxSlots: {farm: 1}}, {invasionStrength: 2}]
     text: "Era end. For the whole next era: +1 farm slot, but every invasion is 2 stronger."
-  the_great_impact:
-    name: Meteor Impact
+  climate_crisis:
+    name: Climate Crisis
     type: event
     category: era
     effects: [{maxSlots: {farm: 1}}, {settlerCost: 1}]
