@@ -22,6 +22,8 @@ public final class Content {
     public static final class Rules {
         public int actionsPerTurn, handLimit, foodUpkeepPerPop, startStability, startHealth, queueExtra,
                 startingEventsPerPlayer, eraTriggerBottomShare;
+        /** The enemy deck at the start: strength to number of cards. Raids and invasions draw from it. */
+        public final Map<Integer, Integer> enemyDeck = new java.util.TreeMap<>();
         public EnumMap<Res, Integer> startResources, growthCost, recruitCost;
         public Map<String, Integer> startWorkers = new LinkedHashMap<>();
         public Map<Integer, Integer> removedPerRound = new LinkedHashMap<>();
@@ -65,6 +67,8 @@ public final class Content {
         // events
         public String category, kind, target;
         public int strengthBase, strengthPerPlayer, threshold;
+        /** A raid draws this many enemy cards: base + perEra × the era's number. -1 when the card has a fixed strength. */
+        public int drawsBase = -1, drawsPerEra;
         /** Invasions grow with the realm: strength += this × players × territories. */
         public double strengthPerPlayerPerTerritory;
         public String stat;
@@ -218,6 +222,7 @@ public final class Content {
         rules.queueExtra = Y.i(m, "queueExtra", 2);
         rules.startingEventsPerPlayer = Y.i(m, "startingEventsPerPlayer", 2);
         rules.eraTriggerBottomShare = Y.i(m, "eraTriggerBottomPercent", 40);
+        Y.map(m.get("enemyDeck")).forEach((k, v) -> rules.enemyDeck.put(Integer.parseInt(String.valueOf(k)), Y.toInt(v)));
         rules.startResources = Res.parse(m.get("startResources"));
         rules.growthCost = Res.parse(m.get("growthCost"));
         rules.recruitCost = Res.parse(m.get("recruitCost"));
@@ -278,6 +283,11 @@ public final class Content {
         c.category = Y.s(m, "category", null);
         c.kind = Y.s(m, "kind", "effects");
         c.target = Y.s(m, "target", "civ");
+        Map<String, Object> dr = Y.map(m.get("draws"));
+        if (!dr.isEmpty()) {
+            c.drawsBase = Y.i(dr, "base", 0);
+            c.drawsPerEra = Y.i(dr, "perEra", 0);
+        }
         Object st = m.get("strength");
         if (st instanceof Map<?, ?>) {
             Map<String, Object> sm = Y.map(st);

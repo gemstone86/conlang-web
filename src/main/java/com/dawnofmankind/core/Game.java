@@ -158,6 +158,8 @@ public final class Game {
     public int stability, health;
     /** Enemies massing from hostility cards; the next invasion adds them to its strength. */
     public int threat;
+    /** The enemy deck: each number is the strength of one card. Raids and invasions draw from it; the cards are shuffled back after. */
+    public final List<Integer> enemyDeck = new ArrayList<>();
 
     public final List<CardInst> eraDeck = new ArrayList<>();
     public final List<Slot> queue = new ArrayList<>();
@@ -213,6 +215,7 @@ public final class Game {
         this.rng = new Random(seed);
         this.seed = seed;
         Content.Rules r = content.rules;
+        r.enemyDeck.forEach((strength, n) -> { for (int i = 0; i < n; i++) enemyDeck.add(strength); });
         for (TerritoryDef t : content.territories.values()) {
             if (!t.special) for (int i = 0; i < t.copies; i++) worldDeck.add(new Territory(nextId++, t));
         }
@@ -618,11 +621,16 @@ public final class Game {
             CardDef d = e.def;
             int target = -1;
             if ("one".equals(d.target) || "raid".equals(d.kind) || "opportunity".equals(d.kind)) target = rng.nextInt(players.size());
-            int strength = d.strength(players.size(), realm.size()) + ("invasion".equals(d.kind) ? threat + civMods().invasionStrength : 0);
-            if (attack != null) {
-                if (attack.target() >= 0) target = attack.target();
-                if (attack.strength() > 0) strength = attack.strength();
-            }
+            if (attack != null && attack.target() >= 0) target = attack.target();
+            int strength;
+            if (attack != null && attack.strength() > 0) strength = attack.strength();
+            else if ("raid".equals(d.kind) && d.drawsBase >= 0) {
+                int n = d.drawsBase + d.drawsPerEra * (eraIndex + 1);
+                strength = drawEnemies(n, d.name + " draws " + n + " enemy cards");
+            } else if ("invasion".equals(d.kind)) {
+                int massed = drawEnemies(threat, threat + " massed enemies join " + d.name);
+                strength = d.strength(players.size(), realm.size()) + massed + civMods().invasionStrength;
+            } else strength = d.strength(players.size(), realm.size());
             pending = new Pending(e, target, strength);
             pending.fromCrisis = attack != null;
             for (Player p : players) pending.ready.put(p.seat, p.away);
@@ -1820,12 +1828,29 @@ public final class Game {
         }
     }
 
+    /** Draws {@code n} cards from the enemy deck and adds up their strength; they are shuffled back into it afterwards. */
+    private int drawEnemies(int n, String what) {
+        if (n <= 0 || enemyDeck.isEmpty()) return 0;
+        List<Integer> drawn = new ArrayList<>();
+        while (drawn.size() < n) {
+            List<Integer> bag = new ArrayList<>(enemyDeck);
+            Collections.shuffle(bag, rng);
+            for (int i = 0; i < bag.size() && drawn.size() < n; i++) drawn.add(bag.get(i));
+        }
+        int sum = drawn.stream().mapToInt(Integer::intValue).sum();
+        log(what + ": " + drawn + " = " + sum + " strength (the cards go back into the enemy deck).");
+        return sum;
+    }
+
+    /** One more card in the enemy deck. */
+    private void addEnemyCards(int strength, int count) {
+        for (int i = 0; i < count; i++) enemyDeck.add(strength);
+        log("The enemy deck gains " + (count == 1 ? "a strength-" + strength + " card" : count + " strength-" + strength + " cards") + ".");
+    }
+
     private void invasion(Pending pe, double factor) {
         CardDef d = pe.event.def;
-        if (threat > 0) {
-            log("The " + threat + " massed enemies join the invasion.");
-            threat = 0;
-        }
+        threat = 0;                                                   // the massed enemies were drawn when the invasion came
         int sent = pe.troops.values().stream().mapToInt(Integer::intValue).sum();
         int total = pe.troops.entrySet().stream().mapToInt(en -> fighting(players.get(en.getKey()), en.getValue())).sum() + pe.defenseBonus + civMods().invasionDefense;
         int s = pe.strength;
@@ -1942,6 +1967,12 @@ public final class Game {
                     threat += Y.toInt(v);
                     log("+" + Y.toInt(v) + " enemies massing (now " + threat + ").");
                 }
+                case "enemyCard" -> {
+                    if (v instanceof Map<?, ?>) {
+                        Map<String, Object> m = Y.map(v);
+                        addEnemyCards(Y.i(m, "strength", 1), Y.i(m, "count", 1));
+                    } else addEnemyCards(Y.toInt(v), 1);
+                }
                 case "invadeIfStronger" -> {
                     int team = teamStrength();
                     if (threat > team) {
@@ -1952,7 +1983,7 @@ public final class Game {
                 case "raidAll" -> {
                     Map<String, Object> m = Y.map(v);
                     CardDef raid = content.cards.get(Y.s(m, "card", ""));
-                    for (Player p : players) attacks.add(new Attack(inst(raid), p.seat, Y.i(m, "strength", raid.strengthBase)));
+                    for (Player p : players) attacks.add(new Attack(inst(raid), p.seat, Y.i(m, "strength", 0)));
                     log(raid.name + " strike every player.");
                 }
                 case "invasion" -> attacks.add(new Attack(inst(content.cards.get(String.valueOf(v))), -1, 0));

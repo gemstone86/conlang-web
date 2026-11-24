@@ -61,6 +61,11 @@ public final class View {
         v.put("stability", g.stability);
         v.put("health", g.effectiveHealth());
         v.put("threat", g.threat);
+        Map<Integer, Integer> enemies = new java.util.TreeMap<>();
+        for (int s : g.enemyDeck) enemies.merge(s, 1, Integer::sum);
+        List<Object> enemyList = new ArrayList<>();
+        enemies.forEach((s, n) -> enemyList.add(Map.of("strength", s, "n", n)));
+        v.put("enemyDeck", enemyList);
         v.put("territoryPoints", g.realm.size());
         v.put("you", seat);
         v.put("result", g.result);

@@ -195,7 +195,7 @@ function renderStatus() {
   const resLine = you && you.resources ? `<span class="resline">Resources: ${resList(you.resources, { all: true })}<span class="muted small">per round</span> ${resList(you.net || you.income, { signed: true, src: true })}</span>` : '';
   $('status').innerHTML = `<span>${esc(s.era)} era (${s.eraIndex + 1}/${s.eraCount})</span><span>Round <b>${s.round}</b></span>
     <span>${phase}</span>${actions}<span>Stability <b class="${s.stability <= 3 ? 'bad' : ''}">${s.stability}</b></span>
-    <span>Health <b>${s.health}</b></span><span class="${s.threat ? 'threat' : ''}">Enemies massing <b>${s.threat}</b></span><span>Era deck <b>${s.eraDeck}</b></span><span>Points <b>${s.score}</b></span>
+    <span>Health <b>${s.health}</b></span><span class="${s.threat ? 'threat' : ''}" title="Enemies massing: that many cards are drawn from the enemy deck when the next invasion comes">Enemies massing <b>${s.threat}</b></span><span title="Raids and invasions draw cards from this deck and shuffle them back. Stronger cards are added by later events.">Enemy deck <b>${(s.enemyDeck || []).map(e => e.n + '×' + e.strength).join(' · ')}</b></span><span>Era deck <b>${s.eraDeck}</b></span><span>Points <b>${s.score}</b></span>
     <span class="muted small">Room ${esc(room.code)}</span>${resLine}`;
 }
 

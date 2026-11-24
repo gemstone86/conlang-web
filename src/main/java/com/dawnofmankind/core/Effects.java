@@ -41,7 +41,7 @@ public final class Effects {
 
     static final Set<String> IMMEDIATE = Set.of("gain", "lose", "population", "army", "stability", "health", "draw",
             "extraActions", "addCrisis", "destroyBuilding", "freeBuilding", "discover", "colony", "civilWar", "enemy", "settle", "core", "removeLand", "coreTerritory", "hostility",
-            "threat", "invadeIfStronger", "raidAll", "invasion", "healthTest", "trade");
+            "threat", "enemyCard", "invadeIfStronger", "raidAll", "invasion", "healthTest", "trade");
     static final Set<String> LASTING = Set.of("income", "perWorker", "handLimit", "actionsPerTurn", "raidDefense",
             "mitigate", "buildDiscount", "sharedPool", "victoryPoints", "invasionDefense", "faceUpLands", "settleDiscount", "freeSettlers", "strengthPerTwoTroops", "giveCards", "freeRecruit", "strengthBonus", "ownStrengthPerTwoTroops", "maxSlots", "buildCost", "wonderGrowth", "eventUnder", "actionsToHand",
             "growthDiscount", "wonderDouble", "incomePerTerritory", "noEnemy", "halveEnemy", "healthMod", "troopStrength", "recruitExtra", "troopUpkeep", "freeTech", "buildingDiscount", "halveWonderUpkeep", "unlockBuilding", "invasionStrength", "settlerCost");

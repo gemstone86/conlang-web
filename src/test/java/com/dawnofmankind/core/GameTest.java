@@ -1122,4 +1122,19 @@ class GameTest {
         Game.Slot end = g.queue.stream().filter(sl -> sl.card.def.type == Content.CardType.ERA_END).findFirst().get();
         assertThrows(GameException.class, () -> g.act(p.seat, Map.of("type", "pick", "slot", g.queue.indexOf(end))));
     }
+
+    @Test
+    void raidsAndInvasionsDrawFromTheEnemyDeckAndPutTheCardsBack() {
+        Game g = game(2, 22);
+        assertEquals(10, g.enemyDeck.size(), "the deck starts with 6 ones and 4 twos");
+        assertEquals(14, g.enemyDeck.stream().mapToInt(Integer::intValue).sum());
+        g.currentEvents.add(0, card(g, "sea_peoples"));
+        g.futureEvents.add(card(g, "good_hunt"));
+        AiPlayer bot = new AiPlayer(1);
+        int round = g.round;
+        while (g.round == round && g.result == null) bot.step(g);
+        assertTrue(g.enemyDeck.contains(4), "the Sea Peoples add a strength-4 card every round they are active");
+        assertEquals(11, g.enemyDeck.size(), "cards that were drawn went back; one card was added");
+        assertTrue(g.log.stream().anyMatch(l -> l.contains("enemy cards:") && l.contains("go back into the enemy deck")), String.join("\n", g.log));
+    }
 }
