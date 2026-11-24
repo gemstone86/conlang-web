@@ -206,3 +206,13 @@ details summary { cursor: pointer; color: var(--bone-dim); font-size: .88rem; }
 .minicard .mname { color: var(--bone); font-weight: 600; }
 .minicard .mvp { color: var(--brass); }
 .minicard.obsolete { opacity: .55; filter: grayscale(.6); }
+
+.queue-wrap { display: flex; gap: .6rem; align-items: stretch; }
+.queue-wrap .queue-row { flex: 1 1 auto; min-width: 0; }
+.deckpile { position: relative; flex: 0 0 96px; min-height: 8rem; display: flex; align-items: flex-end; justify-content: center; padding-bottom: .4rem; }
+.deckpile .back { position: absolute; left: 8px; right: 8px; top: 6px; bottom: 28px; border-radius: 8px; border: 2px solid #6e5a2e; background: repeating-linear-gradient(45deg, #2b3445 0 6px, #232c3b 6px 12px); box-shadow: 0 2px 6px rgba(0,0,0,.5); }
+.deckpile .back.b2 { transform: translate(-3px, 3px); } .deckpile .back.b3 { transform: translate(-6px, 6px); }
+.deckpile .dcount { position: absolute; top: 38%; left: 0; right: 0; text-align: center; font: 700 1.6rem var(--serif, serif); color: var(--brass); text-shadow: 0 1px 4px #000; }
+.deckpile .dlabel { position: relative; font-size: .7rem; text-transform: uppercase; letter-spacing: .06em; color: var(--bone-dim); }
+.deckpile.empty .back { opacity: .25; }
+.queue-wrap .pick-shade { right: 104px; }

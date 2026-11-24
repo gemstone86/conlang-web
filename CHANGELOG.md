@@ -1,5 +1,9 @@
 # Changes
 
+## v1.86.0 (combined app)
+
+- Dawn: an era deck pile sits at the right end of the card queue (with the number of cards left). Cards drawn from it fly out of the pile into the queue, and the cards you draw each round fly into your hand. Nothing animates on the first load, and not when the browser asks for reduced motion.
+
 ## v1.85.3 (combined app)
 
 - Dawn: new Prehistoric raid event, Legendary Predator: strength players + 2 (fixed, no enemy cards), each point short costs 2 food.

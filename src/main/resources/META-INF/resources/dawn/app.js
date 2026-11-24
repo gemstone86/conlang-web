@@ -137,6 +137,7 @@ function render(m) {
   checkTurnDraw();
   renderStarvation();
   renderSetup();
+  dealAnimations();
   renderTechs();
   renderHand();
   renderLeader();
@@ -204,10 +205,33 @@ function cardHtml(c, extra = '', cls = '') {
   const typeLabel = c.type === 'event' ? (c.crisis ? 'Crisis' : 'Event · ' + (c.category || ''))
     : c.type === 'great_wonder' ? `Great wonder · ${c.victoryPoints} points` : c.type === 'leader' ? 'great person' : c.type.replace('_', ' ');
   const art = c.art ? ` hasart" style="--art:url('${c.art}')` : '';
-  return `<div class="cardx ${kind} ${cls}${art}"><div class="type">${esc(typeLabel)}</div><div class="name">${esc(c.name)}</div>
+  return `<div class="cardx ${kind} ${cls}${art}"${c.id != null ? ` data-cid="${c.id}"` : ''}><div class="type">${esc(typeLabel)}</div><div class="name">${esc(c.name)}</div>
     ${c.cost ? `<div class="small">${c.type === 'great_wonder' ? 'Team cost' : 'Cost'}: ${resList(c.cost)}</div>` : ''}<div class="text">${esc(c.text)}</div>${extra}</div>`;
 }
 
+// Cards drawn from the era deck fly out of the deck pile beside the queue: into the queue, or into your hand.
+let dealtSeen = null;
+function dealAnimations() {
+  const cards = [...document.querySelectorAll('#queuePanel .cardx[data-cid], #handPanel .cardx[data-cid]')];
+  const fresh = cards.filter(el => dealtSeen && !dealtSeen.has(el.dataset.cid));
+  if (!dealtSeen) dealtSeen = new Set();
+  cards.forEach(el => dealtSeen.add(el.dataset.cid));
+  const pile = $('eraDeckPile');
+  if (!fresh.length || !pile || !pile.getBoundingClientRect || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const from = pile.getBoundingClientRect();
+  fresh.slice(0, 8).forEach((el, i) => {
+    const to = el.getBoundingClientRect();
+    if (!to.width) return;
+    const dx = from.left + from.width / 2 - (to.left + to.width / 2), dy = from.top + from.height / 2 - (to.top + to.height / 2);
+    el.style.position = el.style.position || 'relative';
+    const anim = el.animate([
+      { transform: `translate(${dx}px, ${dy}px) scale(.3) rotate(-10deg)`, opacity: 0, zIndex: 30 },
+      { opacity: 1, offset: .2, zIndex: 30 },
+      { transform: 'translate(0, 0) scale(1) rotate(0)', opacity: 1, zIndex: 30 }], { duration: 700, delay: i * 150, easing: 'cubic-bezier(.2,.8,.2,1)', fill: 'backwards' });
+    anim.onfinish = () => { el.style.zIndex = ''; };
+  });
+  pile.animate([{ transform: 'scale(1)' }, { transform: 'scale(1.06) rotate(-2deg)' }, { transform: 'scale(1)' }], { duration: 300, iterations: Math.min(fresh.length, 4) });
+}
 function renderQueue() {
   // the queue runs right to left: new cards come in on the right, the leftmost cards leave at the end of the round
   const s = state, leaving = s.queueRemoved, n = s.queue.length;
@@ -222,7 +246,8 @@ function renderQueue() {
   }).reverse().join('');
   $('queuePanel').innerHTML = `<div class="queue-head"><h2>Card queue</h2><span class="muted small">At the end of the round the ${leaving} leftmost card${leaving > 1 ? 's' : ''} (dashed) leave${leaving > 1 ? '' : 's'}; events that leave go to the future deck.</span></div>
     <div class="row small" id="pickBar"><label style="margin:0">Pick time (s, 0 = no limit) <input type="number" min="0" max="3600" step="10" id="pickSecs" value="${s.pickSeconds}" data-keep="pickSecs" style="width:4.5rem"></label><button class="tiny" data-picktime>Set</button></div>
-    <div class="queue-wrap"><div class="queue-row">${items || '<p class="muted">The queue is empty.</p>'}</div><div class="pick-shade" id="pickShade"></div></div>
+    <div class="queue-wrap"><div class="queue-row">${items || '<p class="muted">The queue is empty.</p>'}</div><div class="pick-shade" id="pickShade"></div>
+      <div class="deckpile ${s.eraDeck ? '' : 'empty'}" id="eraDeckPile" title="The era deck: ${s.eraDeck} cards left. New cards come from here."><div class="back b3"></div><div class="back b2"></div><div class="back b1"></div><span class="dcount">${s.eraDeck}</span><span class="dlabel">Era deck</span></div></div>
     <div class="queue-ends"><span>← leaves here</span><span>new cards come in here →</span></div>`;
   tickPickTimer();
 }
