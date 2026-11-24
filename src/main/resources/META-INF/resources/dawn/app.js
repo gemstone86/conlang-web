@@ -22,6 +22,9 @@ async function boot() {
       $('name').disabled = true;
       $('loggedIn').textContent = 'Playing as your account name.';
       $('loggedIn').hidden = false;
+    } else {
+      $('loginLink').href = '/?next=' + encodeURIComponent(location.pathname + location.search);
+      $('loginHint').hidden = false;
     }
   } catch (e) { /* no login available */ }
   if (!$('name').value) $('name').value = localStorage.getItem('dawn.name') || '';

@@ -175,7 +175,7 @@ const state = { me: null, regOpen: true, mode: 'login' };
 // where to go after logging in (?next=/rune/ when an app sent the visitor here); only paths on this site
 const next = (() => {
   const n = new URLSearchParams(location.search).get('next');
-  return n && /^\/(rune|weather)\//.test(n) ? n : null;
+  return n && /^\/(rune|weather|dawn)\//.test(n) ? n : null;
 })();
 
 async function api(method, url, body) {

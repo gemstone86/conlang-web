@@ -1,5 +1,9 @@
 # Changes
 
+## v1.82.1 (combined app)
+
+- Dawn: a "Start" link back to the start page, and a "Log in" link on the Dawn start page for visitors who are not logged in (the start page sends them back to Dawn afterwards).
+
 ## v1.82.0 (combined app)
 
 - Dawn: finished (or abandoned) games now save their game log on the server. Admins get an "All game logs" button that downloads every saved log, plus games still running, as one zip; the saved ones are deleted after the download. Logs live in `dawn.log-dir` (default `./data/dawn-logs`).

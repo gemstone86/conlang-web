@@ -178,3 +178,6 @@ details summary { cursor: pointer; color: var(--bone-dim); font-size: .88rem; }
 [data-tipcard], [data-tipsrc], [data-tipactions] { cursor: help; }
 
 .status .resline { flex-basis: 100%; display: flex; gap: .7rem; align-items: baseline; flex-wrap: wrap; }
+
+.top .home { font-size: .85rem; color: var(--bone-dim); text-decoration: none; white-space: nowrap; }
+.top .home:hover { text-decoration: underline; }

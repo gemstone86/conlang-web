@@ -11,6 +11,7 @@
 </head>
 <body>
 <header class="top">
+  <a href="/" class="home" title="Start page">&#8592; Start</a>
   <h1><a href="./">Dawn of Mankind</a></h1>
   <div id="status" class="status"></div>
   <button id="gameLog" class="allcards" type="button" title="Download everything that happened, to send for review">Game log</button>
@@ -27,6 +28,7 @@
     <label for="name">Your name</label>
     <input id="name" maxlength="24" autocomplete="nickname">
     <p id="loggedIn" class="muted small" hidden></p>
+    <p id="loginHint" class="muted small" hidden>Not logged in. <a id="loginLink" href="/">Log in</a> to play under your account name.</p>
     <div class="row">
       <button id="create" class="primary">Create a room</button>
     </div>
