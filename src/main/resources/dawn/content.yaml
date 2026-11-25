@@ -258,6 +258,41 @@ greatWonders:
     effects: [{stability: 2}, {raidDefense: 2}]
     victoryPoints: 2
     text: +2 Stability and +2 defense against raids for everyone.
+  knossos:
+    name: The Palace of Knossos
+    era: ancient
+    costPerPlayer: {production: 9, culture: 3, influence: 2}
+    effects: [{income: {influence: 1}}, {settleDiscount: {production: 1}}]
+    victoryPoints: 2
+    text: Every player gets +1 influence per turn. Settling any land costs 1 production less.
+  ziggurat_of_ur:
+    name: The Ziggurat of Ur
+    era: ancient
+    costPerPlayer: {production: 9, culture: 3, research: 2}
+    effects: [{income: {research: 1}}, {handLimit: 1}]
+    victoryPoints: 2
+    text: Every player gets +1 research per turn and +1 max hand size.
+  karnak:
+    name: The Temple of Karnak
+    era: ancient
+    costPerPlayer: {production: 11, culture: 4}
+    effects: [{income: {culture: 2}}, {buildingDiscount: {building: temple, production: 1}}]
+    victoryPoints: 2
+    text: Every player gets +2 culture per turn, and temples cost 1 production less.
+  pantheon:
+    name: The Pantheon
+    era: classical
+    costPerPlayer: {production: 11, culture: 4}
+    effects: [{income: {culture: 1}}, {perWorker: {building: temple, culture: 1}}]
+    victoryPoints: 2
+    text: Every player gets +1 culture per turn, and each temple worker produces +1 culture.
+  great_wall:
+    name: The Great Wall
+    era: classical
+    costPerPlayer: {production: 13, food: 2}
+    effects: [{invasionDefense: 4}, {raidDefense: 1}]
+    victoryPoints: 2
+    text: +4 defense for the whole team against invasions and +1 against raids.
   nomadic_living:
     name: Nomadic Living
     era: prehistoric
@@ -483,6 +518,13 @@ eras:
       great_tomb: 1
       epic_wall: 1
       great_trade_route: 1
+      knossos: 1
+      ziggurat_of_ur: 1
+      karnak: 1
+      hatshepsut: 1
+      sargon: 1
+      minos: 1
+      imhotep: 1
       gilgamesh: 1
       hammurabi: 1
       ramses: 1
@@ -497,6 +539,8 @@ eras:
       calendar: 1
       horseback_riding: 1
       ancients_customs: 1
+      irrigation_canals: 1
+      sailing: 1
       markets: 1
       city_state: 1
       irrigation: 2
@@ -546,6 +590,8 @@ eras:
       hostile_tribes: 1
       warlord: 2
       rivals_claim: 1
+      pharaohs_curse: 1
+      volcano_of_thera: 1
       end_of_ancient: 3
     # when the third end card is turned up, one of these strikes; its effects last through the next era
     endEvents: [bronze_age_collapse, iron_age_dawns, age_of_philosophers]
@@ -560,6 +606,13 @@ eras:
       colosseum: 1
       roman_roads: 1
       # leaders
+      pantheon: 1
+      great_wall: 1
+      aqueducts: 1
+      forum: 1
+      cleopatra: 1
+      cyrus: 1
+      augustus: 1
       tomyris: 1
       alexander_the_great: 1
       julius_caesar: 1
@@ -574,6 +627,8 @@ eras:
       iron_working: 1
       philosophy: 1
       mathematics: 1
+      roman_concrete: 1
+      legion_tactics: 1
       engineering: 1
       city_state: 1
       # actions
@@ -622,6 +677,8 @@ eras:
       hostile_tribes: 1
       warlord: 2
       rivals_claim: 1
+      hannibal_at_the_gates: 1
+      pax_romana: 1
       end_of_classical: 3
 # The starting event deck: 2 per player, drawn from these (number = copies in the pool).
 startingEvents:
@@ -1323,6 +1380,126 @@ cards:
     strength: {perPlayerPerTerritory: 1}
     perShortfall: [{lose: {food: 1, production: 1}}]
     text: Invasion, strength = players × territories + the massed enemies, drawn from the enemy deck. If it breaks through, a territory is lost and each point short costs every player 1 food and 1 production.
+  hatshepsut:
+    name: Hatshepsut
+    type: leader
+    effects: [{income: {influence: 1, food: 1}}]
+    text: "+1 influence and +1 food per turn. A trade queen."
+  sargon:
+    name: Sargon of Akkad
+    type: leader
+    effects: [{strengthBonus: 2}, {raidDefense: 2}]
+    text: +2 military strength and +2 defense against raids.
+  minos:
+    name: King Minos
+    type: leader
+    effects: [{raidDefense: 2}, {income: {influence: 1}}]
+    text: +2 defense against raids and +1 influence per turn. A sea power.
+  imhotep:
+    name: Imhotep
+    type: leader
+    effects: [{buildDiscount: {production: 1}}, {income: {production: 1}}]
+    text: Buildings cost 1 production less, and +1 production per turn.
+  cleopatra:
+    name: Cleopatra
+    type: leader
+    effects: [{income: {influence: 2}}]
+    text: +2 influence per turn.
+  cyrus:
+    name: Cyrus the Great
+    type: leader
+    effects: [{troopStrength: 1}]
+    text: Each of your troops counts for +1 strength.
+  augustus:
+    name: Augustus
+    type: leader
+    effects: [{actionsPerTurn: 1}, {raidDefense: 1}]
+    text: +1 action per turn and +1 defense against raids.
+  irrigation_canals:
+    name: Irrigation Canals
+    type: tech
+    cost: {research: 4, food: 1}
+    effects: [{perWorker: {building: farm, food: 1}}]
+    text: Your farmers produce +1 food.
+  sailing:
+    name: Sailing
+    type: tech
+    cost: {research: 4, production: 1}
+    effects: [{faceUpLands: 1}, {income: {influence: 1}}]
+    text: One more land lies face up, and +1 influence per turn.
+  roman_concrete:
+    name: Roman Concrete
+    type: tech
+    cost: {research: 6, production: 2}
+    effects: [{wonderDouble: 1}]
+    text: Resources you give to great wonders count double.
+  legion_tactics:
+    name: Legion Tactics
+    type: tech
+    cost: {research: 5, production: 2}
+    effects: [{troopStrength: 1}]
+    text: Every troop counts for +1 more strength. Put it in the Warriors bonus slot.
+  aqueducts:
+    name: Aqueducts
+    type: minor_wonder
+    cost: {production: 5, culture: 2}
+    effects: [{growthDiscount: 1}, {health: 1}]
+    text: Growing costs 1 less food, and +1 Health.
+  forum:
+    name: The Forum
+    type: minor_wonder
+    cost: {production: 4, culture: 2}
+    effects: [{income: {influence: 1, culture: 1}}]
+    text: +1 influence and +1 culture per turn.
+  pharaohs_curse:
+    name: The Pharaoh's Curse
+    type: event
+    category: unrest
+    target: each
+    effects: [{lose: {culture: 2}}]
+    text: Every player loses 2 culture.
+  volcano_of_thera:
+    name: Volcano of Thera
+    type: event
+    category: unrest
+    effects: [{stability: -1}, {health: -1}]
+    text: -1 Stability and -1 Health.
+  pax_romana:
+    name: Pax Romana
+    type: event
+    category: boon
+    effects: [{stability: 2}]
+    text: +2 Stability.
+  hannibal_at_the_gates:
+    name: Hannibal at the Gates
+    type: event
+    crisis: true
+    category: invasion
+    lasts:
+      rounds: 2
+      everyRound: [{enemyCard: 5}]
+      stages:
+        - [{raidAll: {card: hannibal_raid}}]
+        - [{invasion: hannibal_invasion}]
+    text: "CRISIS, 2 rounds. Every round a strength-5 card is added to the enemy deck for good. First a raid on every player, then an invasion."
+  hannibal_raid:
+    name: Hannibal's Raid
+    type: event
+    helper: true
+    category: raid
+    kind: raid
+    draws: {base: 0, perEra: 2}
+    perShortfall: [{lose: {food: 1, production: 1}}]
+    text: "Raid: draw 2 enemy cards for every Era number. Each point short costs 1 food and 1 production."
+  hannibal_invasion:
+    name: Hannibal's Army
+    type: event
+    helper: true
+    category: invasion
+    kind: invasion
+    strength: {perPlayerPerTerritory: 1}
+    perShortfall: [{lose: {food: 1, production: 1}}]
+    text: Invasion by Hannibal's army, strength = players × territories + the massed enemies, drawn from the enemy deck.
   barbarian_raid:
     name: Barbarian Raid
     type: event

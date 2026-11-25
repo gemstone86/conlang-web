@@ -1,5 +1,9 @@
 # Changes
 
+## v1.93.0 (combined app, branch new-era)
+
+- Dawn: the Ancient and Classical eras filled out. Ancient: wonders Palace of Knossos, Ziggurat of Ur and Temple of Karnak; great people Hatshepsut, Sargon of Akkad, King Minos and Imhotep; techs Irrigation Canals and Sailing; events Pharaoh's Curse and Volcano of Thera. Classical: wonders The Pantheon and The Great Wall; great people Cleopatra, Cyrus the Great and Augustus; techs Roman Concrete and Legion Tactics (a Warriors slot card); minor wonders Aqueducts and The Forum; the crisis Hannibal at the Gates (a strength-5 card added to the enemy deck each round, then a raid and an invasion) and the boon Pax Romana.
+
 ## v1.92.0 (combined app)
 
 - Dawn: a Classical era (iron age, classical Greece, Rome) now follows the Ancient era, and ending it wins the game. The Ancient era is now the early civilisations (bronze age, Egypt, Mesopotamia) and ends with one of three era-end events: Bronze Age Collapse, The Iron Age Dawns or Age of Philosophers. The Greek and Roman cards moved to the Classical era: The Great Library, Great Lighthouse, Colossus, Roman Roads, Tomyris, Alexander, Julius Caesar, Archimedes, Code of Laws. New in Classical: wonders The Parthenon and The Colosseum, great people Pericles and Hannibal, techs Iron Working, Philosophy, Mathematics and Engineering, and the raid and invasion Gallic Warband and The Goths Invade. Hostility is split between the eras (Ancient 2s and 3s, Classical 3s and 5s).

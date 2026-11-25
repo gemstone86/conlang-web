@@ -1309,4 +1309,16 @@ class GameTest {
             assertEquals(3, g.eraDeck.stream().filter(c -> c.def.id.equals("end_of_classical")).count());
         }
     }
+
+    @Test
+    void theNewEraCardsAreInTheirEras() {
+        for (String id : List.of("knossos", "ziggurat_of_ur", "karnak")) assertEquals("ancient", C.greatWonders.get(id).era, id);
+        for (String id : List.of("great_library", "parthenon", "colosseum", "pantheon", "great_wall")) assertEquals("classical", C.greatWonders.get(id).era, id);
+        for (String id : List.of("hatshepsut", "sargon", "minos", "imhotep")) assertEquals("ancient", C.cards.get(id).era, id);
+        for (String id : List.of("cleopatra", "cyrus", "augustus", "pericles", "hannibal")) assertEquals("classical", C.cards.get(id).era, id);
+        Game g = game(1, 9);
+        assertEquals("warriors", g.slotKind(C.cards.get("legion_tactics")));
+        assertEquals("building", g.slotKind(C.cards.get("irrigation_canals")));
+        assertTrue(g.slottable(C.cards.get("forum")));
+    }
 }
