@@ -1,5 +1,9 @@
 # Changes
 
+## v1.93.7 (combined app)
+
+- Dawn: card art for 21 more cards: Lithic Art, Legendary Predator, Climate Crisis, Cult of the Ancestors, End of an Era (Prehistoric), Metalworking, Markets, Bronze Age Collapse, The Iron Age Dawns, Age of Philosophers, Hatshepsut, Sargon, King Minos, Imhotep, Irrigation Canals, Sailing, The Pharaoh's Curse, Volcano of Thera, the Palace of Knossos, the Ziggurat of Ur and the Temple of Karnak.
+
 ## v1.93.6 (combined app)
 
 - Dawn: the era banner shows the era-end event that closed the previous era as a card (Dawn of Agriculture, Climate Crisis...). When the whole game ends there is no new era and so no card.
