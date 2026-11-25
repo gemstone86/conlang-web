@@ -251,6 +251,8 @@ public final class View {
                 pm.put("turnSeq", p.turnSeq);
                 pm.put("turnEvents", p.turnEvents);
                 if (p.turnDraw != null) pm.put("turnDraw", card(p.turnDraw));
+                pm.put("faceDownSeq", p.faceDownSeq);
+                if (p.faceDown != null) pm.put("faceDown", card(p.faceDown));
             }
             players.add(pm);
         }

@@ -1090,6 +1090,8 @@ public final class Game {
             under = nextCard();
         }
         if (under != null) take(p, under);
+        p.faceDown = under;                               // shown to the player whatever it was: a city state or a great wonder never reaches the hand
+        p.faceDownSeq++;
     }
 
     private void installLeader(Player p, CardDef d) {

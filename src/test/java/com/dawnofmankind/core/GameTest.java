@@ -407,6 +407,18 @@ class GameTest {
     }
 
     @Test
+    void theFaceDownCardIsRememberedEvenWhenItIsACityState() {
+        Game g = game(1, 31);
+        Player p = g.players.get(0);
+        Game.CardInst ev = card(g, "wolf_pack"), under = card(g, "city_state");
+        g.queue.add(0, new Game.Slot(ev, under));
+        g.act(p.seat, Map.of("type", "pick", "slot", 0));
+        assertEquals(1, p.faceDownSeq);
+        assertEquals("city_state", p.faceDown.def.id);
+        assertEquals(under.id, Game.class.cast(g).players.get(0).faceDown.id);
+    }
+
+    @Test
     void aLeaderIsPlayedFromTheHandForFourOfAnyResourcesAndLeavesWithTheEra() {
         Game g = game(2, 61);
         Player p = g.players.get(0);

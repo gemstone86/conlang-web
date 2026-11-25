@@ -1,5 +1,9 @@
 # Changes
 
+## v1.93.11 (combined app)
+
+- Dawn: the face-down card you get with an event is always shown (it used to be skipped when it was a city state or great wonder, which never reach the hand); the turn-start draw pop-up also says what a city state does.
+
 ## v1.93.10 (combined app)
 
 - Dawn: New Trading Route is now a standing route: every round you pay 1 of one resource and your ally gets 2 of the other (shown in both players' per-round income).

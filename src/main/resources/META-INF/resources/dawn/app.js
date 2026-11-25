@@ -301,7 +301,7 @@ $('queuePanel').onclick = e => {
   const b = e.target.closest('[data-pick]'); if (!b) return;
   const card = state.queue[+b.dataset.pick];
   if (card && card.type === 'event') {
-    pickWatch = { ids: new Set((me().hand || []).map(c => c.id)), event: card.name, at: Date.now() , leader: me().leader && me().leader.name};
+    pickWatch = { seq: me().faceDownSeq || 0, event: card.name, at: Date.now() };
   }
   send({ type: 'pick', slot: +b.dataset.pick });
 };
@@ -334,7 +334,7 @@ function checkTurnDraw() {
   try { sessionStorage.setItem(key, String(m.turnSeq)); } catch (e) {}
   const ev = m.turnEvents ? `<p class="muted small">${m.turnEvents} event${m.turnEvents > 1 ? 's' : ''} came up first and went face down into the future deck.</p>` : '';
   const body = m.turnDraw
-    ? `<div class="cards">${cardHtml(m.turnDraw)}</div>${m.turnDraw.type === 'great_wonder' ? '<p class="muted small">A great wonder: it goes on the board for the whole tribe to build.</p>' : ''}${m.turnDraw.type === 'leader' ? '<p class="muted small">A great person: they take over at once (or you choose, if you already have one) and leave when the era ends.</p>' : ''}`
+    ? `<div class="cards">${cardHtml(m.turnDraw)}</div>${m.turnDraw.type === 'great_wonder' ? '<p class="muted small">A great wonder: it goes on the board for the whole tribe to build.</p>' : ''}${m.turnDraw.type === 'city_state' ? '<p class="muted small">A city state: it now waits among the lands to settle.</p>' : ''}${m.turnDraw.type === 'leader' ? '<p class="muted small">A great person: they take over at once (or you choose, if you already have one) and leave when the era ends.</p>' : ''}`
     : '<p class="muted">The era deck is empty: nothing to draw.</p>';
   $('gotBox').innerHTML = `<h2>Round ${state.round}: your turn. You drew</h2>${ev}${body}<div class="row"><button class="primary" data-gotok>OK</button></div>`;
   $('gotModal').hidden = false;
@@ -414,13 +414,12 @@ $('noticeModal').onclick = e => {
 function checkPickReveal() {
   if (!pickWatch) return;
   if (Date.now() - pickWatch.at > 5000) { pickWatch = null; return; }
-  const got = (me().hand || []).filter(c => !pickWatch.ids.has(c.id));
-  if (me().leader && me().leader.name !== pickWatch.leader) got.push(me().leader);      // a great person plays at once
-  if (!got.length) return;
-  const ev = pickWatch.event;
+  if ((me().faceDownSeq || 0) <= pickWatch.seq) return;
+  const ev = pickWatch.event, c = me().faceDown;
   pickWatch = null;
+  const note = !c ? '' : c.type === 'city_state' ? '<p class="muted small">A city state: it now waits among the lands to settle.</p>' : c.type === 'great_wonder' ? '<p class="muted small">A great wonder: it goes on the board for the whole tribe to build.</p>' : c.type === 'leader' ? '<p class="muted small">A great person: they take over at once (or you choose, if you already have one).</p>' : '';
   $('gotBox').innerHTML = `<h2>The face-down card</h2><p class="muted small">You took on <b>${esc(ev)}</b> and got:</p>
-    <div class="cards">${got.map(c => cardHtml(c)).join('')}</div><div class="row"><button class="primary" data-gotok>OK</button></div>`;
+    ${c ? `<div class="cards">${cardHtml(c)}</div>${note}` : '<p class="muted">The era deck was empty: nothing under it.</p>'}<div class="row"><button class="primary" data-gotok>OK</button></div>`;
   $('gotModal').hidden = false;
 }
 $('gotModal').onclick = e => { if (e.target.closest('[data-gotok]') || e.target === $('gotModal')) $('gotModal').hidden = true; };
