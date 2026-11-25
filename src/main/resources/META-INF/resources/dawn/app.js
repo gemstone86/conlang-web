@@ -976,8 +976,8 @@ async function openAllCards() {
   const group = (title, kinds) => {
     const list = catalogue.cards.filter(c => kinds.includes(c.type));
     const total = list.reduce((a, c) => a + (c.copies || 0), 0);
-    return list.length ? `<h3>${title} (${list.length} different, ${total} in the game)</h3><div class="catalog">${list.map(c =>
-      item(c.name, [c.type === 'leader' ? 'great person' : c.type.replace('_', ' '), c.era, cost(c.cost) && 'cost ' + cost(c.cost), c.minPlayers && c.minPlayers + '+ players only', c.copies > 0 && `${c.copies} in the game`].filter(Boolean).join(' · '), c.text, c.art)).join('')}</div>` : '';
+    return list.length ? `<h3>${title} (${list.length} different, ${total} copies in all)</h3><div class="catalog">${list.map(c =>
+      item(c.name, [c.type === 'leader' ? 'great person' : c.type.replace('_', ' '), c.era, cost(c.cost) && 'cost ' + cost(c.cost), c.minPlayers && c.minPlayers + '+ players only', c.copies > 0 && `${c.copies} ${c.copies === 1 ? "copy" : "copies"} in the card list`].filter(Boolean).join(' · '), c.text, c.art)).join('')}</div>` : '';
   };
   const types = [...new Set(catalogue.cards.map(c => c.type))].filter(t => t !== 'great_wonder');
   const names = { leader: 'Great people', era_trigger: 'End-of-era cards', hostility: 'Hostility cards', tech: 'Techs', action: 'Actions', response: 'Responses', minor_wonder: 'Minor wonders', great_wonder: 'Great wonders', city_state: 'City states', event: 'Events' };
@@ -997,7 +997,7 @@ async function openAllCards() {
     ${countTable}
     ${types.map(t => group(t === 'leader' ? 'Great people' : t.charAt(0).toUpperCase() + t.slice(1).replace('_', ' ') + ' cards', [t])).join('')}
     <h3>Lands (${catalogue.lands.length})</h3><div class="catalog">${catalogue.lands.map(l => item(l.name, l.special ? 'special land' : 'land', l.text)).join('')}</div>
-    <h3>Great wonders (${catalogue.wonders.length})</h3><div class="catalog">${catalogue.wonders.map(w => item(w.name, [w.era, '1 in the game'].filter(Boolean).join(' · '), w.text, w.art)).join('')}</div>`;
+    <h3>Great wonders (${catalogue.wonders.length})</h3><div class="catalog">${catalogue.wonders.map(w => item(w.name, [w.era, "1 copy"].filter(Boolean).join(' · '), w.text, w.art)).join('')}</div>`;
 }
 $('allCards').onclick = async () => { await openAllCards(); applyKeywords(); };
 $('gameLog').onclick = async () => {

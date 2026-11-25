@@ -1,5 +1,9 @@
 # Changes
 
+## v1.89.1 (combined app)
+
+- Dawn: the All cards list words the card counts as copies in the card list (all cards that exist), not cards in the current game.
+
 ## v1.89.0 (combined app)
 
 - Dawn: upgrade slots are now small cards: an empty slot is an empty box, and a researched tech (shown as a small card in the Technologies list, hover for the full card) is dragged into it, or clicked and then the slot. New Prehistoric tech Lithic Art: slotted into Hunters it gives +1 culture per hunter, a choice against Stone Tools (production). Cards you pick fly from the queue to your hand, a tech flies into its slot, and the card you draw at the start of your turn flies out of the era deck. Prehistoric great wonders are cheaper (production 10/9/10/8/5 became 6/6/6/5/3) because hunters make less production than mines did. The All cards list shows how many copies of each card are in the game.
