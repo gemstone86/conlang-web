@@ -1,5 +1,9 @@
 # Changes
 
+## v1.93.1 (combined app)
+
+- Dawn: lands found by an event, crises and lasting events are laid out in a grid instead of one long column, and the Done / Look at the board buttons of the event pop-up stay in view at the bottom, so you no longer have to zoom out.
+
 ## v1.93.0 (combined app, branch new-era)
 
 - Dawn: the Ancient and Classical eras filled out. Ancient: wonders Palace of Knossos, Ziggurat of Ur and Temple of Karnak; great people Hatshepsut, Sargon of Akkad, King Minos and Imhotep; techs Irrigation Canals and Sailing; events Pharaoh's Curse and Volcano of Thera. Classical: wonders The Pantheon and The Great Wall; great people Cleopatra, Cyrus the Great and Augustus; techs Roman Concrete and Legion Tactics (a Warriors slot card); minor wonders Aqueducts and The Forum; the crisis Hannibal at the Gates (a strength-5 card added to the enemy deck each round, then a raid and an invasion) and the boon Pax Romana.

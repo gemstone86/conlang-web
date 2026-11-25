@@ -242,3 +242,8 @@ details summary { cursor: pointer; color: var(--bone-dim); font-size: .88rem; }
 .minicard.tall .slottag { align-self: flex-start; }
 
 #cheatMode.on { background: var(--err); color: #fff; }
+
+/* events and the lands they bring are laid out in a grid, and the buttons stay in view in the pop-up */
+#eventPanel .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr)); gap: .5rem; }
+#eventPanel.popup .cardx.pending > .actions { position: sticky; bottom: 0; background: #26303f; padding: .4rem 0; z-index: 3; box-shadow: 0 -6px 8px -4px rgba(0,0,0,.5); }
+#eventPanel.popup .cardx.pending > .cards .cardx { min-height: 0; }
