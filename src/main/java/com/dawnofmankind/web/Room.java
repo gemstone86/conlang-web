@@ -177,6 +177,11 @@ public final class Room {
                 else if (seat < host) host--;
                 gone.sessions.forEach(ws -> closeQuietly(ws));
             }
+            case "cheatMode" -> {
+                if (!seats.get(seat).admin) throw new GameException("Only admins can do that.");
+                if (game == null) throw new GameException("The game hasn't started yet.");
+                game.setCheat(seat, Boolean.TRUE.equals(msg.get("on")));
+            }
             case "cheatWonder" -> {
                 if (!seats.get(seat).admin) throw new GameException("Only admins can do that.");
                 if (game == null) throw new GameException("The game hasn't started yet.");

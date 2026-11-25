@@ -56,6 +56,8 @@ public final class Player {
     public boolean away;
     /** Parallel rounds: this player's actions left this round, whether they have ended their round, and what they drew blind at its start. */
     public int actions;
+    /** Admin cheat mode: resources and actions never run out. */
+    public boolean cheat;
     public boolean done;
     public Game.CardInst turnDraw;
     public int turnEvents, turnSeq;

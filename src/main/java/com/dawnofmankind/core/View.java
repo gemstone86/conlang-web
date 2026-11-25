@@ -233,6 +233,7 @@ public final class View {
             if (p.seat == seat) pm.put("hand", p.hand.stream().map(View::card).toList());
             pm.put("done", p.done);
             pm.put("actions", p.actions);
+            if (p.cheat) pm.put("cheat", true);
             if (p.seat == seat && g.phase == Game.Phase.TURNS) {
                 pm.put("turnSeq", p.turnSeq);
                 pm.put("turnEvents", p.turnEvents);

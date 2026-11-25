@@ -1262,4 +1262,21 @@ class GameTest {
         assertNull(p.ofType("gatherer"), "no workers and retired: gone");
         assertNotNull(p.ofType("hunter"));
     }
+
+    @Test
+    void cheatModeMakesEverythingFreeWithUnlimitedActions() {
+        Game g = game(1, 6);
+        Player p = g.players.get(0);
+        p.res.put(Res.PRODUCTION, 0);
+        p.actions = 0;
+        assertThrows(GameException.class, () -> g.act(0, Map.of("type", "build", "building", "temple")));
+        g.setCheat(0, true);
+        for (int i = 0; i < 6; i++) {
+            g.act(0, Map.of("type", "move", "from", p.ofType("hunter").id, "to", "idle"));
+            g.act(0, Map.of("type", "move", "from", "idle", "to", p.ofType("hunter").id));
+        }
+        g.act(0, Map.of("type", "build", "building", "temple"));
+        assertNotNull(p.ofType("temple"));
+        assertTrue(p.actions > 50);
+    }
 }

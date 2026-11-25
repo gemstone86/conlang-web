@@ -184,7 +184,14 @@ const resList = (r, opts = {}) => RES.filter(k => (r?.[k] ?? 0) !== 0 || opts.al
   .map(k => `<span class="res r-${k}"${opts.src ? ` data-tipsrc="${k}"` : ''}>${opts.signed && r[k] > 0 ? '+' : ''}${r[k] ?? 0}<i>${RES_SHORT[k]}</i></span>`).join('') || '<span class="muted">—</span>';
 const affordable = cost => !cost || RES.every(k => (me().resources[k] || 0) >= (cost[k] || 0));
 
+function renderCheatButton() {
+  const b = $('cheatMode'), m = me();
+  b.hidden = !(room && room.admin && m);
+  if (!b.hidden) { b.textContent = 'Cheat mode: ' + (m.cheat ? 'ON' : 'off'); b.classList.toggle('on', !!m.cheat); }
+}
+$('cheatMode').onclick = () => send({ type: 'cheatMode', on: !me().cheat });
 function renderStatus() {
+  renderCheatButton();
   const s = state, waiting = s.players.filter(o => !o.done && !o.away).map(o => esc(o.name));
   const phase = s.result ? (s.result === 'victory' ? 'Victory' : 'Defeat')
     : s.phase === 'setup' ? 'Choosing starting lands'

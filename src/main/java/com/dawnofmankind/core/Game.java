@@ -701,6 +701,21 @@ public final class Game {
     }
 
     /** Once a building type is retired (gatherers after Agriculture) and nobody works in it or has a card in it, it is gone from the list. */
+    /** Admin cheat mode on or off for a seat: resources and actions are topped up so everything is free. */
+    public void setCheat(int seat, boolean on) {
+        Player p = players.get(seat);
+        p.cheat = on;
+        topUpCheat(p);
+        log(p.name + " (admin) turns cheat mode " + (on ? "on" : "off") + ".");
+        version++;
+    }
+
+    private void topUpCheat(Player p) {
+        if (!p.cheat) return;
+        for (Res r : Res.values()) if (p.res.get(r) < 99) p.res.put(r, 99);
+        if (p.actions < 99) p.actions = 99;
+    }
+
     private void pruneRetired() {
         Mods m = civMods();
         for (Player p : players) p.buildings.removeIf(b -> m.retired.contains(b.def.id) && b.workers == 0 && b.upgrades.isEmpty());
@@ -860,6 +875,7 @@ public final class Game {
         if (seat < 0 || seat >= players.size()) throw new GameException("Not a player in this game.");
         String type = Y.s(a, "type", "");
         Player p = players.get(seat);
+        topUpCheat(p);
         switch (type) {
             // free, at any time
             case "deposit" -> deposit(p, a);
@@ -904,6 +920,7 @@ public final class Game {
                 if (!free) p.actions--;
             }
         }
+        for (Player q : players) topUpCheat(q);
         pruneRetired();
         version++;
     }

@@ -1,5 +1,9 @@
 # Changes
 
+## v1.90.0 (combined app)
+
+- Dawn: admins get a "Cheat mode" button in the top bar (nobody else sees it, and the server refuses the message from anyone else). While it is on, your resources and actions are topped up after every move, so every card, building and payment is free with unlimited actions. It is logged in the game log.
+
 ## v1.89.4 (combined app)
 
 - Dawn: techs and minor wonders whose bonus needs an upgrade slot carry a "Bonus slot" tag (on the card, the small card and in the queue and hand).

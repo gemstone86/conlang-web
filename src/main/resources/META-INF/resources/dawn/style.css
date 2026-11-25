@@ -240,3 +240,5 @@ details summary { cursor: pointer; color: var(--bone-dim); font-size: .88rem; }
 
 .slottag { display: inline-block; font-size: .6rem; text-transform: uppercase; letter-spacing: .05em; padding: 0 .35rem; border-radius: 8px; background: var(--brass); color: #1a1408; font-weight: 700; vertical-align: middle; text-shadow: none; }
 .minicard.tall .slottag { align-self: flex-start; }
+
+#cheatMode.on { background: var(--err); color: #fff; }
