@@ -1,5 +1,9 @@
 # Changes
 
+## v1.93.2 (combined app)
+
+- Dawn: a big banner opens each era: "Prehistory / The prehistoric era begins…", then "The ancient era begins…" and so on, with the era-end effects carried over listed under it. Click to close, or it fades after a few seconds.
+
 ## v1.93.1 (combined app)
 
 - Dawn: lands found by an event, crises and lasting events are laid out in a grid instead of one long column, and the Done / Look at the board buttons of the event pop-up stay in view at the bottom, so you no longer have to zoom out.

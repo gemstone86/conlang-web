@@ -54,6 +54,7 @@ public final class View {
         v.put("era", g.era().name);
         v.put("eraIndex", g.eraIndex);
         v.put("eraCount", g.content.eras.size());
+        v.put("eraBoons", g.eraBoons.stream().map(b -> b.def().name).toList());
         v.put("firstPlayer", g.firstPlayer);
         v.put("actionsLeft", g.players.get(seat).actions);
         v.put("pickSeconds", g.pickSeconds);

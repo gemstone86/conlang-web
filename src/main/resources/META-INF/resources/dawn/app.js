@@ -134,6 +134,7 @@ function render(m) {
   renderCiv();
   checkPickReveal();
   checkNotices();
+  checkEraSplash();
   checkTurnDraw();
   renderStarvation();
   renderSetup();
@@ -304,6 +305,23 @@ $('queuePanel').onclick = e => {
   }
   send({ type: 'pick', slot: +b.dataset.pick });
 };
+// A big banner when an era begins (the first one too): once per era and room, click to close, or it fades by itself.
+let splashTimer = null;
+function checkEraSplash() {
+  if (!state || !room || state.phase === 'setup' || state.era == null) return;
+  const key = 'dawnEra-' + room.code;
+  let seen = null;
+  try { seen = sessionStorage.getItem(key); } catch (e) {}
+  if (seen === String(state.eraIndex)) return;
+  try { sessionStorage.setItem(key, String(state.eraIndex)); } catch (e) {}
+  const first = state.eraIndex === 0;
+  const boons = (state.eraBoons || []).length ? `<div class="splash-boon">Carried over: ${state.eraBoons.map(esc).join(', ')}</div>` : '';
+  $('eraSplashBox').innerHTML = `<div class="splash-title">${first ? 'Prehistory' : esc(state.era)}</div><div class="splash-sub">The ${esc(state.era.toLowerCase())} era begins…</div>${boons}<div class="splash-hint">click to continue</div>`;
+  $('eraSplash').hidden = false;
+  clearTimeout(splashTimer);
+  splashTimer = setTimeout(() => { $('eraSplash').hidden = true; }, 6000);
+}
+$('eraSplash').onclick = () => { $('eraSplash').hidden = true; clearTimeout(splashTimer); };
 // The card drawn blind at the start of your turn is shown in a pop-up (once per turn, also after a reload).
 function checkTurnDraw() {
   const m = me();

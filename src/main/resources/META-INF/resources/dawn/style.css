@@ -247,3 +247,14 @@ details summary { cursor: pointer; color: var(--bone-dim); font-size: .88rem; }
 #eventPanel .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr)); gap: .5rem; }
 #eventPanel.popup .cardx.pending > .actions { position: sticky; bottom: 0; background: #26303f; padding: .4rem 0; z-index: 3; box-shadow: 0 -6px 8px -4px rgba(0,0,0,.5); }
 #eventPanel.popup .cardx.pending > .cards .cardx { min-height: 0; }
+
+.erasplash { position: fixed; inset: 0; z-index: 60; display: flex; align-items: center; justify-content: center; text-align: center; cursor: pointer;
+  background: radial-gradient(ellipse at center, rgba(20,16,8,.82), rgba(0,0,0,.94)); animation: splashIn 1.1s ease both; }
+.erasplash[hidden] { display: none; }
+.splash-title { font: 400 clamp(3rem, 11vw, 8rem)/1.05 var(--serif, serif); color: var(--brass); letter-spacing: .06em; text-shadow: 0 4px 30px rgba(200,160,60,.45); animation: splashTitle 1.6s ease both; }
+.splash-sub { margin-top: 1rem; font: italic 400 clamp(1.2rem, 3.5vw, 2.2rem) var(--serif, serif); color: var(--bone); animation: splashIn 2s ease .5s both; }
+.splash-boon { margin-top: 1.4rem; font-size: 1rem; color: var(--bone-dim); animation: splashIn 2s ease 1s both; }
+.splash-hint { margin-top: 2.2rem; font-size: .75rem; letter-spacing: .15em; text-transform: uppercase; color: var(--bone-dim); opacity: .6; }
+@keyframes splashIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes splashTitle { from { opacity: 0; transform: scale(.88); letter-spacing: .3em; } to { opacity: 1; transform: scale(1); letter-spacing: .06em; } }
+@media (prefers-reduced-motion: reduce) { .erasplash, .splash-title, .splash-sub, .splash-boon { animation: none; } }
