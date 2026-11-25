@@ -22,7 +22,7 @@ import java.util.Set;
  * owner may give up to n cards to teammates for 1 action), freeRecruit (leader: the first troop trained each round takes no action),
  * freeTech (leader: the next technology played is free), healthMod (a land: Health counts n more or less while it is held), troopStrength (every troop is worth n more strength), recruitExtra (troops cost this much more to train),
  * troopUpkeep (food per troop each round, may be 0.5), buildingDiscount ({building: temple, production: 1}: that building costs less),
- * unlockBuilding (a tech makes a locked building such as the market available to everyone), halveWonderUpkeep (the upkeep of wonders from earlier eras is halved),
+ * retireBuilding (no more of that building can be built or expanded), unlockBuilding (a tech makes a locked building such as the market available to everyone), halveWonderUpkeep (the upkeep of wonders from earlier eras is halved),
  * growthDiscount (growing costs n less food), wonderDouble (resources given to great wonders count double), incomePerTerritory ({food: 1}: per territory in the realm),
  * noEnemy and halveEnemy (leaders: enemy strength on lands to settle is 0 / halved),
  * strengthBonus (leader: +n military strength), ownStrengthPerTwoTroops (leader: the owner's military strength +n per 2 troops), maxSlots ({farm: 1}: more worker slots a
@@ -41,10 +41,10 @@ public final class Effects {
 
     static final Set<String> IMMEDIATE = Set.of("gain", "lose", "population", "army", "stability", "health", "draw",
             "extraActions", "addCrisis", "destroyBuilding", "freeBuilding", "discover", "colony", "civilWar", "enemy", "settle", "core", "removeLand", "coreTerritory", "hostility",
-            "threat", "invadeIfStronger", "raidAll", "invasion", "healthTest", "trade");
+            "threat", "enemyCard", "invadeIfStronger", "raidAll", "invasion", "healthTest", "trade");
     static final Set<String> LASTING = Set.of("income", "perWorker", "handLimit", "actionsPerTurn", "raidDefense",
             "mitigate", "buildDiscount", "sharedPool", "victoryPoints", "invasionDefense", "faceUpLands", "settleDiscount", "freeSettlers", "strengthPerTwoTroops", "giveCards", "freeRecruit", "strengthBonus", "ownStrengthPerTwoTroops", "maxSlots", "buildCost", "wonderGrowth", "eventUnder", "actionsToHand",
-            "growthDiscount", "wonderDouble", "incomePerTerritory", "noEnemy", "halveEnemy", "healthMod", "troopStrength", "recruitExtra", "troopUpkeep", "freeTech", "buildingDiscount", "halveWonderUpkeep", "unlockBuilding");
+            "growthDiscount", "wonderDouble", "incomePerTerritory", "noEnemy", "halveEnemy", "healthMod", "troopStrength", "recruitExtra", "troopUpkeep", "freeTech", "buildingDiscount", "halveWonderUpkeep", "unlockBuilding", "retireBuilding", "invasionStrength", "settlerCost");
     static final Set<String> RESPONSE = Set.of("defense", "halve", "cancel", "healthBonus");
 
     static String key(Map<String, Object> e) {
@@ -59,13 +59,22 @@ public final class Effects {
     }
 
     /** Lasting bonuses for one player, summed from their techs and minor wonders, the team's great wonders and active curses. */
+    /** Effects that change what buildings produce need an upgrade slot; rule changes (hand size, actions, ...) always work. */
+    public static boolean needsSlot(Map<String, Object> e) {
+        String k = key(e);
+        return k.equals("income") || k.equals("perWorker") || UNIT_KEYS.contains(k);
+    }
+
+    /** Effects on the army (Spearmen): they go in a Warriors slot. */
+    static final Set<String> UNIT_KEYS = Set.of("troopStrength", "recruitExtra", "troopUpkeep");
+
     public static final class Mods {
         public final EnumMap<Res, Integer> income = Res.empty();
         public final Map<String, EnumMap<Res, Integer>> perWorker = new HashMap<>();
         public final EnumMap<Res, Integer> buildDiscount = Res.empty();
         public final EnumMap<Res, Integer> poolIncome = Res.empty();
         public final Set<String> mitigate = new HashSet<>();
-        public int handLimit, actionsPerTurn, raidDefense, victoryPoints, invasionDefense, faceUpLands, freeSettlers, strengthPerTwoTroops, giveCards, freeRecruit, strengthBonus, ownStrengthPerTwoTroops, growthDiscount, wonderDouble, healthMod, troopStrength;
+        public int handLimit, actionsPerTurn, raidDefense, victoryPoints, invasionDefense, faceUpLands, freeSettlers, strengthPerTwoTroops, giveCards, freeRecruit, strengthBonus, ownStrengthPerTwoTroops, growthDiscount, wonderDouble, healthMod, troopStrength, invasionStrength, settlerCost;
         /** Spear Men: troops cost more to train and eat food. */
         public final EnumMap<Res, Integer> recruitExtra = Res.empty();
         public double troopUpkeep;
@@ -83,6 +92,8 @@ public final class Effects {
         public boolean halveWonderUpkeep;
         /** Buildings a tech makes available (Markets). */
         public final Set<String> unlocked = new HashSet<>();
+        /** Buildings nobody may build or expand any more (the gatherers once Agriculture is known). */
+        public final Set<String> retired = new HashSet<>();
 
         void add(List<Map<String, Object>> effects) {
             for (Map<String, Object> e : effects) add(e);
@@ -105,6 +116,8 @@ public final class Effects {
                 case "actionsPerTurn" -> actionsPerTurn += Y.toInt(v);
                 case "raidDefense" -> raidDefense += Y.toInt(v);
                 case "invasionDefense" -> invasionDefense += Y.toInt(v);
+                case "invasionStrength" -> invasionStrength += Y.toInt(v);
+                case "settlerCost" -> settlerCost += Y.toInt(v);
                 case "faceUpLands" -> faceUpLands += Y.toInt(v);
                 case "freeSettlers" -> freeSettlers += Y.toInt(v);
                 case "strengthPerTwoTroops" -> strengthPerTwoTroops += Y.toInt(v);
@@ -133,6 +146,7 @@ public final class Effects {
                 }
                 case "halveWonderUpkeep" -> halveWonderUpkeep = true;
                 case "unlockBuilding" -> unlocked.add(String.valueOf(v));
+                case "retireBuilding" -> retired.add(String.valueOf(v));
                 case "settleDiscount" -> Res.parse(v).forEach((r, n) -> settleDiscount.merge(r, n, Integer::sum));
                 case "victoryPoints" -> victoryPoints += Y.toInt(v);
                 case "mitigate" -> mitigate.addAll(Y.strings(v));

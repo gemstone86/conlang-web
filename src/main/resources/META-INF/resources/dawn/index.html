@@ -11,10 +11,12 @@
 </head>
 <body>
 <header class="top">
+  <a href="/" class="home" title="Start page">&#8592; Start</a>
   <h1><a href="./">Dawn of Mankind</a></h1>
   <div id="status" class="status"></div>
   <button id="gameLog" class="allcards" type="button" title="Download everything that happened, to send for review">Game log</button>
   <button id="adminLogs" class="allcards" type="button" hidden title="Admin: download every saved game log as a zip (they are deleted from the server afterwards)">All game logs</button>
+  <button id="cheatMode" class="allcards" type="button" hidden title="Admin: play everything for free with unlimited actions">Cheat mode: off</button>
   <button id="allCards" class="allcards" type="button">All cards</button>
 </header>
 
@@ -27,6 +29,7 @@
     <label for="name">Your name</label>
     <input id="name" maxlength="24" autocomplete="nickname">
     <p id="loggedIn" class="muted small" hidden></p>
+    <p id="loginHint" class="muted small" hidden>Not logged in. <a id="loginLink" href="/">Log in</a> to play under your account name.</p>
     <div class="row">
       <button id="create" class="primary">Create a room</button>
     </div>
@@ -93,6 +96,7 @@
 <div id="starveModal" class="modal" hidden><div class="card narrow" id="starveBox"></div></div>
 <div id="gotModal" class="modal" hidden><div class="card narrow" id="gotBox"></div></div>
 <div id="growModal" class="modal" hidden><div class="card narrow" id="growBox"></div></div>
+<div id="eraSplash" class="erasplash" hidden><div id="eraSplashBox"></div></div>
 <div id="over" class="modal" hidden><div class="card narrow" id="overBox"></div></div>
 
 <script src="app.js"></script>

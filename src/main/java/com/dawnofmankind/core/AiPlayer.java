@@ -85,7 +85,8 @@ public final class AiPlayer {
         {
             if (pe == null || Boolean.TRUE.equals(pe.ready.get(p.seat))) return false;
             for (Game.Frontier f : List.copyOf(g.frontier)) {
-                if (f.fromEvent && f.eventCard == pe.event.id) tryAct(g, p, landPay(g, p, f, Map.of("type", "colonize")));
+                // a land from an event is lost unless it is paid at once: send nothing if the whole team can't pay it between them
+                if (f.fromEvent && f.eventCard == pe.event.id && teamCanPay(g, f)) tryAct(g, p, landPay(g, p, f, Map.of("type", "colonize")));
             }
             for (CardInst c : List.copyOf(p.hand)) {
                 if (c.def.type == CardType.RESPONSE && tryAct(g, p, Map.of("type", "respond", "card", c.id))) break;
@@ -98,6 +99,7 @@ public final class AiPlayer {
     }
 
     private boolean takeAction(Game g, Player p) {
+        slotUpgrades(g, p);
         // play techs, wonders and actions
         for (CardInst c : List.copyOf(p.hand)) {
             if (c.def.type == CardType.RESPONSE) continue;
@@ -119,7 +121,10 @@ public final class AiPlayer {
         int food = p.res.get(Res.FOOD), pop = p.population();
         if (food >= 3 + pop && g.freeSlots(p) > 0 && tryAct(g, p, Map.of("type", "grow"))) return true;
         if (g.freeSlots(p) == 0) {
-            String b = countFarms(p) * 2 * 2 < pop + 3 ? "farm" : pick("village", "temple", "mine", "farm");
+            boolean farms = g.canBuild(g.content.buildings.get("farm")), mines = g.canBuild(g.content.buildings.get("mine"));
+            String foodB = farms ? "farm" : "gatherer", prod = mines ? "mine" : "hunter";
+            String b = countFarms(p) * 2 * 2 < pop + 3 ? foodB : pick("village", "temple", prod, foodB);
+            if (!g.canBuild(g.content.buildings.get(b))) b = pick("village", "temple");
             if (tryAct(g, p, Map.of("type", "build", "building", b))) return true;
         }
         if (p.army < 2 && tryAct(g, p, Map.of("type", "recruit"))) return true;
@@ -143,6 +148,22 @@ public final class AiPlayer {
         return false;
     }
 
+    /** Whether the players together can spare enough resources, troops and settlers to finish the land (the same spare amounts a bot sends). */
+    static boolean teamCanPay(Game g, Game.Frontier f) {
+        EnumMap<Res, Integer> left = g.settleLeft(f);
+        for (Res r : Res.values()) {
+            int spare = 0;
+            for (Player q : g.players) spare += Math.max(0, q.res.get(r) - (r == Res.FOOD ? q.population() : 0));
+            if (spare < left.get(r)) return false;
+        }
+        int troops = 0, settlers = 0;
+        for (Player q : g.players) {
+            troops += g.strength(q, Math.max(0, q.army - q.committed - 1));
+            settlers += q.population() > 4 ? q.population() - 4 : 0;
+        }
+        return troops >= g.settleTroops(f) - f.troopsPaid && settlers >= g.settleSettlers(f) - f.settlersPaid;
+    }
+
     /** Sends what the bot can spare toward a land. */
     private static Map<String, Object> landPay(Game g, Player p, Game.Frontier f, Map<String, Object> base) {
         Map<String, Object> m = new HashMap<>(base);
@@ -162,7 +183,7 @@ public final class AiPlayer {
     }
 
     private static int countFarms(Player p) {
-        return (int) p.buildings.stream().filter(b -> b.def.id.equals("farm")).count();
+        return (int) p.buildings.stream().filter(b -> b.def.id.equals("farm") || b.def.id.equals("gatherer")).count();
     }
 
     private final java.util.Set<String> freeDone = new java.util.HashSet<>();
@@ -170,6 +191,19 @@ public final class AiPlayer {
     /** True the first time for this seat, round and thing (a free payment that takes no action). */
     private boolean freeOnce(Game g, Player p, String what) {
         return freeDone.add(System.identityHashCode(g) + ":" + g.round + ":" + p.seat + ":" + what);
+    }
+
+    /** Free: put every researched card that makes a building better into a free upgrade slot. */
+    private static void slotUpgrades(Game g, Player p) {
+        for (Content.CardDef c : g.slottable(p)) {
+            if (g.slotKind(c).equals("warriors")) {
+                tryAct(g, p, Map.of("type", "slot", "card", c.id, "building", "warriors"));
+                continue;
+            }
+            for (Player.Building b : p.buildings) {
+                if (b.upgrades.size() < b.def.upgradeSlots && tryAct(g, p, Map.of("type", "slot", "card", c.id, "building", b.id))) break;
+            }
+        }
     }
 
     private static boolean tryAct(Game g, Player p, Map<String, Object> a) {

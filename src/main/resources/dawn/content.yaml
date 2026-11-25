@@ -10,11 +10,12 @@
 rules:
   actionsPerTurn: 4
   handLimit: 7
-  startWorkers: {farm: 2, mine: 1}        # start with a Farm and a Mine; 3 Population: 2 farmers, 1 miner
+  startWorkers: {gatherer: 2, hunter: 1}  # start with Gatherers and Hunters; 3 Population: 2 gatherers, 1 hunter
   startResources: {food: 3, production: 2}
-  growthCost: {food: 3}                   # action "grow": +1 Population ...
-  growthStep: 4                           # ... +1 food for every 4 people beyond the first
+  growthCost: {food: 6}                   # action "grow": +1 Population (Agriculture takes 3 off) ...
+  growthStep: 2                           # ... +1 food for every 2 people beyond the first
   buildingEscalation: 1                   # each level a building already has adds 1 production to the next
+  unitSlots: {warriors: 1, population: 0}   # bonus slots of the army and of the idle people
   homeSlots: {farm: 2, mine: 2}           # farm and mine worker slots each player has before any territory
   startTerritories: 2                     # territories drawn from the world deck at the start
   faceUpLands: 2                          # face-up lands, paid off over time with Settle cards; replaced when settled
@@ -30,45 +31,69 @@ rules:
   startStability: 10
   startHealth: 2
   queueExtra: 4                           # queue size = players + 4
-  removedPerRound: {1: 1, 2: 1, 3: 2, 4: 2, 5: 3, 6: 3}
+  removedPerRound: {1: 2, 2: 2, 3: 1, 4: 1, 5: 1, 6: 1}
   startingEventsPerPlayer: 2
   # what an era deck holds: base + perPlayer × players cards of each kind, drawn at random from that era's list below
   eraDeck:
     leader: {base: 1, perPlayer: 1}
     great_wonder: {base: 0, perPlayer: 1}
     minor_wonder: {base: 1, perPlayer: 1}
-    hostility: {base: 0, perPlayer: 1}
+    hostility: {base: 0, perPlayer: 2}
     tech: {base: 6, perPlayer: 1}
     city_state: {base: 1, perPlayer: 0}
     action: {base: 24, perPlayer: 2}
     response: {base: 0, perPlayer: 1}
     event: {base: 12, perPlayer: 1}
-    era_trigger: {base: 1, perPlayer: 0}
-  eraTriggerBottomPercent: 30             # era-trigger events are placed in the bottom 30% of the era deck
+    era_trigger: {base: 3, perPlayer: 0}       # the three end-of-era cards; when the third is turned up the era ends
+  # the enemy deck at the start (strength: number of cards); raids and invasions draw from it, the cards go back after
+  enemyDeck: {"1": 6, "2": 4}
+  eraTriggerBottomPercent: 100            # the end-of-era cards are shuffled into the whole era deck (100%), not just the bottom part
   # fights: troops spent (up to the enemy's strength) must reach that strength (response cards add to it);
   # the troops spent settling a land are all lost; in invasions half of them, rounded up
 
 # A player has one building of each type. Building it again adds a level: 2 more worker slots.
 buildings:
+  gatherer:
+    upgradeSlots: 1
+    name: Gatherers
+    cost: {production: 2}
+    slots: 2
+    slotKey: farm                        # uses the same land slots as farms
+    perWorker: {food: 2}
+    text: Each gatherer produces 2 food. No more can be built once Agriculture is known.
+  hunter:
+    upgradeSlots: 1
+    name: Hunters
+    cost: {production: 2}
+    slots: 2
+    slotKey: mine                        # uses the same land slots as mines
+    perWorker: {food: 1, production: 1}
+    text: Each hunter produces 1 food and 1 production. No more can be built once Metalworking is known.
   farm:
+    upgradeSlots: 2
     name: Farm
+    locked: true                         # built only after the Agriculture tech
     cost: {production: 2}
     slots: 2
     perWorker: {food: 2}
     text: Each farmer produces 2 food.
   mine:
+    upgradeSlots: 2
     name: Mine
+    locked: true                         # built only after the Metalworking tech
     cost: {production: 2}
     slots: 2
     perWorker: {production: 2}
     text: Each miner produces 2 production.
   temple:
+    upgradeSlots: 1
     name: Temple
     cost: {production: 3}
     slots: 2
     perWorker: {culture: 2}
     text: Each worker produces 2 culture (and 1 happiness, coming later).
   market:
+    upgradeSlots: 1
     name: Market
     locked: true                         # built only after the Markets tech
     cost: {production: 4, culture: 2}
@@ -77,6 +102,7 @@ buildings:
     upkeep: {food: 1, production: 1}    # paid every round while you own one
     text: Each worker produces 1 influence and 1 culture. Upkeep 1 food and 1 production every round. Available once Markets has been researched.
   village:
+    upgradeSlots: 1
     name: Village
     cost: {production: 3}
     slots: 2
@@ -172,28 +198,28 @@ greatWonders:
   stonehenge:
     name: Stonehenge
     era: prehistoric
-    costPerPlayer: {production: 10, culture: 3}
+    costPerPlayer: {production: 6, culture: 3}
     effects: [{actionsPerTurn: 1}]
     victoryPoints: 2
     text: Every player gets +1 action per turn.
   gobekli_tepe:
     name: Göbekli Tepe
     era: prehistoric
-    costPerPlayer: {production: 9, culture: 3, research: 2}
+    costPerPlayer: {production: 6, culture: 3, research: 2}
     effects: [{income: {culture: 2}}, {growthDiscount: 1}, {maxSlots: {farm: 1}}]
     victoryPoints: 2
     text: Every player gets +2 culture per turn, growing costs 1 less food, and +1 farm slot.
   ggantija_temples:
     name: Ġgantija Temples
     era: prehistoric
-    costPerPlayer: {production: 10, culture: 3}
+    costPerPlayer: {production: 6, culture: 3}
     effects: [{wonderDouble: 1}, {maxSlots: {mine: 1}}]
     victoryPoints: 2
     text: Resources given to other great wonders count double. Every player gets +1 mine slot.
   skara_brae:
     name: Skara Brae
     era: prehistoric
-    costPerPlayer: {production: 8, food: 6}
+    costPerPlayer: {production: 5, food: 6}
     effects: [{incomePerTerritory: {food: 1}}]
     victoryPoints: 2
     text: Every player gets +1 food per turn for each territory in the realm.
@@ -213,29 +239,78 @@ greatWonders:
     text: Every farmer +1 food, every player +1 culture per turn.
   great_library:
     name: The Great Library
-    era: ancient
+    era: classical
     costPerPlayer: {production: 9, culture: 4, research: 3}
     effects: [{income: {research: 4}}, {handLimit: 1}]
     victoryPoints: 2
     text: Every player +4 research per turn and +1 max hand size.
+  parthenon:
+    name: The Parthenon
+    era: classical
+    costPerPlayer: {production: 11, culture: 5}
+    effects: [{income: {culture: 2}}, {stability: 1}]
+    victoryPoints: 2
+    text: Every player gets +2 culture per turn and +1 Stability.
+  colosseum:
+    name: The Colosseum
+    era: classical
+    costPerPlayer: {production: 12, culture: 3}
+    effects: [{stability: 2}, {raidDefense: 2}]
+    victoryPoints: 2
+    text: +2 Stability and +2 defense against raids for everyone.
+  knossos:
+    name: The Palace of Knossos
+    era: ancient
+    costPerPlayer: {production: 9, culture: 3, influence: 2}
+    effects: [{income: {influence: 1}}, {settleDiscount: {production: 1}}]
+    victoryPoints: 2
+    text: Every player gets +1 influence per turn. Settling any land costs 1 production less.
+  ziggurat_of_ur:
+    name: The Ziggurat of Ur
+    era: ancient
+    costPerPlayer: {production: 9, culture: 3, research: 2}
+    effects: [{income: {research: 1}}, {handLimit: 1}]
+    victoryPoints: 2
+    text: Every player gets +1 research per turn and +1 max hand size.
+  karnak:
+    name: The Temple of Karnak
+    era: ancient
+    costPerPlayer: {production: 11, culture: 4}
+    effects: [{income: {culture: 2}}, {buildingDiscount: {building: temple, production: 1}}]
+    victoryPoints: 2
+    text: Every player gets +2 culture per turn, and temples cost 1 production less.
+  pantheon:
+    name: The Pantheon
+    era: classical
+    costPerPlayer: {production: 11, culture: 4}
+    effects: [{income: {culture: 1}}, {perWorker: {building: temple, culture: 1}}]
+    victoryPoints: 2
+    text: Every player gets +1 culture per turn, and each temple worker produces +1 culture.
+  great_wall:
+    name: The Great Wall
+    era: classical
+    costPerPlayer: {production: 13, food: 2}
+    effects: [{invasionDefense: 4}, {raidDefense: 1}]
+    victoryPoints: 2
+    text: +4 defense for the whole team against invasions and +1 against raids.
   nomadic_living:
     name: Nomadic Living
     era: prehistoric
-    costPerPlayer: {production: 5, food: 3}       # cheap: about 2.5 rounds of the team's output
+    costPerPlayer: {production: 3, food: 3}       # cheap: about 2.5 rounds of the team's output
     effects: [{freeSettlers: 1}]
     victoryPoints: 1
     obsoleteAfter: prehistoric
     text: Settling any land takes 1 settler less. Obsolete once the Prehistoric era is over.
   great_lighthouse:
     name: The Great Lighthouse
-    era: ancient
+    era: classical
     costPerPlayer: {production: 10, food: 3}
     effects: [{faceUpLands: 1}, {settleDiscount: {production: 2}}, {freeSettlers: 1}, {coreTerritory: 1}]
     victoryPoints: 2
     text: One more land lies face up. Settling any land costs 2 production and 1 settler less. Cores a territory (the one it stands in).
   colossus:
     name: The Colossus
-    era: ancient
+    era: classical
     costPerPlayer: {production: 13, influence: 3}
     effects: [{perWorker: {building: mine, production: 1}}]
     victoryPoints: 2
@@ -315,7 +390,7 @@ keywords:
   great_person:
     name: "Great person"
     match: [great person, great people]
-    text: "Plays itself the moment you draw it. If you already have one you choose whether the newcomer replaces them. A great person leaves when the era ends."
+    text: "Goes to your hand. Play it for 1 action and 4 resources of any kind per era (4 in the Prehistoric era, 8 in the Ancient); it replaces your current great person. A great person leaves when the era ends."
   upkeep:
     name: "Upkeep"
     match: [upkeep]
@@ -376,11 +451,13 @@ eras:
       storyteller: 1
       great_mother: 1
       # hostility: triggers when revealed, adding enemies to the next invasion
-      hostility_1: 3
-      hostility_2: 3
+      hostility_1: 4
+      hostility_2: 4
       # technologies
       fire: 1
       stone_tools: 1
+      lithic_art: 1
+      agriculture: 1
       hunting: 1
       animal_husbandry: 1
       pottery: 1
@@ -412,6 +489,7 @@ eras:
       offering_to_the_spirits: 1
       # events
       wolf_pack: 2
+      legendary_predator: 1
       rival_tribe: 2
       wandering_horde: 1
       harsh_winter: 1
@@ -429,39 +507,40 @@ eras:
       wondrous_land_found: 1
       hostile_tribes: 2
       rivals_claim: 1
-      dawn_of_agriculture: 1
+      end_of_prehistoric: 3
+    # when the third end card is turned up, one of these strikes; its effects last through the next era
+    endEvents: [dawn_of_agriculture, climate_crisis, cult_of_ancestors]
   - id: ancient
     name: Ancient
     cards:
       pyramids: 1
       hanging_gardens: 1
-      great_library: 1
-      great_lighthouse: 1
-      colossus: 1
-      roman_roads: 1
       great_tomb: 1
       epic_wall: 1
       great_trade_route: 1
-      tomyris: 1
-      alexander_the_great: 1
-      julius_caesar: 1
-      archimedes: 1
+      knossos: 1
+      ziggurat_of_ur: 1
+      karnak: 1
+      hatshepsut: 1
+      sargon: 1
+      minos: 1
+      imhotep: 1
       gilgamesh: 1
       hammurabi: 1
       ramses: 1
-      hostility_2: 2
-      hostility_3: 2
-      hostility_5: 1
-      agriculture: 1
+      hostility_2: 4
+      hostility_3: 3
+      metalworking: 1
       bronze_working: 1
       writing: 1
       masonry: 1
       medicine: 1
       currency: 1
       calendar: 1
-      code_of_laws: 1
       horseback_riding: 1
       ancients_customs: 1
+      irrigation_canals: 1
+      sailing: 1
       markets: 1
       city_state: 1
       irrigation: 2
@@ -511,8 +590,96 @@ eras:
       hostile_tribes: 1
       warlord: 2
       rivals_claim: 1
-      rise_of_empires: 1
-
+      pharaohs_curse: 1
+      volcano_of_thera: 1
+      end_of_ancient: 3
+    # when the third end card is turned up, one of these strikes; its effects last through the next era
+    endEvents: [bronze_age_collapse, iron_age_dawns, age_of_philosophers]
+  - id: classical
+    name: Classical
+    cards:
+      # great wonders
+      great_library: 1
+      great_lighthouse: 1
+      colossus: 1
+      parthenon: 1
+      colosseum: 1
+      roman_roads: 1
+      # leaders
+      pantheon: 1
+      great_wall: 1
+      aqueducts: 1
+      forum: 1
+      cleopatra: 1
+      cyrus: 1
+      augustus: 1
+      tomyris: 1
+      alexander_the_great: 1
+      julius_caesar: 1
+      archimedes: 1
+      pericles: 1
+      hannibal: 1
+      # hostility
+      hostility_3: 3
+      hostility_5: 3
+      # technologies
+      code_of_laws: 1
+      iron_working: 1
+      philosophy: 1
+      mathematics: 1
+      roman_concrete: 1
+      legion_tactics: 1
+      engineering: 1
+      city_state: 1
+      # actions
+      irrigation: 1
+      harvest_festival: 1
+      conscription: 2
+      scribes: 1
+      merchants: 2
+      stone_quarry: 1
+      census: 1
+      festival: 1
+      long_day: 1
+      foraging: 1
+      send_scouts: 1
+      settle_land: 3
+      core_territory: 2
+      new_trading_route: 2
+      # responses
+      city_walls: 2
+      quarantine: 1
+      priests: 1
+      granary_reserve: 1
+      # events
+      barbarian_raid: 2
+      gallic_warband: 2
+      chariot_raiders: 1
+      goths_invade: 1
+      hill_tribes: 1
+      nomad_empire: 1
+      drought: 1
+      earthquake: 1
+      plague: 1
+      revolt: 1
+      civil_war: 1
+      golden_age: 1
+      great_scientist: 1
+      refugees: 1
+      comet_sighted: 1
+      explorers: 1
+      free_colony: 1
+      great_expedition: 1
+      rich_land_found: 1
+      fortified_land_found: 1
+      fertile_delta_found: 1
+      wondrous_land_found: 1
+      hostile_tribes: 1
+      warlord: 2
+      rivals_claim: 1
+      hannibal_at_the_gates: 1
+      pax_romana: 1
+      end_of_classical: 3
 # The starting event deck: 2 per player, drawn from these (number = copies in the pool).
 startingEvents:
   wolf_pack: 2
@@ -621,8 +788,15 @@ cards:
     name: Stone Tools
     type: tech
     cost: {research: 2, production: 1}
-    effects: [{perWorker: {building: mine, production: 1}}]
-    text: Your miners produce +1 production.
+    effects: [{perWorker: {building: hunter, production: 1}}]
+    text: Your hunters produce +1 production.
+    required: true                       # always in the Prehistoric era deck
+  lithic_art:
+    name: Lithic Art
+    type: tech
+    cost: {research: 2, production: 1}
+    effects: [{perWorker: {building: hunter, culture: 1}}]
+    text: Your hunters produce +1 culture. Put it in a Hunters slot (competes with Stone Tools for the one slot).
   hunting:
     name: Hunting
     type: tech
@@ -664,7 +838,7 @@ cards:
     type: tech
     cost: {research: 2, production: 2}
     effects: [{troopStrength: 1}, {recruitExtra: {production: 1}}, {troopUpkeep: 0.5}]
-    text: Every troop counts for +1 more strength, but training one costs +1 production and each troop eats half a food per round.
+    text: Every troop counts for +1 more strength, but training one costs +1 production and each troop eats half a food per round. Put it in the Warriors bonus slot; take it out if your economy needs the relief.
   herbalism:
     name: Herbalism
     type: tech
@@ -674,9 +848,17 @@ cards:
   agriculture:
     name: Agriculture
     type: tech
+    required: true                       # always in the Prehistoric era deck
     cost: {research: 4, food: 2}
-    effects: [{perWorker: {building: farm, food: 1}}]
-    text: Your farmers produce +1 food.
+    effects: [{unlockBuilding: farm}, {retireBuilding: gatherer}, {growthDiscount: 3}]
+    text: Unlocks the Farm for everyone and ends the building of more Gatherers (those you have stay). Growing costs 3 less food.
+  metalworking:
+    name: Metalworking
+    type: tech
+    required: true                       # always in the Ancient era deck
+    cost: {research: 4, production: 3}
+    effects: [{unlockBuilding: mine}, {retireBuilding: hunter}]
+    text: Unlocks the Mine for everyone and ends the building of more Hunters (those you have stay).
   bronze_working:
     name: Bronze Working
     type: tech
@@ -991,17 +1173,25 @@ cards:
     type: event
     category: raid
     kind: raid
-    strength: 2
+    draws: {base: 0, perEra: 1}
     perShortfall: [{lose: {food: 1}}]
-    text: Raid, strength 2. Each point you fall short costs 1 food.
+    text: "Raid: draw the Era number of enemy cards (Prehistoric 1, Ancient 2). Each point you fall short costs 1 food."
+  legendary_predator:
+    name: Legendary Predator
+    type: event
+    category: raid
+    kind: raid
+    strength: {base: 2, perPlayer: 1}
+    perShortfall: [{lose: {food: 2}}]
+    text: "Raid, strength = players + 2 (a fixed strength, no enemy cards are drawn). Each point you fall short costs 2 food."
   rival_tribe:
     name: Rival Tribe
     type: event
     category: raid
     kind: raid
-    strength: 3
+    draws: {base: 1, perEra: 1}
     perShortfall: [{lose: {food: 1, production: 1}}]
-    text: Raid, strength 3. Each point short costs 1 food and 1 production.
+    text: "Raid: draw the Era number + 1 enemy cards. Each point short costs 1 food and 1 production."
   wandering_horde:
     name: Wandering Horde
     type: event
@@ -1009,7 +1199,7 @@ cards:
     kind: invasion
     strength: {perPlayerPerTerritory: 1}
     perShortfall: [{lose: {food: 1}}]
-    text: Invasion, strength = players × territories + the massed enemies. If it breaks through, a territory is lost and each point short costs every player 1 food.
+    text: Invasion, strength = players × territories + the massed enemies, drawn from the enemy deck. If it breaks through, a territory is lost and each point short costs every player 1 food.
   harsh_winter:
     name: Harsh Winter
     type: event
@@ -1096,26 +1286,236 @@ cards:
     name: Dawn of Agriculture
     type: event
     category: era
-    eraTrigger: true
+    effects: [{maxSlots: {farm: 1}}, {invasionStrength: 2}]
+    text: "Era end. For the whole next era: +1 farm slot, but every invasion is 2 stronger."
+  climate_crisis:
+    name: Climate Crisis
+    type: event
+    category: era
+    effects: [{maxSlots: {farm: 1}}, {settlerCost: 1}]
+    text: "Era end. For the whole next era: +1 farm slot, but every colony costs 1 more settler."
+  cult_of_ancestors:
+    name: Cult of the Ancestors
+    type: event
+    category: era
+    effects: [{income: {culture: 1}}, {handLimit: -1}]
+    text: "Era end. For the whole next era: every player gets +1 culture per turn, but hand size is 1 smaller."
+  end_of_prehistoric:
+    name: End of an Era
+    type: era_end
+    text: "The Prehistoric era is coming to an end. This card can't be taken. When the third one is turned up, a special event ends the era, and its effects last through the next one."
+  end_of_ancient:
+    name: End of an Era
+    type: era_end
+    text: "The Ancient era is coming to an end. This card can't be taken. When the third one is turned up, a special event ends the era, and its effects last through the next one."
+  iron_working:
+    name: Iron Working
+    type: tech
+    cost: {research: 5, production: 3}
+    effects: [{perWorker: {building: mine, production: 1}}]
+    text: Your miners produce +1 production.
+  philosophy:
+    name: Philosophy
+    type: tech
+    cost: {research: 5, culture: 2}
+    effects: [{income: {research: 1, culture: 1}}]
+    text: +1 research and +1 culture per turn.
+  mathematics:
+    name: Mathematics
+    type: tech
+    cost: {research: 5}
+    effects: [{perWorker: {building: village, research: 1}}]
+    text: Your village workers produce +1 research.
+  engineering:
+    name: Engineering
+    type: tech
+    cost: {research: 5, production: 2}
+    effects: [{buildDiscount: {production: 1}}]
+    text: Buildings cost 1 less production.
+  pericles:
+    name: Pericles
+    type: leader
+    effects: [{income: {culture: 2}}]
+    text: +2 culture per turn.
+  hannibal:
+    name: Hannibal
+    type: leader
+    effects: [{strengthBonus: 3}]
+    text: +3 military strength.
+  bronze_age_collapse:
+    name: Bronze Age Collapse
+    type: event
+    category: era
+    effects: [{maxSlots: {mine: 1}}, {settlerCost: 1}]
+    text: "Era end. For the whole next era: +1 mine slot, but every colony costs 1 more settler."
+  iron_age_dawns:
+    name: The Iron Age Dawns
+    type: event
+    category: era
+    effects: [{maxSlots: {mine: 1}}, {invasionStrength: 2}]
+    text: "Era end. For the whole next era: +1 mine slot, but every invasion is 2 stronger."
+  age_of_philosophers:
+    name: Age of Philosophers
+    type: event
+    category: era
+    effects: [{income: {research: 1}}, {handLimit: -1}]
+    text: "Era end. For the whole next era: every player gets +1 research per turn, but hand size is 1 smaller."
+  end_of_classical:
+    name: End of an Era
+    type: era_end
+    text: "The Classical era is coming to an end. This card can't be taken. When the third one is turned up, the civilization has endured and the game is won at the end of the round."
+  gallic_warband:
+    name: Gallic Warband
+    type: event
+    category: raid
+    kind: raid
+    draws: {base: 3, perEra: 1}
+    perShortfall: [{lose: {food: 1, production: 1, culture: 1}}]
+    text: "Raid: draw the Era number + 3 enemy cards. Each point short costs 1 food, 1 production and 1 culture."
+  goths_invade:
+    name: The Goths Invade
+    type: event
+    category: invasion
+    kind: invasion
+    strength: {perPlayerPerTerritory: 1}
+    perShortfall: [{lose: {food: 1, production: 1}}]
+    text: Invasion, strength = players × territories + the massed enemies, drawn from the enemy deck. If it breaks through, a territory is lost and each point short costs every player 1 food and 1 production.
+  hatshepsut:
+    name: Hatshepsut
+    type: leader
+    effects: [{income: {influence: 1, food: 1}}]
+    text: "+1 influence and +1 food per turn. A trade queen."
+  sargon:
+    name: Sargon of Akkad
+    type: leader
+    effects: [{strengthBonus: 2}, {raidDefense: 2}]
+    text: +2 military strength and +2 defense against raids.
+  minos:
+    name: King Minos
+    type: leader
+    effects: [{raidDefense: 2}, {income: {influence: 1}}]
+    text: +2 defense against raids and +1 influence per turn. A sea power.
+  imhotep:
+    name: Imhotep
+    type: leader
+    effects: [{buildDiscount: {production: 1}}, {income: {production: 1}}]
+    text: Buildings cost 1 production less, and +1 production per turn.
+  cleopatra:
+    name: Cleopatra
+    type: leader
+    effects: [{income: {influence: 2}}]
+    text: +2 influence per turn.
+  cyrus:
+    name: Cyrus the Great
+    type: leader
+    effects: [{troopStrength: 1}]
+    text: Each of your troops counts for +1 strength.
+  augustus:
+    name: Augustus
+    type: leader
+    effects: [{actionsPerTurn: 1}, {raidDefense: 1}]
+    text: +1 action per turn and +1 defense against raids.
+  irrigation_canals:
+    name: Irrigation Canals
+    type: tech
+    cost: {research: 4, food: 1}
+    effects: [{perWorker: {building: farm, food: 1}}]
+    text: Your farmers produce +1 food.
+  sailing:
+    name: Sailing
+    type: tech
+    cost: {research: 4, production: 1}
+    effects: [{faceUpLands: 1}, {income: {influence: 1}}]
+    text: One more land lies face up, and +1 influence per turn.
+  roman_concrete:
+    name: Roman Concrete
+    type: tech
+    cost: {research: 6, production: 2}
+    effects: [{wonderDouble: 1}]
+    text: Resources you give to great wonders count double.
+  legion_tactics:
+    name: Legion Tactics
+    type: tech
+    cost: {research: 5, production: 2}
+    effects: [{troopStrength: 1}]
+    text: Every troop counts for +1 more strength. Put it in the Warriors bonus slot.
+  aqueducts:
+    name: Aqueducts
+    type: minor_wonder
+    cost: {production: 5, culture: 2}
+    effects: [{growthDiscount: 1}, {health: 1}]
+    text: Growing costs 1 less food, and +1 Health.
+  forum:
+    name: The Forum
+    type: minor_wonder
+    cost: {production: 4, culture: 2}
+    effects: [{income: {influence: 1, culture: 1}}]
+    text: +1 influence and +1 culture per turn.
+  pharaohs_curse:
+    name: The Pharaoh's Curse
+    type: event
+    category: unrest
     target: each
-    effects: [{gain: {food: 2}}]
-    text: Every player gains 2 food. The Prehistoric era ends at the end of this round.
+    effects: [{lose: {culture: 2}}]
+    text: Every player loses 2 culture.
+  volcano_of_thera:
+    name: Volcano of Thera
+    type: event
+    category: unrest
+    effects: [{stability: -1}, {health: -1}]
+    text: -1 Stability and -1 Health.
+  pax_romana:
+    name: Pax Romana
+    type: event
+    category: boon
+    effects: [{stability: 2}]
+    text: +2 Stability.
+  hannibal_at_the_gates:
+    name: Hannibal at the Gates
+    type: event
+    crisis: true
+    category: invasion
+    lasts:
+      rounds: 2
+      everyRound: [{enemyCard: 5}]
+      stages:
+        - [{raidAll: {card: hannibal_raid}}]
+        - [{invasion: hannibal_invasion}]
+    text: "CRISIS, 2 rounds. Every round a strength-5 card is added to the enemy deck for good. First a raid on every player, then an invasion."
+  hannibal_raid:
+    name: Hannibal's Raid
+    type: event
+    helper: true
+    category: raid
+    kind: raid
+    draws: {base: 0, perEra: 2}
+    perShortfall: [{lose: {food: 1, production: 1}}]
+    text: "Raid: draw 2 enemy cards for every Era number. Each point short costs 1 food and 1 production."
+  hannibal_invasion:
+    name: Hannibal's Army
+    type: event
+    helper: true
+    category: invasion
+    kind: invasion
+    strength: {perPlayerPerTerritory: 1}
+    perShortfall: [{lose: {food: 1, production: 1}}]
+    text: Invasion by Hannibal's army, strength = players × territories + the massed enemies, drawn from the enemy deck.
   barbarian_raid:
     name: Barbarian Raid
     type: event
     category: raid
     kind: raid
-    strength: 4
+    draws: {base: 2, perEra: 1}
     perShortfall: [{lose: {food: 1, production: 1}}]
-    text: Raid, strength 4. Each point short costs 1 food and 1 production.
+    text: "Raid: draw the Era number + 2 enemy cards. Each point short costs 1 food and 1 production."
   chariot_raiders:
     name: Chariot Raiders
     type: event
     category: raid
     kind: raid
-    strength: 5
+    draws: {base: 3, perEra: 1}
     perShortfall: [{lose: {food: 1, production: 1, culture: 1}}]
-    text: Raid, strength 5. Each point short costs 1 food, 1 production and 1 culture.
+    text: "Raid: draw the Era number + 3 enemy cards. Each point short costs 1 food, 1 production and 1 culture."
   hill_tribes:
     name: The Hill Tribes Invade
     type: event
@@ -1123,7 +1523,7 @@ cards:
     kind: invasion
     strength: {perPlayerPerTerritory: 1}
     perShortfall: [{lose: {food: 1, production: 1}}]
-    text: Invasion, strength = players × territories + the massed enemies. If it breaks through, a territory is lost and each point short costs every player 1 food and 1 production.
+    text: Invasion, strength = players × territories + the massed enemies, drawn from the enemy deck. If it breaks through, a territory is lost and each point short costs every player 1 food and 1 production.
   drought:
     name: Drought
     type: event
@@ -1211,15 +1611,6 @@ cards:
     target: each
     effects: [{lose: {food: 1}}, {addCrisis: climate_change}]
     text: Every player loses 1 food. The Climate Change crisis is added to the future deck.
-  rise_of_empires:
-    name: Rise of Empires
-    type: event
-    category: era
-    eraTrigger: true
-    target: each
-    effects: [{gain: {culture: 2}}]
-    text: Every player gains 2 culture. The Ancient era ends at the end of this round.
-
   scouts_return:
     name: Scouts Return
     type: event
@@ -1364,10 +1755,11 @@ cards:
     category: invasion
     lasts:
       rounds: 2
+      everyRound: [{enemyCard: 4}]
       stages:
-        - [{raidAll: {card: sea_peoples_raid, strength: 8}}]
+        - [{raidAll: {card: sea_peoples_raid}}]
         - [{invasion: sea_peoples_invasion}]
-    text: "CRISIS, 2 rounds. First a double-strength raid (8) on every player, then an invasion."
+    text: "CRISIS, 2 rounds. Every round a strength-4 card is added to the enemy deck for good. First a double raid on every player, then an invasion."
   # the raids and invasions crises send (not in any deck)
   nomad_invasion:
     name: Nomad Horde
@@ -1377,16 +1769,16 @@ cards:
     kind: invasion
     strength: {perPlayerPerTerritory: 1}
     perShortfall: [{lose: {food: 1, production: 1}}]
-    text: Invasion by the nomad empire, strength = players × territories + the massed enemies.
+    text: Invasion by the nomad empire, strength = players × territories + the massed enemies, drawn from the enemy deck.
   sea_peoples_raid:
     name: Sea Peoples' Raid
     type: event
     helper: true
     category: raid
     kind: raid
-    strength: 8
+    draws: {base: 0, perEra: 4}
     perShortfall: [{lose: {food: 1, production: 1}}]
-    text: Raid, strength 8. Each point short costs 1 food and 1 production.
+    text: "Raid: draw 4 enemy cards for every Era number (8 in the Ancient era). Each point short costs 1 food and 1 production."
   sea_peoples_invasion:
     name: Sea Peoples' Landing
     type: event
@@ -1395,7 +1787,7 @@ cards:
     kind: invasion
     strength: {perPlayerPerTerritory: 1}
     perShortfall: [{lose: {food: 1, production: 1}}]
-    text: Invasion by the Sea Peoples, strength = players × territories + the massed enemies.
+    text: Invasion by the Sea Peoples, strength = players × territories + the massed enemies, drawn from the enemy deck.
   climate_change:
     name: Climate Change
     type: event

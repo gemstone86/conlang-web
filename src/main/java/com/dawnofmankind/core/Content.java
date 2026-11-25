@@ -16,12 +16,14 @@ import org.yaml.snakeyaml.Yaml;
  */
 public final class Content {
 
-    public enum CardType { TECH, ACTION, RESPONSE, MINOR_WONDER, GREAT_WONDER, EVENT, HOSTILITY, LEADER, CITY_STATE }
+    public enum CardType { TECH, ACTION, RESPONSE, MINOR_WONDER, GREAT_WONDER, EVENT, HOSTILITY, LEADER, CITY_STATE, ERA_END }
 
     /** Rule numbers from the {@code rules:} block. */
     public static final class Rules {
         public int actionsPerTurn, handLimit, foodUpkeepPerPop, startStability, startHealth, queueExtra,
                 startingEventsPerPlayer, eraTriggerBottomShare;
+        /** The enemy deck at the start: strength to number of cards. Raids and invasions draw from it. */
+        public final Map<Integer, Integer> enemyDeck = new java.util.TreeMap<>();
         public EnumMap<Res, Integer> startResources, growthCost, recruitCost;
         public Map<String, Integer> startWorkers = new LinkedHashMap<>();
         public Map<Integer, Integer> removedPerRound = new LinkedHashMap<>();
@@ -29,6 +31,8 @@ public final class Content {
         public Map<String, int[]> eraDeck = new LinkedHashMap<>();
         /** Worker slots every player has for land-bound buildings (farm, mine) before any territory. */
         public Map<String, Integer> homeSlots = new LinkedHashMap<>();
+        /** Upgrade slots of the people themselves: "warriors" (the army) and "population" (idle people). */
+        public Map<String, Integer> unitSlots = new LinkedHashMap<>();
         public int startTerritories, growthStep;
         /** Extra production for each level a building already has. */
         public int buildingEscalation;
@@ -36,7 +40,7 @@ public final class Content {
         public int colonizeFreeTerritories, faceUpLands, colonizeSettlersPerPlayer;
 
         public int removedPerRound(int players) {
-            return removedPerRound.getOrDefault(players, players <= 2 ? 1 : players <= 4 ? 2 : 3);
+            return removedPerRound.getOrDefault(players, players <= 2 ? 2 : 1);
         }
     }
 
@@ -46,6 +50,10 @@ public final class Content {
         public boolean buildable;
         /** Cannot be built until a tech with {@code unlockBuilding} for it has been researched. */
         public boolean locked;
+        /** The land slots this building uses (territories and maxSlots name it): gatherers use the farm slots, hunters the mine slots. */
+        public String slotKey;
+        /** Cards that change what this building produces (techs, minor wonders) each need one of these; they never grow with the building. */
+        public int upgradeSlots;
         public EnumMap<Res, Integer> cost, perWorker, upkeep;
     }
 
@@ -65,6 +73,8 @@ public final class Content {
         // events
         public String category, kind, target;
         public int strengthBase, strengthPerPlayer, threshold;
+        /** A raid draws this many enemy cards: base + perEra × the era's number. -1 when the card has a fixed strength. */
+        public int drawsBase = -1, drawsPerEra;
         /** Invasions grow with the realm: strength += this × players × territories. */
         public double strengthPerPlayerPerTerritory;
         public String stat;
@@ -73,6 +83,8 @@ public final class Content {
         public List<Map<String, Object>> ongoing = new ArrayList<>();
         public EnumMap<Res, Integer> cleanseCost;
         public boolean eraTrigger, crisis, persistent;
+        /** An era-end event: the era whose end it can be (listed under that era's endEvents). */
+        public String eraEnd;
         /** Always in the era deck of the era that lists it (it takes one of the places of its kind). */
         public boolean required;
         /** Minor wonders: the era after which the bonuses stop. */
@@ -141,6 +153,8 @@ public final class Content {
         public String id, name;
         public int order;
         public Map<String, Integer> cards = new LinkedHashMap<>();
+        /** The special events one of which strikes when the era's third end card is placed; their effects last through the next era. */
+        public List<String> endEvents = new ArrayList<>();
     }
 
     public final Rules rules = new Rules();
@@ -196,6 +210,7 @@ public final class Content {
             e.name = Y.s(m, "name", e.id);
             e.order = order++;
             Y.map(m.get("cards")).forEach((k, v) -> e.cards.put(k, Y.toInt(v)));
+            e.endEvents.addAll(Y.strings(m.get("endEvents")));
             c.eras.add(e);
         }
         Y.map(root.get("startingEvents")).forEach((k, v) -> c.startingEvents.put(k, Y.toInt(v)));
@@ -213,6 +228,7 @@ public final class Content {
         rules.queueExtra = Y.i(m, "queueExtra", 2);
         rules.startingEventsPerPlayer = Y.i(m, "startingEventsPerPlayer", 2);
         rules.eraTriggerBottomShare = Y.i(m, "eraTriggerBottomPercent", 40);
+        Y.map(m.get("enemyDeck")).forEach((k, v) -> rules.enemyDeck.put(Integer.parseInt(String.valueOf(k)), Y.toInt(v)));
         rules.startResources = Res.parse(m.get("startResources"));
         rules.growthCost = Res.parse(m.get("growthCost"));
         rules.recruitCost = Res.parse(m.get("recruitCost"));
@@ -221,6 +237,7 @@ public final class Content {
             rp.forEach((k, v) -> rules.removedPerRound.put(Y.toInt(k), Y.toInt(v)));
         }
         Y.map(m.get("homeSlots")).forEach((k, v) -> rules.homeSlots.put(k, Y.toInt(v)));
+        Y.map(m.get("unitSlots")).forEach((k, v) -> rules.unitSlots.put(k, Y.toInt(v)));
         rules.startTerritories = Y.i(m, "startTerritories", 2);
         rules.faceUpLands = Y.i(m, "faceUpLands", 2);
         rules.growthStep = Y.i(m, "growthStep", 4);
@@ -244,6 +261,8 @@ public final class Content {
         b.slots = Y.i(m, "slots", 2);
         b.buildable = !m.containsKey("buildable") || Y.b(m, "buildable");
         b.locked = Y.b(m, "locked");
+        b.slotKey = Y.s(m, "slotKey", id);
+        b.upgradeSlots = Y.i(m, "upgradeSlots", 1);
         b.cost = Res.parse(m.get("cost"));
         b.perWorker = Res.parse(m.get("perWorker"));
         b.upkeep = Res.parse(m.get("upkeep"));
@@ -273,6 +292,11 @@ public final class Content {
         c.category = Y.s(m, "category", null);
         c.kind = Y.s(m, "kind", "effects");
         c.target = Y.s(m, "target", "civ");
+        Map<String, Object> dr = Y.map(m.get("draws"));
+        if (!dr.isEmpty()) {
+            c.drawsBase = Y.i(dr, "base", 0);
+            c.drawsPerEra = Y.i(dr, "perEra", 0);
+        }
         Object st = m.get("strength");
         if (st instanceof Map<?, ?>) {
             Map<String, Object> sm = Y.map(st);
@@ -293,7 +317,8 @@ public final class Content {
         c.persistent = !pers.isEmpty();
         c.ongoing = effects(pers.get("ongoing"));
         c.cleanseCost = Res.parse(pers.get("cleanse"));
-        c.eraTrigger = Y.b(m, "eraTrigger");
+        c.eraTrigger = Y.b(m, "eraTrigger") || c.type == CardType.ERA_END;
+        c.eraEnd = Y.s(m, "eraEnd", null);
         c.land = Y.s(m, "land", null);
         c.required = Y.b(m, "required");
         c.minPlayers = Y.i(m, "minPlayers", 1);
@@ -345,6 +370,12 @@ public final class Content {
         for (EraDef e : eras) for (String id : e.cards.keySet()) {
             CardDef d = cards.get(id);
             if (d != null && d.era == null) d.era = e.id;
+        }
+        for (EraDef e : eras) for (String id : e.endEvents) {
+            CardDef d = cards.get(id);
+            if (d == null || !d.isEvent()) throw new IllegalStateException("Era " + e.id + " lists an unknown era-end event " + id);
+            if (d.era == null) d.era = e.id;
+            d.eraEnd = e.id;
         }
         for (CardDef c : cards.values()) {
             if (c.type == CardType.CITY_STATE && (c.land == null || !territories.containsKey(c.land))) throw new IllegalStateException("City state card " + c.id + " needs a land: from territories");

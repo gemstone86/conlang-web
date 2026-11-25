@@ -1,5 +1,121 @@
 # Changes
 
+## v1.93.8 (combined app)
+
+- Dawn: card art for the 22 Classical cards: Iron Working, Philosophy, Mathematics, Engineering, Roman Concrete, Pericles, Hannibal, Cleopatra, Cyrus, Augustus, Legion Tactics, Aqueducts, The Forum, Pax Romana, Gallic Warband, The Goths Invade, Hannibal at the Gates, End of an Era (Classical), The Parthenon, The Colosseum, The Pantheon and The Great Wall.
+
+## v1.93.7 (combined app)
+
+- Dawn: card art for 21 more cards: Lithic Art, Legendary Predator, Climate Crisis, Cult of the Ancestors, End of an Era (Prehistoric), Metalworking, Markets, Bronze Age Collapse, The Iron Age Dawns, Age of Philosophers, Hatshepsut, Sargon, King Minos, Imhotep, Irrigation Canals, Sailing, The Pharaoh's Curse, Volcano of Thera, the Palace of Knossos, the Ziggurat of Ur and the Temple of Karnak.
+
+## v1.93.6 (combined app)
+
+- Dawn: the era banner shows the era-end event that closed the previous era as a card (Dawn of Agriculture, Climate Crisis...). When the whole game ends there is no new era and so no card.
+
+## v1.93.5 (combined app)
+
+- Dawn: hover over "Hand N" in The tribe to see that player's cards (the server now sends every player's hand to the team).
+
+## v1.93.4 (combined app)
+
+- Dawn: fixed a required card (Markets, Stone Tools, Agriculture, Metalworking) turning up twice in an era deck: it is put in once, and the random fill no longer draws another copy.
+
+## v1.93.3 (combined app)
+
+- Dawn: before a bot sends resources, troops or settlers to a land found by an event, it checks that the players can pay all of it together. If they can't (the land would be lost anyway), it sends nothing.
+
+## v1.93.2 (combined app)
+
+- Dawn: a big banner opens each era: "Prehistory / The prehistoric era begins…", then "The ancient era begins…" and so on, with the era-end effects carried over listed under it. Click to close, or it fades after a few seconds.
+
+## v1.93.1 (combined app)
+
+- Dawn: lands found by an event, crises and lasting events are laid out in a grid instead of one long column, and the Done / Look at the board buttons of the event pop-up stay in view at the bottom, so you no longer have to zoom out.
+
+## v1.93.0 (combined app, branch new-era)
+
+- Dawn: the Ancient and Classical eras filled out. Ancient: wonders Palace of Knossos, Ziggurat of Ur and Temple of Karnak; great people Hatshepsut, Sargon of Akkad, King Minos and Imhotep; techs Irrigation Canals and Sailing; events Pharaoh's Curse and Volcano of Thera. Classical: wonders The Pantheon and The Great Wall; great people Cleopatra, Cyrus the Great and Augustus; techs Roman Concrete and Legion Tactics (a Warriors slot card); minor wonders Aqueducts and The Forum; the crisis Hannibal at the Gates (a strength-5 card added to the enemy deck each round, then a raid and an invasion) and the boon Pax Romana.
+
+## v1.92.0 (combined app)
+
+- Dawn: a Classical era (iron age, classical Greece, Rome) now follows the Ancient era, and ending it wins the game. The Ancient era is now the early civilisations (bronze age, Egypt, Mesopotamia) and ends with one of three era-end events: Bronze Age Collapse, The Iron Age Dawns or Age of Philosophers. The Greek and Roman cards moved to the Classical era: The Great Library, Great Lighthouse, Colossus, Roman Roads, Tomyris, Alexander, Julius Caesar, Archimedes, Code of Laws. New in Classical: wonders The Parthenon and The Colosseum, great people Pericles and Hannibal, techs Iron Working, Philosophy, Mathematics and Engineering, and the raid and invasion Gallic Warband and The Goths Invade. Hostility is split between the eras (Ancient 2s and 3s, Classical 3s and 5s).
+
+## v1.91.0 (combined app)
+
+- Dawn: under Buildings there is now a Population section with the idle population and the warriors, each with bonus slots like a building. The population starts with no bonus slot, the warriors with one. Spearmen is now a bonus-slot card for the warriors: slot it to get its stronger troops (and the dearer training and upkeep), take it out (1 action) when the economy needs relief. Troop strength bonuses from slotted cards are per player.
+
+## v1.90.0 (combined app)
+
+- Dawn: admins get a "Cheat mode" button in the top bar (nobody else sees it, and the server refuses the message from anyone else). While it is on, your resources and actions are topped up after every move, so every card, building and payment is free with unlimited actions. It is logged in the game log.
+
+## v1.89.4 (combined app)
+
+- Dawn: techs and minor wonders whose bonus needs an upgrade slot carry a "Bonus slot" tag (on the card, the small card and in the queue and hand).
+
+## v1.89.3 (combined app)
+
+- Dawn: minor wonders are shown as small cards like technologies (hover for the full card, drag into an upgrade slot, Remove button under your own). A building type that has been retired (Gatherers after Agriculture, Hunters after Metalworking) disappears from your list once nobody works in it and no card sits in it.
+
+## v1.89.2 (combined app)
+
+- Dawn: the Expand button now sits to the right of the building name. The queue loses 2 cards per round with 1-2 players and 1 card with 3 or more (it was the other way round).
+
+## v1.89.1 (combined app)
+
+- Dawn: the All cards list words the card counts as copies in the card list (all cards that exist), not cards in the current game.
+
+## v1.89.0 (combined app)
+
+- Dawn: upgrade slots are now small cards: an empty slot is an empty box, and a researched tech (shown as a small card in the Technologies list, hover for the full card) is dragged into it, or clicked and then the slot. New Prehistoric tech Lithic Art: slotted into Hunters it gives +1 culture per hunter, a choice against Stone Tools (production). Cards you pick fly from the queue to your hand, a tech flies into its slot, and the card you draw at the start of your turn flies out of the era deck. Prehistoric great wonders are cheaper (production 10/9/10/8/5 became 6/6/6/5/3) because hunters make less production than mines did. The All cards list shows how many copies of each card are in the game.
+
+## v1.88.0 (combined app)
+
+- Dawn: upgrade slots. Each building has upgrade slots (gatherers 1, hunters 1, farms 2, mines 2, temples, markets and villages 1) that never grow when the building is expanded. A tech or minor wonder that adds income or per-worker output now only works once you put it into a free slot of one of your buildings; its other effects (hand size, actions, health...) still work at once, and it counts for points either way. Every player can slot every researched tech, so players can end up with different bonuses. Slotting is free (pick the card in the building's slot menu); taking a card out costs 1 action. New actions slot and unslot; bots slot what they can.
+
+## v1.87.0 (combined app)
+
+- Dawn (branch hunter-gatherer): the Prehistoric era has no farms or mines. You start with Gatherers (2 food per worker) and Hunters (1 food and 1 production per worker); they use the same land slots farms and mines will. Agriculture (always in the Prehistoric deck) unlocks the Farm, stops more Gatherers from being built and makes growing cost 3 less; Metalworking (always in the Ancient deck) unlocks the Mine and stops more Hunters. Existing ones stay. Growing now costs 6 food (+1 per 2 people beyond the first). Stone Tools now makes hunters +1 production. New effect retireBuilding.
+
+## v1.86.0 (combined app)
+
+- Dawn: an era deck pile sits at the right end of the card queue (with the number of cards left). Cards drawn from it fly out of the pile into the queue, and the cards you draw each round fly into your hand. Nothing animates on the first load, and not when the browser asks for reduced motion.
+
+## v1.85.3 (combined app)
+
+- Dawn: new Prehistoric raid event, Legendary Predator: strength players + 2 (fixed, no enemy cards), each point short costs 2 food.
+
+## v1.85.2 (combined app)
+
+- Dawn: twice as many hostility cards in each era deck: 2 per player (was 1). The cards keep their values (+1, +2, +3, +5); there are more copies of each to make up the numbers.
+
+## v1.85.1 (combined app)
+
+- Dawn: a great person costs 4 per era (4 in the Prehistoric era, 8 in the Ancient era), not a flat 4. Stone Tools is now a required card: it is in every game. The great person rules text was updated too.
+
+## v1.85.0 (combined app)
+
+- Dawn: a finished great wonder now stands as a miniature card on the territory it was built on (hover it for the full card), and leaves the great wonders panel.
+
+## v1.84.1 (combined app)
+
+- Dawn: when a raid or invasion strikes, the popup shows the enemy cards that were drawn (and the fixed part), with your troops on the left and your allies' troops on the right.
+
+## v1.84.0 (combined app)
+
+- Dawn: enemy deck. Raids and invasions now draw cards from an enemy deck (it starts with six strength-1 and four strength-2 cards), add up their strength and shuffle them back. Massing enemies are a count: when an invasion comes, that many cards are drawn and added to players × territories. Raids draw Era number + a number written on the card (Wolf Pack +0, Rival Tribe +1, Barbarian Raid +2, Chariot Raiders +3); the Sea Peoples' raid draws 4 per era. The Sea Peoples crisis adds a strength-4 card to the deck every round it is active. The deck is shown in the status bar.
+
+## v1.83.1 (combined app)
+
+- Dawn: the End of an Era cards are shuffled through the whole era deck, not just the bottom part. The era-end event "Meteor Impact" is now called "Climate Crisis" (the Meteor Impact crisis card is unchanged).
+
+## v1.83.0 (combined app)
+
+- Dawn: new way for eras to end. Each era has three "End of an Era" cards in the bottom of its deck. They are turned up onto the queue, can't be taken, and drift left like other cards. When the third is turned up, a special era-end event strikes (one of three per era) and the next era's cards are drawn from then on. The event's bonuses and penalties last through the whole next era. Prehistoric: Dawn of Agriculture (+1 farm slot, invasions +2), Meteor Impact (+1 farm slot, colonies cost +1 settler), Cult of the Ancestors (+1 culture per turn, hand size -1). In the last era the third end card wins the game at the end of the round. Replaces the old single era-trigger event (Rise of Empires is gone).
+
+## v1.82.1 (combined app)
+
+- Dawn: a "Start" link back to the start page, and a "Log in" link on the Dawn start page for visitors who are not logged in (the start page sends them back to Dawn afterwards).
+
 ## v1.82.0 (combined app)
 
 - Dawn: finished (or abandoned) games now save their game log on the server. Admins get an "All game logs" button that downloads every saved log, plus games still running, as one zip; the saved ones are deleted after the download. Logs live in `dawn.log-dir` (default `./data/dawn-logs`).

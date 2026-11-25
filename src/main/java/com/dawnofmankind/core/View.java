@@ -54,6 +54,7 @@ public final class View {
         v.put("era", g.era().name);
         v.put("eraIndex", g.eraIndex);
         v.put("eraCount", g.content.eras.size());
+        v.put("eraBoons", g.eraBoons.stream().map(b -> def(b.def())).toList());
         v.put("firstPlayer", g.firstPlayer);
         v.put("actionsLeft", g.players.get(seat).actions);
         v.put("pickSeconds", g.pickSeconds);
@@ -61,6 +62,12 @@ public final class View {
         v.put("stability", g.stability);
         v.put("health", g.effectiveHealth());
         v.put("threat", g.threat);
+        v.put("leaderCost", g.leaderCost());
+        Map<Integer, Integer> enemies = new java.util.TreeMap<>();
+        for (int s : g.enemyDeck) enemies.merge(s, 1, Integer::sum);
+        List<Object> enemyList = new ArrayList<>();
+        enemies.forEach((s, n) -> enemyList.add(Map.of("strength", s, "n", n)));
+        v.put("enemyDeck", enemyList);
         v.put("territoryPoints", g.realm.size());
         v.put("you", seat);
         v.put("result", g.result);
@@ -127,7 +134,11 @@ public final class View {
         List<Object> realm = new ArrayList<>();
         for (Game.Territory t : g.realm) {
             Map<String, Object> m = territory(t);
-            m.put("wonders", t.wonders.stream().map(w -> w.name).toList());
+            m.put("wonders", t.wonders.stream().map(w -> {
+                Map<String, Object> wm = wonder(w);
+                wm.put("obsolete", g.obsolete(w));
+                return wm;
+            }).toList());
             m.put("cored", t.cored);
             realm.add(m);
         }
@@ -205,18 +216,33 @@ public final class View {
                 each.forEach((r, n) -> { if (n * g.working(p, b) != 0) makes.put(r, n * g.working(p, b)); });
                 bm.put("makes", makes);
                 bm.put("each", each);
+                bm.put("upgradeSlots", b.def.upgradeSlots);
+                bm.put("upgrades", b.upgrades.stream().map(View::def).toList());
                 bs.add(bm);
             }
             pm.put("buildings", bs);
+            // researched techs and your minor wonders that make a building better, and are not in a slot yet
+            List<Object> slotCards = new ArrayList<>();
+            for (Content.CardDef c : g.slottable(p)) slotCards.add(def(c));
+            pm.put("slotCards", slotCards);
+            Map<String, Object> units = new LinkedHashMap<>();
+            for (String k : List.of("warriors", "population")) {
+                Map<String, Object> um = new LinkedHashMap<>();
+                um.put("slots", g.content.rules.unitSlots.getOrDefault(k, 0));
+                um.put("upgrades", (k.equals("warriors") ? p.warriorUpgrades : p.populationUpgrades).stream().map(View::def).toList());
+                units.put(k, um);
+            }
+            pm.put("units", units);
             pm.put("techs", p.techs.stream().map(View::def).toList());
             if (p.leader != null) pm.put("leader", def(p.leader));
             if (p.pendingLeader != null) pm.put("pendingLeader", def(p.pendingLeader));
             pm.put("freeTech", g.freeTechAvailable(p));
             pm.put("wonderUpkeep", g.wonderUpkeep(p));
             pm.put("minorWonders", p.minorWonders.stream().map(View::def).toList());
-            if (p.seat == seat) pm.put("hand", p.hand.stream().map(View::card).toList());
+            pm.put("hand", p.hand.stream().map(View::card).toList());          // a team game: everyone may look at the others' hands
             pm.put("done", p.done);
             pm.put("actions", p.actions);
+            if (p.cheat) pm.put("cheat", true);
             if (p.seat == seat && g.phase == Game.Phase.TURNS) {
                 pm.put("turnSeq", p.turnSeq);
                 pm.put("turnEvents", p.turnEvents);
@@ -256,6 +282,8 @@ public final class View {
             Map<String, Object> pm = card(pe.event);
             pm.put("target", pe.target);
             pm.put("strength", pe.strength);
+            pm.put("enemyCards", pe.enemyCards);
+            pm.put("enemyFixed", pe.strength - pe.enemyCards.stream().mapToInt(Integer::intValue).sum());
             pm.put("ready", pe.ready);
             pm.put("troops", pe.troops);
             pm.put("responses", pe.responses);
@@ -411,6 +439,9 @@ public final class View {
             if (d.helper) continue;
             Map<String, Object> m = def(d);
             m.put("era", d.era);
+            int copies = 0;
+            for (Content.EraDef e : content.eras) copies += e.cards.getOrDefault(d.id, 0);
+            m.put("copies", copies);
             if (d.minPlayers > 1) m.put("minPlayers", d.minPlayers);
             cards.add(m);
         }
@@ -496,8 +527,8 @@ public final class View {
         m.put("name", d.name);
         m.put("type", d.type.name().toLowerCase());
         m.put("text", d.text);
+        if ((d.type == CardType.TECH || d.type == CardType.MINOR_WONDER) && d.effects.stream().anyMatch(Effects::needsSlot)) m.put("slottable", true);
         if (!Res.isZero(d.cost)) m.put("cost", res(d.cost));
-        if (d.type == CardType.LEADER) m.put("anyCost", Game.LEADER_COST);
         if (d.isEvent()) {
             m.put("category", d.category);
             m.put("kind", d.kind);
@@ -530,6 +561,7 @@ public final class View {
         m.put("name", w.name);
         m.put("text", w.text);
         m.put("victoryPoints", w.victoryPoints);
+        if (hasArt(w.id)) m.put("art", "cards/" + w.id + ".jpg");
         return m;
     }
 

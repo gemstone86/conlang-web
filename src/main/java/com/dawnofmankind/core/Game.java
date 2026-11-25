@@ -124,6 +124,8 @@ public final class Game {
         /** Target seat for one-player events, else -1. */
         public final int target;
         public final int strength;
+        /** The enemy cards drawn for this raid or invasion (their strengths); the rest of the strength is fixed. */
+        public final List<Integer> enemyCards = new ArrayList<>();
         public final Map<Integer, Boolean> ready = new LinkedHashMap<>();
         public final Map<Integer, Integer> troops = new LinkedHashMap<>();
         public final List<String> responses = new ArrayList<>();
@@ -158,6 +160,8 @@ public final class Game {
     public int stability, health;
     /** Enemies massing from hostility cards; the next invasion adds them to its strength. */
     public int threat;
+    /** The enemy deck: each number is the strength of one card. Raids and invasions draw from it; the cards are shuffled back after. */
+    public final List<Integer> enemyDeck = new ArrayList<>();
 
     public final List<CardInst> eraDeck = new ArrayList<>();
     public final List<Slot> queue = new ArrayList<>();
@@ -180,6 +184,17 @@ public final class Game {
     public Pending pending;
     public int eventsDrawnThisRound;
     private boolean eraEnding;
+    /** End-of-era cards placed on the queue in this era; the era-end event strikes when the last one is. */
+    private int endCardsPlaced;
+    /** The era-end events in force: their effects last through the era after the one they ended. */
+    public final List<EraBoon> eraBoons = new ArrayList<>();
+
+    public record EraBoon(CardDef def, int era) {}
+
+    /** How many end-of-era cards have been turned up in this era so far. */
+    public int endCardsTurnedUp() {
+        return endCardsPlaced;
+    }
 
     public String result; // null, "victory" or "defeat"
     public String endReason;
@@ -202,6 +217,7 @@ public final class Game {
         this.rng = new Random(seed);
         this.seed = seed;
         Content.Rules r = content.rules;
+        r.enemyDeck.forEach((strength, n) -> { for (int i = 0; i < n; i++) enemyDeck.add(strength); });
         for (TerritoryDef t : content.territories.values()) {
             if (!t.special) for (int i = 0; i < t.copies; i++) worldDeck.add(new Territory(nextId++, t));
         }
@@ -324,7 +340,8 @@ public final class Game {
                 if (bag.isEmpty()) {
                     if (bagUsed && !cycle) break;
                     bagUsed = true;
-                    for (CardInst c : pool) bag.add(inst(c.def));
+                    for (CardInst c : pool) if (!c.def.required) bag.add(inst(c.def));      // required cards are already in, once
+                    if (bag.isEmpty()) break;
                     Collections.shuffle(bag, rng);
                 }
                 picked.add(bag.remove(bag.size() - 1));
@@ -378,6 +395,8 @@ public final class Game {
             }
         }
         eraIndex++;
+        eraBoons.removeIf(b -> b.era() < eraIndex);
+        endCardsPlaced = 0;
         startEra(keepQueue);
     }
 
@@ -556,7 +575,7 @@ public final class Game {
     /** Draws for a player: events go to the future deck and the player draws again. Returns the card kept, or null. */
     private CardInst drawFromEraDeck(Player p) {
         CardInst c;
-        while ((c = nextFromEraDeck()) != null) {
+        while ((c = nextCard()) != null) {
             if (c.def.isEvent()) {
                 futureEvents.add(c);
                 p.turnEvents++;
@@ -605,12 +624,20 @@ public final class Game {
             CardDef d = e.def;
             int target = -1;
             if ("one".equals(d.target) || "raid".equals(d.kind) || "opportunity".equals(d.kind)) target = rng.nextInt(players.size());
-            int strength = d.strength(players.size(), realm.size()) + ("invasion".equals(d.kind) ? threat : 0);
-            if (attack != null) {
-                if (attack.target() >= 0) target = attack.target();
-                if (attack.strength() > 0) strength = attack.strength();
-            }
+            if (attack != null && attack.target() >= 0) target = attack.target();
+            int strength;
+            List<Integer> cards = List.of();
+            if (attack != null && attack.strength() > 0) strength = attack.strength();
+            else if ("raid".equals(d.kind) && d.drawsBase >= 0) {
+                int n = d.drawsBase + d.drawsPerEra * (eraIndex + 1);
+                cards = drawEnemies(n, d.name + " draws " + n + " enemy cards");
+                strength = cards.stream().mapToInt(Integer::intValue).sum();
+            } else if ("invasion".equals(d.kind)) {
+                cards = drawEnemies(threat, threat + " massed enemies join " + d.name);
+                strength = d.strength(players.size(), realm.size()) + cards.stream().mapToInt(Integer::intValue).sum() + civMods().invasionStrength;
+            } else strength = d.strength(players.size(), realm.size());
             pending = new Pending(e, target, strength);
+            pending.enemyCards.addAll(cards);
             pending.fromCrisis = attack != null;
             for (Player p : players) pending.ready.put(p.seat, p.away);
             log("Event: " + d.name + (target >= 0 ? " (" + players.get(target).name + ")" : "") + " — " + d.text);
@@ -674,7 +701,29 @@ public final class Game {
         return null;
     }
 
+    /** Once a building type is retired (gatherers after Agriculture) and nobody works in it or has a card in it, it is gone from the list. */
+    /** Admin cheat mode on or off for a seat: resources and actions are topped up so everything is free. */
+    public void setCheat(int seat, boolean on) {
+        Player p = players.get(seat);
+        p.cheat = on;
+        topUpCheat(p);
+        log(p.name + " (admin) turns cheat mode " + (on ? "on" : "off") + ".");
+        version++;
+    }
+
+    private void topUpCheat(Player p) {
+        if (!p.cheat) return;
+        for (Res r : Res.values()) if (p.res.get(r) < 99) p.res.put(r, 99);
+        if (p.actions < 99) p.actions = 99;
+    }
+
+    private void pruneRetired() {
+        Mods m = civMods();
+        for (Player p : players) p.buildings.removeIf(b -> m.retired.contains(b.def.id) && b.workers == 0 && b.upgrades.isEmpty());
+    }
+
     private void endRound() {
+        pruneRetired();
         // the last k slots leave (an empty one costs nothing); then the gaps close up and the queue is refilled
         int k = Math.min(queue.size(), content.rules.removedPerRound(players.size()));
         for (int i = 0; i < k; i++) {
@@ -684,15 +733,16 @@ public final class Game {
                 futureEvents.add(s.card);
                 log(s.card.def.name + " leaves the bottom of the queue and goes to the future deck.");
                 Player teller = leaderWith("eventUnder");
+                String tellerLeader = teller == null ? null : teller.leader.name;      // an era could end while cards are drawn
                 CardInst under = s.under;
                 if (teller != null && under != null) {
                     while (under != null && under.def.isEvent()) {
                         futureEvents.add(under);
                         log("The face-down card was another event; it goes face down into the future deck.");
-                        under = nextFromEraDeck();
+                        under = nextCard();
                     }
                     if (under != null) {
-                        log(teller.leader.name + ": " + teller.name + " gets the face-down card.");
+                        log(tellerLeader + ": " + teller.name + " gets the face-down card.");
                         take(teller, under);
                     }
                 }
@@ -722,7 +772,12 @@ public final class Game {
         while (queue.size() < queueSize()) {
             CardInst c = nextFromEraDeck();
             if (c == null) break;
-            CardInst under = c.def.isEvent() ? nextFromEraDeck() : null;
+            if (c.def.type == CardType.ERA_END) {                  // turned up onto the queue; it can't be taken
+                queue.add(0, new Slot(c, null));
+                endCardPlaced(c);
+                continue;
+            }
+            CardInst under = c.def.isEvent() ? nextCard() : null;
             queue.add(0, new Slot(c, under));
         }
     }
@@ -731,6 +786,40 @@ public final class Game {
      * Takes the top card of the era deck. Hostility cards never stay anywhere: as soon as one is revealed it adds
      * its enemies to the threat massing against the realm, and the next card is taken.
      */
+    private CardInst nextCard() {
+        CardInst c;
+        while ((c = nextFromEraDeck()) != null) {
+            if (c.def.type != CardType.ERA_END) return c;
+            queue.add(0, new Slot(c, null));               // an end card drawn some other way still goes onto the queue
+            endCardPlaced(c);
+            if (result != null) return null;
+        }
+        return null;
+    }
+
+    /** Counts an end-of-era card; the third one brings the era-end event, and the next era's cards are drawn from then on. */
+    private void endCardPlaced(CardInst c) {
+        endCardsPlaced++;
+        int needed = content.rules.eraDeck.get("era_trigger")[0];
+        log(c.def.name + " is turned up on the queue (" + Math.min(endCardsPlaced, needed) + " of " + needed + ").");
+        if (endCardsPlaced < needed) return;
+        endCardsPlaced = 0;
+        boolean lastEra = eraIndex + 1 >= content.eras.size();
+        if (lastEra) {
+            eraEnding = true;                              // the game is won at the end of the round
+            log("The " + era().name + " era draws to its close.");
+            return;
+        }
+        List<String> options = era().endEvents;
+        if (!options.isEmpty()) {
+            CardDef d = content.cards.get(options.get(rng.nextInt(options.size())));
+            log("THE ERA ENDS: " + d.name + " — " + d.text);
+            eraBoons.add(new EraBoon(d, eraIndex + 1));
+            pastEvents.add(inst(d));
+        }
+        advanceEra(true);
+    }
+
     private CardInst nextFromEraDeck() {
         while (true) {
             if (eraDeck.isEmpty()) {
@@ -787,6 +876,7 @@ public final class Game {
         if (seat < 0 || seat >= players.size()) throw new GameException("Not a player in this game.");
         String type = Y.s(a, "type", "");
         Player p = players.get(seat);
+        topUpCheat(p);
         switch (type) {
             // free, at any time
             case "deposit" -> deposit(p, a);
@@ -799,6 +889,7 @@ public final class Game {
             case "ready" -> ready(p);
             case "leader" -> chooseLeader(p, a);
             case "removeBonus" -> removeBonus(p, a);
+            case "slot" -> slot(p, a);                 // free
             case "chooseLand" -> chooseLand(p, a);
             case "colonize" -> colonize(p, a);
             case "starve" -> starve(p, a);
@@ -816,6 +907,7 @@ public final class Game {
                 boolean free = type.equals("recruit") && !p.freeRecruitUsed && mods(p).freeRecruit > 0;   // a leader's free troop
                 if (!free && p.actions <= 0) throw new GameException("No actions left. You can be done for the round.");
                 switch (type) {
+                    case "unslot" -> unslot(p, a);
                     case "move" -> move(p, a);
                     case "build" -> build(p, a);
                     case "pick" -> pick(p, a);
@@ -829,6 +921,8 @@ public final class Game {
                 if (!free) p.actions--;
             }
         }
+        for (Player q : players) topUpCheat(q);
+        pruneRetired();
         version++;
     }
 
@@ -889,10 +983,12 @@ public final class Game {
 
     /** Worker slots a player may have in a building type: home slots plus what the realm's territories add. */
     public int capacity(Player p, String type) {
-        Integer home = content.rules.homeSlots.get(type);
+        BuildingDef def = content.buildings.get(type);
+        String key = def == null ? type : def.slotKey;
+        Integer home = content.rules.homeSlots.get(key);
         if (home == null) return Integer.MAX_VALUE;
-        int cap = home + mods(p).maxSlots.getOrDefault(type, 0);
-        for (Territory t : realm) cap += t.def.slots.getOrDefault(type, 0);
+        int cap = home + mods(p).maxSlots.getOrDefault(key, 0);
+        for (Territory t : realm) cap += t.def.slots.getOrDefault(key, 0);
         return cap;
     }
 
@@ -912,7 +1008,7 @@ public final class Game {
         return n;
     }
 
-    /** Food for 3 (base) more for every {@code growthStep} people beyond the first. */
+    /** Base food (6 until Agriculture takes 3 off), +1 for every {@code growthStep} people beyond the first. */
     public EnumMap<Res, Integer> growthCost(Player p) {
         EnumMap<Res, Integer> c = new EnumMap<>(content.rules.growthCost);
         int extra = Math.max(0, p.population() - 1) / Math.max(1, content.rules.growthStep);
@@ -929,14 +1025,14 @@ public final class Game {
 
     /** Whether a building may be built now: locked ones (the market) wait for the tech that unlocks them. */
     public boolean canBuild(BuildingDef b) {
-        return b.buildable && (!b.locked || civMods().unlocked.contains(b.id));
+        return b.buildable && (!b.locked || civMods().unlocked.contains(b.id)) && !civMods().retired.contains(b.id);
     }
 
     private void build(Player p, Map<String, Object> a) {
         String id = Y.s(a, "building", "");
         BuildingDef b = content.buildings.get(id);
         if (b == null || !b.buildable) throw new GameException("You can't build that.");
-        if (!canBuild(b)) throw new GameException("The " + b.name + " isn't available yet: a technology must unlock it first.");
+        if (!canBuild(b)) throw new GameException(civMods().retired.contains(b.id) ? "No more " + b.name.toLowerCase() + "s can be built: a technology has made them obsolete." : "The " + b.name + " isn't available yet: a technology must unlock it first.");
         Building existing = p.ofType(b.id);
         int cap = capacity(p, b.id);
         if ((existing == null ? 0 : existing.slots) >= cap) {
@@ -963,6 +1059,7 @@ public final class Game {
         }
         if (picksLocked) throw new GameException("The time to pick cards is over for this round.");
         if (s.taken) throw new GameException("That card was just taken.");
+        if (s.card.def.type == CardType.ERA_END) throw new GameException("An end-of-era card can't be taken: it only counts down the era.");
         s.taken = true;
         if (!s.card.def.isEvent()) {
             log(p.name + " takes " + s.card.def.name + " from the queue.");
@@ -975,7 +1072,7 @@ public final class Game {
         while (under != null && under.def.isEvent()) {
             futureEvents.add(under);
             log("The face-down card was another event; it goes face down into the future deck.");
-            under = nextFromEraDeck();
+            under = nextCard();
         }
         if (under != null) take(p, under);
     }
@@ -994,6 +1091,9 @@ public final class Game {
         CardDef d = p.minorWonders.stream().filter(x -> x.id.equals(id)).findFirst()
                 .orElseThrow(() -> new GameException("You have no such bonus."));
         p.minorWonders.remove(d);
+        for (Building b : p.buildings) b.upgrades.remove(d);
+        p.warriorUpgrades.remove(d);
+        p.populationUpgrades.remove(d);
         log(p.name + " gives up " + d.name + ".");
     }
 
@@ -1034,21 +1134,26 @@ public final class Game {
     }
 
     /** What a great person costs, in any mix of resources. */
-    public static final int LEADER_COST = 4;
+    public static final int LEADER_COST_PER_ERA = 4;
 
-    /** Plays a great person from the hand: it costs {@link #LEADER_COST} of any resources and replaces the current one. */
+    /** 4 for each era counted from the first: 4 in the Prehistoric era, 8 in the Ancient. */
+    public int leaderCost() {
+        return LEADER_COST_PER_ERA * (eraIndex + 1);
+    }
+
+    /** Plays a great person from the hand: it costs {@link #leaderCost()} of any resources and replaces the current one. */
     private void playLeader(Player p, CardInst c, Map<String, Object> a) {
         EnumMap<Res, Integer> give = Res.parse(a.get("resources"));
         if (give.values().stream().anyMatch(v -> v < 0)) throw new GameException("Amounts can't be negative.");
         int sum = give.values().stream().mapToInt(Integer::intValue).sum();
         if (sum == 0) {                                   // nothing chosen: take from what the player has most of
-            for (int i = 0; i < LEADER_COST; i++) {
+            for (int i = 0; i < leaderCost(); i++) {
                 Res top = null;
                 for (Res r : Res.values()) if (p.res.get(r) - give.get(r) > 0 && (top == null || p.res.get(r) - give.get(r) > p.res.get(top) - give.get(top))) top = r;
-                if (top == null) throw new GameException("A great person costs " + LEADER_COST + " resources, of any kind.");
+                if (top == null) throw new GameException("A great person costs " + leaderCost() + " resources, of any kind.");
                 give.merge(top, 1, Integer::sum);
             }
-        } else if (sum != LEADER_COST) throw new GameException("A great person costs exactly " + LEADER_COST + " resources, of any kind.");
+        } else if (sum != leaderCost()) throw new GameException("A great person costs exactly " + leaderCost() + " resources, of any kind.");
         for (Res r : Res.values()) if (p.res.get(r) < give.get(r)) throw new GameException("Not enough " + r.key() + ".");
         pay(p, give);
         p.hand.remove(c);
@@ -1326,18 +1431,18 @@ public final class Game {
     /** Settlers needed: per player (special lands their own number, other lands the rule's), minus free settlers. */
     public int settleSettlers(Frontier f) {
         int per = f.land.def.special ? f.land.def.populationPerPlayer : content.rules.colonizeSettlersPerPlayer;
-        return Math.max(0, per * players.size() - civMods().freeSettlers);
+        return Math.max(0, per * players.size() + civMods().settlerCost - civMods().freeSettlers);
     }
 
     /** Military strength of a number of troops: Bronze Working adds 1 for every 2. */
     public int strength(int troops) {
         Mods m = civMods();
-        return troops * (1 + m.troopStrength) + (troops / 2) * m.strengthPerTwoTroops;
+        return troops + (troops / 2) * m.strengthPerTwoTroops;
     }
 
     /** A player's strength for settling lands: Bronze Working's bonus plus a leader like Julius Caesar's. */
     public int strength(Player p, int troops) {
-        return strength(troops) + (troops / 2) * mods(p).ownStrengthPerTwoTroops;
+        return strength(troops) + (troops / 2) * mods(p).ownStrengthPerTwoTroops + troops * mods(p).troopStrength;
     }
 
     /** A player's strength in a raid or invasion: the above plus a leader's flat bonus (Gilgamesh). */
@@ -1693,10 +1798,6 @@ public final class Game {
             default -> applyImmediate(d.effects.stream().filter(x -> !x.containsKey("discover")).toList(), targets, null, factor, "civ".equals(d.target));
         }
         loseFoundLands(ev.id);
-        if (d.eraTrigger && era().cards.containsKey(d.id)) {
-            eraEnding = true;
-            log(d.name + ": this era will end at the end of the round.");
-        }
         if (d.persistent) {
             persistentEvents.add(ev);
             log(d.name + " lingers until lifted (" + Res.describe(d.cleanseCost) + ").");
@@ -1770,12 +1871,29 @@ public final class Game {
         }
     }
 
+    /** Draws {@code n} cards from the enemy deck and adds up their strength; they are shuffled back into it afterwards. */
+    private List<Integer> drawEnemies(int n, String what) {
+        if (n <= 0 || enemyDeck.isEmpty()) return List.of();
+        List<Integer> drawn = new ArrayList<>();
+        while (drawn.size() < n) {
+            List<Integer> bag = new ArrayList<>(enemyDeck);
+            Collections.shuffle(bag, rng);
+            for (int i = 0; i < bag.size() && drawn.size() < n; i++) drawn.add(bag.get(i));
+        }
+        int sum = drawn.stream().mapToInt(Integer::intValue).sum();
+        log(what + ": " + drawn + " = " + sum + " strength (the cards go back into the enemy deck).");
+        return drawn;
+    }
+
+    /** One more card in the enemy deck. */
+    private void addEnemyCards(int strength, int count) {
+        for (int i = 0; i < count; i++) enemyDeck.add(strength);
+        log("The enemy deck gains " + (count == 1 ? "a strength-" + strength + " card" : count + " strength-" + strength + " cards") + ".");
+    }
+
     private void invasion(Pending pe, double factor) {
         CardDef d = pe.event.def;
-        if (threat > 0) {
-            log("The " + threat + " massed enemies join the invasion.");
-            threat = 0;
-        }
+        threat = 0;                                                   // the massed enemies were drawn when the invasion came
         int sent = pe.troops.values().stream().mapToInt(Integer::intValue).sum();
         int total = pe.troops.entrySet().stream().mapToInt(en -> fighting(players.get(en.getKey()), en.getValue())).sum() + pe.defenseBonus + civMods().invasionDefense;
         int s = pe.strength;
@@ -1892,6 +2010,12 @@ public final class Game {
                     threat += Y.toInt(v);
                     log("+" + Y.toInt(v) + " enemies massing (now " + threat + ").");
                 }
+                case "enemyCard" -> {
+                    if (v instanceof Map<?, ?>) {
+                        Map<String, Object> m = Y.map(v);
+                        addEnemyCards(Y.i(m, "strength", 1), Y.i(m, "count", 1));
+                    } else addEnemyCards(Y.toInt(v), 1);
+                }
                 case "invadeIfStronger" -> {
                     int team = teamStrength();
                     if (threat > team) {
@@ -1902,7 +2026,7 @@ public final class Game {
                 case "raidAll" -> {
                     Map<String, Object> m = Y.map(v);
                     CardDef raid = content.cards.get(Y.s(m, "card", ""));
-                    for (Player p : players) attacks.add(new Attack(inst(raid), p.seat, Y.i(m, "strength", raid.strengthBase)));
+                    for (Player p : players) attacks.add(new Attack(inst(raid), p.seat, Y.i(m, "strength", 0)));
                     log(raid.name + " strike every player.");
                 }
                 case "invasion" -> attacks.add(new Attack(inst(content.cards.get(String.valueOf(v))), -1, 0));
@@ -2065,11 +2189,12 @@ public final class Game {
     /** Technologies are global: every player gets the lasting effects of every tech researched by anyone. */
     public Mods mods(Player p) {
         Mods m = new Mods();
-        for (Player o : players) for (CardDef t : o.techs) m.add(t.effects);
-        for (CardDef w : p.minorWonders) if (!obsolete(w)) m.add(w.effects);
+        for (Player o : players) for (CardDef t : o.techs) m.add(effectsFor(p, t));
+        for (CardDef w : p.minorWonders) if (!obsolete(w)) m.add(effectsFor(p, w));
         if (p.leader != null) m.add(p.leader.effects);
         for (WonderDef w : builtWonders) if (!obsolete(w)) m.add(w.effects);
         for (CardInst e : persistentEvents) m.add(e.def.ongoing);
+        for (EraBoon b : eraBoons) m.add(b.def().effects);
         for (Territory t : realm) m.add(t.def.effects);
         m.perTerritory.forEach((r, n) -> m.income.merge(r, n * realm.size(), Integer::sum));
         return m;
@@ -2078,25 +2203,117 @@ public final class Game {
     /** Everything that adds lasting effects for a player, by name: techs (everyone's), their minor wonders, their great person, built wonders, lasting events, territories. */
     public List<Map.Entry<String, List<Map<String, Object>>>> effectSources(Player p) {
         List<Map.Entry<String, List<Map<String, Object>>>> out = new ArrayList<>();
-        for (Player o : players) for (CardDef t : o.techs) out.add(Map.entry(t.name, t.effects));
-        for (CardDef w : p.minorWonders) if (!obsolete(w)) out.add(Map.entry(w.name, w.effects));
+        for (Player o : players) for (CardDef t : o.techs) out.add(Map.entry(t.name, effectsFor(p, t)));
+        for (CardDef w : p.minorWonders) if (!obsolete(w)) out.add(Map.entry(w.name, effectsFor(p, w)));
         if (p.leader != null) out.add(Map.entry(p.leader.name, p.leader.effects));
         for (WonderDef w : builtWonders) if (!obsolete(w)) out.add(Map.entry(w.name, w.effects));
         for (CardInst e : persistentEvents) out.add(Map.entry(e.def.name, e.def.ongoing));
+        for (EraBoon b : eraBoons) out.add(Map.entry(b.def().name, b.def().effects));
         for (Territory t : realm) out.add(Map.entry(t.def.name, t.def.effects));
         return out;
+    }
+
+    /** Whether a card's building bonuses (per worker, income) need an upgrade slot to work. */
+    public boolean slottable(CardDef c) {
+        return (c.type == CardType.TECH || c.type == CardType.MINOR_WONDER) && c.effects.stream().anyMatch(Effects::needsSlot);
+    }
+
+    /** The researched techs and the player's own minor wonders that make a building better and are not in a slot yet. */
+    public List<CardDef> slottable(Player p) {
+        java.util.LinkedHashSet<CardDef> usable = new java.util.LinkedHashSet<>();
+        for (Player o : players) usable.addAll(o.techs);
+        usable.addAll(p.minorWonders);
+        List<CardDef> out = new ArrayList<>();
+        for (CardDef c : usable) if (slottable(c) && !isSlotted(p, c)) out.add(c);
+        return out;
+    }
+
+    /** Where a card's bonus goes: "warriors" (army effects), else "building". */
+    public String slotKind(CardDef c) {
+        return c.effects.stream().anyMatch(e -> Effects.UNIT_KEYS.contains(Effects.key(e))) ? "warriors" : "building";
+    }
+
+    /** Whether the card sits in any of the player's slots (a building, the warriors or the population). */
+    public boolean isSlotted(Player p, CardDef c) {
+        return slottedIn(p, c) != null || p.warriorUpgrades.contains(c) || p.populationUpgrades.contains(c);
+    }
+
+    /** The building of {@code p} that has the card in an upgrade slot, or null. */
+    public Building slottedIn(Player p, CardDef c) {
+        for (Building b : p.buildings) if (b.upgrades.contains(c)) return b;
+        return null;
+    }
+
+    /** The effects of a tech or minor wonder that work for {@code p}: rule changes always, building bonuses only while slotted ({@code p == null}: rules only). */
+    public List<Map<String, Object>> effectsFor(Player p, CardDef c) {
+        if (!slottable(c)) return c.effects;
+        List<Map<String, Object>> out = new ArrayList<>();
+        boolean in = p != null && isSlotted(p, c);
+        for (Map<String, Object> e : c.effects) if (in || !Effects.needsSlot(e)) out.add(e);
+        return out;
+    }
+
+    /** Puts a researched tech or one of your minor wonders into a free upgrade slot of one of your buildings. Free. */
+    private void slot(Player p, Map<String, Object> a) {
+        String id = Y.s(a, "card", "");
+        CardDef d = null;
+        for (Player o : players) for (CardDef t : o.techs) if (t.id.equals(id)) d = t;
+        for (CardDef w : p.minorWonders) if (w.id.equals(id)) d = w;
+        if (d == null) throw new GameException("That card isn't one you can use.");
+        if (!slottable(d)) throw new GameException(d.name + " needs no upgrade slot.");
+        if (isSlotted(p, d)) throw new GameException(d.name + " is already in one of your slots.");
+        String target = String.valueOf(a.get("building"));
+        if (target.equals("warriors") || target.equals("population")) {
+            boolean war = target.equals("warriors");
+            if (!slotKind(d).equals(war ? "warriors" : "population")) throw new GameException(d.name + " doesn't fit " + (war ? "the warriors" : "the population") + ".");
+            List<CardDef> list = war ? p.warriorUpgrades : p.populationUpgrades;
+            if (list.size() >= content.rules.unitSlots.getOrDefault(target, 0)) throw new GameException("The " + target + " have no free bonus slot.");
+            list.add(d);
+            log(p.name + " puts " + d.name + " into the " + target + ".");
+            return;
+        }
+        if (!slotKind(d).equals("building")) throw new GameException(d.name + " is for your warriors, not a building.");
+        Building b = p.buildings.stream().filter(x -> x.id == Y.i(a, "building", -1)).findFirst().orElseThrow(() -> new GameException("You have no such building."));
+        if (b.upgrades.size() >= b.def.upgradeSlots) throw new GameException("The " + b.def.name + " has no free upgrade slot.");
+        b.upgrades.add(d);
+        log(p.name + " puts " + d.name + " into the " + b.def.name + ".");
+    }
+
+    /** Takes a card out of its upgrade slot (1 action). */
+    private void unslot(Player p, Map<String, Object> a) {
+        String id = Y.s(a, "card", "");
+        for (List<CardDef> list : List.of(p.warriorUpgrades, p.populationUpgrades)) {
+            for (CardDef c : list) {
+                if (c.id.equals(id)) {
+                    list.remove(c);
+                    log(p.name + " takes " + c.name + " out of its slot.");
+                    return;
+                }
+            }
+        }
+        for (Building b : p.buildings) {
+            for (CardDef c : b.upgrades) {
+                if (c.id.equals(id)) {
+                    b.upgrades.remove(c);
+                    log(p.name + " takes " + c.name + " out of the " + b.def.name + ".");
+                    return;
+                }
+            }
+        }
+        throw new GameException("That card isn't in one of your buildings.");
     }
 
     /** Lasting effects that any player has, for team-wide things (shared pool, mitigations). */
     public Mods civMods() {
         Mods m = new Mods();
         for (Player p : players) {
-            for (CardDef t : p.techs) m.add(t.effects);
-            for (CardDef w : p.minorWonders) if (!obsolete(w)) m.add(w.effects);
+            for (CardDef t : p.techs) m.add(effectsFor(null, t));
+            for (CardDef w : p.minorWonders) if (!obsolete(w)) m.add(effectsFor(null, w));
             // a leader like Tomyris defends the whole team
             if (p.leader != null) for (Map<String, Object> e : p.leader.effects) if (e.containsKey("invasionDefense")) m.add(e);
         }
         for (WonderDef w : builtWonders) if (!obsolete(w)) m.add(w.effects);
+        for (EraBoon b : eraBoons) m.add(b.def().effects);
         for (Territory t : realm) m.add(t.def.effects);
         return m;
     }

@@ -32,7 +32,8 @@ class GameTest {
         assertEquals(2, p.buildings.size());
         assertEquals(4, g.players.get(0).actions);
         assertEquals(8, g.currentEvents.size(), "2 starting events per player");
-        assertEquals(8, g.queue.size(), "queue = players + 4");
+        long endCards = g.queue.stream().filter(sl -> sl.card.def.type == Content.CardType.ERA_END).count();
+        assertTrue(g.queue.size() >= 8 && g.queue.size() <= 8 + endCards, "queue = players + 4 (an end card drawn off the queue may add one)");
         for (Slot s : g.queue) assertEquals(s.card.def.isEvent(), s.under != null, "events have a face-down card under them");
         // production comes at the end of the round, so a round starts with what the tribe has left
         assertEquals(3, p.res.get(Res.FOOD));
@@ -176,12 +177,12 @@ class GameTest {
         Game g = game(1, 33);
         Player p = g.players.get(0);
         p.res.put(Res.FOOD, 20);
-        Player.Building mine = p.ofType("mine");
+        Player.Building mine = p.ofType("hunter");
         assertTrue(mine.workers < mine.slots);
         int before = mine.workers;
         g.act(0, Map.of("type", "grow", "building", mine.id));
         assertEquals(before + 1, mine.workers);
-        Player.Building farm = p.ofType("farm");
+        Player.Building farm = p.ofType("gatherer");
         assertTrue(farm.workers >= farm.slots, "the farm was full");
         assertThrows(GameException.class, () -> g.act(0, Map.of("type", "grow", "building", farm.id)));
     }
@@ -225,7 +226,7 @@ class GameTest {
         Game g = game(1, 37);
         Player p = g.players.get(0);
         p.res.put(Res.FOOD, 10);
-        Player.Building mine = p.ofType("mine");
+        Player.Building mine = p.ofType("hunter");
         int before = mine.workers;
         Game.CardInst c = card(g, "gather_the_tribe");
         p.hand.add(c);
@@ -243,11 +244,11 @@ class GameTest {
 
     @Test
     void starvingPlayersChooseWhoGoes() {
-        Game g = game(2, 39);
+        Game g = game(2, 40);
         Player p = g.players.get(0);
         // people idle and in a mine, 2 food for 3 Population and a round about to start: one person must starve
         p.res.put(Res.FOOD, 2);
-        Player.Building farm = p.ofType("farm"), mine = p.ofType("mine");
+        Player.Building farm = p.ofType("gatherer"), mine = p.ofType("hunter");
         assertTrue(farm.workers > 0 && mine.workers > 0);
         p.idle += farm.workers;
         farm.workers = 0;                           // nobody farms: the food runs short
@@ -257,10 +258,12 @@ class GameTest {
         AiPlayer ai = new AiPlayer(1);
         while (g.phase != Game.Phase.STARVATION && g.result == null && guard++ < 400) {
             if (g.phase == Game.Phase.EVENTS) { for (Player q : g.players) { try { g.act(q.seat, Map.of("type", "ready")); } catch (GameException e) { } } }
-            else { for (Player q : g.players) { try { g.act(q.seat, Map.of("type", "endTurn")); } catch (GameException e) { } } }
+            else { for (Player q : g.players) { try { while (q.hand.size() > g.handLimit(q)) g.act(q.seat, Map.of("type", "discard", "card", q.hand.get(0).id)); g.act(q.seat, Map.of("type", "endTurn")); } catch (GameException e) { } } }
             p.res.put(Res.FOOD, 2);
+            g.threat = 0;                            // this test is about hunger, not about the enemy
+            g.stability = 10;
         }
-        assertEquals(Game.Phase.STARVATION, g.phase, "a starving player with people in two places chooses");
+        assertEquals(Game.Phase.STARVATION, g.phase, "a starving player with people in two places chooses: " + g.endReason);
         int need = g.starving.get(g.starving.keySet().iterator().next());
         int seat = g.starving.keySet().iterator().next();
         assertThrows(GameException.class, () -> g.act(seat, Map.of("type", "starve", "lose", Map.of("idle", need + 5))));
@@ -302,13 +305,15 @@ class GameTest {
     void techsAreGlobal() {
         Game g = game(2, 18);
         Player a = g.players.get(0), b = g.players.get(1);
-        Player.Building bMine = b.ofType("mine");
+        Player.Building bMine = b.ofType("hunter");
         int before = View.income(g, b, g.mods(b)).get("production");
         a.res.put(Res.RESEARCH, 10);
         a.res.put(Res.PRODUCTION, 10);
         Game.CardInst tools = card(g, "stone_tools");
         a.hand.add(tools);
         g.act(a.seat, Map.of("type", "play", "card", tools.id));
+        assertEquals(before, View.income(g, b, g.mods(b)).get("production"), "the bonus is off until it sits in an upgrade slot");
+        g.act(b.seat, Map.of("type", "slot", "card", "stone_tools", "building", bMine.id));
         assertEquals(before + bMine.workers, View.income(g, b, g.mods(b)).get("production"), "the other player's miners gain too");
     }
 
@@ -363,7 +368,7 @@ class GameTest {
             bot.step(g);
             if (g.pending != null && g.pending.event.def.id.equals("sea_peoples_invasion")) invaded = true;
         }
-        assertTrue(invaded || g.result != null, "the second round brings the invasion");
+        assertTrue(invaded || g.result != null || g.log.stream().anyMatch(l -> l.contains("Sea Peoples' Landing")), "the second round brings the invasion");
     }
 
     @Test
@@ -428,6 +433,15 @@ class GameTest {
         g.act(p.seat, Map.of("type", "play", "card", b.id));
         assertEquals("Gilgamesh", p.leader.name, "the new great person replaces the old one");
         assertEquals(5, p.res.get(Res.CULTURE), "paid 4 from the largest pile");
+        assertEquals(4, g.leaderCost());
+        g.eraIndex = 1;
+        assertEquals(8, g.leaderCost(), "4 for each era: 8 in the Ancient era");
+        p.hand.add(a);
+        p.res.put(Res.CULTURE, 7);
+        assertThrows(GameException.class, () -> g.act(p.seat, Map.of("type", "play", "card", a.id)), "7 is not enough for 8");
+        p.res.put(Res.CULTURE, 9);
+        g.act(p.seat, Map.of("type", "play", "card", a.id));
+        assertEquals(1, p.res.get(Res.CULTURE));
     }
 
     @Test
@@ -479,7 +493,7 @@ class GameTest {
         int cap = g.capacity(p, "farm");
         p.leader = C.cards.get("great_hunter");
         assertEquals(cap + 1, g.capacity(p, "farm"));
-        Player.Building farm = p.ofType("farm");
+        Player.Building farm = p.ofType("gatherer");
         farm.slots = cap + 1;
         farm.workers = cap + 1;
         assertEquals(cap + 1, g.working(p, farm));
@@ -537,8 +551,9 @@ class GameTest {
             assertEquals(1, n.getOrDefault("city_state", 0) + cityStates, "one city state");
             assertEquals(24 + 2 * x, n.getOrDefault("action", 0), "actions");
             assertEquals(x, n.getOrDefault("response", 0), "responses");
+            assertEquals(2 * x, n.getOrDefault("hostility", 0) + (int) g.pastEvents.stream().filter(c -> c.def.type == Content.CardType.HOSTILITY).count(), "hostility cards: 2 per player");
             assertEquals(12 + x, n.getOrDefault("event", 0), "events");
-            assertEquals(1, n.getOrDefault("era_trigger", 0), "one era-trigger event");
+            assertEquals(3, n.getOrDefault("era_trigger", 0), "three end-of-era cards");
         }
     }
 
@@ -671,13 +686,14 @@ class GameTest {
                 try {
                     var m = Game.class.getDeclaredMethod("startEra", boolean.class);
                     m.setAccessible(true);
-                    m.invoke(a, false);
+                    m.invoke(a, true);       // keep the queue: only the freshly built deck is looked at
                 } catch (ReflectiveOperationException e) {
                     throw new IllegalStateException(e);
                 }
                 boolean inDeck = a.eraDeck.stream().anyMatch(c -> c.def.id.equals("markets"))
                         || a.queue.stream().anyMatch(sl -> sl.card.def.id.equals("markets") || (sl.under != null && sl.under.def.id.equals("markets")));
                 assertTrue(inDeck, "Markets is always in the Ancient deck (" + players + " players, seed " + seed + ")");
+                assertTrue(a.eraDeck.stream().anyMatch(c -> c.def.id.equals("metalworking")), "Metalworking is always in the Ancient deck");
             }
         }
     }
@@ -720,6 +736,7 @@ class GameTest {
         Player p = g.players.get(0);
         p.leader = C.cards.get("first_architect");                 // +1 action per turn
         p.techs.add(C.cards.get("herbalism"));                     // +1 research per turn
+        g.act(0, Map.of("type", "slot", "card", "herbalism", "building", p.buildings.get(0).id));
         Map<String, Object> me = (Map<String, Object>) ((List<Object>) View.of(g, 0).get("players")).get(0);
         List<Map<String, Object>> actions = (List<Map<String, Object>>) me.get("actionSources");
         assertEquals("Base", actions.get(0).get("from"));
@@ -749,6 +766,7 @@ class GameTest {
         Player p = g.players.get(0);
         p.leader = null;
         p.minorWonders.add(C.cards.get("first_religion"));
+        g.act(0, Map.of("type", "slot", "card", "first_religion", "building", p.buildings.get(0).id));
         assertEquals(2, g.mods(p).income.get(Res.CULTURE));
         int temple = g.buildCost(p, C.buildings.get("temple")).get(Res.PRODUCTION);
         assertEquals(C.buildings.get("temple").cost.get(Res.PRODUCTION) - 1, temple, "temples cost 1 less");
@@ -763,12 +781,19 @@ class GameTest {
         p.leader = null;
         int cost = g.recruitCost(p).get(Res.PRODUCTION), strength = g.strength(p, 4);
         p.techs.add(C.cards.get("spear_men"));
+        assertEquals(cost, g.recruitCost(p).get(Res.PRODUCTION), "no effect until it is in the warriors' bonus slot");
+        assertThrows(GameException.class, () -> g.act(0, Map.of("type", "slot", "card", "spear_men", "building", p.ofType("hunter").id)), "spearmen are for the warriors");
+        g.act(0, Map.of("type", "slot", "card", "spear_men", "building", "warriors"));
         assertEquals(cost + 1, g.recruitCost(p).get(Res.PRODUCTION));
         assertEquals(strength + 4, g.strength(p, 4), "+1 strength per troop");
         p.army = 3;
         assertEquals(2, g.troopUpkeep(p), "half a food per troop, rounded up");
         p.army = 4;
         assertEquals(2, g.troopUpkeep(p));
+        g.act(0, Map.of("type", "unslot", "card", "spear_men"));
+        assertEquals(0, g.troopUpkeep(p), "taking the spearmen out ends the upkeep");
+        assertEquals(strength, g.strength(p, 4));
+        assertThrows(GameException.class, () -> g.act(0, Map.of("type", "slot", "card", "stone_tools", "building", "population")), "the population has no bonus slot yet");
     }
 
     @Test
@@ -846,6 +871,13 @@ class GameTest {
         g.act(p.seat, Map.of("type", "colonize", "land", f.land.id, "resources", Map.of("food", 6, "production", 6), "army", 4, "population", 1));
         assertTrue(g.builtWonders.contains(w), "the wonder is built when the land is settled");
         assertTrue(g.realm.stream().anyMatch(t -> t.wonders.contains(w)));
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> realmView = (List<Map<String, Object>>) (List<?>) View.of(g, 0).get("realm");
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> onLand = realmView.stream().flatMap(t -> ((List<Map<String, Object>>) t.get("wonders")).stream()).toList();
+        assertEquals(1, onLand.size(), "the built wonder is shown on its territory");
+        assertEquals(w.name, onLand.get(0).get("name"));
+        assertNotNull(onLand.get(0).get("text"), "with what the full card needs");
     }
 
     @Test
@@ -857,7 +889,7 @@ class GameTest {
             int total = g.worldDeck.size() + g.setupOffers.values().stream().mapToInt(List::size).sum();
             for (int seat = 0; seat < n; seat++) g.act(seat, Map.of("type", "chooseLand", "land", g.setupOffers.get(seat).get(0).id));
             assertEquals(2, g.realm.size(), n + " players");
-            assertEquals(total, g.worldDeck.size() + g.realm.size() + (int) g.frontier.stream().filter(f -> !f.fromEvent).count(), "no land was lost");
+            assertEquals(total, g.worldDeck.size() + g.realm.size() + (int) g.frontier.stream().filter(f -> !f.fromEvent && !f.land.def.special).count(), "no land was lost");
         }
     }
 
@@ -897,11 +929,11 @@ class GameTest {
     void growthGetsDearer() {
         Game g = game(1, 9);
         Player p = g.players.get(0);
-        assertEquals(3, g.growthCost(p).get(Res.FOOD), "3 people: base cost");
+        assertEquals(7, g.growthCost(p).get(Res.FOOD), "3 people: 6 base, +1 for 2 beyond the first");
         p.idle += 2; // 5 people: 4 beyond the first
-        assertEquals(4, g.growthCost(p).get(Res.FOOD));
+        assertEquals(8, g.growthCost(p).get(Res.FOOD));
         p.idle += 4; // 9 people
-        assertEquals(5, g.growthCost(p).get(Res.FOOD));
+        assertEquals(10, g.growthCost(p).get(Res.FOOD));
     }
 
     @Test
@@ -909,12 +941,12 @@ class GameTest {
         Game g = game(1, 10);
         Player p = g.players.get(0);
         p.res.put(Res.PRODUCTION, 50);
-        Player.Building farm = p.ofType("farm");
-        int cap = g.capacity(p, "farm");
-        while (farm.slots < cap) g.act(0, Map.of("type", "build", "building", "farm"));
-        assertThrows(GameException.class, () -> g.act(0, Map.of("type", "build", "building", "farm")));
+        Player.Building farm = p.ofType("gatherer");
+        int cap = g.capacity(p, "gatherer");
+        while (farm.slots < cap) g.act(0, Map.of("type", "build", "building", "gatherer"));
+        assertThrows(GameException.class, () -> g.act(0, Map.of("type", "build", "building", "gatherer")));
         // building levels get dearer
-        assertTrue(g.buildCost(p, C.buildings.get("farm")).get(Res.PRODUCTION) > 2 || cap == 2);
+        assertTrue(g.buildCost(p, C.buildings.get("gatherer")).get(Res.PRODUCTION) > 2 || cap == 2);
         // lose every territory that gives farm slots: the farm shrinks back to the home slots
         for (Game.Territory t : List.copyOf(g.realm)) {
             if (t.def.slots.getOrDefault("farm", 0) > 0 && g.realm.size() > 1) {
@@ -1032,8 +1064,9 @@ class GameTest {
         Game g = game(1, 6);
         Player p = g.players.get(0);
         p.res.put(Res.PRODUCTION, 10);
-        Player.Building farm = p.ofType("farm");
-        g.act(0, Map.of("type", "build", "building", "farm"));
+        p.res.put(Res.FOOD, 20);
+        Player.Building farm = p.ofType("gatherer");
+        g.act(0, Map.of("type", "build", "building", "gatherer"));
         assertEquals(2, p.buildings.size(), "still one farm and one mine");
         assertEquals(4, farm.slots);
         assertEquals(2, farm.level());
@@ -1098,5 +1131,232 @@ class GameTest {
 
     private static String last(Game g) {
         return String.join("\n", g.log.subList(Math.max(0, g.log.size() - 15), g.log.size()));
+    }
+
+    @Test
+    void theThirdEndOfEraCardEndsTheEraAndItsEventLastsThroughTheNextOne() {
+        Game g = game(1, 91);
+        Player p = g.players.get(0);
+        assertEquals(0, g.eraIndex);
+        assertEquals(0, g.mods(p).maxSlots.getOrDefault("farm", 0));
+        g.eraDeck.removeIf(c -> c.def.type == Content.CardType.ERA_END);        // only the ones this test turns up count
+        g.queue.removeIf(sl -> sl.card.def.type == Content.CardType.ERA_END);
+        int need = 3 - g.endCardsTurnedUp();                // some may have been turned up already when the era began
+        for (int round = 1; round <= need; round++) {
+            g.eraDeck.add(0, card(g, "end_of_prehistoric"));
+            while (p.hand.size() > g.handLimit(p)) g.act(p.seat, Map.of("type", "discard", "card", p.hand.get(0).id));
+            g.act(p.seat, Map.of("type", "endTurn"));
+            for (int guard = 0; g.phase == Game.Phase.EVENTS && guard < 50; guard++) g.act(p.seat, Map.of("type", "ready"));
+            if (round < need) assertEquals(0, g.eraIndex, "the era goes on until the third end card");
+        }
+        assertEquals(1, g.eraIndex, "the third end card ends the era");
+        assertEquals(1, g.eraBoons.size());
+        assertEquals(2, g.eraBoons.get(0).def().effects.size(), g.eraBoons.get(0).def().id);
+        assertTrue(g.queue.stream().anyMatch(sl -> sl.card.def.type == Content.CardType.ERA_END), "the end cards stay on the queue");
+        Game.Slot end = g.queue.stream().filter(sl -> sl.card.def.type == Content.CardType.ERA_END).findFirst().get();
+        assertThrows(GameException.class, () -> g.act(p.seat, Map.of("type", "pick", "slot", g.queue.indexOf(end))));
+    }
+
+    @Test
+    void raidsAndInvasionsDrawFromTheEnemyDeckAndPutTheCardsBack() {
+        Game g = game(2, 22);
+        assertEquals(10, g.enemyDeck.size(), "the deck starts with 6 ones and 4 twos");
+        assertEquals(14, g.enemyDeck.stream().mapToInt(Integer::intValue).sum());
+        g.currentEvents.add(0, card(g, "sea_peoples"));
+        g.futureEvents.add(card(g, "good_hunt"));
+        AiPlayer bot = new AiPlayer(1);
+        int round = g.round;
+        while (g.round == round && g.result == null) bot.step(g);
+        assertTrue(g.enemyDeck.contains(4), "the Sea Peoples add a strength-4 card every round they are active");
+        assertEquals(11, g.enemyDeck.size(), "cards that were drawn went back; one card was added");
+        assertTrue(g.log.stream().anyMatch(l -> l.contains("enemy cards:") && l.contains("go back into the enemy deck")), String.join("\n", g.log));
+    }
+
+    @Test
+    void stoneToolsIsInEveryGame() {
+        for (int n = 1; n <= 4; n++) {
+            for (long seed = 1; seed <= 5; seed++) {
+                Game g = game(n, seed * 31 + n);
+                List<Game.CardInst> all = new ArrayList<>(g.eraDeck);
+                g.queue.forEach(sl -> { all.add(sl.card); if (sl.under != null) all.add(sl.under); });
+                for (Player p : g.players) { all.addAll(p.hand); all.addAll(p.techs.stream().map(t -> new Game.CardInst(0, t)).toList()); }
+                assertTrue(all.stream().anyMatch(c -> c.def.id.equals("stone_tools")), "Stone Tools is in the deck, " + n + " players, seed " + seed);
+            }
+        }
+    }
+
+    @Test
+    void theLegendaryPredatorIsAPrehistoricRaidOfPlayersPlusTwo() {
+        assertTrue(C.eras.get(0).cards.containsKey("legendary_predator"));
+        Content.CardDef d = C.cards.get("legendary_predator");
+        assertEquals("raid", d.kind);
+        assertEquals(3, d.strength(1, 5));
+        assertEquals(6, d.strength(4, 5));
+    }
+
+    @Test
+    void agricultureUnlocksFarmsAndRetiresGatherers() {
+        Game g = game(1, 6);
+        Player p = g.players.get(0);
+        p.res.put(Res.PRODUCTION, 20);
+        assertNotNull(p.ofType("gatherer"));
+        assertThrows(GameException.class, () -> g.act(0, Map.of("type", "build", "building", "farm")), "locked before Agriculture");
+        int before = g.growthCost(p).get(Res.FOOD);
+        p.techs.add(C.cards.get("agriculture"));
+        assertThrows(GameException.class, () -> g.act(0, Map.of("type", "build", "building", "gatherer")), "no more gatherers");
+        g.act(0, Map.of("type", "build", "building", "farm"));
+        assertNotNull(p.ofType("farm"));
+        assertNotNull(p.ofType("gatherer"), "existing gatherers stay");
+        assertEquals(before - 3, g.growthCost(p).get(Res.FOOD));
+    }
+
+    @Test
+    void metalworkingUnlocksMinesAndRetiresHunters() {
+        Game g = game(1, 6);
+        Player p = g.players.get(0);
+        p.res.put(Res.PRODUCTION, 20);
+        assertThrows(GameException.class, () -> g.act(0, Map.of("type", "build", "building", "mine")));
+        p.techs.add(C.cards.get("metalworking"));
+        assertThrows(GameException.class, () -> g.act(0, Map.of("type", "build", "building", "hunter")));
+        g.act(0, Map.of("type", "build", "building", "mine"));
+        assertNotNull(p.ofType("mine"));
+    }
+
+    @Test
+    void upgradeSlotsGateBuildingBonuses() {
+        Game g = game(2, 18);
+        Player a = g.players.get(0), b = g.players.get(1);
+        Player.Building hunters = a.ofType("hunter"), gatherers = a.ofType("gatherer");
+        a.techs.add(C.cards.get("herbalism"));                       // +2 health (a rule) and +1 research (a building bonus)
+        assertEquals(0, g.mods(a).income.get(Res.RESEARCH), "not slotted: no research");
+        assertTrue(g.mods(a).healthMod >= 0);
+        assertEquals(1, g.slottable(a).size());
+        g.act(0, Map.of("type", "slot", "card", "herbalism", "building", hunters.id));
+        assertEquals(1, g.mods(a).income.get(Res.RESEARCH));
+        assertEquals(0, g.mods(b).income.get(Res.RESEARCH), "b has not slotted it");
+        assertTrue(g.slottable(b).stream().anyMatch(c -> c.id.equals("herbalism")), "everyone can slot a researched tech");
+        assertThrows(GameException.class, () -> g.act(0, Map.of("type", "slot", "card", "herbalism", "building", gatherers.id)), "already slotted");
+        a.techs.add(C.cards.get("pottery"));
+        assertThrows(GameException.class, () -> g.act(0, Map.of("type", "slot", "card", "pottery", "building", hunters.id)), "the hunters have only one slot");
+        int actions = a.actions;
+        g.act(0, Map.of("type", "unslot", "card", "herbalism"));
+        assertEquals(actions - 1, a.actions, "taking a card out costs an action");
+        assertEquals(0, g.mods(a).income.get(Res.RESEARCH));
+        hunters.slots += 2;
+        assertEquals(1, hunters.upgrades.size() + 1, "expanding does not add upgrade slots");
+        assertEquals(1, C.buildings.get("hunter").upgradeSlots);
+    }
+
+    @Test
+    void lithicArtMakesHuntersProduceCultureOnceSlotted() {
+        Game g = game(1, 18);
+        Player p = g.players.get(0);
+        p.techs.add(C.cards.get("lithic_art"));
+        int before = View.income(g, p, g.mods(p)).get("culture");
+        g.act(0, Map.of("type", "slot", "card", "lithic_art", "building", p.ofType("hunter").id));
+        assertEquals(before + p.ofType("hunter").workers, View.income(g, p, g.mods(p)).get("culture"));
+        assertThrows(GameException.class, () -> g.act(0, Map.of("type", "slot", "card", "stone_tools", "building", p.ofType("hunter").id)), "one slot only: a choice between production and culture");
+    }
+
+    @Test
+    void aRetiredBuildingWithNoWorkersLeavesTheList() {
+        Game g = game(1, 6);
+        Player p = g.players.get(0);
+        p.techs.add(C.cards.get("agriculture"));
+        Player.Building gatherers = p.ofType("gatherer");
+        assertNotNull(gatherers, "still there while people work in it");
+        g.act(0, Map.of("type", "move", "from", gatherers.id, "to", "idle"));
+        g.act(0, Map.of("type", "move", "from", gatherers.id, "to", "idle"));
+        assertNull(p.ofType("gatherer"), "no workers and retired: gone");
+        assertNotNull(p.ofType("hunter"));
+    }
+
+    @Test
+    void cheatModeMakesEverythingFreeWithUnlimitedActions() {
+        Game g = game(1, 6);
+        Player p = g.players.get(0);
+        p.res.put(Res.PRODUCTION, 0);
+        p.actions = 0;
+        assertThrows(GameException.class, () -> g.act(0, Map.of("type", "build", "building", "temple")));
+        g.setCheat(0, true);
+        for (int i = 0; i < 6; i++) {
+            g.act(0, Map.of("type", "move", "from", p.ofType("hunter").id, "to", "idle"));
+            g.act(0, Map.of("type", "move", "from", "idle", "to", p.ofType("hunter").id));
+        }
+        g.act(0, Map.of("type", "build", "building", "temple"));
+        assertNotNull(p.ofType("temple"));
+        assertTrue(p.actions > 50);
+    }
+
+    @Test
+    void theClassicalEraFollowsTheAncientEra() {
+        assertEquals(List.of("prehistoric", "ancient", "classical"), C.eras.stream().map(e -> e.id).toList());
+        assertEquals(3, C.eras.get(1).endEvents.size(), "the Ancient era ends with one of three events");
+        assertTrue(C.eras.get(2).endEvents.isEmpty(), "the Classical era is the last: its end wins the game");
+        assertEquals("classical", C.greatWonders.get("great_library").era);
+        assertEquals("ancient", C.greatWonders.get("pyramids").era);
+        for (int players = 1; players <= 6; players++) {
+            Game g = game(players, 500 + players);
+            g.eraIndex = 2;
+            try {
+                var m = Game.class.getDeclaredMethod("startEra", boolean.class);
+                m.setAccessible(true);
+                m.invoke(g, true);
+            } catch (ReflectiveOperationException e) {
+                throw new IllegalStateException(e);
+            }
+            assertFalse(g.eraDeck.isEmpty());
+            assertEquals(3, g.eraDeck.stream().filter(c -> c.def.id.equals("end_of_classical")).count());
+        }
+    }
+
+    @Test
+    void theNewEraCardsAreInTheirEras() {
+        for (String id : List.of("knossos", "ziggurat_of_ur", "karnak")) assertEquals("ancient", C.greatWonders.get(id).era, id);
+        for (String id : List.of("great_library", "parthenon", "colosseum", "pantheon", "great_wall")) assertEquals("classical", C.greatWonders.get(id).era, id);
+        for (String id : List.of("hatshepsut", "sargon", "minos", "imhotep")) assertEquals("ancient", C.cards.get(id).era, id);
+        for (String id : List.of("cleopatra", "cyrus", "augustus", "pericles", "hannibal")) assertEquals("classical", C.cards.get(id).era, id);
+        Game g = game(1, 9);
+        assertEquals("warriors", g.slotKind(C.cards.get("legion_tactics")));
+        assertEquals("building", g.slotKind(C.cards.get("irrigation_canals")));
+        assertTrue(g.slottable(C.cards.get("forum")));
+    }
+
+    @Test
+    void botsSendNothingToAnEventLandTheTeamCannotPay() {
+        Game g = game(2, 13);
+        Game.Frontier f = new Game.Frontier(new Game.Territory(9000, C.territories.get("plains")), true, 1);
+        for (Player q : g.players) for (Res r : Res.values()) q.res.put(r, 0);
+        assertFalse(AiPlayer.teamCanPay(g, f), "nothing to spend between them");
+        for (Player q : g.players) {
+            for (Res r : Res.values()) q.res.put(r, 99);
+            q.idle += 6;
+            q.army = 20;
+        }
+        assertTrue(AiPlayer.teamCanPay(g, f), "together they can pay it");
+    }
+
+    @Test
+    void aRequiredCardIsInTheEraDeckExactlyOnce() {
+        for (int players = 1; players <= 6; players++) {
+            for (long seed = 0; seed < 8; seed++) {
+                for (int era = 0; era < 2; era++) {
+                    Game a = game(players, 700 + seed);
+                    a.eraIndex = era;
+                    try {
+                        var m = Game.class.getDeclaredMethod("startEra", boolean.class);
+                        m.setAccessible(true);
+                        m.invoke(a, true);
+                    } catch (ReflectiveOperationException e) {
+                        throw new IllegalStateException(e);
+                    }
+                    for (Content.CardDef d : C.cards.values()) {
+                        if (!d.required || !a.era().cards.containsKey(d.id)) continue;
+                        long n = a.eraDeck.stream().filter(c -> c.def == d).count();
+                        assertEquals(1, n, d.id + " must be in the deck once (" + players + " players, seed " + seed + ")");
+                    }
+                }
+            }
+        }
     }
 }

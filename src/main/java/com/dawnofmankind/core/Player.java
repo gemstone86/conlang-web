@@ -18,6 +18,8 @@ public final class Player {
         public final BuildingDef def;
         public int workers;
         public int slots;
+        /** The cards slotted into this building: their per-worker and income bonuses work for the owner only while they sit here. */
+        public final List<CardDef> upgrades = new ArrayList<>();
 
         Building(int id, BuildingDef def) {
             this.id = id;
@@ -54,6 +56,10 @@ public final class Player {
     public boolean away;
     /** Parallel rounds: this player's actions left this round, whether they have ended their round, and what they drew blind at its start. */
     public int actions;
+    /** Admin cheat mode: resources and actions never run out. */
+    public boolean cheat;
+    /** Cards in the upgrade slots of the army (warriors) and of the idle people (population). */
+    public final List<CardDef> warriorUpgrades = new ArrayList<>(), populationUpgrades = new ArrayList<>();
     public boolean done;
     public Game.CardInst turnDraw;
     public int turnEvents, turnSeq;
