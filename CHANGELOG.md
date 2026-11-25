@@ -1,5 +1,9 @@
 # Changes
 
+## v1.93.9 (combined app)
+
+- Dawn: cards with art now show the picture as a banner on top and the text on a solid dark panel below, so it is readable everywhere (hand, queue, event popup, catalogue).
+
 ## v1.93.8 (combined app)
 
 - Dawn: card art for the 22 Classical cards: Iron Working, Philosophy, Mathematics, Engineering, Roman Concrete, Pericles, Hannibal, Cleopatra, Cyrus, Augustus, Legion Tactics, Aqueducts, The Forum, Pax Romana, Gallic Warband, The Goths Invade, Hannibal at the Gates, End of an Era (Classical), The Parthenon, The Colosseum, The Pantheon and The Great Wall.
