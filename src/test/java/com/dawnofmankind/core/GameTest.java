@@ -1321,4 +1321,18 @@ class GameTest {
         assertEquals("building", g.slotKind(C.cards.get("irrigation_canals")));
         assertTrue(g.slottable(C.cards.get("forum")));
     }
+
+    @Test
+    void botsSendNothingToAnEventLandTheTeamCannotPay() {
+        Game g = game(2, 13);
+        Game.Frontier f = new Game.Frontier(new Game.Territory(9000, C.territories.get("plains")), true, 1);
+        for (Player q : g.players) for (Res r : Res.values()) q.res.put(r, 0);
+        assertFalse(AiPlayer.teamCanPay(g, f), "nothing to spend between them");
+        for (Player q : g.players) {
+            for (Res r : Res.values()) q.res.put(r, 99);
+            q.idle += 6;
+            q.army = 20;
+        }
+        assertTrue(AiPlayer.teamCanPay(g, f), "together they can pay it");
+    }
 }

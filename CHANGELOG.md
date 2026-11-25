@@ -1,5 +1,9 @@
 # Changes
 
+## v1.93.3 (combined app)
+
+- Dawn: before a bot sends resources, troops or settlers to a land found by an event, it checks that the players can pay all of it together. If they can't (the land would be lost anyway), it sends nothing.
+
 ## v1.93.2 (combined app)
 
 - Dawn: a big banner opens each era: "Prehistory / The prehistoric era begins…", then "The ancient era begins…" and so on, with the era-end effects carried over listed under it. Click to close, or it fades after a few seconds.

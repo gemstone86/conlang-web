@@ -85,7 +85,8 @@ public final class AiPlayer {
         {
             if (pe == null || Boolean.TRUE.equals(pe.ready.get(p.seat))) return false;
             for (Game.Frontier f : List.copyOf(g.frontier)) {
-                if (f.fromEvent && f.eventCard == pe.event.id) tryAct(g, p, landPay(g, p, f, Map.of("type", "colonize")));
+                // a land from an event is lost unless it is paid at once: send nothing if the whole team can't pay it between them
+                if (f.fromEvent && f.eventCard == pe.event.id && teamCanPay(g, f)) tryAct(g, p, landPay(g, p, f, Map.of("type", "colonize")));
             }
             for (CardInst c : List.copyOf(p.hand)) {
                 if (c.def.type == CardType.RESPONSE && tryAct(g, p, Map.of("type", "respond", "card", c.id))) break;
@@ -145,6 +146,22 @@ public final class AiPlayer {
             if (!open.isEmpty()) return tryAct(g, p, Map.of("type", "pick", "slot", open.get(rng.nextInt(open.size()))));
         }
         return false;
+    }
+
+    /** Whether the players together can spare enough resources, troops and settlers to finish the land (the same spare amounts a bot sends). */
+    static boolean teamCanPay(Game g, Game.Frontier f) {
+        EnumMap<Res, Integer> left = g.settleLeft(f);
+        for (Res r : Res.values()) {
+            int spare = 0;
+            for (Player q : g.players) spare += Math.max(0, q.res.get(r) - (r == Res.FOOD ? q.population() : 0));
+            if (spare < left.get(r)) return false;
+        }
+        int troops = 0, settlers = 0;
+        for (Player q : g.players) {
+            troops += g.strength(q, Math.max(0, q.army - q.committed - 1));
+            settlers += q.population() > 4 ? q.population() - 4 : 0;
+        }
+        return troops >= g.settleTroops(f) - f.troopsPaid && settlers >= g.settleSettlers(f) - f.settlersPaid;
     }
 
     /** Sends what the bot can spare toward a land. */
