@@ -188,6 +188,8 @@ public final class Game {
     public Pending pending;
     public int eventsDrawnThisRound;
     private boolean eraEnding;
+    /** The era-end event at the bottom of the era deck (not in the last era): turned up, it ends the era. */
+    private CardInst eraEndCard;
     /** End-of-era cards placed on the queue in this era; the era-end event strikes when the last one is. */
     private int endCardsPlaced;
     /** The era-end events in force: their effects last through the era after the one they ended. */
@@ -353,11 +355,16 @@ public final class Game {
             if (kind.equals("era_trigger")) triggers.addAll(picked); else eraDeck.addAll(picked);
         });
         Collections.shuffle(eraDeck, rng);
+        eraEndCard = null;
+        if (eraIndex + 1 < content.eras.size() && !e.endEvents.isEmpty()) {          // one of the era-end events lies at the very bottom of the deck
+            eraEndCard = inst(content.cards.get(e.endEvents.get(rng.nextInt(e.endEvents.size()))));
+        }
         // era-trigger events go into the bottom part of the deck: they can end the era early, but not at once
         for (CardInst t : triggers) {
             int from = eraDeck.size() * (100 - content.rules.eraTriggerBottomShare) / 100;
             eraDeck.add(from + rng.nextInt(eraDeck.size() - from + 1), t);
         }
+        if (eraEndCard != null) eraDeck.add(eraEndCard);
         if (!keepQueue) {
             queue.clear();
             refillQueue();
@@ -812,27 +819,12 @@ public final class Game {
         return null;
     }
 
-    /** Counts an end-of-era card; the third one brings the era-end event, and the next era's cards are drawn from then on. */
+    /** The last era's end card is turned up: the civilization has endured, and the game is won at the end of the round. */
     private void endCardPlaced(CardInst c) {
-        endCardsPlaced++;
-        int needed = content.rules.eraDeck.get("era_trigger")[0];
-        log(c.def.name + " is turned up on the queue (" + Math.min(endCardsPlaced, needed) + " of " + needed + ").");
-        if (endCardsPlaced < needed) return;
+        log(c.def.name + " is turned up on the queue.");
         endCardsPlaced = 0;
-        boolean lastEra = eraIndex + 1 >= content.eras.size();
-        if (lastEra) {
-            eraEnding = true;                              // the game is won at the end of the round
-            log("The " + era().name + " era draws to its close.");
-            return;
-        }
-        List<String> options = era().endEvents;
-        if (!options.isEmpty()) {
-            CardDef d = content.cards.get(options.get(rng.nextInt(options.size())));
-            log("THE ERA ENDS: " + d.name + " — " + d.text);
-            eraBoons.add(new EraBoon(d, eraIndex + 1));
-            pastEvents.add(inst(d));
-        }
-        advanceEra(true);
+        eraEnding = true;
+        log("The " + era().name + " era draws to its close.");
     }
 
     private CardInst nextFromEraDeck() {
@@ -845,6 +837,15 @@ public final class Game {
                 if (eraDeck.isEmpty()) return null;
             }
             CardInst c = eraDeck.remove(0);
+            if (c == eraEndCard) {                            // the bottom card: this event ends the era
+                eraEndCard = null;
+                log("THE ERA ENDS: " + c.def.name + " — " + c.def.text);
+                eraBoons.add(new EraBoon(c.def, eraIndex + 1));
+                pastEvents.add(c);
+                advanceEra(true);
+                if (result != null) return null;
+                continue;
+            }
             if (c.def.type != CardType.HOSTILITY) return c;
             int n = c.def.effects.stream().filter(e -> e.containsKey("hostility")).mapToInt(e -> Y.toInt(e.get("hostility"))).sum();
             threat += n;

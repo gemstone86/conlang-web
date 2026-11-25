@@ -1,5 +1,9 @@
 # Changes
 
+## v1.94.0 (combined app)
+
+- Dawn: the "End of an Era" cards are gone. One era-end event (chosen at random from the era's list) now lies at the very bottom of each era deck, and the era ends when it is turned up; its effects still last through the next era. The last era has a single end card at the bottom that wins the game. Eras now last until the deck is nearly used up, so required cards (Agriculture, Metalworking, Markets) always come up.
+
 ## v1.93.11 (combined app)
 
 - Dawn: the face-down card you get with an event is always shown (it used to be skipped when it was a city state or great wonder, which never reach the hand); the turn-start draw pop-up also says what a city state does.

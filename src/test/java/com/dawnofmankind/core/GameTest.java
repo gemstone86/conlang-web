@@ -32,8 +32,7 @@ class GameTest {
         assertEquals(2, p.buildings.size());
         assertEquals(4, g.players.get(0).actions);
         assertEquals(8, g.currentEvents.size(), "2 starting events per player");
-        long endCards = g.queue.stream().filter(sl -> sl.card.def.type == Content.CardType.ERA_END).count();
-        assertTrue(g.queue.size() >= 8 && g.queue.size() <= 8 + endCards, "queue = players + 4 (an end card drawn off the queue may add one)");
+        assertEquals(8, g.queue.size(), "queue = players + 4");
         for (Slot s : g.queue) assertEquals(s.card.def.isEvent(), s.under != null, "events have a face-down card under them");
         // production comes at the end of the round, so a round starts with what the tribe has left
         assertEquals(3, p.res.get(Res.FOOD));
@@ -553,7 +552,7 @@ class GameTest {
             g.queue.forEach(sl -> { all.add(sl.card); if (sl.under != null) all.add(sl.under); });
             all.addAll(g.futureEvents);                                      // events drawn blind go face down here
             for (Player p : g.players) all.addAll(p.hand);                 // what they drew blind
-            for (Game.CardInst c : all) n.merge(c.def.eraTrigger ? "era_trigger" : c.def.type.name().toLowerCase(), 1, Integer::sum);
+            for (Game.CardInst c : all) if (c.def.eraEnd == null) n.merge(c.def.eraTrigger ? "era_trigger" : c.def.type.name().toLowerCase(), 1, Integer::sum);
             // leaders and great wonders play or go to the board as soon as they are drawn; hostility cards are spent
             int ledBy = (int) g.log.stream().filter(l -> l.contains(" has the great person ") || l.contains(" draws the great person ")).count();
             assertEquals(x + 1, n.getOrDefault("leader", 0) + ledBy, "leaders, " + x + " players");
@@ -565,7 +564,8 @@ class GameTest {
             assertEquals(x, n.getOrDefault("response", 0), "responses");
             assertEquals(2 * x, n.getOrDefault("hostility", 0) + (int) g.pastEvents.stream().filter(c -> c.def.type == Content.CardType.HOSTILITY).count(), "hostility cards: 2 per player");
             assertEquals(12 + x, n.getOrDefault("event", 0), "events");
-            assertEquals(3, n.getOrDefault("era_trigger", 0), "three end-of-era cards");
+            assertEquals(0, n.getOrDefault("era_trigger", 0), "no End of an Era cards before the last era");
+            assertEquals(1, all.stream().filter(c -> c.def.eraEnd != null).count(), "one era-end event, at the bottom of the deck");
         }
     }
 
@@ -1146,27 +1146,24 @@ class GameTest {
     }
 
     @Test
-    void theThirdEndOfEraCardEndsTheEraAndItsEventLastsThroughTheNextOne() {
+    void oneEraEndEventLiesAtTheBottomOfTheDeckAndEndsTheEraWhenTurnedUp() {
         Game g = game(1, 91);
         Player p = g.players.get(0);
         assertEquals(0, g.eraIndex);
         assertEquals(0, g.mods(p).maxSlots.getOrDefault("farm", 0));
-        g.eraDeck.removeIf(c -> c.def.type == Content.CardType.ERA_END);        // only the ones this test turns up count
-        g.queue.removeIf(sl -> sl.card.def.type == Content.CardType.ERA_END);
-        int need = 3 - g.endCardsTurnedUp();                // some may have been turned up already when the era began
-        for (int round = 1; round <= need; round++) {
-            g.eraDeck.add(0, card(g, "end_of_prehistoric"));
+        Game.CardInst bottom = g.eraDeck.get(g.eraDeck.size() - 1);
+        assertTrue(bottom.def.eraEnd != null && bottom.def.isEvent(), "the bottom card is an era-end event");
+        assertEquals(1, g.eraDeck.stream().filter(c -> c.def.eraEnd != null).count());
+        assertTrue(g.eraDeck.stream().noneMatch(c -> c.def.type == Content.CardType.ERA_END), "no End of an Era cards");
+        g.eraDeck.subList(0, g.eraDeck.size() - 1).clear();          // only the end card is left
+        for (int guard = 0; guard < 5 && g.eraIndex == 0; guard++) {
             while (p.hand.size() > g.handLimit(p)) g.act(p.seat, Map.of("type", "discard", "card", p.hand.get(0).id));
             g.act(p.seat, Map.of("type", "endTurn"));
-            for (int guard = 0; g.phase == Game.Phase.EVENTS && guard < 50; guard++) g.act(p.seat, Map.of("type", "ready"));
-            if (round < need) assertEquals(0, g.eraIndex, "the era goes on until the third end card");
+            for (int k = 0; g.phase == Game.Phase.EVENTS && k < 50; k++) g.act(p.seat, Map.of("type", "ready"));
         }
-        assertEquals(1, g.eraIndex, "the third end card ends the era");
+        assertEquals(1, g.eraIndex, "the end card ends the era");
         assertEquals(1, g.eraBoons.size());
-        assertEquals(2, g.eraBoons.get(0).def().effects.size(), g.eraBoons.get(0).def().id);
-        assertTrue(g.queue.stream().anyMatch(sl -> sl.card.def.type == Content.CardType.ERA_END), "the end cards stay on the queue");
-        Game.Slot end = g.queue.stream().filter(sl -> sl.card.def.type == Content.CardType.ERA_END).findFirst().get();
-        assertThrows(GameException.class, () -> g.act(p.seat, Map.of("type", "pick", "slot", g.queue.indexOf(end))));
+        assertEquals(bottom.def.id, g.eraBoons.get(0).def().id);
     }
 
     @Test
@@ -1318,7 +1315,8 @@ class GameTest {
                 throw new IllegalStateException(e);
             }
             assertFalse(g.eraDeck.isEmpty());
-            assertEquals(3, g.eraDeck.stream().filter(c -> c.def.id.equals("end_of_classical")).count());
+            assertEquals(1, g.eraDeck.stream().filter(c -> c.def.id.equals("end_of_classical")).count());
+            assertEquals("end_of_classical", g.eraDeck.get(g.eraDeck.size() - 1).def.id, "it is the bottom card");
         }
     }
 
