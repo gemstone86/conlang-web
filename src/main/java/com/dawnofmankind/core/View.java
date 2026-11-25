@@ -224,6 +224,14 @@ public final class View {
             List<Object> slotCards = new ArrayList<>();
             for (Content.CardDef c : g.slottable(p)) slotCards.add(def(c));
             pm.put("slotCards", slotCards);
+            Map<String, Object> units = new LinkedHashMap<>();
+            for (String k : List.of("warriors", "population")) {
+                Map<String, Object> um = new LinkedHashMap<>();
+                um.put("slots", g.content.rules.unitSlots.getOrDefault(k, 0));
+                um.put("upgrades", (k.equals("warriors") ? p.warriorUpgrades : p.populationUpgrades).stream().map(View::def).toList());
+                units.put(k, um);
+            }
+            pm.put("units", units);
             pm.put("techs", p.techs.stream().map(View::def).toList());
             if (p.leader != null) pm.put("leader", def(p.leader));
             if (p.pendingLeader != null) pm.put("pendingLeader", def(p.pendingLeader));

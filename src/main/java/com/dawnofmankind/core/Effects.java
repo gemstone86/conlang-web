@@ -62,8 +62,11 @@ public final class Effects {
     /** Effects that change what buildings produce need an upgrade slot; rule changes (hand size, actions, ...) always work. */
     public static boolean needsSlot(Map<String, Object> e) {
         String k = key(e);
-        return k.equals("income") || k.equals("perWorker");
+        return k.equals("income") || k.equals("perWorker") || UNIT_KEYS.contains(k);
     }
+
+    /** Effects on the army (Spearmen): they go in a Warriors slot. */
+    static final Set<String> UNIT_KEYS = Set.of("troopStrength", "recruitExtra", "troopUpkeep");
 
     public static final class Mods {
         public final EnumMap<Res, Integer> income = Res.empty();

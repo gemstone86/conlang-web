@@ -31,6 +31,8 @@ public final class Content {
         public Map<String, int[]> eraDeck = new LinkedHashMap<>();
         /** Worker slots every player has for land-bound buildings (farm, mine) before any territory. */
         public Map<String, Integer> homeSlots = new LinkedHashMap<>();
+        /** Upgrade slots of the people themselves: "warriors" (the army) and "population" (idle people). */
+        public Map<String, Integer> unitSlots = new LinkedHashMap<>();
         public int startTerritories, growthStep;
         /** Extra production for each level a building already has. */
         public int buildingEscalation;
@@ -235,6 +237,7 @@ public final class Content {
             rp.forEach((k, v) -> rules.removedPerRound.put(Y.toInt(k), Y.toInt(v)));
         }
         Y.map(m.get("homeSlots")).forEach((k, v) -> rules.homeSlots.put(k, Y.toInt(v)));
+        Y.map(m.get("unitSlots")).forEach((k, v) -> rules.unitSlots.put(k, Y.toInt(v)));
         rules.startTerritories = Y.i(m, "startTerritories", 2);
         rules.faceUpLands = Y.i(m, "faceUpLands", 2);
         rules.growthStep = Y.i(m, "growthStep", 4);

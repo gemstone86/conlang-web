@@ -1,5 +1,9 @@
 # Changes
 
+## v1.91.0 (combined app)
+
+- Dawn: under Buildings there is now a Population section with the idle population and the warriors, each with bonus slots like a building. The population starts with no bonus slot, the warriors with one. Spearmen is now a bonus-slot card for the warriors: slot it to get its stronger troops (and the dearer training and upkeep), take it out (1 action) when the economy needs relief. Troop strength bonuses from slotted cards are per player.
+
 ## v1.90.0 (combined app)
 
 - Dawn: admins get a "Cheat mode" button in the top bar (nobody else sees it, and the server refuses the message from anyone else). While it is on, your resources and actions are topped up after every move, so every card, building and payment is free with unlimited actions. It is logged in the game log.

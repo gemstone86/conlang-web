@@ -179,6 +179,10 @@ public final class AiPlayer {
     /** Free: put every researched card that makes a building better into a free upgrade slot. */
     private static void slotUpgrades(Game g, Player p) {
         for (Content.CardDef c : g.slottable(p)) {
+            if (g.slotKind(c).equals("warriors")) {
+                tryAct(g, p, Map.of("type", "slot", "card", c.id, "building", "warriors"));
+                continue;
+            }
             for (Player.Building b : p.buildings) {
                 if (b.upgrades.size() < b.def.upgradeSlots && tryAct(g, p, Map.of("type", "slot", "card", c.id, "building", b.id))) break;
             }

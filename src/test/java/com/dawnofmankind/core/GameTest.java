@@ -780,12 +780,19 @@ class GameTest {
         p.leader = null;
         int cost = g.recruitCost(p).get(Res.PRODUCTION), strength = g.strength(p, 4);
         p.techs.add(C.cards.get("spear_men"));
+        assertEquals(cost, g.recruitCost(p).get(Res.PRODUCTION), "no effect until it is in the warriors' bonus slot");
+        assertThrows(GameException.class, () -> g.act(0, Map.of("type", "slot", "card", "spear_men", "building", p.ofType("hunter").id)), "spearmen are for the warriors");
+        g.act(0, Map.of("type", "slot", "card", "spear_men", "building", "warriors"));
         assertEquals(cost + 1, g.recruitCost(p).get(Res.PRODUCTION));
         assertEquals(strength + 4, g.strength(p, 4), "+1 strength per troop");
         p.army = 3;
         assertEquals(2, g.troopUpkeep(p), "half a food per troop, rounded up");
         p.army = 4;
         assertEquals(2, g.troopUpkeep(p));
+        g.act(0, Map.of("type", "unslot", "card", "spear_men"));
+        assertEquals(0, g.troopUpkeep(p), "taking the spearmen out ends the upkeep");
+        assertEquals(strength, g.strength(p, 4));
+        assertThrows(GameException.class, () -> g.act(0, Map.of("type", "slot", "card", "stone_tools", "building", "population")), "the population has no bonus slot yet");
     }
 
     @Test

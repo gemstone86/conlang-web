@@ -596,7 +596,7 @@ function miniCard(c, extra = '', cls = '') {
 function renderTechs() {
   const s = state, list = s.players.flatMap(o => o.techs.map(t => ({ t, by: o.name })));
   const mine = me(), loose = new Set((mine?.slotCards || []).map(c => c.key));
-  const inSlot = new Set((mine?.buildings || []).flatMap(b => (b.upgrades || []).map(u => u.key)));
+  const inSlot = new Set([...(mine?.buildings || []).flatMap(b => (b.upgrades || []).map(u => u.key)), ...Object.values(mine?.units || {}).flatMap(u => (u.upgrades || []).map(x => x.key))]);
   $('techPanel').innerHTML = `<h2>Technologies <span class="muted small">(${list.length})</span></h2>` + (list.length
     ? `<p class="muted small" style="margin:.1rem 0 .3rem">Drag a card with a bonus into an upgrade slot of one of your buildings (or click it, then the slot).</p><div class="minis">${list.map(({ t, by }) => {
       const can = loose.has(t.key), used = inSlot.has(t.key);
@@ -659,6 +659,12 @@ function renderCiv() {
       ${cap != null ? `<span class="small muted">${b.slots}/${cap} slots built</span>` : ''}${b.inactive ? `<span class="small bad">${b.inactive} inactive (over the land limit)</span>` : ''}
       ${b.id != null ? `<div class="upgrades">${(b.upgrades || []).map(u => `<div class="uslot full">${miniCard(u, `<button class="tiny uout" ${act ? '' : 'disabled'} data-unslot="${u.key}" title="Take it out (1 action)">×</button>`)}</div>`).join('')}${Array.from({ length: Math.max(0, (b.upgradeSlots || 0) - (b.upgrades || []).length) }, () => `<div class="uslot" data-slot-into="${b.id}" title="Upgrade slot: drop a technology or minor wonder here (free). Taking it out later costs 1 action."><span>＋<br>upgrade slot</span></div>`).join('')}</div>` : ''}</div>`;
   }).join('');
+  const unitSlot = (key, u) => `${(u.upgrades || []).map(x => `<div class="uslot full">${miniCard(x, `<button class="tiny uout" ${act ? '' : 'disabled'} data-unslot="${x.key}" title="Take it out (1 action)">×</button>`)}</div>`).join('')}${Array.from({ length: Math.max(0, (u.slots || 0) - (u.upgrades || []).length) }, () => `<div class="uslot" data-slot-into="${key}" title="Bonus slot: drop a card here (free). Taking it out later costs 1 action."><span>＋<br>bonus slot</span></div>`).join('')}`;
+  const units = p.units || {};
+  const peopleRows = `<div class="bld"><span class="bname">Idle population</span><span class="small muted">${p.idle} idle</span>
+      ${(units.population?.slots || 0) ? `<div class="upgrades">${unitSlot('population', units.population)}</div>` : '<span class="small muted">no bonus slot</span>'}</div>
+    <div class="bld"><span class="bname">Warriors</span><span class="small muted">${p.army} troops${p.strength !== p.army ? ` (strength ${p.strength})` : ''}</span>
+      ${(units.warriors?.slots || 0) ? `<div class="upgrades">${unitSlot('warriors', units.warriors)}</div>` : '<span class="small muted">no bonus slot</span>'}</div>`;
   const moveOpts = [['idle', `Idle (${p.idle})`], ...p.buildings.map(b => [b.id, `${b.name} #${b.id} (${b.workers}/${b.slots})`])]
     .map(([v, t]) => `<option value="${v}">${esc(t)}</option>`).join('');
   const build = (s.buildable || []).filter(b => !b.owned).map(b => {
@@ -678,6 +684,7 @@ function renderCiv() {
     ${p.minorWonders.length ? `<div class="small">${p.minorWonders.map(t => `<span class="chip"${tipAttr(t)}>★ ${esc(t.name)}</span>`).join('')}</div>` : ''}
     ${s.strengthPerTwoTroops || s.freeSettlers ? `<div class="small muted">${s.strengthPerTwoTroops ? `Military strength +${s.strengthPerTwoTroops} per 2 troops. ` : ''}${s.freeSettlers ? `Settling takes ${s.freeSettlers} settler${s.freeSettlers > 1 ? 's' : ''} less.` : ''}</div>` : ''}
     <h3 style="margin-top:.5rem">Buildings</h3><p class="small muted" style="margin:0">● worker · ○ empty slot · <span style="opacity:.5">●</span> room on your land, not built yet</p>${blds}
+    <h3 style="margin-top:.5rem">Population</h3>${peopleRows}
     <div class="row small">Move a worker <select id="mvFrom" data-keep="mvFrom">${moveOpts}</select> → <select id="mvTo" data-keep="mvTo">${moveOpts}</select><button ${act ? '' : 'disabled'} data-move>Move (1 action)</button></div>
     <h3>Actions</h3><p class="small muted" style="margin:0">Building something you already have adds worker slots to it; each level costs 1 more production. Gatherers, hunters, farms and mines need land.</p>
     <div class="row">${build}</div>
@@ -697,7 +704,7 @@ function putInSlot(key, building) {
   if (el) techRects[key] = el.getBoundingClientRect();
   slotWatch.add(key);
   pickedCard = null;
-  send({ type: 'slot', card: key, building: +building });
+  send({ type: 'slot', card: key, building: /^\d+$/.test(building) ? +building : building });
 }
 document.addEventListener('dragstart', e => {
   const c = e.target.closest && e.target.closest('[draggable="true"][data-key]'); if (!c) return;

@@ -15,6 +15,7 @@ rules:
   growthCost: {food: 6}                   # action "grow": +1 Population (Agriculture takes 3 off) ...
   growthStep: 2                           # ... +1 food for every 2 people beyond the first
   buildingEscalation: 1                   # each level a building already has adds 1 production to the next
+  unitSlots: {warriors: 1, population: 0}   # bonus slots of the army and of the idle people
   homeSlots: {farm: 2, mine: 2}           # farm and mine worker slots each player has before any territory
   startTerritories: 2                     # territories drawn from the world deck at the start
   faceUpLands: 2                          # face-up lands, paid off over time with Settle cards; replaced when settled
@@ -701,7 +702,7 @@ cards:
     type: tech
     cost: {research: 2, production: 2}
     effects: [{troopStrength: 1}, {recruitExtra: {production: 1}}, {troopUpkeep: 0.5}]
-    text: Every troop counts for +1 more strength, but training one costs +1 production and each troop eats half a food per round.
+    text: Every troop counts for +1 more strength, but training one costs +1 production and each troop eats half a food per round. Put it in the Warriors bonus slot; take it out if your economy needs the relief.
   herbalism:
     name: Herbalism
     type: tech

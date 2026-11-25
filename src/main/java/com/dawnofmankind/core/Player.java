@@ -58,6 +58,8 @@ public final class Player {
     public int actions;
     /** Admin cheat mode: resources and actions never run out. */
     public boolean cheat;
+    /** Cards in the upgrade slots of the army (warriors) and of the idle people (population). */
+    public final List<CardDef> warriorUpgrades = new ArrayList<>(), populationUpgrades = new ArrayList<>();
     public boolean done;
     public Game.CardInst turnDraw;
     public int turnEvents, turnSeq;

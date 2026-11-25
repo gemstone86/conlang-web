@@ -1091,6 +1091,8 @@ public final class Game {
                 .orElseThrow(() -> new GameException("You have no such bonus."));
         p.minorWonders.remove(d);
         for (Building b : p.buildings) b.upgrades.remove(d);
+        p.warriorUpgrades.remove(d);
+        p.populationUpgrades.remove(d);
         log(p.name + " gives up " + d.name + ".");
     }
 
@@ -1434,12 +1436,12 @@ public final class Game {
     /** Military strength of a number of troops: Bronze Working adds 1 for every 2. */
     public int strength(int troops) {
         Mods m = civMods();
-        return troops * (1 + m.troopStrength) + (troops / 2) * m.strengthPerTwoTroops;
+        return troops + (troops / 2) * m.strengthPerTwoTroops;
     }
 
     /** A player's strength for settling lands: Bronze Working's bonus plus a leader like Julius Caesar's. */
     public int strength(Player p, int troops) {
-        return strength(troops) + (troops / 2) * mods(p).ownStrengthPerTwoTroops;
+        return strength(troops) + (troops / 2) * mods(p).ownStrengthPerTwoTroops + troops * mods(p).troopStrength;
     }
 
     /** A player's strength in a raid or invasion: the above plus a leader's flat bonus (Gilgamesh). */
@@ -2221,8 +2223,18 @@ public final class Game {
         for (Player o : players) usable.addAll(o.techs);
         usable.addAll(p.minorWonders);
         List<CardDef> out = new ArrayList<>();
-        for (CardDef c : usable) if (slottable(c) && slottedIn(p, c) == null) out.add(c);
+        for (CardDef c : usable) if (slottable(c) && !isSlotted(p, c)) out.add(c);
         return out;
+    }
+
+    /** Where a card's bonus goes: "warriors" (army effects), else "building". */
+    public String slotKind(CardDef c) {
+        return c.effects.stream().anyMatch(e -> Effects.UNIT_KEYS.contains(Effects.key(e))) ? "warriors" : "building";
+    }
+
+    /** Whether the card sits in any of the player's slots (a building, the warriors or the population). */
+    public boolean isSlotted(Player p, CardDef c) {
+        return slottedIn(p, c) != null || p.warriorUpgrades.contains(c) || p.populationUpgrades.contains(c);
     }
 
     /** The building of {@code p} that has the card in an upgrade slot, or null. */
@@ -2235,7 +2247,7 @@ public final class Game {
     public List<Map<String, Object>> effectsFor(Player p, CardDef c) {
         if (!slottable(c)) return c.effects;
         List<Map<String, Object>> out = new ArrayList<>();
-        boolean in = p != null && slottedIn(p, c) != null;
+        boolean in = p != null && isSlotted(p, c);
         for (Map<String, Object> e : c.effects) if (in || !Effects.needsSlot(e)) out.add(e);
         return out;
     }
@@ -2248,7 +2260,18 @@ public final class Game {
         for (CardDef w : p.minorWonders) if (w.id.equals(id)) d = w;
         if (d == null) throw new GameException("That card isn't one you can use.");
         if (!slottable(d)) throw new GameException(d.name + " needs no upgrade slot.");
-        if (slottedIn(p, d) != null) throw new GameException(d.name + " is already in one of your buildings.");
+        if (isSlotted(p, d)) throw new GameException(d.name + " is already in one of your slots.");
+        String target = String.valueOf(a.get("building"));
+        if (target.equals("warriors") || target.equals("population")) {
+            boolean war = target.equals("warriors");
+            if (!slotKind(d).equals(war ? "warriors" : "population")) throw new GameException(d.name + " doesn't fit " + (war ? "the warriors" : "the population") + ".");
+            List<CardDef> list = war ? p.warriorUpgrades : p.populationUpgrades;
+            if (list.size() >= content.rules.unitSlots.getOrDefault(target, 0)) throw new GameException("The " + target + " have no free bonus slot.");
+            list.add(d);
+            log(p.name + " puts " + d.name + " into the " + target + ".");
+            return;
+        }
+        if (!slotKind(d).equals("building")) throw new GameException(d.name + " is for your warriors, not a building.");
         Building b = p.buildings.stream().filter(x -> x.id == Y.i(a, "building", -1)).findFirst().orElseThrow(() -> new GameException("You have no such building."));
         if (b.upgrades.size() >= b.def.upgradeSlots) throw new GameException("The " + b.def.name + " has no free upgrade slot.");
         b.upgrades.add(d);
@@ -2258,6 +2281,15 @@ public final class Game {
     /** Takes a card out of its upgrade slot (1 action). */
     private void unslot(Player p, Map<String, Object> a) {
         String id = Y.s(a, "card", "");
+        for (List<CardDef> list : List.of(p.warriorUpgrades, p.populationUpgrades)) {
+            for (CardDef c : list) {
+                if (c.id.equals(id)) {
+                    list.remove(c);
+                    log(p.name + " takes " + c.name + " out of its slot.");
+                    return;
+                }
+            }
+        }
         for (Building b : p.buildings) {
             for (CardDef c : b.upgrades) {
                 if (c.id.equals(id)) {
