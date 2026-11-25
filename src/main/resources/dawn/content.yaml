@@ -239,25 +239,11 @@ greatWonders:
     text: Every farmer +1 food, every player +1 culture per turn.
   great_library:
     name: The Great Library
-    era: classical
+    era: ancient
     costPerPlayer: {production: 9, culture: 4, research: 3}
     effects: [{income: {research: 4}}, {handLimit: 1}]
     victoryPoints: 2
     text: Every player +4 research per turn and +1 max hand size.
-  parthenon:
-    name: The Parthenon
-    era: classical
-    costPerPlayer: {production: 11, culture: 5}
-    effects: [{income: {culture: 2}}, {stability: 1}]
-    victoryPoints: 2
-    text: Every player gets +2 culture per turn and +1 Stability.
-  colosseum:
-    name: The Colosseum
-    era: classical
-    costPerPlayer: {production: 12, culture: 3}
-    effects: [{stability: 2}, {raidDefense: 2}]
-    victoryPoints: 2
-    text: +2 Stability and +2 defense against raids for everyone.
   nomadic_living:
     name: Nomadic Living
     era: prehistoric
@@ -268,14 +254,14 @@ greatWonders:
     text: Settling any land takes 1 settler less. Obsolete once the Prehistoric era is over.
   great_lighthouse:
     name: The Great Lighthouse
-    era: classical
+    era: ancient
     costPerPlayer: {production: 10, food: 3}
     effects: [{faceUpLands: 1}, {settleDiscount: {production: 2}}, {freeSettlers: 1}, {coreTerritory: 1}]
     victoryPoints: 2
     text: One more land lies face up. Settling any land costs 2 production and 1 settler less. Cores a territory (the one it stands in).
   colossus:
     name: The Colossus
-    era: classical
+    era: ancient
     costPerPlayer: {production: 13, influence: 3}
     effects: [{perWorker: {building: mine, production: 1}}]
     victoryPoints: 2
@@ -480,14 +466,23 @@ eras:
     cards:
       pyramids: 1
       hanging_gardens: 1
+      great_library: 1
+      great_lighthouse: 1
+      colossus: 1
+      roman_roads: 1
       great_tomb: 1
       epic_wall: 1
       great_trade_route: 1
+      tomyris: 1
+      alexander_the_great: 1
+      julius_caesar: 1
+      archimedes: 1
       gilgamesh: 1
       hammurabi: 1
       ramses: 1
-      hostility_2: 4
+      hostility_2: 3
       hostility_3: 3
+      hostility_5: 2
       metalworking: 1
       bronze_working: 1
       writing: 1
@@ -495,6 +490,7 @@ eras:
       medicine: 1
       currency: 1
       calendar: 1
+      code_of_laws: 1
       horseback_riding: 1
       ancients_customs: 1
       markets: 1
@@ -547,82 +543,7 @@ eras:
       warlord: 2
       rivals_claim: 1
       end_of_ancient: 3
-    # when the third end card is turned up, one of these strikes; its effects last through the next era
-    endEvents: [bronze_age_collapse, iron_age_dawns, age_of_philosophers]
-  - id: classical
-    name: Classical
-    cards:
-      # great wonders
-      great_library: 1
-      great_lighthouse: 1
-      colossus: 1
-      parthenon: 1
-      colosseum: 1
-      roman_roads: 1
-      # leaders
-      tomyris: 1
-      alexander_the_great: 1
-      julius_caesar: 1
-      archimedes: 1
-      pericles: 1
-      hannibal: 1
-      # hostility
-      hostility_3: 3
-      hostility_5: 3
-      # technologies
-      code_of_laws: 1
-      iron_working: 1
-      philosophy: 1
-      mathematics: 1
-      engineering: 1
-      city_state: 1
-      # actions
-      irrigation: 1
-      harvest_festival: 1
-      conscription: 2
-      scribes: 1
-      merchants: 2
-      stone_quarry: 1
-      census: 1
-      festival: 1
-      long_day: 1
-      foraging: 1
-      send_scouts: 1
-      settle_land: 3
-      core_territory: 2
-      new_trading_route: 2
-      # responses
-      city_walls: 2
-      quarantine: 1
-      priests: 1
-      granary_reserve: 1
-      # events
-      barbarian_raid: 2
-      gallic_warband: 2
-      chariot_raiders: 1
-      goths_invade: 1
-      hill_tribes: 1
-      nomad_empire: 1
-      drought: 1
-      earthquake: 1
-      plague: 1
-      revolt: 1
-      civil_war: 1
-      golden_age: 1
-      great_scientist: 1
-      refugees: 1
-      comet_sighted: 1
-      explorers: 1
-      free_colony: 1
-      great_expedition: 1
-      rich_land_found: 1
-      fortified_land_found: 1
-      fertile_delta_found: 1
-      wondrous_land_found: 1
-      hostile_tribes: 1
-      warlord: 2
-      rivals_claim: 1
-      end_of_classical: 3
+
 # The starting event deck: 2 per player, drawn from these (number = copies in the pool).
 startingEvents:
   wolf_pack: 2
@@ -1250,79 +1171,7 @@ cards:
   end_of_ancient:
     name: End of an Era
     type: era_end
-    text: "The Ancient era is coming to an end. This card can't be taken. When the third one is turned up, a special event ends the era, and its effects last through the next one."
-  iron_working:
-    name: Iron Working
-    type: tech
-    cost: {research: 5, production: 3}
-    effects: [{perWorker: {building: mine, production: 1}}]
-    text: Your miners produce +1 production.
-  philosophy:
-    name: Philosophy
-    type: tech
-    cost: {research: 5, culture: 2}
-    effects: [{income: {research: 1, culture: 1}}]
-    text: +1 research and +1 culture per turn.
-  mathematics:
-    name: Mathematics
-    type: tech
-    cost: {research: 5}
-    effects: [{perWorker: {building: village, research: 1}}]
-    text: Your village workers produce +1 research.
-  engineering:
-    name: Engineering
-    type: tech
-    cost: {research: 5, production: 2}
-    effects: [{buildDiscount: {production: 1}}]
-    text: Buildings cost 1 less production.
-  pericles:
-    name: Pericles
-    type: leader
-    effects: [{income: {culture: 2}}]
-    text: +2 culture per turn.
-  hannibal:
-    name: Hannibal
-    type: leader
-    effects: [{strengthBonus: 3}]
-    text: +3 military strength.
-  bronze_age_collapse:
-    name: Bronze Age Collapse
-    type: event
-    category: era
-    effects: [{maxSlots: {mine: 1}}, {settlerCost: 1}]
-    text: "Era end. For the whole next era: +1 mine slot, but every colony costs 1 more settler."
-  iron_age_dawns:
-    name: The Iron Age Dawns
-    type: event
-    category: era
-    effects: [{maxSlots: {mine: 1}}, {invasionStrength: 2}]
-    text: "Era end. For the whole next era: +1 mine slot, but every invasion is 2 stronger."
-  age_of_philosophers:
-    name: Age of Philosophers
-    type: event
-    category: era
-    effects: [{income: {research: 1}}, {handLimit: -1}]
-    text: "Era end. For the whole next era: every player gets +1 research per turn, but hand size is 1 smaller."
-  end_of_classical:
-    name: End of an Era
-    type: era_end
-    text: "The Classical era is coming to an end. This card can't be taken. When the third one is turned up, the civilization has endured and the game is won at the end of the round."
-  gallic_warband:
-    name: Gallic Warband
-    type: event
-    category: raid
-    kind: raid
-    draws: {base: 3, perEra: 1}
-    perShortfall: [{lose: {food: 1, production: 1, culture: 1}}]
-    text: "Raid: draw the Era number + 3 enemy cards. Each point short costs 1 food, 1 production and 1 culture."
-  goths_invade:
-    name: The Goths Invade
-    type: event
-    category: invasion
-    kind: invasion
-    strength: {perPlayerPerTerritory: 1}
-    perShortfall: [{lose: {food: 1, production: 1}}]
-    text: Invasion, strength = players × territories + the massed enemies, drawn from the enemy deck. If it breaks through, a territory is lost and each point short costs every player 1 food and 1 production.
+    text: "The Ancient era is coming to an end. This card can't be taken. When the third one is turned up, the civilization has endured and the game is won at the end of the round."
   barbarian_raid:
     name: Barbarian Raid
     type: event
