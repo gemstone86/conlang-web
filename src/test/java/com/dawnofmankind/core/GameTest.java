@@ -384,7 +384,7 @@ class GameTest {
     }
 
     @Test
-    void aTradingRouteSendsTwoOfTheOtherResourceForOne() {
+    void aTradingRouteCostsOnePerRoundAndGivesTheAllyTwoOfTheOtherResource() {
         Game g = game(2, 24);
         Player p = g.players.get(0);
         Player other = g.players.get(1);
@@ -394,16 +394,16 @@ class GameTest {
         Game.CardInst route = card(g, "new_trading_route");
         p.hand.add(route);
         assertThrows(GameException.class, () -> g.act(p.seat, Map.of("type", "play", "card", route.id, "to", other.seat)), "an option must be chosen");
-        int prod = other.res.get(Res.PRODUCTION);
-        g.act(p.seat, Map.of("type", "play", "card", route.id, "to", other.seat, "option", 0));        // pay 1 food: they get 2 production
-        assertEquals(prod + 2, other.res.get(Res.PRODUCTION));
-        assertEquals(9, p.res.get(Res.FOOD));
+        g.act(p.seat, Map.of("type", "play", "card", route.id, "to", other.seat, "option", 0));        // -1 food per round, ally +2 production
         Game.CardInst again = card(g, "new_trading_route");
         p.hand.add(again);
-        int food = other.res.get(Res.FOOD);
-        g.act(p.seat, Map.of("type", "play", "card", again.id, "to", other.seat, "option", 1));        // pay 1 production: they get 2 food
-        assertEquals(food + 2, other.res.get(Res.FOOD));
-        assertEquals(9, p.res.get(Res.PRODUCTION));
+        g.act(p.seat, Map.of("type", "play", "card", again.id, "to", other.seat, "option", 1));        // -1 production per round, ally +2 food
+        assertEquals(2, g.routes.size());
+        assertEquals(10, p.res.get(Res.FOOD), "nothing is paid when the route is opened");
+        g.act(p.seat, Map.of("type", "endTurn"));
+        g.act(other.seat, Map.of("type", "endTurn"));
+        assertEquals(2, g.log.stream().filter(l -> l.startsWith("Trading route: ") && l.contains("gets")).count(), "both routes run at the end of the round");
+        assertEquals(2, g.routes.size(), "routes stay");
     }
 
     @Test

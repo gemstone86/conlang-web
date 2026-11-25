@@ -1157,7 +1157,7 @@ cards:
       - trade:
           - {give: {food: 1}, get: {production: 2}}
           - {give: {production: 1}, get: {food: 2}}
-    text: Choose a teammate, then either pay 1 food so they get 2 production, or pay 1 production so they get 2 food.
+    text: Choose a teammate. Every round you pay 1 food and they get 2 production, or you pay 1 production and they get 2 food.
   roman_roads:
     name: Roman Roads
     type: minor_wonder

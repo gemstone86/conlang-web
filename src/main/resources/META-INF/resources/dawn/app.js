@@ -791,7 +791,7 @@ function renderHand() {
     }
     const opts = c.target === 'territory' ? s.realm.filter(t => !t.cored).map(t => [t.id, t.name])
       : c.target === 'player' ? others.map(o => [o.seat, o.name]) : null;
-    const tradeText = o => `pay ${resList(o.give)} → your teammate gets ${resList(o.get)}`;
+    const tradeText = o => `every round pay ${resList(o.give)} → your teammate gets ${resList(o.get)} every round`;
     const tradeInputs = c.trade ? `<div class="row small"><select id="opt-${c.id}" data-keep="opt-${c.id}">${c.trade.map((o, k) => `<option value="${k}">${RES.filter(r => o.give[r]).map(r => o.give[r] + ' ' + r).join(', ')} → ${RES.filter(r => o.get[r]).map(r => '+' + o.get[r] + ' ' + r).join(', ')} for them</option>`).join('')}</select></div>` : '';
     const pickTarget = opts ? `<select id="tgt-${c.id}" data-keep="tgt-${c.id}">${opts.map(([v, t]) => `<option value="${v}">${esc(t)}</option>`).join('')}</select>` : '';
     return cardHtml(c, `${tradeInputs}<div class="actions">${pickTarget}${playable ? `<button ${act && (affordable(c.cost) || (c.type === 'tech' && me().freeTech)) && (!opts || opts.length) ? '' : 'disabled'} data-play="${c.id}" data-target="${c.target || ''}">Play (1 action)</button>` : '<span class="small muted">Play it when an event strikes.</span>'}

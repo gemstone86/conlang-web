@@ -195,6 +195,10 @@ public final class View {
             Map<String, Integer> net = new LinkedHashMap<>(inc);          // after what the round takes: upkeep for wonders of earlier eras
             net.merge(Res.PRODUCTION.key(), -g.wonderUpkeep(p), Integer::sum);
             g.buildingUpkeep(p).forEach((r, amount) -> net.merge(r.key(), -amount, Integer::sum));
+            for (Game.Route rt : g.routes) {
+                if (rt.from() == p.seat) rt.give().forEach((r, n) -> net.merge(r.key(), -n, Integer::sum));
+                if (rt.to() == p.seat) rt.get().forEach((r, n) -> net.merge(r.key(), n, Integer::sum));
+            }
             pm.put("net", net);
             pm.put("incomeSources", incomeSources(g, p));
             pm.put("actionSources", actionSources(g, p));
@@ -377,6 +381,14 @@ public final class View {
             EnumMap<Res, Integer> up = Res.empty();
             b.def.upkeep.forEach((r, n) -> up.put(r, -n));
             add.accept("Upkeep: " + b.def.name, up);
+        }
+        for (Game.Route rt : g.routes) {
+            if (rt.from() == p.seat) {
+                EnumMap<Res, Integer> pay = Res.empty();
+                rt.give().forEach((r, n) -> pay.put(r, -n));
+                add.accept("Trading route to " + g.players.get(rt.to()).name, pay);
+            }
+            if (rt.to() == p.seat) add.accept("Trading route from " + g.players.get(rt.from()).name, rt.get());
         }
         return out;
     }

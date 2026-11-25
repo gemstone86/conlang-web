@@ -1,5 +1,9 @@
 # Changes
 
+## v1.93.10 (combined app)
+
+- Dawn: New Trading Route is now a standing route: every round you pay 1 of one resource and your ally gets 2 of the other (shown in both players' per-round income).
+
 ## v1.93.9 (combined app)
 
 - Dawn: cards with art now show the picture as a banner on top and the text on a solid dark panel below, so it is readable everywhere (hand, queue, event popup, catalogue).

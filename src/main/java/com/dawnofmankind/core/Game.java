@@ -9,6 +9,7 @@ import com.dawnofmankind.core.Content.WonderDef;
 import com.dawnofmankind.core.Effects.Mods;
 import com.dawnofmankind.core.Player.Building;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.EnumMap;
 import java.util.LinkedHashMap;
@@ -177,6 +178,9 @@ public final class Game {
     public final EnumMap<Res, Integer> pool = Res.empty();
     public final List<Territory> worldDeck = new ArrayList<>();
     public final List<Territory> realm = new ArrayList<>();
+    /** Standing trading routes: every round `from` pays `give` and `to` receives `get`. */
+    public record Route(int from, int to, EnumMap<Res, Integer> give, EnumMap<Res, Integer> get) { }
+    public final List<Route> routes = new ArrayList<>();
     public final List<Frontier> frontier = new ArrayList<>();
 
     private List<CardInst> drawn = new ArrayList<>();
@@ -497,6 +501,17 @@ public final class Game {
                 else starving.put(p.seat, starve);
             }
             log(msg);
+        }
+        for (Route r : routes) {                          // trading routes run once everyone has produced; a payer who can't afford it skips the round
+            Player from = players.get(r.from()), to = players.get(r.to());
+            boolean can = Arrays.stream(Res.values()).allMatch(x -> from.res.get(x) >= r.give().get(x));
+            if (!can) {
+                log(from.name + " cannot afford the trading route to " + to.name + " this round.");
+                continue;
+            }
+            r.give().forEach((x, v) -> from.res.merge(x, -v, Integer::sum));
+            r.get().forEach((x, v) -> to.res.merge(x, v, Integer::sum));
+            log("Trading route: " + from.name + " pays " + Res.describe(r.give()) + ", " + to.name + " gets " + Res.describe(r.get()) + ".");
         }
         // a leader like Ramses makes every unfinished great wonder grow by itself
         for (Player p : players) {
@@ -1191,7 +1206,7 @@ public final class Game {
             tradeAmounts = Res.parse(o.get("give"));
             tradeGets = Res.parse(o.get("get"));
             for (Res r : Res.values()) {
-                if (p.res.get(r) < tradeAmounts.get(r) + d.cost.get(r)) throw new GameException("Not enough " + r.key() + ".");
+                if (p.res.get(r) < d.cost.get(r)) throw new GameException("Not enough " + r.key() + ".");
             }
         }
         final EnumMap<Res, Integer> tradeGet = tradeGets;
@@ -1236,10 +1251,8 @@ public final class Game {
             if (!Res.isZero(now.res()) || now.troops() > 0 || now.settlers() > 0) payLand(p, now);
         }
         if (tradeTo != null) {
-            pay(p, tradeAmounts);
-            Player to = tradeTo;
-            tradeGet.forEach((r, v) -> to.res.merge(r, v, Integer::sum));
-            log(p.name + " pays " + Res.describe(tradeAmounts) + " and " + to.name + " gets " + Res.describe(tradeGet) + " along a new trading route.");
+            routes.add(new Route(p.seat, tradeTo.seat, tradeAmounts, tradeGet));
+            log(p.name + " opens a trading route: every round they pay " + Res.describe(tradeAmounts) + " and " + tradeTo.name + " gets " + Res.describe(tradeGet) + ".");
         }
         if (core != null) {
             core.cored = true;
