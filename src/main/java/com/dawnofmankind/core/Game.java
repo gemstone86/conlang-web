@@ -700,7 +700,14 @@ public final class Game {
         return null;
     }
 
+    /** Once a building type is retired (gatherers after Agriculture) and nobody works in it or has a card in it, it is gone from the list. */
+    private void pruneRetired() {
+        Mods m = civMods();
+        for (Player p : players) p.buildings.removeIf(b -> m.retired.contains(b.def.id) && b.workers == 0 && b.upgrades.isEmpty());
+    }
+
     private void endRound() {
+        pruneRetired();
         // the last k slots leave (an empty one costs nothing); then the gaps close up and the queue is refilled
         int k = Math.min(queue.size(), content.rules.removedPerRound(players.size()));
         for (int i = 0; i < k; i++) {
@@ -897,6 +904,7 @@ public final class Game {
                 if (!free) p.actions--;
             }
         }
+        pruneRetired();
         version++;
     }
 

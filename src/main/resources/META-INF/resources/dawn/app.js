@@ -599,7 +599,11 @@ function renderTechs() {
   // the lasting bonuses that aren't technologies: minor wonders such as Roman Roads
   const bonus = s.players.flatMap(o => o.minorWonders.map(t => ({ t, by: o.name, mine: o.seat === s.you })));
   $('bonusPanel').innerHTML = `<h2>Bonuses <span class="muted small">(${bonus.length})</span></h2>` + (bonus.length
-    ? bonus.map(({ t, by, mine }) => `<div class="techrow${mine && loose.has(t.key) ? ' draggable' : ''}" data-key="${t.key}"${mine && loose.has(t.key) ? ' draggable="true"' : ''}${tipAttr(t)}><b>★ ${esc(t.name)}</b> <span class="muted small">by ${esc(by)}</span>${mine ? ` <button class="secondary small" data-removebonus="${t.key}" data-bname="${esc(t.name)}">Remove</button>` : ''}<div class="small">${esc(t.text)}</div></div>`).join('')
+    ? `<div class="minis">${bonus.map(({ t, by, mine }) => {
+      const can = mine && loose.has(t.key), used = mine && inSlot.has(t.key);
+      const card = miniCard(t, `<span class="mby">${esc(by)}</span>${used ? '<span class="mtag">in a slot</span>' : can ? '<span class="mtag go">needs a slot</span>' : ''}`, `${can ? 'draggable' : ''} ${used ? 'used' : ''} ${pickedCard === t.key ? 'picked' : ''}`).replace('<div class="minicard', can ? '<div draggable="true" class="minicard' : '<div class="minicard');
+      return `<div class="minibox">${card}${mine ? `<button class="secondary tiny" data-removebonus="${t.key}" data-bname="${esc(t.name)}">Remove</button>` : ''}</div>`;
+    }).join('')}</div>`
     : '<p class="muted small">None yet. Minor wonders (like Roman Roads) and other lasting bonuses show here.</p>');
 }
 $('bonusPanel').onclick = e => {
@@ -682,7 +686,7 @@ function renderCiv() {
 // Putting a card in an upgrade slot: drag it there, or click the card and then the slot.
 let pickedCard = null, dragCard = null;
 function putInSlot(key, building) {
-  const el = document.querySelector(`#techPanel .minicard[data-key="${key}"], #bonusPanel [data-key="${key}"]`);
+  const el = document.querySelector(`#techPanel .minicard[data-key="${key}"], #bonusPanel .minicard[data-key="${key}"]`);
   if (el) techRects[key] = el.getBoundingClientRect();
   slotWatch.add(key);
   pickedCard = null;
@@ -706,7 +710,7 @@ document.addEventListener('drop', e => {
 document.addEventListener('click', e => {
   const sl = e.target.closest && e.target.closest('.uslot[data-slot-into]');
   if (sl && pickedCard) return putInSlot(pickedCard, sl.dataset.slotInto);
-  const c = e.target.closest && e.target.closest('#techPanel .minicard.draggable, #bonusPanel .techrow.draggable');
+  const c = e.target.closest && e.target.closest('#techPanel .minicard.draggable, #bonusPanel .minicard.draggable');
   if (c) { pickedCard = pickedCard === c.dataset.key ? null : c.dataset.key; document.querySelectorAll('.picked').forEach(x => x.classList.remove('picked')); if (pickedCard) c.classList.add('picked'); }
 });
 $('civPanel').onclick = e => {

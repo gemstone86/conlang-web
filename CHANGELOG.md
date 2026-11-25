@@ -1,5 +1,9 @@
 # Changes
 
+## v1.89.3 (combined app)
+
+- Dawn: minor wonders are shown as small cards like technologies (hover for the full card, drag into an upgrade slot, Remove button under your own). A building type that has been retired (Gatherers after Agriculture, Hunters after Metalworking) disappears from your list once nobody works in it and no card sits in it.
+
 ## v1.89.2 (combined app)
 
 - Dawn: the Expand button now sits to the right of the building name. The queue loses 2 cards per round with 1-2 players and 1 card with 3 or more (it was the other way round).

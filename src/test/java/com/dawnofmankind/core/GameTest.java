@@ -1249,4 +1249,17 @@ class GameTest {
         assertEquals(before + p.ofType("hunter").workers, View.income(g, p, g.mods(p)).get("culture"));
         assertThrows(GameException.class, () -> g.act(0, Map.of("type", "slot", "card", "stone_tools", "building", p.ofType("hunter").id)), "one slot only: a choice between production and culture");
     }
+
+    @Test
+    void aRetiredBuildingWithNoWorkersLeavesTheList() {
+        Game g = game(1, 6);
+        Player p = g.players.get(0);
+        p.techs.add(C.cards.get("agriculture"));
+        Player.Building gatherers = p.ofType("gatherer");
+        assertNotNull(gatherers, "still there while people work in it");
+        g.act(0, Map.of("type", "move", "from", gatherers.id, "to", "idle"));
+        g.act(0, Map.of("type", "move", "from", gatherers.id, "to", "idle"));
+        assertNull(p.ofType("gatherer"), "no workers and retired: gone");
+        assertNotNull(p.ofType("hunter"));
+    }
 }

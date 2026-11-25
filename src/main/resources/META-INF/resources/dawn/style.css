@@ -235,3 +235,5 @@ details summary { cursor: pointer; color: var(--bone-dim); font-size: .88rem; }
 .uslot.ready { border-color: var(--brass); color: var(--brass); }
 .uslot.over { background: rgba(200,160,60,.18); }
 .uslot .minicard.tall { width: 100%; height: 100%; }
+
+.minibox { display: flex; flex-direction: column; align-items: center; gap: .2rem; }
