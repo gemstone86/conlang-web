@@ -429,6 +429,9 @@ public final class View {
             if (d.helper) continue;
             Map<String, Object> m = def(d);
             m.put("era", d.era);
+            int copies = 0;
+            for (Content.EraDef e : content.eras) copies += e.cards.getOrDefault(d.id, 0);
+            m.put("copies", copies);
             if (d.minPlayers > 1) m.put("minPlayers", d.minPlayers);
             cards.add(m);
         }

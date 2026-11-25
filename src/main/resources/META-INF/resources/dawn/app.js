@@ -137,13 +137,13 @@ function render(m) {
   checkTurnDraw();
   renderStarvation();
   renderSetup();
-  dealAnimations();
   renderTechs();
   renderHand();
   renderLeader();
   renderTeam();
   renderDecks();
   renderLog();
+  dealAnimations();
   renderOver();
   applyKeywords();
   document.querySelectorAll('#game [data-keep]').forEach(el => {
@@ -209,29 +209,48 @@ function cardHtml(c, extra = '', cls = '') {
     ${c.cost ? `<div class="small">${c.type === 'great_wonder' ? 'Team cost' : 'Cost'}: ${resList(c.cost)}</div>` : ''}<div class="text">${esc(c.text)}</div>${extra}</div>`;
 }
 
-// Cards drawn from the era deck fly out of the deck pile beside the queue: into the queue, or into your hand.
-let dealtSeen = null;
-function dealAnimations() {
-  const cards = [...document.querySelectorAll('#queuePanel .cardx[data-cid], #handPanel .cardx[data-cid]')];
-  const fresh = cards.filter(el => dealtSeen && !dealtSeen.has(el.dataset.cid));
-  if (!dealtSeen) dealtSeen = new Set();
-  cards.forEach(el => dealtSeen.add(el.dataset.cid));
-  const pile = $('eraDeckPile');
-  if (!fresh.length || !pile || !pile.getBoundingClientRect || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-  const from = pile.getBoundingClientRect();
-  fresh.slice(0, 8).forEach((el, i) => {
-    const to = el.getBoundingClientRect();
-    if (!to.width) return;
-    const dx = from.left + from.width / 2 - (to.left + to.width / 2), dy = from.top + from.height / 2 - (to.top + to.height / 2);
-    el.style.position = el.style.position || 'relative';
-    const anim = el.animate([
-      { transform: `translate(${dx}px, ${dy}px) scale(.3) rotate(-10deg)`, opacity: 0, zIndex: 30 },
-      { opacity: 1, offset: .2, zIndex: 30 },
-      { transform: 'translate(0, 0) scale(1) rotate(0)', opacity: 1, zIndex: 30 }], { duration: 700, delay: i * 150, easing: 'cubic-bezier(.2,.8,.2,1)', fill: 'backwards' });
-    anim.onfinish = () => { el.style.zIndex = ''; };
-  });
-  pile.animate([{ transform: 'scale(1)' }, { transform: 'scale(1.06) rotate(-2deg)' }, { transform: 'scale(1)' }], { duration: 300, iterations: Math.min(fresh.length, 4) });
+// A card flies in from where it was (a rectangle: the deck pile, a queue card, a tech card) to where it now sits.
+const reducedMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
+function flyIn(el, from, delay = 0) {
+  if (!el || !from || reducedMotion()) return;
+  const to = el.getBoundingClientRect();
+  if (!to.width) return;
+  const dx = from.left + from.width / 2 - (to.left + to.width / 2), dy = from.top + from.height / 2 - (to.top + to.height / 2);
+  const sc = Math.max(.25, Math.min(1, from.width / to.width));
+  el.style.position = el.style.position || 'relative';
+  const anim = el.animate([
+    { transform: `translate(${dx}px, ${dy}px) scale(${sc}) rotate(-8deg)`, opacity: 0, zIndex: 30 },
+    { opacity: 1, offset: .2, zIndex: 30 },
+    { transform: 'translate(0, 0) scale(1) rotate(0)', opacity: 1, zIndex: 30 }], { duration: 700, delay, easing: 'cubic-bezier(.2,.8,.2,1)', fill: 'backwards' });
+  anim.onfinish = () => { el.style.zIndex = ''; };
 }
+const pileRect = () => { const p = $('eraDeckPile'); return p && p.getBoundingClientRect ? p.getBoundingClientRect() : null; };
+// Cards drawn from the era deck fly out of the deck pile beside the queue: into the queue, or into your hand.
+// A card you pick flies from its place in the queue to your hand; a tech put in an upgrade slot flies from its card to the slot.
+let seenQueue = null, seenHand = null, queueRects = {}, techRects = {};
+function dealAnimations() {
+  const qs = [...document.querySelectorAll('#queuePanel .cardx[data-cid]')], hs = [...document.querySelectorAll('#handPanel .cardx[data-cid]')];
+  const freshQ = qs.filter(el => seenQueue && !seenQueue.has(el.dataset.cid)), freshH = hs.filter(el => seenHand && !seenHand.has(el.dataset.cid));
+  const pile = pileRect();
+  freshQ.slice(0, 8).forEach((el, i) => flyIn(el, pile, i * 150));
+  freshH.slice(0, 8).forEach((el, i) => flyIn(el, queueRects[el.dataset.cid] || pile, i * 150));
+  if ((freshQ.length || freshH.some(el => !queueRects[el.dataset.cid])) && $('eraDeckPile') && !reducedMotion()) {
+    $('eraDeckPile').animate([{ transform: 'scale(1)' }, { transform: 'scale(1.06) rotate(-2deg)' }, { transform: 'scale(1)' }], { duration: 300, iterations: Math.min(freshQ.length + freshH.length, 4) });
+  }
+  seenQueue = new Set(qs.map(el => el.dataset.cid));
+  seenHand = new Set(hs.map(el => el.dataset.cid));
+  queueRects = {};
+  qs.forEach(el => { queueRects[el.dataset.cid] = el.getBoundingClientRect(); });
+  // upgrade slots: a card that just arrived there flies from where its tech card was
+  document.querySelectorAll('.uslot .minicard[data-key]').forEach(el => {
+    const r = techRects[el.dataset.key];
+    if (r && slotWatch.has(el.dataset.key)) flyIn(el, r);
+  });
+  slotWatch.clear();
+  techRects = {};
+  document.querySelectorAll('#techPanel .minicard[data-key], #bonusPanel .minicard[data-key]').forEach(el => { techRects[el.dataset.key] = el.getBoundingClientRect(); });
+}
+const slotWatch = new Set();
 function renderQueue() {
   // the queue runs right to left: new cards come in on the right, the leftmost cards leave at the end of the round
   const s = state, leaving = s.queueRemoved, n = s.queue.length;
@@ -293,6 +312,7 @@ function checkTurnDraw() {
     : '<p class="muted">The era deck is empty: nothing to draw.</p>';
   $('gotBox').innerHTML = `<h2>Round ${state.round}: your turn. You drew</h2>${ev}${body}<div class="row"><button class="primary" data-gotok>OK</button></div>`;
   $('gotModal').hidden = false;
+  flyIn($('gotBox').querySelector('.cardx'), pileRect());
 }
 // Starvation: when food runs short and your people are in more than one place, you choose who starves.
 // Start of the game: each player picks one of two lands to start with.
@@ -561,16 +581,25 @@ $('eventPanel').onclick = e => {
   } else if (t.dataset.cleanse) send({ type: 'cleanse', event: +t.dataset.cleanse });
 };
 
+// A card as a small card (art, name): in the tech list, and in a building's upgrade slot.
+function miniCard(c, extra = '', cls = '') {
+  return `<div class="minicard tall${c.art ? ' hasart' : ''} ${cls}" data-key="${c.key}"${c.art ? ` style="--art:url('${c.art}')"` : ''}${tipAttr(c)}><span class="mname">${esc(c.name)}</span>${extra}</div>`;
+}
 // The technologies researched so far (global: they help every player), with what each does.
 function renderTechs() {
   const s = state, list = s.players.flatMap(o => o.techs.map(t => ({ t, by: o.name })));
+  const mine = me(), loose = new Set((mine?.slotCards || []).map(c => c.key));
+  const inSlot = new Set((mine?.buildings || []).flatMap(b => (b.upgrades || []).map(u => u.key)));
   $('techPanel').innerHTML = `<h2>Technologies <span class="muted small">(${list.length})</span></h2>` + (list.length
-    ? list.map(({ t, by }) => `<div class="techrow"${tipAttr(t)}><b>${esc(t.name)}</b> <span class="muted small">by ${esc(by)}</span><div class="small">${esc(t.text)}</div></div>`).join('')
+    ? `<p class="muted small" style="margin:.1rem 0 .3rem">Drag a card with a bonus into an upgrade slot of one of your buildings (or click it, then the slot).</p><div class="minis">${list.map(({ t, by }) => {
+      const can = loose.has(t.key), used = inSlot.has(t.key);
+      return miniCard(t, `<span class="mby">${esc(by)}</span>${used ? '<span class="mtag">in a slot</span>' : can ? '<span class="mtag go">needs a slot</span>' : ''}`, `${can ? 'draggable' : ''} ${used ? 'used' : ''} ${pickedCard === t.key ? 'picked' : ''}`).replace('<div class="minicard', can ? '<div draggable="true" class="minicard' : '<div class="minicard');
+    }).join('')}</div>`
     : '<p class="muted small">None yet. Technologies help every player once anyone has researched them.</p>');
   // the lasting bonuses that aren't technologies: minor wonders such as Roman Roads
   const bonus = s.players.flatMap(o => o.minorWonders.map(t => ({ t, by: o.name, mine: o.seat === s.you })));
   $('bonusPanel').innerHTML = `<h2>Bonuses <span class="muted small">(${bonus.length})</span></h2>` + (bonus.length
-    ? bonus.map(({ t, by, mine }) => `<div class="techrow"${tipAttr(t)}><b>★ ${esc(t.name)}</b> <span class="muted small">by ${esc(by)}</span>${mine ? ` <button class="secondary small" data-removebonus="${t.key}" data-bname="${esc(t.name)}">Remove</button>` : ''}<div class="small">${esc(t.text)}</div></div>`).join('')
+    ? bonus.map(({ t, by, mine }) => `<div class="techrow${mine && loose.has(t.key) ? ' draggable' : ''}" data-key="${t.key}"${mine && loose.has(t.key) ? ' draggable="true"' : ''}${tipAttr(t)}><b>★ ${esc(t.name)}</b> <span class="muted small">by ${esc(by)}</span>${mine ? ` <button class="secondary small" data-removebonus="${t.key}" data-bname="${esc(t.name)}">Remove</button>` : ''}<div class="small">${esc(t.text)}</div></div>`).join('')
     : '<p class="muted small">None yet. Minor wonders (like Roman Roads) and other lasting bonuses show here.</p>');
 }
 $('bonusPanel').onclick = e => {
@@ -614,9 +643,7 @@ function renderCiv() {
       <span class="slots">${dots}</span>${controls}
       ${b.id != null ? `<span class="makes" title="${esc(Object.entries(b.each || {}).map(([r, n]) => `${n} ${r} per worker`).join(', ') || 'makes nothing')} (technologies included)">${Object.keys(b.makes || {}).length ? resList(b.makes, { signed: true }) : '<span class="muted">—</span>'}</span>` : ''}
       ${cap != null ? `<span class="small muted">${b.slots}/${cap} slots built</span>` : ''}${b.inactive ? `<span class="small bad">${b.inactive} inactive (over the land limit)</span>` : ''}
-      ${b.id != null ? `<div class="upgrades">${(b.upgrades || []).map(u => `<span class="upg"${tipAttr(u)}>${esc(u.name)} <button class="tiny" ${act ? '' : 'disabled'} data-unslot="${u.key}" title="Take it out (1 action)">×</button></span>`).join('')}${Array.from({ length: Math.max(0, (b.upgradeSlots || 0) - (b.upgrades || []).length) }, () => (p.slotCards || []).length
-        ? `<select class="upg empty" data-slot-into="${b.id}" title="Upgrade slot (free to fill, 1 action to empty)"><option value="">＋ upgrade slot</option>${p.slotCards.map(c => `<option value="${c.key}">${esc(c.name)}</option>`).join('')}</select>`
-        : '<span class="upg empty" title="An empty upgrade slot: technologies and minor wonders that make a building better go here">＋ upgrade slot</span>').join('')}</div>` : ''}</div>`;
+      ${b.id != null ? `<div class="upgrades">${(b.upgrades || []).map(u => `<div class="uslot full">${miniCard(u, `<button class="tiny uout" ${act ? '' : 'disabled'} data-unslot="${u.key}" title="Take it out (1 action)">×</button>`)}</div>`).join('')}${Array.from({ length: Math.max(0, (b.upgradeSlots || 0) - (b.upgrades || []).length) }, () => `<div class="uslot" data-slot-into="${b.id}" title="Upgrade slot: drop a technology or minor wonder here (free). Taking it out later costs 1 action."><span>＋<br>upgrade slot</span></div>`).join('')}</div>` : ''}</div>`;
   }).join('');
   const moveOpts = [['idle', `Idle (${p.idle})`], ...p.buildings.map(b => [b.id, `${b.name} #${b.id} (${b.workers}/${b.slots})`])]
     .map(([v, t]) => `<option value="${v}">${esc(t)}</option>`).join('');
@@ -649,10 +676,36 @@ function renderCiv() {
       <div class="row small">${RES.map(k => `<label class="res r-${k}" style="margin:0">${RES_SHORT[k]} <input type="number" min="0" value="0" data-keep="pool-${k}" data-pres="${k}"></label>`).join('')}</div>
       <div class="row"><button data-deposit>Put in</button><button data-withdraw>Take out</button></div>` : ''}`;
 }
-$('civPanel').onchange = e => {
-  const sel = e.target.closest('[data-slot-into]'); if (!sel || !sel.value) return;
-  send({ type: 'slot', card: sel.value, building: +sel.dataset.slotInto });
-};
+// Putting a card in an upgrade slot: drag it there, or click the card and then the slot.
+let pickedCard = null, dragCard = null;
+function putInSlot(key, building) {
+  const el = document.querySelector(`#techPanel .minicard[data-key="${key}"], #bonusPanel [data-key="${key}"]`);
+  if (el) techRects[key] = el.getBoundingClientRect();
+  slotWatch.add(key);
+  pickedCard = null;
+  send({ type: 'slot', card: key, building: +building });
+}
+document.addEventListener('dragstart', e => {
+  const c = e.target.closest && e.target.closest('[draggable="true"][data-key]'); if (!c) return;
+  dragCard = c.dataset.key;
+  e.dataTransfer.setData('text/plain', dragCard);
+  e.dataTransfer.effectAllowed = 'move';
+  document.querySelectorAll('.uslot[data-slot-into]').forEach(x => x.classList.add('ready'));
+});
+document.addEventListener('dragend', () => { dragCard = null; document.querySelectorAll('.uslot.ready, .uslot.over').forEach(x => x.classList.remove('ready', 'over')); });
+document.addEventListener('dragover', e => { const sl = e.target.closest && e.target.closest('.uslot[data-slot-into]'); if (sl && dragCard) { e.preventDefault(); sl.classList.add('over'); } });
+document.addEventListener('dragleave', e => { const sl = e.target.closest && e.target.closest('.uslot[data-slot-into]'); if (sl) sl.classList.remove('over'); });
+document.addEventListener('drop', e => {
+  const sl = e.target.closest && e.target.closest('.uslot[data-slot-into]'); if (!sl || !dragCard) return;
+  e.preventDefault();
+  putInSlot(dragCard, sl.dataset.slotInto);
+});
+document.addEventListener('click', e => {
+  const sl = e.target.closest && e.target.closest('.uslot[data-slot-into]');
+  if (sl && pickedCard) return putInSlot(pickedCard, sl.dataset.slotInto);
+  const c = e.target.closest && e.target.closest('#techPanel .minicard.draggable, #bonusPanel .techrow.draggable');
+  if (c) { pickedCard = pickedCard === c.dataset.key ? null : c.dataset.key; document.querySelectorAll('.picked').forEach(x => x.classList.remove('picked')); if (pickedCard) c.classList.add('picked'); }
+});
 $('civPanel').onclick = e => {
   const t = e.target.closest('button'); if (!t) return;
   const d = t.dataset;
@@ -922,8 +975,9 @@ async function openAllCards() {
   const item = (name, meta, text, art) => `<div${art ? ` class="hasart" style="--art:url('${art}')"` : ''}><div class="nm">${esc(name)}</div><div class="meta">${esc(meta)}</div><div>${esc(text || '')}</div></div>`;
   const group = (title, kinds) => {
     const list = catalogue.cards.filter(c => kinds.includes(c.type));
-    return list.length ? `<h3>${title} (${list.length})</h3><div class="catalog">${list.map(c =>
-      item(c.name, [c.type === 'leader' ? 'great person' : c.type.replace('_', ' '), c.era, cost(c.cost) && 'cost ' + cost(c.cost), c.minPlayers && c.minPlayers + '+ players only'].filter(Boolean).join(' · '), c.text, c.art)).join('')}</div>` : '';
+    const total = list.reduce((a, c) => a + (c.copies || 0), 0);
+    return list.length ? `<h3>${title} (${list.length} different, ${total} in the game)</h3><div class="catalog">${list.map(c =>
+      item(c.name, [c.type === 'leader' ? 'great person' : c.type.replace('_', ' '), c.era, cost(c.cost) && 'cost ' + cost(c.cost), c.minPlayers && c.minPlayers + '+ players only', c.copies > 0 && `${c.copies} in the game`].filter(Boolean).join(' · '), c.text, c.art)).join('')}</div>` : '';
   };
   const types = [...new Set(catalogue.cards.map(c => c.type))].filter(t => t !== 'great_wonder');
   const names = { leader: 'Great people', era_trigger: 'End-of-era cards', hostility: 'Hostility cards', tech: 'Techs', action: 'Actions', response: 'Responses', minor_wonder: 'Minor wonders', great_wonder: 'Great wonders', city_state: 'City states', event: 'Events' };
@@ -943,7 +997,7 @@ async function openAllCards() {
     ${countTable}
     ${types.map(t => group(t === 'leader' ? 'Great people' : t.charAt(0).toUpperCase() + t.slice(1).replace('_', ' ') + ' cards', [t])).join('')}
     <h3>Lands (${catalogue.lands.length})</h3><div class="catalog">${catalogue.lands.map(l => item(l.name, l.special ? 'special land' : 'land', l.text)).join('')}</div>
-    <h3>Great wonders (${catalogue.wonders.length})</h3><div class="catalog">${catalogue.wonders.map(w => item(w.name, w.era || '', w.text, w.art)).join('')}</div>`;
+    <h3>Great wonders (${catalogue.wonders.length})</h3><div class="catalog">${catalogue.wonders.map(w => item(w.name, [w.era, '1 in the game'].filter(Boolean).join(' · '), w.text, w.art)).join('')}</div>`;
 }
 $('allCards').onclick = async () => { await openAllCards(); applyKeywords(); };
 $('gameLog').onclick = async () => {

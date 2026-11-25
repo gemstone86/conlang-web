@@ -1,5 +1,9 @@
 # Changes
 
+## v1.89.0 (combined app)
+
+- Dawn: upgrade slots are now small cards: an empty slot is an empty box, and a researched tech (shown as a small card in the Technologies list, hover for the full card) is dragged into it, or clicked and then the slot. New Prehistoric tech Lithic Art: slotted into Hunters it gives +1 culture per hunter, a choice against Stone Tools (production). Cards you pick fly from the queue to your hand, a tech flies into its slot, and the card you draw at the start of your turn flies out of the era deck. Prehistoric great wonders are cheaper (production 10/9/10/8/5 became 6/6/6/5/3) because hunters make less production than mines did. The All cards list shows how many copies of each card are in the game.
+
 ## v1.88.0 (combined app)
 
 - Dawn: upgrade slots. Each building has upgrade slots (gatherers 1, hunters 1, farms 2, mines 2, temples, markets and villages 1) that never grow when the building is expanded. A tech or minor wonder that adds income or per-worker output now only works once you put it into a free slot of one of your buildings; its other effects (hand size, actions, health...) still work at once, and it counts for points either way. Every player can slot every researched tech, so players can end up with different bonuses. Slotting is free (pick the card in the building's slot menu); taking a card out costs 1 action. New actions slot and unslot; bots slot what they can.

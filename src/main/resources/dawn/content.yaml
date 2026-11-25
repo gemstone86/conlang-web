@@ -197,28 +197,28 @@ greatWonders:
   stonehenge:
     name: Stonehenge
     era: prehistoric
-    costPerPlayer: {production: 10, culture: 3}
+    costPerPlayer: {production: 6, culture: 3}
     effects: [{actionsPerTurn: 1}]
     victoryPoints: 2
     text: Every player gets +1 action per turn.
   gobekli_tepe:
     name: Göbekli Tepe
     era: prehistoric
-    costPerPlayer: {production: 9, culture: 3, research: 2}
+    costPerPlayer: {production: 6, culture: 3, research: 2}
     effects: [{income: {culture: 2}}, {growthDiscount: 1}, {maxSlots: {farm: 1}}]
     victoryPoints: 2
     text: Every player gets +2 culture per turn, growing costs 1 less food, and +1 farm slot.
   ggantija_temples:
     name: Ġgantija Temples
     era: prehistoric
-    costPerPlayer: {production: 10, culture: 3}
+    costPerPlayer: {production: 6, culture: 3}
     effects: [{wonderDouble: 1}, {maxSlots: {mine: 1}}]
     victoryPoints: 2
     text: Resources given to other great wonders count double. Every player gets +1 mine slot.
   skara_brae:
     name: Skara Brae
     era: prehistoric
-    costPerPlayer: {production: 8, food: 6}
+    costPerPlayer: {production: 5, food: 6}
     effects: [{incomePerTerritory: {food: 1}}]
     victoryPoints: 2
     text: Every player gets +1 food per turn for each territory in the realm.
@@ -246,7 +246,7 @@ greatWonders:
   nomadic_living:
     name: Nomadic Living
     era: prehistoric
-    costPerPlayer: {production: 5, food: 3}       # cheap: about 2.5 rounds of the team's output
+    costPerPlayer: {production: 3, food: 3}       # cheap: about 2.5 rounds of the team's output
     effects: [{freeSettlers: 1}]
     victoryPoints: 1
     obsoleteAfter: prehistoric
@@ -406,6 +406,7 @@ eras:
       # technologies
       fire: 1
       stone_tools: 1
+      lithic_art: 1
       agriculture: 1
       hunting: 1
       animal_husbandry: 1
@@ -653,6 +654,12 @@ cards:
     effects: [{perWorker: {building: hunter, production: 1}}]
     text: Your hunters produce +1 production.
     required: true                       # always in the Prehistoric era deck
+  lithic_art:
+    name: Lithic Art
+    type: tech
+    cost: {research: 2, production: 1}
+    effects: [{perWorker: {building: hunter, culture: 1}}]
+    text: Your hunters produce +1 culture. Put it in a Hunters slot (competes with Stone Tools for the one slot).
   hunting:
     name: Hunting
     type: tech

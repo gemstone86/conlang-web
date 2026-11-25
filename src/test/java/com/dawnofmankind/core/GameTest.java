@@ -1238,4 +1238,15 @@ class GameTest {
         assertEquals(1, hunters.upgrades.size() + 1, "expanding does not add upgrade slots");
         assertEquals(1, C.buildings.get("hunter").upgradeSlots);
     }
+
+    @Test
+    void lithicArtMakesHuntersProduceCultureOnceSlotted() {
+        Game g = game(1, 18);
+        Player p = g.players.get(0);
+        p.techs.add(C.cards.get("lithic_art"));
+        int before = View.income(g, p, g.mods(p)).get("culture");
+        g.act(0, Map.of("type", "slot", "card", "lithic_art", "building", p.ofType("hunter").id));
+        assertEquals(before + p.ofType("hunter").workers, View.income(g, p, g.mods(p)).get("culture"));
+        assertThrows(GameException.class, () -> g.act(0, Map.of("type", "slot", "card", "stone_tools", "building", p.ofType("hunter").id)), "one slot only: a choice between production and culture");
+    }
 }
