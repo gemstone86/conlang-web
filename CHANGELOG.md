@@ -1,5 +1,9 @@
 # Changes
 
+## v1.92.0 (combined app)
+
+- Dawn: a Classical era (iron age, classical Greece, Rome) now follows the Ancient era, and ending it wins the game. The Ancient era is now the early civilisations (bronze age, Egypt, Mesopotamia) and ends with one of three era-end events: Bronze Age Collapse, The Iron Age Dawns or Age of Philosophers. The Greek and Roman cards moved to the Classical era: The Great Library, Great Lighthouse, Colossus, Roman Roads, Tomyris, Alexander, Julius Caesar, Archimedes, Code of Laws. New in Classical: wonders The Parthenon and The Colosseum, great people Pericles and Hannibal, techs Iron Working, Philosophy, Mathematics and Engineering, and the raid and invasion Gallic Warband and The Goths Invade. Hostility is split between the eras (Ancient 2s and 3s, Classical 3s and 5s).
+
 ## v1.91.0 (combined app)
 
 - Dawn: under Buildings there is now a Population section with the idle population and the warriors, each with bonus slots like a building. The population starts with no bonus slot, the warriors with one. Spearmen is now a bonus-slot card for the warriors: slot it to get its stronger troops (and the dearer training and upkeep), take it out (1 action) when the economy needs relief. Troop strength bonuses from slotted cards are per player.

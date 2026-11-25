@@ -686,13 +686,14 @@ class GameTest {
                 try {
                     var m = Game.class.getDeclaredMethod("startEra", boolean.class);
                     m.setAccessible(true);
-                    m.invoke(a, false);
+                    m.invoke(a, true);       // keep the queue: only the freshly built deck is looked at
                 } catch (ReflectiveOperationException e) {
                     throw new IllegalStateException(e);
                 }
                 boolean inDeck = a.eraDeck.stream().anyMatch(c -> c.def.id.equals("markets"))
                         || a.queue.stream().anyMatch(sl -> sl.card.def.id.equals("markets") || (sl.under != null && sl.under.def.id.equals("markets")));
                 assertTrue(inDeck, "Markets is always in the Ancient deck (" + players + " players, seed " + seed + ")");
+                assertTrue(a.eraDeck.stream().anyMatch(c -> c.def.id.equals("metalworking")), "Metalworking is always in the Ancient deck");
             }
         }
     }
@@ -1285,5 +1286,27 @@ class GameTest {
         g.act(0, Map.of("type", "build", "building", "temple"));
         assertNotNull(p.ofType("temple"));
         assertTrue(p.actions > 50);
+    }
+
+    @Test
+    void theClassicalEraFollowsTheAncientEra() {
+        assertEquals(List.of("prehistoric", "ancient", "classical"), C.eras.stream().map(e -> e.id).toList());
+        assertEquals(3, C.eras.get(1).endEvents.size(), "the Ancient era ends with one of three events");
+        assertTrue(C.eras.get(2).endEvents.isEmpty(), "the Classical era is the last: its end wins the game");
+        assertEquals("classical", C.greatWonders.get("great_library").era);
+        assertEquals("ancient", C.greatWonders.get("pyramids").era);
+        for (int players = 1; players <= 6; players++) {
+            Game g = game(players, 500 + players);
+            g.eraIndex = 2;
+            try {
+                var m = Game.class.getDeclaredMethod("startEra", boolean.class);
+                m.setAccessible(true);
+                m.invoke(g, true);
+            } catch (ReflectiveOperationException e) {
+                throw new IllegalStateException(e);
+            }
+            assertFalse(g.eraDeck.isEmpty());
+            assertEquals(3, g.eraDeck.stream().filter(c -> c.def.id.equals("end_of_classical")).count());
+        }
     }
 }
