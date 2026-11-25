@@ -340,7 +340,8 @@ public final class Game {
                 if (bag.isEmpty()) {
                     if (bagUsed && !cycle) break;
                     bagUsed = true;
-                    for (CardInst c : pool) bag.add(inst(c.def));
+                    for (CardInst c : pool) if (!c.def.required) bag.add(inst(c.def));      // required cards are already in, once
+                    if (bag.isEmpty()) break;
                     Collections.shuffle(bag, rng);
                 }
                 picked.add(bag.remove(bag.size() - 1));

@@ -1,5 +1,9 @@
 # Changes
 
+## v1.93.4 (combined app)
+
+- Dawn: fixed a required card (Markets, Stone Tools, Agriculture, Metalworking) turning up twice in an era deck: it is put in once, and the random fill no longer draws another copy.
+
 ## v1.93.3 (combined app)
 
 - Dawn: before a bot sends resources, troops or settlers to a land found by an event, it checks that the players can pay all of it together. If they can't (the land would be lost anyway), it sends nothing.

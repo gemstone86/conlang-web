@@ -1335,4 +1335,28 @@ class GameTest {
         }
         assertTrue(AiPlayer.teamCanPay(g, f), "together they can pay it");
     }
+
+    @Test
+    void aRequiredCardIsInTheEraDeckExactlyOnce() {
+        for (int players = 1; players <= 6; players++) {
+            for (long seed = 0; seed < 8; seed++) {
+                for (int era = 0; era < 2; era++) {
+                    Game a = game(players, 700 + seed);
+                    a.eraIndex = era;
+                    try {
+                        var m = Game.class.getDeclaredMethod("startEra", boolean.class);
+                        m.setAccessible(true);
+                        m.invoke(a, true);
+                    } catch (ReflectiveOperationException e) {
+                        throw new IllegalStateException(e);
+                    }
+                    for (Content.CardDef d : C.cards.values()) {
+                        if (!d.required || !a.era().cards.containsKey(d.id)) continue;
+                        long n = a.eraDeck.stream().filter(c -> c.def == d).count();
+                        assertEquals(1, n, d.id + " must be in the deck once (" + players + " players, seed " + seed + ")");
+                    }
+                }
+            }
+        }
+    }
 }
