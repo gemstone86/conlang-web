@@ -1,5 +1,9 @@
 # Changes
 
+## v1.89.2 (combined app)
+
+- Dawn: the Expand button now sits to the right of the building name. The queue loses 2 cards per round with 1-2 players and 1 card with 3 or more (it was the other way round).
+
 ## v1.89.1 (combined app)
 
 - Dawn: the All cards list words the card counts as copies in the card list (all cards that exist), not cards in the current game.

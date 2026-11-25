@@ -639,7 +639,10 @@ function renderCiv() {
     const controls = b.id == null ? '<span class="small muted">not built</span>' : `
       <button class="tiny" ${act && p.idle > 0 && b.workers < b.slots ? '' : 'disabled'} data-move-in="${b.id}" title="Move an idle worker here (1 action)">+ worker</button>
       <button class="tiny" ${act && b.workers > 0 ? '' : 'disabled'} data-move-out="${b.id}" title="Make a worker idle (1 action)">− worker</button>`;
-    return `<div class="bld"><span class="bname">${esc(b.name)}${b.level > 1 ? ` <span class="chip">level ${b.level}</span>` : ''}</span>
+    const bd = b.id != null ? (s.buildable || []).find(x => x.id === b.type) : null;
+    const expand = bd ? (() => { const full = bd.capacity != null && bd.slots >= bd.capacity, add = bd.capacity != null ? Math.min(bd.slotsAdded, bd.capacity - bd.slots) : bd.slotsAdded;
+      return `<button class="tiny" ${act && !full && affordable(bd.cost) ? '' : 'disabled'} data-build="${bd.id}" title="${full ? 'No room on your land: settle more territory' : 'Add worker slots (+' + add + '); each level costs 1 more production'}">${full ? 'Expand: no room' : `Expand (+${add}) — ${resList(bd.cost)}`}</button>`; })() : '';
+    return `<div class="bld"><span class="bname">${esc(b.name)}${b.level > 1 ? ` <span class="chip">level ${b.level}</span>` : ''}</span>${expand}
       <span class="slots">${dots}</span>${controls}
       ${b.id != null ? `<span class="makes" title="${esc(Object.entries(b.each || {}).map(([r, n]) => `${n} ${r} per worker`).join(', ') || 'makes nothing')} (technologies included)">${Object.keys(b.makes || {}).length ? resList(b.makes, { signed: true }) : '<span class="muted">—</span>'}</span>` : ''}
       ${cap != null ? `<span class="small muted">${b.slots}/${cap} slots built</span>` : ''}${b.inactive ? `<span class="small bad">${b.inactive} inactive (over the land limit)</span>` : ''}
@@ -647,7 +650,7 @@ function renderCiv() {
   }).join('');
   const moveOpts = [['idle', `Idle (${p.idle})`], ...p.buildings.map(b => [b.id, `${b.name} #${b.id} (${b.workers}/${b.slots})`])]
     .map(([v, t]) => `<option value="${v}">${esc(t)}</option>`).join('');
-  const build = (s.buildable || []).map(b => {
+  const build = (s.buildable || []).filter(b => !b.owned).map(b => {
     const full = b.capacity != null && b.slots >= b.capacity;
     const add = b.capacity != null ? Math.min(b.slotsAdded, b.capacity - b.slots) : b.slotsAdded;
     return `<button ${act && !full && affordable(b.cost) ? '' : 'disabled'} data-build="${b.id}" title="${esc(b.text)}">${full ? `${esc(b.name)}: no room — settle more land`
