@@ -625,9 +625,9 @@ class GameTest {
         g.builtWonders.add(C.greatWonders.get("skara_brae"));        // a prehistoric one
         p.minorWonders.add(C.cards.get("first_farms"));              // a prehistoric minor wonder
         g.eraIndex = 1;
-        assertEquals(2, g.wonderUpkeep(p), "no upkeep this era; 1 each for the two prehistoric ones");
+        assertEquals(1, g.wonderUpkeep(p), "none for the ancient wonder this era; 1 for Skara Brae; minor wonders cost nothing");
         g.eraIndex = 2;
-        assertEquals(3, g.wonderUpkeep(p), "pyramids 1 + Skara Brae 2; The First Farms has faded and costs nothing");
+        assertEquals(3, g.wonderUpkeep(p), "pyramids 1 + Skara Brae 2; the minor wonder never costs upkeep");
         p.techs.add(C.cards.get("ancients_customs"));
         assertEquals(2, g.wonderUpkeep(p), "halved, rounded up");
     }

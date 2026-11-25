@@ -394,7 +394,7 @@ keywords:
   upkeep:
     name: "Upkeep"
     match: [upkeep]
-    text: "A cost paid every round. Wonders of earlier eras cost 1 production per era they are removed from (wonders of the current era are free). Some techs add food upkeep for troops."
+    text: "A cost paid every round. Great wonders of earlier eras cost 1 production per era they are removed from (wonders of the current era are free; minor wonders never cost upkeep). Some techs add food upkeep for troops."
   obsolete:
     name: "Fades"
     match: [fades, obsolete]

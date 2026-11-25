@@ -698,7 +698,7 @@ function renderCiv() {
     <div class="row small">Net per round, after upkeep: ${resList(p.net, { signed: true, src: true })}</div>
     <div class="row small">Population <b>${p.population}</b> · idle ${p.idle} · Army <b>${p.army}</b>${p.strength !== p.army ? ` (strength ${p.strength})` : ''}${p.committed ? ` (${p.committed} away at war)` : ''} · raid defense +${p.raidDefense} · hand ${p.handSize}/${p.handLimit}</div>
     ${(() => { const techs = s.players.flatMap(o => o.techs); return techs.length ? `<div class="small">Technologies (they help everyone): ${techs.map(t => `<span class="chip"${tipAttr(t)}>${esc(t.name)}</span>`).join('')}</div>` : ''; })()}
-    ${p.wonderUpkeep ? `<div class="small">Upkeep for wonders of earlier eras: <b>${p.wonderUpkeep} production</b> every round.</div>` : ''}
+    ${p.wonderUpkeep ? `<div class="small">Upkeep for great wonders of earlier eras: <b>${p.wonderUpkeep} production</b> every round.</div>` : ''}
     ${p.minorWonders.length ? `<div class="small">${p.minorWonders.map(t => `<span class="chip"${tipAttr(t)}>★ ${esc(t.name)}</span>`).join('')}</div>` : ''}
     ${s.strengthPerTwoTroops || s.freeSettlers ? `<div class="small muted">${s.strengthPerTwoTroops ? `Military strength +${s.strengthPerTwoTroops} per 2 troops. ` : ''}${s.freeSettlers ? `Settling takes ${s.freeSettlers} settler${s.freeSettlers > 1 ? 's' : ''} less.` : ''}</div>` : ''}
     <h3 style="margin-top:.5rem">Buildings</h3><p class="small muted" style="margin:0">● worker · ○ empty slot · <span style="opacity:.5">●</span> room on your land, not built yet</p>${blds}

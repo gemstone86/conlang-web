@@ -1,5 +1,9 @@
 # Changes
 
+## v1.94.1 (combined app)
+
+- Dawn: minor wonders no longer cost production upkeep; only great wonders of earlier eras do.
+
 ## v1.94.0 (combined app)
 
 - Dawn: the "End of an Era" cards are gone. One era-end event (chosen at random from the era's list) now lies at the very bottom of each era deck, and the era ends when it is turned up; its effects still last through the next era. The last era has a single end card at the bottom that wins the game. Eras now last until the deck is nearly used up, so required cards (Agriculture, Metalworking, Markets) always come up.

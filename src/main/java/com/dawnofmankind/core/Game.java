@@ -1306,7 +1306,6 @@ public final class Game {
     public int wonderUpkeep(Player p) {
         int total = 0;
         for (WonderDef w : builtWonders) if (!obsolete(w)) total += eraAge(w.era);
-        for (CardDef c : p.minorWonders) if (!obsolete(c)) total += eraAge(c.era);
         if (mods(p).halveWonderUpkeep) total = (total + 1) / 2;
         return total;
     }
