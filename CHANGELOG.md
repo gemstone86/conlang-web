@@ -1,5 +1,9 @@
 # Changes
 
+## v1.93.6 (combined app)
+
+- Dawn: the era banner shows the era-end event that closed the previous era as a card (Dawn of Agriculture, Climate Crisis...). When the whole game ends there is no new era and so no card.
+
 ## v1.93.5 (combined app)
 
 - Dawn: hover over "Hand N" in The tribe to see that player's cards (the server now sends every player's hand to the team).

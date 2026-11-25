@@ -315,7 +315,8 @@ function checkEraSplash() {
   if (seen === String(state.eraIndex)) return;
   try { sessionStorage.setItem(key, String(state.eraIndex)); } catch (e) {}
   const first = state.eraIndex === 0;
-  const boons = (state.eraBoons || []).length ? `<div class="splash-boon">Carried over: ${state.eraBoons.map(esc).join(', ')}</div>` : '';
+  // the era-end event that closed the last era shows as a card (the end of the whole game has no event, so no card)
+  const boons = (state.eraBoons || []).length ? `<div class="splash-cards">${state.eraBoons.map(b => cardHtml(b)).join('')}</div>` : '';
   $('eraSplashBox').innerHTML = `<div class="splash-title">${first ? 'Prehistory' : esc(state.era)}</div><div class="splash-sub">The ${esc(state.era.toLowerCase())} era begins…</div>${boons}<div class="splash-hint">click to continue</div>`;
   $('eraSplash').hidden = false;
   clearTimeout(splashTimer);

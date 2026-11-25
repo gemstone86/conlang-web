@@ -262,3 +262,6 @@ details summary { cursor: pointer; color: var(--bone-dim); font-size: .88rem; }
 .handtip { border-bottom: 1px dotted var(--bone-dim); cursor: help; }
 .handrow { padding: .25rem 0; border-top: 1px solid var(--line); }
 .handrow:first-of-type { border-top: 0; }
+
+.splash-cards { display: flex; gap: 1rem; justify-content: center; margin-top: 1.4rem; animation: splashIn 2s ease 1s both; }
+.splash-cards .cardx { width: min(20rem, 80vw); text-align: left; min-height: 0; }
