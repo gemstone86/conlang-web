@@ -853,7 +853,7 @@ function renderTeam() {
   const list = s.players.map(o => `<div class="teammate ${s.phase === 'turns' && !o.done ? 'active' : ''}">
       <div class="tname">${s.phase === 'turns' ? (o.done ? '✔ ' : '▶ ') : ''}${esc(o.name)}${o.seat === s.you ? ' (you)' : ''}${room.players[o.seat]?.ai ? ' <span class="chip">AI</span>' : ''}${o.seat === s.firstPlayer ? ' <span class="chip">first</span>' : ''}${o.away ? ' <span class="chip">away</span>' : ''}</div>
       <div class="small">${resList(o.resources)}</div>
-      <div class="small muted">${s.phase === 'turns' ? `<b class="${o.done || !o.actions ? 'muted' : 'al-num'}">${o.done ? 'done' : o.actions + ' action' + (o.actions === 1 ? '' : 's') + ' left'}</b> · ` : ''}Pop ${o.population} · Army ${o.army}${o.strength !== o.army ? ` (strength ${o.strength})` : ''} · Hand ${o.handSize} · ${o.buildings.map(b => esc(b.name) + ' ' + b.workers + '/' + b.slots).join(', ')}</div>
+      <div class="small muted">${s.phase === 'turns' ? `<b class="${o.done || !o.actions ? 'muted' : 'al-num'}">${o.done ? 'done' : o.actions + ' action' + (o.actions === 1 ? '' : 's') + ' left'}</b> · ` : ''}Pop ${o.population} · Army ${o.army}${o.strength !== o.army ? ` (strength ${o.strength})` : ''} · <span class="handtip" data-tiphand="${o.seat}">Hand ${o.handSize}</span> · ${o.buildings.map(b => esc(b.name) + ' ' + b.workers + '/' + b.slots).join(', ')}</div>
       ${o.techs.length || o.minorWonders.length ? `<div>${o.techs.map(t => `<span class="chip"${tipAttr(t)}>${esc(t.name)}</span>`).join('')}${o.minorWonders.map(t => `<span class="chip"${tipAttr(t)}>★ ${esc(t.name)}</span>`).join('')}</div>` : ''}
       ${o.leader ? `<div class="small"><span class="chip"${tipAttr(o.leader)}>♛ ${esc(o.leader.name)}</span></div>` : ''}
     </div>`).join('');
@@ -974,7 +974,7 @@ function showKw(el) {
   placeTip(el);
 }
 // hover boxes: a card (techs, bonuses, wonders, great people), where a resource per round comes from, where actions come from
-const TIP = '.kw, [data-tipcard], [data-tipsrc], [data-tipactions]';
+const TIP = '.kw, [data-tipcard], [data-tipsrc], [data-tipactions], [data-tiphand]';
 function showTip(el) {
   if (el.classList.contains('kw')) return showKw(el);
   let html = '', wide = false;
@@ -982,6 +982,10 @@ function showTip(el) {
     const c = tipCards[+el.dataset.tipcard];
     if (!c) return;
     html = cardHtml(c); wide = true;
+  } else if (el.dataset.tiphand != null) {
+    const o = state.players[+el.dataset.tiphand], hand = (o && o.hand) || [];
+    html = `<b>${esc(o.name)}'s hand (${hand.length})</b>` + (hand.length ? hand.map(c => `<div class="handrow"><b>${esc(c.name)}</b> <span class="muted small">${esc(c.type === 'leader' ? 'great person' : c.type.replace('_', ' '))}${c.cost ? ' · ' + resList(c.cost) : ''}</span><div class="small">${esc(c.text)}</div></div>`).join('') : '<div class="muted small">No cards.</div>');
+    wide = true;
   } else {
     const rows = el.dataset.tipactions != null ? me().actionSources : (me().incomeSources || {})[el.dataset.tipsrc];
     const title = el.dataset.tipactions != null ? 'Where your actions come from' : 'Where it comes from: ' + el.dataset.tipsrc;

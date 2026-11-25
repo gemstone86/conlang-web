@@ -239,7 +239,7 @@ public final class View {
             pm.put("freeTech", g.freeTechAvailable(p));
             pm.put("wonderUpkeep", g.wonderUpkeep(p));
             pm.put("minorWonders", p.minorWonders.stream().map(View::def).toList());
-            if (p.seat == seat) pm.put("hand", p.hand.stream().map(View::card).toList());
+            pm.put("hand", p.hand.stream().map(View::card).toList());          // a team game: everyone may look at the others' hands
             pm.put("done", p.done);
             pm.put("actions", p.actions);
             if (p.cheat) pm.put("cheat", true);

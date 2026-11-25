@@ -1,5 +1,9 @@
 # Changes
 
+## v1.93.5 (combined app)
+
+- Dawn: hover over "Hand N" in The tribe to see that player's cards (the server now sends every player's hand to the team).
+
 ## v1.93.4 (combined app)
 
 - Dawn: fixed a required card (Markets, Stone Tools, Agriculture, Metalworking) turning up twice in an era deck: it is put in once, and the random fill no longer draws another copy.
