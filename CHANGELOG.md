@@ -1,5 +1,9 @@
 # Changes
 
+## v1.93.8 (combined app)
+
+- Dawn: card art for the 22 Classical cards: Iron Working, Philosophy, Mathematics, Engineering, Roman Concrete, Pericles, Hannibal, Cleopatra, Cyrus, Augustus, Legion Tactics, Aqueducts, The Forum, Pax Romana, Gallic Warband, The Goths Invade, Hannibal at the Gates, End of an Era (Classical), The Parthenon, The Colosseum, The Pantheon and The Great Wall.
+
 ## v1.93.7 (combined app)
 
 - Dawn: card art for 21 more cards: Lithic Art, Legendary Predator, Climate Crisis, Cult of the Ancestors, End of an Era (Prehistoric), Metalworking, Markets, Bronze Age Collapse, The Iron Age Dawns, Age of Philosophers, Hatshepsut, Sargon, King Minos, Imhotep, Irrigation Canals, Sailing, The Pharaoh's Curse, Volcano of Thera, the Palace of Knossos, the Ziggurat of Ur and the Temple of Karnak.
