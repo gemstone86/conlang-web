@@ -205,7 +205,7 @@ function cardHtml(c, extra = '', cls = '') {
   const typeLabel = c.type === 'event' ? (c.crisis ? 'Crisis' : 'Event · ' + (c.category || ''))
     : c.type === 'great_wonder' ? `Great wonder · ${c.victoryPoints} points` : c.type === 'leader' ? 'great person' : c.type.replace('_', ' ');
   const art = c.art ? ` hasart" style="--art:url('${c.art}')` : '';
-  return `<div class="cardx ${kind} ${cls}${art}"${c.id != null ? ` data-cid="${c.id}"` : ''}><div class="type">${esc(typeLabel)}</div><div class="name">${esc(c.name)}</div>
+  return `<div class="cardx ${kind} ${cls}${art}"${c.id != null ? ` data-cid="${c.id}"` : ''}><div class="type">${esc(typeLabel)}${c.slottable ? ' <span class="slottag" title="Its bonus works only while it sits in an upgrade slot of one of your buildings">Bonus slot</span>' : ''}</div><div class="name">${esc(c.name)}</div>
     ${c.cost ? `<div class="small">${c.type === 'great_wonder' ? 'Team cost' : 'Cost'}: ${resList(c.cost)}</div>` : ''}<div class="text">${esc(c.text)}</div>${extra}</div>`;
 }
 
@@ -583,7 +583,7 @@ $('eventPanel').onclick = e => {
 
 // A card as a small card (art, name): in the tech list, and in a building's upgrade slot.
 function miniCard(c, extra = '', cls = '') {
-  return `<div class="minicard tall${c.art ? ' hasart' : ''} ${cls}" data-key="${c.key}"${c.art ? ` style="--art:url('${c.art}')"` : ''}${tipAttr(c)}><span class="mname">${esc(c.name)}</span>${extra}</div>`;
+  return `<div class="minicard tall${c.art ? ' hasart' : ''} ${cls}" data-key="${c.key}"${c.art ? ` style="--art:url('${c.art}')"` : ''}${tipAttr(c)}>${c.slottable ? '<span class="slottag">Bonus slot</span>' : ''}<span class="mname">${esc(c.name)}</span>${extra}</div>`;
 }
 // The technologies researched so far (global: they help every player), with what each does.
 function renderTechs() {

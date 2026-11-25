@@ -517,6 +517,7 @@ public final class View {
         m.put("name", d.name);
         m.put("type", d.type.name().toLowerCase());
         m.put("text", d.text);
+        if ((d.type == CardType.TECH || d.type == CardType.MINOR_WONDER) && d.effects.stream().anyMatch(Effects::needsSlot)) m.put("slottable", true);
         if (!Res.isZero(d.cost)) m.put("cost", res(d.cost));
         if (d.isEvent()) {
             m.put("category", d.category);
