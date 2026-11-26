@@ -159,6 +159,7 @@ details summary { cursor: pointer; color: var(--bone-dim); font-size: .88rem; }
 .catalog > div.hasart { padding-top: 6.5rem; }
 .cardx.hasart::before, .catalog > div.hasart::before { content: ''; position: absolute; left: 0; right: 0; top: 0; height: 8rem; z-index: -1; border-radius: 13px 13px 0 0; background-image: linear-gradient(rgba(17,22,29,0) 65%, #11161d 100%), var(--art); background-size: cover; background-position: center; }
 .catalog > div.hasart::before { height: 6rem; }
+.cardx.leader.hasart::before { background-position: center top; }      /* portraits: the face is near the top of the picture */
 .cardx.hasart .actions { margin-top: .4rem; padding-top: 0; }
 .status .al { background: var(--brass); color: var(--ink); padding: .1rem .6rem; border-radius: 6px; font-weight: 500; }
 .status .al b { color: var(--ink); font-size: 1.15em; font-weight: 800; }

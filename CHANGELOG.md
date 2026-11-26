@@ -1,5 +1,9 @@
 # Changes
 
+## v1.95.5 (combined app)
+
+- Dawn: great person cards show their picture from the top, so faces (Ramses) are no longer cut off.
+
 ## v1.95.4 (combined app)
 
 - Dawn: Great Work now gives 6 of ONE resource that the players choose when it strikes (a button per resource a wonder still needs); it goes into the great wonder nearest completion that needs it and what the wonder does not need is lost (before, it spilled over into other resources). Fixed a bug where the event resolved without asking.
