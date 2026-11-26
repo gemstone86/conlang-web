@@ -257,6 +257,15 @@ public final class View {
             players.add(pm);
         }
         v.put("players", players);
+        List<Object> lost = new ArrayList<>();
+        for (Game.LostCard l : g.lostCards.subList(Math.max(0, g.lostCards.size() - 4), g.lostCards.size())) {
+            Map<String, Object> lm = new LinkedHashMap<>();
+            lm.put("seq", l.seq());
+            lm.put("event", l.event());
+            lm.put("card", def(l.card()));
+            lost.add(lm);
+        }
+        v.put("lostCards", lost);
 
         if (seat >= 0 && seat < g.players.size()) {
             Player me = g.players.get(seat);
@@ -541,7 +550,8 @@ public final class View {
         m.put("name", d.name);
         m.put("type", d.type.name().toLowerCase());
         m.put("text", d.text);
-        if ((d.type == CardType.TECH || d.type == CardType.MINOR_WONDER) && d.effects.stream().anyMatch(Effects::needsSlot)) m.put("slottable", true);
+        if ((d.type == CardType.TECH || d.type == CardType.MINOR_WONDER) && (!d.bonus.isEmpty() || d.effects.stream().anyMatch(Effects::needsSlot))) m.put("slottable", true);
+        if (!d.slotIn.isEmpty()) m.put("slotIn", d.slotIn);
         if (!Res.isZero(d.cost)) m.put("cost", res(d.cost));
         if (d.isEvent()) {
             m.put("category", d.category);

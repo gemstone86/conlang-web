@@ -16,6 +16,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * One game of Dawn of Mankind: the whole state and every rule. Not thread-safe; the caller (a room) serialises calls.
@@ -181,6 +183,11 @@ public final class Game {
     /** Standing trading routes: every round `from` pays `give` and `to` receives `get`. */
     public record Route(int from, int to, EnumMap<Res, Integer> give, EnumMap<Res, Integer> get) { }
     public final List<Route> routes = new ArrayList<>();
+    /** A face-down card that was lost when its event left the queue untaken. */
+    public record LostCard(int seq, String event, CardDef card) { }
+    public final List<LostCard> lostCards = new ArrayList<>();
+    /** Great Work gifts that found no wonder yet; they go in when the next great wonder is brought to the board. */
+    private int wonderGifts;
     public final List<Frontier> frontier = new ArrayList<>();
 
     private List<CardInst> drawn = new ArrayList<>();
@@ -340,7 +347,7 @@ public final class Game {
             boolean cycle = !kind.equals("great_wonder") && !kind.equals("hostility");
             List<CardInst> picked = new ArrayList<>(), bag = new ArrayList<>();
             // required cards (the Markets tech) are always in the deck, one copy each
-            for (CardInst c : pool) if (c.def.required && picked.stream().noneMatch(x -> x.def == c.def)) picked.add(inst(c.def));
+            for (CardInst c : pool) if (c.def.required && picked.stream().noneMatch(x -> x.def == c.def)) for (int k = 0; k < c.def.requiredCopies; k++) picked.add(inst(c.def));
             boolean bagUsed = false;
             while (picked.size() < want && !pool.isEmpty()) {
                 if (bag.isEmpty()) {
@@ -741,7 +748,13 @@ public final class Game {
 
     private void pruneRetired() {
         Mods m = civMods();
-        for (Player p : players) p.buildings.removeIf(b -> m.retired.contains(b.def.id) && b.workers == 0 && b.upgrades.isEmpty());
+        for (Player p : players) {
+            for (Building b : List.copyOf(p.buildings)) {
+                if (!m.retired.contains(b.def.id) || b.workers != 0) continue;
+                for (CardDef c : b.upgrades) log(c.name + " goes back to " + p.name + "'s techs: the " + b.def.name + " is no more.");
+                p.buildings.remove(b);
+            }
+        }
     }
 
     private void endRound() {
@@ -757,6 +770,10 @@ public final class Game {
                 Player teller = leaderWith("eventUnder");
                 String tellerLeader = teller == null ? null : teller.leader.name;      // an era could end while cards are drawn
                 CardInst under = s.under;
+                if (under != null && teller == null) {
+                    lostCards.add(new LostCard(lostCards.size() + 1, s.card.def.name, under.def));
+                    log("The face-down card under " + s.card.def.name + " is lost: " + under.def.name + ".");
+                }
                 if (teller != null && under != null) {
                     while (under != null && under.def.isEvent()) {
                         futureEvents.add(under);
@@ -1143,6 +1160,11 @@ public final class Game {
         if (known) return;
         greatWonders.add(new WonderProgress(w));
         log(p.name + " brings the great wonder " + w.name + " to the tribe: everyone can now help build it.");
+        if (wonderGifts > 0) {
+            int n = wonderGifts;
+            wonderGifts = 0;
+            giveToWonder(n);
+        }
     }
 
     private CardInst handCard(Player p, Map<String, Object> a) {
@@ -1959,6 +1981,36 @@ public final class Game {
      * Applies immediate effects. Losses are multiplied by {@code factor} (rounded down). With {@code civWide},
      * Population losses are spread over the civilization (largest first) instead of hitting each target.
      */
+    /** A gift (Great Work): n of the resource a great wonder still needs most, into the one nearest completion; with none being built it waits. */
+    private void giveToWonder(int n) {
+        WonderProgress best = null;
+        int bestLeft = Integer.MAX_VALUE;
+        for (WonderProgress w : greatWonders) {
+            if (w.done) continue;
+            EnumMap<Res, Integer> need = w.def.cost(players.size());
+            int left = 0;
+            for (Res r : Res.values()) left += Math.max(0, need.get(r) - w.paid.get(r));
+            if (left > 0 && left < bestLeft) { best = w; bestLeft = left; }
+        }
+        if (best == null) {
+            wonderGifts += n;
+            log("No great wonder is being built: the gift of " + n + " waits for the next one.");
+            return;
+        }
+        EnumMap<Res, Integer> need = best.def.cost(players.size());
+        Res pick = null;
+        int most = 0;
+        for (Res r : Res.values()) {
+            int left = need.get(r) - best.paid.get(r);
+            if (left > most) { most = left; pick = r; }
+        }
+        int add = Math.min(n, most);
+        best.paid.merge(pick, add, Integer::sum);
+        log("Great Work: " + add + " " + pick.key() + " go into " + best.def.name + ".");
+        if (best.paid.equals(need)) completeWonder(best, players.get(0), -1);
+        if (n > add) giveToWonder(n - add);
+    }
+
     private void applyImmediate(List<Map<String, Object>> effects, List<Player> targets, Player actor, double factor, boolean civWide) {
         for (Map<String, Object> e : effects) {
             String k = Effects.key(e);
@@ -2017,6 +2069,7 @@ public final class Game {
                 case "draw" -> {
                     for (Player p : actor == null ? targets : List.of(actor)) for (int i = 0; i < Y.toInt(v); i++) drawFromEraDeck(p);
                 }
+                case "wonderGift" -> giveToWonder(Y.toInt(v));
                 case "extraActions" -> {
                     if (actor != null && phase == Phase.TURNS) actor.actions += Y.toInt(v);
                 }
@@ -2230,7 +2283,7 @@ public final class Game {
 
     /** Whether a card's building bonuses (per worker, income) need an upgrade slot to work. */
     public boolean slottable(CardDef c) {
-        return (c.type == CardType.TECH || c.type == CardType.MINOR_WONDER) && c.effects.stream().anyMatch(Effects::needsSlot);
+        return (c.type == CardType.TECH || c.type == CardType.MINOR_WONDER) && (!c.bonus.isEmpty() || c.effects.stream().anyMatch(Effects::needsSlot));
     }
 
     /** The researched techs and the player's own minor wonders that make a building better and are not in a slot yet. */
@@ -2245,7 +2298,7 @@ public final class Game {
 
     /** Where a card's bonus goes: "warriors" (army effects), else "building". */
     public String slotKind(CardDef c) {
-        return c.effects.stream().anyMatch(e -> Effects.UNIT_KEYS.contains(Effects.key(e))) ? "warriors" : "building";
+        return Stream.concat(c.effects.stream(), c.bonus.stream()).anyMatch(e -> Effects.UNIT_KEYS.contains(Effects.key(e))) ? "warriors" : "building";
     }
 
     /** Whether the card sits in any of the player's slots (a building, the warriors or the population). */
@@ -2261,10 +2314,12 @@ public final class Game {
 
     /** The effects of a tech or minor wonder that work for {@code p}: rule changes always, building bonuses only while slotted ({@code p == null}: rules only). */
     public List<Map<String, Object>> effectsFor(Player p, CardDef c) {
-        if (!slottable(c)) return c.effects;
+        if (!slottable(c)) return c.global.isEmpty() ? c.effects : Stream.concat(c.effects.stream(), c.global.stream()).toList();
         List<Map<String, Object>> out = new ArrayList<>();
         boolean in = p != null && isSlotted(p, c);
         for (Map<String, Object> e : c.effects) if (in || !Effects.needsSlot(e)) out.add(e);
+        out.addAll(c.global);
+        if (in) out.addAll(c.bonus);
         return out;
     }
 
@@ -2290,6 +2345,7 @@ public final class Game {
         if (!slotKind(d).equals("building")) throw new GameException(d.name + " is for your warriors, not a building.");
         Building b = p.buildings.stream().filter(x -> x.id == Y.i(a, "building", -1)).findFirst().orElseThrow(() -> new GameException("You have no such building."));
         if (b.upgrades.size() >= b.def.upgradeSlots) throw new GameException("The " + b.def.name + " has no free upgrade slot.");
+        if (!d.slotIn.isEmpty() && !d.slotIn.contains(b.def.id)) throw new GameException(d.name + " only fits " + d.slotIn.stream().map(x -> content.buildings.get(x).name).collect(Collectors.joining(" or ")) + ".");
         b.upgrades.add(d);
         log(p.name + " puts " + d.name + " into the " + b.def.name + ".");
     }
@@ -2330,6 +2386,13 @@ public final class Game {
         for (WonderDef w : builtWonders) if (!obsolete(w)) m.add(w.effects);
         for (EraBoon b : eraBoons) m.add(b.def().effects);
         for (Territory t : realm) m.add(t.def.effects);
+        // the health of the world also counts what a slotted card gives (Fire)
+        for (Player p : players) {
+            List<CardDef> slotted = new ArrayList<>(p.warriorUpgrades);
+            slotted.addAll(p.populationUpgrades);
+            for (Building b : p.buildings) slotted.addAll(b.upgrades);
+            for (CardDef c : slotted) for (Map<String, Object> e : c.bonus) if (e.containsKey("healthMod")) m.add(e);
+        }
         return m;
     }
 

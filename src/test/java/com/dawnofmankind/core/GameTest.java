@@ -555,13 +555,13 @@ class GameTest {
             for (Game.CardInst c : all) if (c.def.eraEnd == null) n.merge(c.def.eraTrigger ? "era_trigger" : c.def.type.name().toLowerCase(), 1, Integer::sum);
             // leaders and great wonders play or go to the board as soon as they are drawn; hostility cards are spent
             int ledBy = (int) g.log.stream().filter(l -> l.contains(" has the great person ") || l.contains(" draws the great person ")).count();
-            assertEquals(x + 1, n.getOrDefault("leader", 0) + ledBy, "leaders, " + x + " players");
-            assertEquals(x, n.getOrDefault("great_wonder", 0) + g.greatWonders.size(), "great wonders");
+            assertEquals(x + 2, n.getOrDefault("leader", 0) + ledBy, "leaders, " + x + " players");
+            assertEquals(x + 1, n.getOrDefault("great_wonder", 0) + g.greatWonders.size(), "great wonders");
             assertEquals(6 + x, n.getOrDefault("tech", 0), "techs");
             long cityStates = g.frontier.stream().filter(fr -> fr.land.def.id.equals("city_state")).count();
             assertEquals(1, n.getOrDefault("city_state", 0) + cityStates, "one city state");
-            assertEquals(24 + 2 * x, n.getOrDefault("action", 0), "actions");
-            assertEquals(x, n.getOrDefault("response", 0), "responses");
+            assertEquals(20 + 2 * x, n.getOrDefault("action", 0), "actions");
+            assertEquals(2 + x, n.getOrDefault("response", 0), "responses");
             assertEquals(2 * x, n.getOrDefault("hostility", 0) + (int) g.pastEvents.stream().filter(c -> c.def.type == Content.CardType.HOSTILITY).count(), "hostility cards: 2 per player");
             assertEquals(12 + x, n.getOrDefault("event", 0), "events");
             assertEquals(0, n.getOrDefault("era_trigger", 0), "no End of an Era cards before the last era");
@@ -1363,10 +1363,93 @@ class GameTest {
                     for (Content.CardDef d : C.cards.values()) {
                         if (!d.required || !a.era().cards.containsKey(d.id)) continue;
                         long n = a.eraDeck.stream().filter(c -> c.def == d).count();
-                        assertEquals(1, n, d.id + " must be in the deck once (" + players + " players, seed " + seed + ")");
+                        assertEquals(d.requiredCopies, n, d.id + " must be in the deck exactly its required copies (" + players + " players, seed " + seed + ")");
                     }
                 }
             }
         }
+    }
+
+    @Test
+    void fireIsABonusForHuntersAndGatherersAndGivesATroopWhenPlayed() {
+        Game g = game(1, 5);
+        Player p = g.players.get(0);
+        p.leader = null;
+        p.res.put(Res.RESEARCH, 5);
+        Game.CardInst fire = card(g, "fire");
+        p.hand.add(fire);
+        int army = p.army, health = g.effectiveHealth(), raid = g.mods(p).raidDefense;
+        g.act(p.seat, Map.of("type", "play", "card", fire.id));
+        assertEquals(army + 1, p.army, "a troop when played");
+        assertEquals(health, g.effectiveHealth(), "no health until it is slotted");
+        assertEquals(raid, g.mods(p).raidDefense);
+        p.res.put(Res.PRODUCTION, 10);
+        g.act(p.seat, Map.of("type", "build", "building", "temple"));
+        final Player.Building t = p.ofType("temple");
+        assertThrows(GameException.class, () -> g.act(p.seat, Map.of("type", "slot", "card", "fire", "building", t.id)), "only hunters or gatherers");
+        g.act(p.seat, Map.of("type", "slot", "card", "fire", "building", p.ofType("hunter").id));
+        assertEquals(health + 2, g.effectiveHealth());
+        assertEquals(raid + 2, g.mods(p).raidDefense);
+    }
+
+    @Test
+    void huntingAndPotteryAreGlobalAndGiveSomethingWhenPlayed() {
+        Game g = game(1, 6);
+        Player p = g.players.get(0);
+        p.leader = null;
+        p.res.put(Res.RESEARCH, 10);
+        int food = p.res.get(Res.FOOD), hand = g.handLimit(p);
+        int income = g.mods(p).income.get(Res.FOOD);
+        Game.CardInst pottery = card(g, "pottery"), hunting = card(g, "hunting");
+        p.hand.add(pottery);
+        p.hand.add(hunting);
+        p.res.put(Res.PRODUCTION, 5);
+        g.act(p.seat, Map.of("type", "play", "card", pottery.id));
+        assertEquals(food + 2, p.res.get(Res.FOOD), "+2 food when played");
+        g.act(p.seat, Map.of("type", "play", "card", hunting.id));
+        assertEquals(income + 2, g.mods(p).income.get(Res.FOOD), "+1 food per turn each, with no slot");
+        assertEquals(hand + 1, g.handLimit(p));
+    }
+
+    @Test
+    void aRetiredBuildingSendsItsUpgradesBackToTheTechList() {
+        Game g = game(1, 7);
+        Player p = g.players.get(0);
+        p.leader = null;
+        p.techs.add(C.cards.get("stone_tools"));
+        g.act(p.seat, Map.of("type", "slot", "card", "stone_tools", "building", p.ofType("hunter").id));
+        p.ofType("hunter").workers = 0;
+        p.idle += 2;
+        p.techs.add(C.cards.get("metalworking"));
+        g.act(p.seat, Map.of("type", "endTurn"));
+        assertNull(p.ofType("hunter"), "the empty retired hunters are gone");
+        assertTrue(g.slottable(p).contains(C.cards.get("stone_tools")), "the card is back in the tech list");
+    }
+
+    @Test
+    void aFaceDownCardThatLeavesTheQueueIsRecordedAsLost() {
+        Game g = game(1, 8);
+        Player p = g.players.get(0);
+        p.leader = null;
+        Game.CardInst ev = card(g, "wolf_pack"), under = card(g, "fire");
+        g.queue.add(g.queue.size(), new Game.Slot(ev, under));
+        g.queue.add(g.queue.size(), new Game.Slot(card(g, "bountiful_season"), card(g, "hunting")));
+        g.act(p.seat, Map.of("type", "endTurn"));
+        assertFalse(g.lostCards.isEmpty());
+        assertEquals("hunting", g.lostCards.get(0).card().id);
+    }
+
+    @Test
+    void greatWorkGivesSixOfTheNeededResourceToTheNearestWonder() {
+        Game g = game(1, 9);
+        Player p = g.players.get(0);
+        p.leader = null;
+        g.greatWonders.clear();
+        g.greatWonders.add(new Game.WonderProgress(C.greatWonders.get("stonehenge")));
+        g.currentEvents.add(0, card(g, "great_work"));
+        g.act(p.seat, Map.of("type", "endTurn"));
+        for (int k = 0; g.phase == Game.Phase.EVENTS && k < 50; k++) g.act(p.seat, Map.of("type", "ready"));
+        Game.WonderProgress w = g.greatWonders.stream().filter(x -> x.def.id.equals("stonehenge")).findFirst().orElse(null);
+        assertTrue(w == null || w.done || w.paid.values().stream().mapToInt(Integer::intValue).sum() >= 4, "the gift went into Stonehenge: " + g.log);
     }
 }

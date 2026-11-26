@@ -136,6 +136,7 @@ function render(m) {
   checkNotices();
   checkEraSplash();
   checkTurnDraw();
+  checkLostCards();
   renderStarvation();
   renderSetup();
   renderTechs();
@@ -323,6 +324,20 @@ function checkEraSplash() {
   splashTimer = setTimeout(() => { $('eraSplash').hidden = true; }, 6000);
 }
 $('eraSplash').onclick = () => { $('eraSplash').hidden = true; clearTimeout(splashTimer); };
+// A face-down card whose event left the queue untaken is lost: say which card it was (once per card, also after a reload).
+function checkLostCards() {
+  if (!room || !(state.lostCards || []).length) return;
+  const key = 'dawnLost-' + room.code;
+  let last = 0;
+  try { last = +sessionStorage.getItem(key) || 0; } catch (e) {}
+  const fresh = state.lostCards.filter(l => l.seq > last);
+  if (!fresh.length) return;
+  try { sessionStorage.setItem(key, String(fresh[fresh.length - 1].seq)); } catch (e) {}
+  $('lostBox').innerHTML = `<h2>${fresh.length > 1 ? 'Face-down cards lost' : 'A face-down card was lost'}</h2>` + fresh.map(l =>
+    `<p class="muted small">${esc(l.event)} left the queue untaken. Under it lay:</p><div class="cards">${cardHtml(l.card)}</div>`).join('') + '<div class="row"><button class="primary" data-lostok>OK</button></div>';
+  $('lostModal').hidden = false;
+}
+$('lostModal').onclick = e => { if (e.target.closest('[data-lostok]') || e.target === $('lostModal')) $('lostModal').hidden = true; };
 // The card drawn blind at the start of your turn is shown in a pop-up (once per turn, also after a reload).
 function checkTurnDraw() {
   const m = me();
@@ -675,7 +690,7 @@ function renderCiv() {
       <span class="slots">${dots}</span>${controls}
       ${b.id != null ? `<span class="makes" title="${esc(Object.entries(b.each || {}).map(([r, n]) => `${n} ${r} per worker`).join(', ') || 'makes nothing')} (technologies included)">${Object.keys(b.makes || {}).length ? resList(b.makes, { signed: true }) : '<span class="muted">—</span>'}</span>` : ''}
       ${cap != null ? `<span class="small muted">${b.slots}/${cap} slots built</span>` : ''}${b.inactive ? `<span class="small bad">${b.inactive} inactive (over the land limit)</span>` : ''}
-      ${b.id != null ? `<div class="upgrades">${(b.upgrades || []).map(u => `<div class="uslot full">${miniCard(u, `<button class="tiny uout" ${act ? '' : 'disabled'} data-unslot="${u.key}" title="Take it out (1 action)">×</button>`)}</div>`).join('')}${Array.from({ length: Math.max(0, (b.upgradeSlots || 0) - (b.upgrades || []).length) }, () => `<div class="uslot" data-slot-into="${b.id}" title="Upgrade slot: drop a technology or minor wonder here (free). Taking it out later costs 1 action."><span>＋<br>upgrade slot</span></div>`).join('')}</div>` : ''}</div>`;
+      ${b.id != null ? `<div class="upgrades">${(b.upgrades || []).map(u => `<div class="uslot full">${miniCard(u, `<button class="tiny uout" ${act ? '' : 'disabled'} data-unslot="${u.key}" title="Take it out (1 action)">×</button>`)}</div>`).join('')}${Array.from({ length: Math.max(0, (b.upgradeSlots || 0) - (b.upgrades || []).length) }, () => `<div class="uslot" data-slot-into="${b.id}" data-btype="${b.type}" title="Upgrade slot: drop a technology or minor wonder here (free). Taking it out later costs 1 action."><span>＋<br>upgrade slot</span></div>`).join('')}</div>` : ''}</div>`;
   }).join('');
   const unitSlot = (key, u) => `${(u.upgrades || []).map(x => `<div class="uslot full">${miniCard(x, `<button class="tiny uout" ${act ? '' : 'disabled'} data-unslot="${x.key}" title="Take it out (1 action)">×</button>`)}</div>`).join('')}${Array.from({ length: Math.max(0, (u.slots || 0) - (u.upgrades || []).length) }, () => `<div class="uslot" data-slot-into="${key}" title="Bonus slot: drop a card here (free). Taking it out later costs 1 action."><span>＋<br>bonus slot</span></div>`).join('')}`;
   const units = p.units || {};
@@ -717,6 +732,11 @@ function renderCiv() {
 }
 // Putting a card in an upgrade slot: drag it there, or click the card and then the slot.
 let pickedCard = null, dragCard = null;
+// Some cards fit only certain buildings (Fire: hunters or gatherers): the card def says which.
+function slotFits(key, slotEl) {
+  const def = ((me() || {}).slotCards || []).find(c => c.key === key);
+  return !def || !def.slotIn || !slotEl.dataset.btype || def.slotIn.includes(slotEl.dataset.btype);
+}
 function putInSlot(key, building) {
   const el = document.querySelector(`#techPanel .minicard[data-key="${key}"], #bonusPanel .minicard[data-key="${key}"]`);
   if (el) techRects[key] = el.getBoundingClientRect();
@@ -729,19 +749,19 @@ document.addEventListener('dragstart', e => {
   dragCard = c.dataset.key;
   e.dataTransfer.setData('text/plain', dragCard);
   e.dataTransfer.effectAllowed = 'move';
-  document.querySelectorAll('.uslot[data-slot-into]').forEach(x => x.classList.add('ready'));
+  document.querySelectorAll('.uslot[data-slot-into]').forEach(x => { if (slotFits(dragCard, x)) x.classList.add('ready'); });
 });
 document.addEventListener('dragend', () => { dragCard = null; document.querySelectorAll('.uslot.ready, .uslot.over').forEach(x => x.classList.remove('ready', 'over')); });
-document.addEventListener('dragover', e => { const sl = e.target.closest && e.target.closest('.uslot[data-slot-into]'); if (sl && dragCard) { e.preventDefault(); sl.classList.add('over'); } });
+document.addEventListener('dragover', e => { const sl = e.target.closest && e.target.closest('.uslot[data-slot-into]'); if (sl && dragCard && slotFits(dragCard, sl)) { e.preventDefault(); sl.classList.add('over'); } });
 document.addEventListener('dragleave', e => { const sl = e.target.closest && e.target.closest('.uslot[data-slot-into]'); if (sl) sl.classList.remove('over'); });
 document.addEventListener('drop', e => {
-  const sl = e.target.closest && e.target.closest('.uslot[data-slot-into]'); if (!sl || !dragCard) return;
+  const sl = e.target.closest && e.target.closest('.uslot[data-slot-into]'); if (!sl || !dragCard || !slotFits(dragCard, sl)) return;
   e.preventDefault();
   putInSlot(dragCard, sl.dataset.slotInto);
 });
 document.addEventListener('click', e => {
   const sl = e.target.closest && e.target.closest('.uslot[data-slot-into]');
-  if (sl && pickedCard) return putInSlot(pickedCard, sl.dataset.slotInto);
+  if (sl && pickedCard) return slotFits(pickedCard, sl) ? putInSlot(pickedCard, sl.dataset.slotInto) : undefined;
   const c = e.target.closest && e.target.closest('#techPanel .minicard.draggable, #bonusPanel .minicard.draggable');
   if (c) { pickedCard = pickedCard === c.dataset.key ? null : c.dataset.key; document.querySelectorAll('.picked').forEach(x => x.classList.remove('picked')); if (pickedCard) c.classList.add('picked'); }
 });
@@ -917,7 +937,7 @@ let catalogue = null;
 
 // ------------------------------------------------------------------ keywords: hover a marked word to see its rule
 let kwRe = null, kwById = {}, kwLoading = false;
-const KW_ROOTS = '#game, #setupModal, #noticeModal, #gotModal, #starveModal, #growModal, #over, #cardsModal, #eventBackdrop';
+const KW_ROOTS = '#game, #setupModal, #noticeModal, #lostModal, #gotModal, #starveModal, #growModal, #over, #cardsModal, #eventBackdrop';
 const KW_SKIP = 'button, input, select, textarea, option, script, style, label, h1, h2, h3, .kw, .name, .nm, .type, #chat, .chat, .readylist';
 async function loadKeywords() {
   if (kwRe || kwLoading) return;

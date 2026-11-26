@@ -1,5 +1,13 @@
 # Changes
 
+## v1.95.0 (combined app)
+
+- Dawn: when an event leaves the queue untaken, a popup shows the face-down card that was lost.
+- Dawn: era decks hold 2+X great people, 20+2X actions, X+1 great wonders and 2+X responses.
+- Dawn: cards now say what is global (always on), what is a bonus (works only in a slot) and what happens when played. Fire (+2 Health, +2 raid defense in a Hunters/Gatherers slot; 1 troop when played), Stone Tools and Lithic Art (Hunters/Gatherers slots only; Lithic Art also +2 influence when played), Hunting (global +1 food, 1 troop), Animal Husbandry (bonus; +2 production when played), Pottery (global +1 food and +1 hand size; +2 food when played) and Mysticism (bonus). When a retired building disappears, the cards in its slots go back to the tech list.
+- Dawn: the Prehistoric great wonders cost about half as much.
+- Dawn: new required event Great Work (two copies in every era deck): 6 of the resource a great wonder needs most go into the wonder closest to done (kept for the next wonder if none is being built).
+
 ## v1.94.1 (combined app)
 
 - Dawn: minor wonders no longer cost production upkeep; only great wonders of earlier eras do.

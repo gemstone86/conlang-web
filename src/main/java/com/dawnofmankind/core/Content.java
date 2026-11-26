@@ -83,10 +83,15 @@ public final class Content {
         public List<Map<String, Object>> ongoing = new ArrayList<>();
         public EnumMap<Res, Integer> cleanseCost;
         public boolean eraTrigger, crisis, persistent;
+        /** Techs and minor wonders: lasting effects that are always on, effects that work only while the card sits in an upgrade slot, and the building types whose slots it fits (empty: any). */
+        public List<Map<String, Object>> global = new ArrayList<>(), bonus = new ArrayList<>();
+        public List<String> slotIn = new ArrayList<>();
         /** An era-end event: the era whose end it can be (listed under that era's endEvents). */
         public String eraEnd;
         /** Always in the era deck of the era that lists it (it takes one of the places of its kind). */
         public boolean required;
+        /** How many copies a required card puts in the era deck. */
+        public int requiredCopies = 1;
         /** Minor wonders: the era after which the bonuses stop. */
         public String obsoleteAfter;
         /** The card is only put in the era deck when at least this many play. */
@@ -288,6 +293,9 @@ public final class Content {
         c.type = CardType.valueOf(Y.s(m, "type", "action").toUpperCase().replace(' ', '_'));
         c.cost = Res.parse(m.get("cost"));
         c.effects = effects(m.get("effects"));
+        c.global = effects(m.get("global"));
+        c.bonus = effects(m.get("bonus"));
+        c.slotIn.addAll(Y.strings(m.get("slotIn")));
         c.respondsTo = Y.strings(m.get("respondsTo"));
         c.category = Y.s(m, "category", null);
         c.kind = Y.s(m, "kind", "effects");
@@ -321,6 +329,7 @@ public final class Content {
         c.eraEnd = Y.s(m, "eraEnd", null);
         c.land = Y.s(m, "land", null);
         c.required = Y.b(m, "required");
+        c.requiredCopies = Y.i(m, "requiredCopies", 1);
         c.minPlayers = Y.i(m, "minPlayers", 1);
         c.obsoleteAfter = Y.s(m, "obsoleteAfter", null);
         c.helper = Y.b(m, "helper");

@@ -35,14 +35,14 @@ rules:
   startingEventsPerPlayer: 2
   # what an era deck holds: base + perPlayer × players cards of each kind, drawn at random from that era's list below
   eraDeck:
-    leader: {base: 1, perPlayer: 1}
-    great_wonder: {base: 0, perPlayer: 1}
+    leader: {base: 2, perPlayer: 1}
+    great_wonder: {base: 1, perPlayer: 1}
     minor_wonder: {base: 1, perPlayer: 1}
     hostility: {base: 0, perPlayer: 2}
     tech: {base: 6, perPlayer: 1}
     city_state: {base: 1, perPlayer: 0}
-    action: {base: 24, perPlayer: 2}
-    response: {base: 0, perPlayer: 1}
+    action: {base: 20, perPlayer: 2}
+    response: {base: 2, perPlayer: 1}
     event: {base: 12, perPlayer: 1}
     era_trigger: {base: 1, perPlayer: 0}       # the last era only: one end card at the bottom of the deck; when it is turned up the game is won
   # the enemy deck at the start (strength: number of cards); raids and invasions draw from it, the cards go back after
@@ -198,28 +198,28 @@ greatWonders:
   stonehenge:
     name: Stonehenge
     era: prehistoric
-    costPerPlayer: {production: 6, culture: 3}
+    costPerPlayer: {production: 3, culture: 1}
     effects: [{actionsPerTurn: 1}]
     victoryPoints: 2
     text: Every player gets +1 action per turn.
   gobekli_tepe:
     name: Göbekli Tepe
     era: prehistoric
-    costPerPlayer: {production: 6, culture: 3, research: 2}
+    costPerPlayer: {production: 3, culture: 2, research: 1}
     effects: [{income: {culture: 2}}, {growthDiscount: 1}, {maxSlots: {farm: 1}}]
     victoryPoints: 2
     text: Every player gets +2 culture per turn, growing costs 1 less food, and +1 farm slot.
   ggantija_temples:
     name: Ġgantija Temples
     era: prehistoric
-    costPerPlayer: {production: 6, culture: 3}
+    costPerPlayer: {production: 3, culture: 1}
     effects: [{wonderDouble: 1}, {maxSlots: {mine: 1}}]
     victoryPoints: 2
     text: Resources given to other great wonders count double. Every player gets +1 mine slot.
   skara_brae:
     name: Skara Brae
     era: prehistoric
-    costPerPlayer: {production: 5, food: 6}
+    costPerPlayer: {production: 3, food: 4}
     effects: [{incomePerTerritory: {food: 1}}]
     victoryPoints: 2
     text: Every player gets +1 food per turn for each territory in the realm.
@@ -498,6 +498,7 @@ eras:
       tribal_quarrel: 1
       bad_omen: 1
       bountiful_season: 2
+      great_work: 1
       wandering_sage: 1
       strangers_at_the_fire: 1
       scouts_return: 1
@@ -590,6 +591,7 @@ eras:
       warlord: 2
       rivals_claim: 1
       pharaohs_curse: 1
+      great_work: 1
       volcano_of_thera: 1
     # when the third end card is turned up, one of these strikes; its effects last through the next era
     endEvents: [bronze_age_collapse, iron_age_dawns, age_of_philosophers]
@@ -677,6 +679,7 @@ eras:
       rivals_claim: 1
       hannibal_at_the_gates: 1
       pax_romana: 1
+      great_work: 1
       end_of_classical: 1
 # The starting event deck: 2 per player, drawn from these (number = copies in the pool).
 startingEvents:
@@ -780,45 +783,53 @@ cards:
     name: Fire
     type: tech
     cost: {research: 2}
-    effects: [{health: 1}, {raidDefense: 1}]
-    text: +1 Health. Your camp is +1 defense against raids.
+    effects: [{army: 1}]
+    bonus: [{healthMod: 2}, {raidDefense: 2}]
+    slotIn: [hunter, gatherer]
+    text: "When played: you gain 1 troop. Bonus slot (Hunters or Gatherers only): +2 Health and +2 defense against raids."
   stone_tools:
     name: Stone Tools
     type: tech
     cost: {research: 2, production: 1}
-    effects: [{perWorker: {building: hunter, production: 1}}]
-    text: Your hunters produce +1 production.
+    bonus: [{perWorker: {building: hunter, production: 1}}]
+    slotIn: [hunter, gatherer]
+    text: "Bonus slot (Hunters or Gatherers only): your hunters produce +1 production."
     required: true                       # always in the Prehistoric era deck
   lithic_art:
     name: Lithic Art
     type: tech
     cost: {research: 2, production: 1}
-    effects: [{perWorker: {building: hunter, culture: 1}}]
-    text: Your hunters produce +1 culture. Put it in a Hunters slot (competes with Stone Tools for the one slot).
+    effects: [{gain: {influence: 2}}]
+    bonus: [{perWorker: {building: hunter, culture: 1}}]
+    slotIn: [hunter, gatherer]
+    text: "When played: +2 influence. Bonus slot (Hunters or Gatherers only): your hunters produce +1 culture."
   hunting:
     name: Hunting
     type: tech
     cost: {research: 2}
-    effects: [{income: {food: 1}}, {army: 1}]
-    text: +1 food per turn and 1 troop.
+    effects: [{army: 1}]
+    global: [{income: {food: 1}}]
+    text: "When played: you gain 1 troop. Always on: +1 food per turn."
   animal_husbandry:
     name: Animal Husbandry
     type: tech
     cost: {research: 3, food: 2}
-    effects: [{perWorker: {building: farm, food: 1}}]
-    text: Your farmers produce +1 food.
+    effects: [{gain: {production: 2}}]
+    bonus: [{perWorker: {building: farm, food: 1}}]
+    text: "When played: +2 production. Bonus slot: your farmers produce +1 food."
   pottery:
     name: Pottery
     type: tech
     cost: {research: 3, production: 1}
-    effects: [{handLimit: 1}, {income: {food: 1}}]
-    text: +1 max hand size, +1 food per turn.
+    effects: [{gain: {food: 2}}]
+    global: [{income: {food: 1}}, {handLimit: 1}]
+    text: "When played: +2 food. Always on: +1 food per turn and +1 max hand size."
   mysticism:
     name: Mysticism
     type: tech
     cost: {research: 3, culture: 1}
-    effects: [{perWorker: {building: temple, culture: 1}}]
-    text: Your temple workers produce +1 culture.
+    bonus: [{perWorker: {building: temple, culture: 1}}]
+    text: "Bonus slot: your temple workers produce +1 culture."
   wanderlust:
     name: Wanderlust
     type: tech
@@ -1250,6 +1261,15 @@ cards:
       ongoing: [{income: {culture: -1}}, {stability: -1}]
       cleanse: {culture: 3}
     text: Until lifted (3 culture, 1 action), every player produces 1 less culture per turn and Stability drops by 1 each round.
+  great_work:
+    name: Great Work
+    type: event
+    category: boon
+    target: civ
+    required: true
+    requiredCopies: 2                    # two copies in every era deck
+    effects: [{wonderGift: 6}]
+    text: "6 of one resource (the kind the wonder needs most) go into the great wonder that is closest to done. With none being built, they wait for the next one."
   bountiful_season:
     name: Bountiful Season
     type: event
