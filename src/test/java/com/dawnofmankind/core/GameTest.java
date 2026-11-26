@@ -1440,17 +1440,26 @@ class GameTest {
     }
 
     @Test
-    void greatWorkGivesSixOfTheNeededResourceToTheNearestWonder() {
+    void greatWorkGivesSixOfOneChosenResourceAndTheOverflowIsLost() {
         Game g = game(1, 9);
         Player p = g.players.get(0);
         p.leader = null;
         g.greatWonders.clear();
-        g.greatWonders.add(new Game.WonderProgress(C.greatWonders.get("stonehenge")));
-        g.currentEvents.add(0, card(g, "great_work"));
+        g.greatWonders.add(new Game.WonderProgress(C.greatWonders.get("stonehenge")));        // 3 production and 1 culture for one player
+        g.currentEvents.clear();
+        g.currentEvents.add(card(g, "great_work"));
+        g.futureEvents.clear();
+        g.futureEvents.add(card(g, "good_hunt"));                                     // one event is drawn for every one in the future deck
         g.act(p.seat, Map.of("type", "endTurn"));
-        for (int k = 0; g.phase == Game.Phase.EVENTS && k < 50; k++) g.act(p.seat, Map.of("type", "ready"));
-        Game.WonderProgress w = g.greatWonders.stream().filter(x -> x.def.id.equals("stonehenge")).findFirst().orElse(null);
-        assertTrue(w == null || w.done || w.paid.values().stream().mapToInt(Integer::intValue).sum() >= 4, "the gift went into Stonehenge: " + g.log);
+        assertEquals(Game.Phase.EVENTS, g.phase);
+        assertThrows(GameException.class, () -> g.act(p.seat, Map.of("type", "decide", "resource", "gold")));
+        g.act(p.seat, Map.of("type", "decide", "resource", "culture"));
+        g.act(p.seat, Map.of("type", "ready"));
+        Game.WonderProgress w = g.greatWonders.get(0);
+        assertEquals(1, w.paid.get(Res.CULTURE), "only the 1 culture it needs went in");
+        assertEquals(0, w.paid.get(Res.PRODUCTION), "one resource only: no spill-over into production");
+        assertFalse(w.done);
+        assertTrue(g.log.stream().anyMatch(l -> l.contains("the other 5 are lost")), String.join("\n", g.log));
     }
 
     @Test
@@ -1467,5 +1476,17 @@ class GameTest {
         int culture = g.mods(p).income.get(Res.CULTURE);
         p.techs.add(C.cards.get("mysticism"));
         assertEquals(culture + 1, g.mods(p).income.get(Res.CULTURE), "no slot needed");
+    }
+
+    @Test
+    void spearmenGoOnlyIntoTheWarriors() {
+        Game g = game(1, 14);
+        Player p = g.players.get(0);
+        p.leader = null;
+        p.techs.add(C.cards.get("spear_men"));
+        assertThrows(GameException.class, () -> g.act(p.seat, Map.of("type", "slot", "card", "spear_men", "building", p.ofType("hunter").id)));
+        g.act(p.seat, Map.of("type", "slot", "card", "spear_men", "building", "warriors"));
+        assertTrue(p.warriorUpgrades.contains(C.cards.get("spear_men")));
+        assertEquals("warriors", View.def(C.cards.get("spear_men")).get("slotsInto"));
     }
 }

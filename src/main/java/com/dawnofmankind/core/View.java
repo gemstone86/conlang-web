@@ -13,6 +13,7 @@ import java.util.EnumMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Stream;
 import java.util.TreeMap;
 
 /**
@@ -307,6 +308,12 @@ public final class View {
             pm.put("halve", pe.halve);
             pm.put("cancel", pe.cancel);
             pm.put("accept", pe.accept);
+            if (pe.event.def.effects.stream().anyMatch(e -> e.containsKey("wonderGift"))) {
+                List<String> opts = new ArrayList<>();
+                for (Res r : Res.values()) if (g.greatWonders.stream().anyMatch(w -> !w.done && w.def.cost(g.players.size()).get(r) > w.paid.get(r))) opts.add(r.key());
+                pm.put("giftOptions", opts);
+                pm.put("giftChoice", pe.giftChoice == null ? null : pe.giftChoice.key());
+            }
             if (pe.event.def.offerCost != null && !Res.isZero(pe.event.def.offerCost)) pm.put("offerCost", res(pe.event.def.offerCost));
             pm.put("preview", preview(g, pe));
             v.put("pending", pm);
@@ -552,6 +559,7 @@ public final class View {
         m.put("text", d.text);
         if ((d.type == CardType.TECH || d.type == CardType.MINOR_WONDER) && (!d.bonus.isEmpty() || d.effects.stream().anyMatch(Effects::needsSlot))) m.put("slottable", true);
         if (!d.slotIn.isEmpty()) m.put("slotIn", d.slotIn);
+        if (Stream.concat(d.effects.stream(), d.bonus.stream()).anyMatch(e -> Effects.UNIT_KEYS.contains(Effects.key(e)))) m.put("slotsInto", "warriors");
         if (!Res.isZero(d.cost)) m.put("cost", res(d.cost));
         if (d.isEvent()) {
             m.put("category", d.category);

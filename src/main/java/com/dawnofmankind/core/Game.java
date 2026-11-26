@@ -135,6 +135,8 @@ public final class Game {
         public int defenseBonus, healthBonus;
         public boolean halve, cancel;
         public Boolean accept;
+        /** Great Work: the resource the players chose for the gift (none: the kind a wonder needs most). */
+        public Res giftChoice;
         /** Sent by a crisis, not drawn from the event deck. */
         boolean fromCrisis;
 
@@ -188,6 +190,7 @@ public final class Game {
     public final List<LostCard> lostCards = new ArrayList<>();
     /** Great Work gifts that found no wonder yet; they go in when the next great wonder is brought to the board. */
     private int wonderGifts;
+    private Res giftResource;
     public final List<Frontier> frontier = new ArrayList<>();
 
     private List<CardInst> drawn = new ArrayList<>();
@@ -695,6 +698,7 @@ public final class Game {
         if ("invasion".equals(d.kind)) return players.stream().anyMatch(p -> !p.away && p.army - p.committed > 0)
                 || anyResponseCard(d);
         if ("opportunity".equals(d.kind)) return !players.get(pending.target).away;
+        if (d.effects.stream().anyMatch(e -> e.containsKey("wonderGift")) && nearestWonder(null) != null && players.stream().anyMatch(p -> !p.away)) return true;      // Great Work: the players choose the resource
         return anyResponseCard(d);
     }
 
@@ -1162,8 +1166,10 @@ public final class Game {
         log(p.name + " brings the great wonder " + w.name + " to the tribe: everyone can now help build it.");
         if (wonderGifts > 0) {
             int n = wonderGifts;
+            Res r = giftResource;
             wonderGifts = 0;
-            giveToWonder(n);
+            giftResource = null;
+            giveToWonder(n, r);
         }
     }
 
@@ -1743,6 +1749,14 @@ public final class Game {
 
     private void decide(Player p, Map<String, Object> a) {
         Pending pe = pendingFor(p);
+        if (pe.event.def.effects.stream().anyMatch(e -> e.containsKey("wonderGift"))) {
+            try {
+                pe.giftChoice = Res.of(Y.s(a, "resource", ""));
+            } catch (IllegalArgumentException e) {
+                throw new GameException("Choose one of the resources.");
+            }
+            return;
+        }
         if (!"opportunity".equals(pe.event.def.kind) || pe.target != p.seat) throw new GameException("This choice isn't yours.");
         pe.accept = Y.b(a, "accept");
     }
@@ -1981,34 +1995,54 @@ public final class Game {
      * Applies immediate effects. Losses are multiplied by {@code factor} (rounded down). With {@code civWide},
      * Population losses are spread over the civilization (largest first) instead of hitting each target.
      */
-    /** A gift (Great Work): n of the resource a great wonder still needs most, into the one nearest completion; with none being built it waits. */
-    private void giveToWonder(int n) {
+    /** The great wonder nearest completion that still needs {@code r} (null {@code r}: any resource), or null. */
+    private WonderProgress nearestWonder(Res r) {
         WonderProgress best = null;
         int bestLeft = Integer.MAX_VALUE;
         for (WonderProgress w : greatWonders) {
             if (w.done) continue;
             EnumMap<Res, Integer> need = w.def.cost(players.size());
             int left = 0;
-            for (Res r : Res.values()) left += Math.max(0, need.get(r) - w.paid.get(r));
-            if (left > 0 && left < bestLeft) { best = w; bestLeft = left; }
+            for (Res x : Res.values()) left += Math.max(0, need.get(x) - w.paid.get(x));
+            if (left == 0 || (r != null && need.get(r) - w.paid.get(r) <= 0)) continue;
+            if (left < bestLeft) { best = w; bestLeft = left; }
         }
+        return best;
+    }
+
+    /** Great Work: n of ONE resource into the great wonder nearest completion that needs it; what it does not need is lost. */
+    private void giveToWonder(int n, Res chosen) {
+        Res pick = chosen;
+        if (pick == null) {                                   // no choice made: the kind the nearest wonder needs most
+            WonderProgress w = nearestWonder(null);
+            if (w != null) {
+                EnumMap<Res, Integer> need = w.def.cost(players.size());
+                int most = 0;
+                for (Res x : Res.values()) if (need.get(x) - w.paid.get(x) > most) { most = need.get(x) - w.paid.get(x); pick = x; }
+            }
+        }
+        if (pick == null) {
+            wonderGifts = n;
+            giftResource = null;
+            log("No great wonder is being built: the gift waits for the next one.");
+            return;
+        }
+        WonderProgress best = nearestWonder(pick);
         if (best == null) {
-            wonderGifts += n;
-            log("No great wonder is being built: the gift of " + n + " waits for the next one.");
+            if (greatWonders.stream().allMatch(w -> w.done)) {
+                wonderGifts = n;
+                giftResource = pick;
+                log("No great wonder is being built: " + n + " " + pick.key() + " wait for the next one.");
+            } else {
+                log("Great Work: no great wonder needs " + pick.key() + ", so the " + n + " are lost.");
+            }
             return;
         }
         EnumMap<Res, Integer> need = best.def.cost(players.size());
-        Res pick = null;
-        int most = 0;
-        for (Res r : Res.values()) {
-            int left = need.get(r) - best.paid.get(r);
-            if (left > most) { most = left; pick = r; }
-        }
-        int add = Math.min(n, most);
+        int add = Math.min(n, need.get(pick) - best.paid.get(pick));
         best.paid.merge(pick, add, Integer::sum);
-        log("Great Work: " + add + " " + pick.key() + " go into " + best.def.name + ".");
+        log("Great Work: " + add + " " + pick.key() + " go into " + best.def.name + (n > add ? "; the other " + (n - add) + " are lost." : "."));
         if (best.paid.equals(need)) completeWonder(best, players.get(0), -1);
-        if (n > add) giveToWonder(n - add);
     }
 
     private void applyImmediate(List<Map<String, Object>> effects, List<Player> targets, Player actor, double factor, boolean civWide) {
@@ -2069,7 +2103,7 @@ public final class Game {
                 case "draw" -> {
                     for (Player p : actor == null ? targets : List.of(actor)) for (int i = 0; i < Y.toInt(v); i++) drawFromEraDeck(p);
                 }
-                case "wonderGift" -> giveToWonder(Y.toInt(v));
+                case "wonderGift" -> giveToWonder(Y.toInt(v), pending == null ? null : pending.giftChoice);
                 case "extraActions" -> {
                     if (actor != null && phase == Phase.TURNS) actor.actions += Y.toInt(v);
                 }

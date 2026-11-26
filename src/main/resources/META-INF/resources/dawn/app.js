@@ -574,6 +574,9 @@ function renderEvents() {
       if (p.kind === 'opportunity' && p.target === s.you) {
         controls += `<button data-decide="1" class="${p.accept === true ? 'primary' : ''}">Accept</button><button data-decide="0" class="${p.accept === false ? 'primary' : ''}">Decline</button>`;
       }
+      if (p.giftOptions) {
+        controls += p.giftOptions.length ? `<span class="small">Great Work gives 6 of:</span>` + p.giftOptions.map(r => `<button data-gift="${r}" class="${p.giftChoice === r ? 'primary' : ''}">${r}</button>`).join('') : '<span class="small muted">No great wonder is being built: the gift waits for the next one.</span>';
+      }
       controls += `<button class="primary" data-ready>Done — resolve</button><button data-hidepop title="Look at the board first; it stays pending">Look at the board</button>`;
     } else {
       controls = '<span class="muted small">You are done. Waiting for the others…</span>';
@@ -613,6 +616,7 @@ $('eventPanel').onclick = e => {
   else if ('showpop' in t.dataset) { popupHiddenFor = null; renderEvents(); renderRealm(); }
   else if (t.dataset.respond) send({ type: 'respond', card: +t.dataset.respond });
   else if ('troops' in t.dataset) send({ type: 'troops', troops: +$('troopIn').value || 0 });
+  else if (t.dataset.gift) send({ type: 'decide', resource: t.dataset.gift });
   else if (t.dataset.decide) send({ type: 'decide', accept: t.dataset.decide === '1' });
   else if ('ready' in t.dataset) {
     const tin = $('troopIn');
@@ -735,6 +739,9 @@ let pickedCard = null, dragCard = null;
 // Some cards fit only certain buildings (Fire: hunters or gatherers): the card def says which.
 function slotFits(key, slotEl) {
   const def = ((me() || {}).slotCards || []).find(c => c.key === key);
+  const unit = slotEl.dataset.slotInto === 'warriors' || slotEl.dataset.slotInto === 'population';
+  if (def && def.slotsInto === 'warriors') return slotEl.dataset.slotInto === 'warriors';      // Spearmen go only into the warriors
+  if (unit) return false;                                                                       // building bonuses never go into the units
   return !def || !def.slotIn || !slotEl.dataset.btype || def.slotIn.includes(slotEl.dataset.btype);
 }
 function putInSlot(key, building) {

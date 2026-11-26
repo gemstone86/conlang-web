@@ -1,5 +1,10 @@
 # Changes
 
+## v1.95.4 (combined app)
+
+- Dawn: Great Work now gives 6 of ONE resource that the players choose when it strikes (a button per resource a wonder still needs); it goes into the great wonder nearest completion that needs it and what the wonder does not need is lost (before, it spilled over into other resources). Fixed a bug where the event resolved without asking.
+- Dawn: Spearmen can only be dropped into the Warriors slot, and building bonuses cannot be dropped into the Warriors or Population slots.
+
 ## v1.95.3 (combined app)
 
 - Dawn: The Great Hunter gives +2 food per turn (was +1).
