@@ -65,6 +65,9 @@ public final class Room {
     private final AiPlayer ai = new AiPlayer(RANDOM.nextLong());
     private boolean aiScheduled;
 
+    /** A special language for the names in this game (set by an admin when the room is made), or null. */
+    volatile String language;
+
     Room(String code, Content content, Function<Object, String> json, ScheduledExecutorService timer, long aiDelayMillis) {
         this.code = code;
         this.content = content;
@@ -310,6 +313,7 @@ public final class Room {
         room.put("you", seat);
         room.put("admin", seat >= 0 && seat < seats.size() && seats.get(seat).admin);
         room.put("started", game != null);
+        room.put("language", language);
         List<Object> ps = new ArrayList<>();
         for (int i = 0; i < seats.size(); i++) {
             Map<String, Object> p = new LinkedHashMap<>();

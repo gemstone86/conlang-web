@@ -16,7 +16,7 @@ async function boot() {
   code = (params.get('room') || '').toUpperCase() || null;
   try {
     const me = await (await fetch(API + '/me')).json();
-    if (me.admin) $('adminLogs').hidden = false;
+    if (me.admin) { $('adminLogs').hidden = false; $('adminLangRow').hidden = false; }
     if (me.name) {
       $('name').value = me.name;
       $('name').disabled = true;
@@ -59,7 +59,7 @@ async function enter(promise) {
   } catch (e) { toast(e.message); }
 }
 
-$('create').onclick = () => enter(post(API + '/rooms', { name: $('name').value }));
+$('create').onclick = () => enter(post(API + '/rooms', { name: $('name').value, language: $('newLang').value || null }));
 $('join').onclick = () => {
   const c = $('code').value.trim().toUpperCase();
   if (!c) return toast('Type the room code.');
@@ -116,8 +116,9 @@ function tipAttr(c) { tipCards.push(c); return ` data-tipcard="${tipCards.length
 
 // ------------------------------------------------------------------ localization
 // lang/<code>.json maps card, wonder, land, building ids to names, and era ids to names (lang/en.json is the template).
-let langCode = 'en', langNames = {}, langEras = {}, enNames = {}, enEras = {}, langRegex = null, langPairs = new Map(), lastMsg = null;
-try { langCode = localStorage.getItem('dawnLang') || 'en'; } catch (e) {}
+let userLang = 'en', langWanted = 'en', langCode = 'en', langNames = {}, langEras = {}, enNames = {}, enEras = {}, langRegex = null, langPairs = new Map(), lastMsg = null;
+try { userLang = localStorage.getItem('dawnLang') || 'en'; } catch (e) {}
+langWanted = userLang;
 async function loadLang(code) {
   try {
     const en = await (await fetch('lang/en.json')).json();
@@ -161,11 +162,11 @@ async function setupLangSelect() {
     const list = await (await fetch('lang/languages.json')).json();
     sel.innerHTML = list.map(l => `<option value="${l.code}">${esc(l.name)}</option>`).join('');
   } catch (e) { sel.hidden = true; return; }
-  await loadLang(langCode);
-  sel.value = langCode;
-  sel.onchange = async () => {
-    try { localStorage.setItem('dawnLang', sel.value); } catch (e) {}
-    await loadLang(sel.value);
+  sel.value = userLang;
+  await loadLang(langWanted);
+  sel.onchange = () => {
+    userLang = sel.value;
+    try { localStorage.setItem('dawnLang', userLang); } catch (e) {}
     if (lastMsg) render(JSON.parse(lastMsg));
   };
   if (lastMsg) render(JSON.parse(lastMsg));
@@ -173,6 +174,14 @@ async function setupLangSelect() {
 
 function render(m) {
   lastMsg = JSON.stringify(m);
+  // an admin can give a room a special language (Mundana); it overrides the player's own choice there
+  const wanted = (m.room && m.room.language) || userLang;
+  const sel = $('langSel');
+  if (sel) { sel.disabled = !!(m.room && m.room.language); sel.title = sel.disabled ? 'This room uses its own language' : 'Language: the names of all cards, wonders, buildings and eras'; }
+  if (wanted !== langWanted) {
+    langWanted = wanted;
+    loadLang(wanted).then(() => { if (lastMsg) render(JSON.parse(lastMsg)); });
+  }
   tipCards = [];
   room = m.room;
   state = localize(m.game);

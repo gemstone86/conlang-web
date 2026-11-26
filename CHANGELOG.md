@@ -1,5 +1,9 @@
 # Changes
 
+## v1.96.1 (combined app)
+
+- Dawn: a hidden language, Mundana, that only an admin can choose on the create-room screen. It renames the 17 great wonders and the great people, for everyone in that room (it overrides their own language choice); everything else keeps its normal name. Not listed in the language dropdown.
+
 ## v1.96.0 (combined app)
 
 - Dawn: a language switch in the header renames every card, great wonder, land, building and era (and those names in the game log). English and Swedish are included; the choice is remembered in the browser. To add a language, copy `dawn/lang/en.json` (a template listing every id), translate the names, and add the file to `languages.json`. Card texts are not translated yet.

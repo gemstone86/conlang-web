@@ -1521,6 +1521,7 @@ class GameTest {
         ids.addAll(C.buildings.keySet());
         for (String id : ids) assertTrue(((Map<String, Object>) en.get("names")).containsKey(id), "en.json lacks " + id);
         for (var e : C.eras) assertTrue(((Map<String, Object>) en.get("eras")).containsKey(e.id), "en.json lacks era " + e.id);
+        for (String id : ((Map<String, Object>) load.apply("mundana").get("names")).keySet()) assertTrue(ids.contains(id), "mundana names an unknown id " + id);
         for (Map<String, Object> l : (List<Map<String, Object>>) yaml.load(Game.class.getResourceAsStream("/META-INF/resources/dawn/lang/languages.json"))) {
             var f = load.apply((String) l.get("code"));
             for (String id : ((Map<String, Object>) f.get("names")).keySet()) assertTrue(ids.contains(id), l + " names an unknown id " + id);
