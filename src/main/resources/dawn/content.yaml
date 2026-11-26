@@ -715,8 +715,8 @@ cards:
   great_hunter:
     name: The Great Hunter
     type: leader
-    effects: [{income: {food: 1}}, {maxSlots: {farm: 1}}]
-    text: +1 food per turn and +1 max farm slot.
+    effects: [{income: {food: 2}}, {maxSlots: {farm: 1}}]
+    text: +2 food per turn and +1 max farm slot.
   storyteller:
     name: The Storyteller
     type: leader

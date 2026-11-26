@@ -1,5 +1,9 @@
 # Changes
 
+## v1.95.3 (combined app)
+
+- Dawn: The Great Hunter gives +2 food per turn (was +1).
+
 ## v1.95.2 (combined app)
 
 - Dawn: only 1 card leaves the queue each round, whatever the number of players.
