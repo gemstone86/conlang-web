@@ -1452,4 +1452,20 @@ class GameTest {
         Game.WonderProgress w = g.greatWonders.stream().filter(x -> x.def.id.equals("stonehenge")).findFirst().orElse(null);
         assertTrue(w == null || w.done || w.paid.values().stream().mapToInt(Integer::intValue).sum() >= 4, "the gift went into Stonehenge: " + g.log);
     }
+
+    @Test
+    void husbandryFitsOnlyFarmsPotteryAddsGathererFoodAndMysticismIsGlobal() {
+        Game g = game(1, 12);
+        Player p = g.players.get(0);
+        p.leader = null;
+        p.techs.add(C.cards.get("animal_husbandry"));
+        assertThrows(GameException.class, () -> g.act(p.seat, Map.of("type", "slot", "card", "animal_husbandry", "building", p.ofType("hunter").id)), "farms only");
+        p.techs.add(C.cards.get("pottery"));
+        int food = Game.class.cast(g).mods(p).perWorker.getOrDefault("gatherer", Res.empty()).get(Res.FOOD);
+        g.act(p.seat, Map.of("type", "slot", "card", "pottery", "building", p.ofType("gatherer").id));
+        assertEquals(food + 1, g.mods(p).perWorker.get("gatherer").get(Res.FOOD));
+        int culture = g.mods(p).income.get(Res.CULTURE);
+        p.techs.add(C.cards.get("mysticism"));
+        assertEquals(culture + 1, g.mods(p).income.get(Res.CULTURE), "no slot needed");
+    }
 }

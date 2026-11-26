@@ -816,20 +816,23 @@ cards:
     cost: {research: 3, food: 2}
     effects: [{gain: {production: 2}}]
     bonus: [{perWorker: {building: farm, food: 1}}]
-    text: "When played: +2 production. Bonus slot: your farmers produce +1 food."
+    slotIn: [farm]
+    text: "When played: +2 production. Bonus slot (Farm only): your farmers produce +1 food."
   pottery:
     name: Pottery
     type: tech
     cost: {research: 3, production: 1}
     effects: [{gain: {food: 2}}]
     global: [{income: {food: 1}}, {handLimit: 1}]
-    text: "When played: +2 food. Always on: +1 food per turn and +1 max hand size."
+    bonus: [{perWorker: {building: gatherer, food: 1}}]
+    slotIn: [hunter, gatherer]
+    text: "When played: +2 food. Always on: +1 food per turn and +1 max hand size. Bonus slot (Hunters or Gatherers only): your gatherers produce +1 food."
   mysticism:
     name: Mysticism
     type: tech
     cost: {research: 3, culture: 1}
-    bonus: [{perWorker: {building: temple, culture: 1}}]
-    text: "Bonus slot: your temple workers produce +1 culture."
+    global: [{income: {culture: 1}}]
+    text: "Always on: +1 culture per turn."
   wanderlust:
     name: Wanderlust
     type: tech
