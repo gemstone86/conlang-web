@@ -1,5 +1,9 @@
 # Changes
 
+## v1.96.0 (combined app)
+
+- Dawn: a language switch in the header renames every card, great wonder, land, building and era (and those names in the game log). English and Swedish are included; the choice is remembered in the browser. To add a language, copy `dawn/lang/en.json` (a template listing every id), translate the names, and add the file to `languages.json`. Card texts are not translated yet.
+
 ## v1.95.7 (combined app)
 
 - Dawn: Great Work with no great wonder being built gives every player +1 production, and the card goes back into the future events deck (it no longer banks the gift).

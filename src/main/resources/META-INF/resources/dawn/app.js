@@ -114,10 +114,68 @@ function toast(text, ok) {
 let tipCards = [];
 function tipAttr(c) { tipCards.push(c); return ` data-tipcard="${tipCards.length - 1}"`; }
 
+// ------------------------------------------------------------------ localization
+// lang/<code>.json maps card, wonder, land, building ids to names, and era ids to names (lang/en.json is the template).
+let langCode = 'en', langNames = {}, langEras = {}, enNames = {}, enEras = {}, langRegex = null, langPairs = new Map(), lastMsg = null;
+try { langCode = localStorage.getItem('dawnLang') || 'en'; } catch (e) {}
+async function loadLang(code) {
+  try {
+    const en = await (await fetch('lang/en.json')).json();
+    enNames = en.names || {}; enEras = en.eras || {};
+    const l = code === 'en' ? en : await (await fetch(`lang/${code}.json`)).json();
+    langNames = l.names || {}; langEras = l.eras || {};
+  } catch (e) { code = 'en'; langNames = {}; langEras = {}; }
+  langCode = code;
+  langPairs = new Map();
+  if (code !== 'en') {
+    for (const [id, en] of Object.entries(enNames)) if (langNames[id] && langNames[id] !== en) langPairs.set(en, langNames[id]);
+    for (const [id, en] of Object.entries(enEras)) if (langEras[id] && langEras[id] !== en) langPairs.set(en, langEras[id]);
+  }
+  const keys = [...langPairs.keys()].sort((x, y) => y.length - x.length).map(k => k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+  langRegex = keys.length ? new RegExp(`(?<![\\p{L}])(?:${keys.join('|')})(?![\\p{L}])`, 'gu') : null;
+}
+function locText(t) { return langRegex && typeof t === 'string' ? t.replace(langRegex, x => langPairs.get(x) || x) : t; }
+function localize(g) {
+  if (langCode === 'en' || !g) return g;
+  const eraByName = {}; for (const [id, en] of Object.entries(enEras)) eraByName[en] = langEras[id] || en;
+  const walk = o => {
+    if (Array.isArray(o)) { o.forEach(walk); return; }
+    if (!o || typeof o !== 'object') return;
+    if (typeof o.name === 'string') {
+      if (typeof o.key === 'string' && langNames[o.key]) o.name = langNames[o.key];
+      else if (typeof o.type === 'string' && langNames[o.type] && !('key' in o)) o.name = langNames[o.type];
+      else if (typeof o.id === 'string' && langNames[o.id]) o.name = langNames[o.id];
+    }
+    if (typeof o.era === 'string') o.era = eraByName[o.era] || langEras[o.era] || o.era;
+    for (const k of Object.keys(o)) { const v = o[k]; if (v && typeof v === 'object') walk(v); }
+  };
+  walk(g);
+  if (typeof g.era === 'string') g.era = eraByName[g.era] || g.era;
+  if (Array.isArray(g.log)) g.log = g.log.map(locText);
+  (g.notices || []).forEach(n => { if (Array.isArray(n.lines)) n.lines = n.lines.map(locText); });
+  return g;
+}
+async function setupLangSelect() {
+  const sel = $('langSel');
+  try {
+    const list = await (await fetch('lang/languages.json')).json();
+    sel.innerHTML = list.map(l => `<option value="${l.code}">${esc(l.name)}</option>`).join('');
+  } catch (e) { sel.hidden = true; return; }
+  await loadLang(langCode);
+  sel.value = langCode;
+  sel.onchange = async () => {
+    try { localStorage.setItem('dawnLang', sel.value); } catch (e) {}
+    await loadLang(sel.value);
+    if (lastMsg) render(JSON.parse(lastMsg));
+  };
+  if (lastMsg) render(JSON.parse(lastMsg));
+}
+
 function render(m) {
+  lastMsg = JSON.stringify(m);
   tipCards = [];
   room = m.room;
-  state = m.game;
+  state = localize(m.game);
   renderChat(m.chat);
   if (!room.started) return renderLobby();
   show('game');
@@ -1101,3 +1159,5 @@ $('adminLogs').onclick = async () => {
     toast('Downloaded. The saved logs are now deleted from the server.', true);
   } catch (e) { toast('Could not fetch the logs.'); }
 };
+
+setupLangSelect();
