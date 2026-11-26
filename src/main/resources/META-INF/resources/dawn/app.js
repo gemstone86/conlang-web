@@ -132,6 +132,7 @@ function render(m) {
   renderWonders();
   renderEvents();
   renderCiv();
+  markFreeSlots();
   checkPickReveal();
   checkNotices();
   checkEraSplash();
@@ -733,6 +734,11 @@ function renderCiv() {
     ${s.sharedPool ? `<h3>Shared pool</h3><div class="row">${resList(s.sharedPool, { all: true })}</div>
       <div class="row small">${RES.map(k => `<label class="res r-${k}" style="margin:0">${RES_SHORT[k]} <input type="number" min="0" value="0" data-keep="pool-${k}" data-pres="${k}"></label>`).join('')}</div>
       <div class="row"><button data-deposit>Put in</button><button data-withdraw>Take out</button></div>` : ''}`;
+}
+// An empty slot glows gold (pulsing) while you hold a bonus card that fits it.
+function markFreeSlots() {
+  const cards = (me() || {}).slotCards || [];
+  document.querySelectorAll('.uslot[data-slot-into]').forEach(el => el.classList.toggle('avail', cards.some(c => slotFits(c.key, el))));
 }
 // Putting a card in an upgrade slot: drag it there, or click the card and then the slot.
 let pickedCard = null, dragCard = null;

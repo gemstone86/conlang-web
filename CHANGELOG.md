@@ -1,5 +1,9 @@
 # Changes
 
+## v1.95.6 (combined app)
+
+- Dawn: an empty bonus slot glows gold, slowly pulsing, while you hold a bonus card that fits it.
+
 ## v1.95.5 (combined app)
 
 - Dawn: great person cards show their picture from the top, so faces (Ramses) are no longer cut off.
