@@ -1,5 +1,9 @@
 # Changes
 
+## v1.95.2 (combined app)
+
+- Dawn: only 1 card leaves the queue each round, whatever the number of players.
+
 ## v1.95.1 (combined app)
 
 - Dawn: Animal Husbandry only fits a Farm slot; Pottery in a Hunters/Gatherers slot gives gatherers +1 food; Mysticism is now a global +1 culture per turn.

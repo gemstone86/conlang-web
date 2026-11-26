@@ -40,7 +40,7 @@ public final class Content {
         public int colonizeFreeTerritories, faceUpLands, colonizeSettlersPerPlayer;
 
         public int removedPerRound(int players) {
-            return removedPerRound.getOrDefault(players, players <= 2 ? 2 : 1);
+            return removedPerRound.getOrDefault(players, 1);
         }
     }
 
