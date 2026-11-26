@@ -1489,4 +1489,22 @@ class GameTest {
         assertTrue(p.warriorUpgrades.contains(C.cards.get("spear_men")));
         assertEquals("warriors", View.def(C.cards.get("spear_men")).get("slotsInto"));
     }
+
+    @Test
+    void greatWorkWithNoWonderGivesProductionAndReturnsToTheFutureEvents() {
+        Game g = game(1, 15);
+        Player p = g.players.get(0);
+        p.leader = null;
+        g.greatWonders.clear();
+        Game.CardInst gw = card(g, "great_work");
+        g.currentEvents.clear();
+        g.currentEvents.add(gw);
+        g.futureEvents.clear();
+        g.futureEvents.add(card(g, "good_hunt"));
+        g.act(p.seat, Map.of("type", "endTurn"));
+        for (int k = 0; g.phase == Game.Phase.EVENTS && k < 50; k++) g.act(p.seat, Map.of("type", "ready"));
+        assertTrue(g.log.stream().anyMatch(l -> l.contains("every player gets +1 production")), String.join("\n", g.log));
+        assertFalse(g.pastEvents.contains(gw), "it is not spent");
+        assertTrue(g.futureEvents.contains(gw) || g.currentEvents.contains(gw), "it went back into the future events (or was shuffled on into the deck)");
+    }
 }

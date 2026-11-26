@@ -188,9 +188,8 @@ public final class Game {
     /** A face-down card that was lost when its event left the queue untaken. */
     public record LostCard(int seq, String event, CardDef card) { }
     public final List<LostCard> lostCards = new ArrayList<>();
-    /** Great Work gifts that found no wonder yet; they go in when the next great wonder is brought to the board. */
-    private int wonderGifts;
-    private Res giftResource;
+    /** Great Work found no great wonder to help: the card goes back into the future events instead of the past ones. */
+    private boolean greatWorkReturns;
     public final List<Frontier> frontier = new ArrayList<>();
 
     private List<CardInst> drawn = new ArrayList<>();
@@ -1164,13 +1163,7 @@ public final class Game {
         if (known) return;
         greatWonders.add(new WonderProgress(w));
         log(p.name + " brings the great wonder " + w.name + " to the tribe: everyone can now help build it.");
-        if (wonderGifts > 0) {
-            int n = wonderGifts;
-            Res r = giftResource;
-            wonderGifts = 0;
-            giftResource = null;
-            giveToWonder(n, r);
-        }
+
     }
 
     private CardInst handCard(Player p, Map<String, Object> a) {
@@ -1852,6 +1845,9 @@ public final class Game {
         if (d.persistent) {
             persistentEvents.add(ev);
             log(d.name + " lingers until lifted (" + Res.describe(d.cleanseCost) + ").");
+        } else if (greatWorkReturns) {
+            greatWorkReturns = false;
+            futureEvents.add(ev);
         } else if (!d.helper) {
             pastEvents.add(ev);
         }
@@ -2010,32 +2006,24 @@ public final class Game {
         return best;
     }
 
-    /** Great Work: n of ONE resource into the great wonder nearest completion that needs it; what it does not need is lost. */
+    /** Great Work: n of ONE resource into the great wonder nearest completion that needs it; what it does not need is lost. With no wonder being built, every player gets +1 production and the card goes back into the future events. */
     private void giveToWonder(int n, Res chosen) {
+        if (nearestWonder(null) == null) {
+            for (Player p : players) p.res.merge(Res.PRODUCTION, 1, Integer::sum);
+            greatWorkReturns = true;
+            log("No great wonder is being built: every player gets +1 production, and Great Work goes back into the future events.");
+            return;
+        }
         Res pick = chosen;
         if (pick == null) {                                   // no choice made: the kind the nearest wonder needs most
             WonderProgress w = nearestWonder(null);
-            if (w != null) {
-                EnumMap<Res, Integer> need = w.def.cost(players.size());
-                int most = 0;
-                for (Res x : Res.values()) if (need.get(x) - w.paid.get(x) > most) { most = need.get(x) - w.paid.get(x); pick = x; }
-            }
-        }
-        if (pick == null) {
-            wonderGifts = n;
-            giftResource = null;
-            log("No great wonder is being built: the gift waits for the next one.");
-            return;
+            EnumMap<Res, Integer> need = w.def.cost(players.size());
+            int most = 0;
+            for (Res x : Res.values()) if (need.get(x) - w.paid.get(x) > most) { most = need.get(x) - w.paid.get(x); pick = x; }
         }
         WonderProgress best = nearestWonder(pick);
         if (best == null) {
-            if (greatWonders.stream().allMatch(w -> w.done)) {
-                wonderGifts = n;
-                giftResource = pick;
-                log("No great wonder is being built: " + n + " " + pick.key() + " wait for the next one.");
-            } else {
-                log("Great Work: no great wonder needs " + pick.key() + ", so the " + n + " are lost.");
-            }
+            log("Great Work: no great wonder needs " + pick.key() + ", so the " + n + " are lost.");
             return;
         }
         EnumMap<Res, Integer> need = best.def.cost(players.size());

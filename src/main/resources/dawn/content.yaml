@@ -1272,7 +1272,7 @@ cards:
     required: true
     requiredCopies: 2                    # two copies in every era deck
     effects: [{wonderGift: 6}]
-    text: "Choose one resource when it strikes: 6 of it go into the great wonder nearest completion that needs it. What the wonder does not need is lost. With no wonder being built, the gift waits for the next one."
+    text: "Choose one resource when it strikes: 6 of it go into the great wonder nearest completion that needs it. What the wonder does not need is lost. With no great wonder being built, every player gets +1 production instead, and the card goes back into the future events."
   bountiful_season:
     name: Bountiful Season
     type: event

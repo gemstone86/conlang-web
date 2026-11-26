@@ -576,7 +576,7 @@ function renderEvents() {
         controls += `<button data-decide="1" class="${p.accept === true ? 'primary' : ''}">Accept</button><button data-decide="0" class="${p.accept === false ? 'primary' : ''}">Decline</button>`;
       }
       if (p.giftOptions) {
-        controls += p.giftOptions.length ? `<span class="small">Great Work gives 6 of:</span>` + p.giftOptions.map(r => `<button data-gift="${r}" class="${p.giftChoice === r ? 'primary' : ''}">${r}</button>`).join('') : '<span class="small muted">No great wonder is being built: the gift waits for the next one.</span>';
+        controls += p.giftOptions.length ? `<span class="small">Great Work gives 6 of:</span>` + p.giftOptions.map(r => `<button data-gift="${r}" class="${p.giftChoice === r ? 'primary' : ''}">${r}</button>`).join('') : '<span class="small muted">No great wonder is being built: every player gets +1 production and the card returns to the future events.</span>';
       }
       controls += `<button class="primary" data-ready>Done — resolve</button><button data-hidepop title="Look at the board first; it stays pending">Look at the board</button>`;
     } else {

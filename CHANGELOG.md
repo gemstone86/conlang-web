@@ -1,5 +1,9 @@
 # Changes
 
+## v1.95.7 (combined app)
+
+- Dawn: Great Work with no great wonder being built gives every player +1 production, and the card goes back into the future events deck (it no longer banks the gift).
+
 ## v1.95.6 (combined app)
 
 - Dawn: an empty bonus slot glows gold, slowly pulsing, while you hold a bonus card that fits it.
