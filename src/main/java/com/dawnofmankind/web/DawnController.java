@@ -47,7 +47,8 @@ public class DawnController {
 
     @PostMapping("/rooms")
     public RoomService.Joined create(@RequestBody(required = false) Map<String, Object> body, HttpServletRequest req) {
-        return rooms.create(name(body, req), isAdmin(req));
+        Object lang = body == null ? null : body.get("language");
+        return rooms.create(name(body, req), isAdmin(req), lang instanceof String l && !l.isBlank() ? l : null);
     }
 
     @PostMapping("/rooms/{code}/join")

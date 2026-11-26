@@ -16,7 +16,7 @@ async function boot() {
   code = (params.get('room') || '').toUpperCase() || null;
   try {
     const me = await (await fetch(API + '/me')).json();
-    if (me.admin) $('adminLogs').hidden = false;
+    if (me.admin) { $('adminLogs').hidden = false; $('adminLangRow').hidden = false; }
     if (me.name) {
       $('name').value = me.name;
       $('name').disabled = true;
@@ -59,7 +59,7 @@ async function enter(promise) {
   } catch (e) { toast(e.message); }
 }
 
-$('create').onclick = () => enter(post(API + '/rooms', { name: $('name').value }));
+$('create').onclick = () => enter(post(API + '/rooms', { name: $('name').value, language: $('newLang').value || null }));
 $('join').onclick = () => {
   const c = $('code').value.trim().toUpperCase();
   if (!c) return toast('Type the room code.');
@@ -114,10 +114,77 @@ function toast(text, ok) {
 let tipCards = [];
 function tipAttr(c) { tipCards.push(c); return ` data-tipcard="${tipCards.length - 1}"`; }
 
+// ------------------------------------------------------------------ localization
+// lang/<code>.json maps card, wonder, land, building ids to names, and era ids to names (lang/en.json is the template).
+let userLang = 'en', langWanted = 'en', langCode = 'en', langNames = {}, langEras = {}, enNames = {}, enEras = {}, langRegex = null, langPairs = new Map(), lastMsg = null;
+try { userLang = localStorage.getItem('dawnLang') || 'en'; } catch (e) {}
+langWanted = userLang;
+async function loadLang(code) {
+  try {
+    const en = await (await fetch('lang/en.json')).json();
+    enNames = en.names || {}; enEras = en.eras || {};
+    const l = code === 'en' ? en : await (await fetch(`lang/${code}.json`)).json();
+    langNames = l.names || {}; langEras = l.eras || {};
+  } catch (e) { code = 'en'; langNames = {}; langEras = {}; }
+  langCode = code;
+  langPairs = new Map();
+  if (code !== 'en') {
+    for (const [id, en] of Object.entries(enNames)) if (langNames[id] && langNames[id] !== en) langPairs.set(en, langNames[id]);
+    for (const [id, en] of Object.entries(enEras)) if (langEras[id] && langEras[id] !== en) langPairs.set(en, langEras[id]);
+  }
+  const keys = [...langPairs.keys()].sort((x, y) => y.length - x.length).map(k => k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+  langRegex = keys.length ? new RegExp(`(?<![\\p{L}])(?:${keys.join('|')})(?![\\p{L}])`, 'gu') : null;
+}
+function locText(t) { return langRegex && typeof t === 'string' ? t.replace(langRegex, x => langPairs.get(x) || x) : t; }
+function localize(g) {
+  if (langCode === 'en' || !g) return g;
+  const eraByName = {}; for (const [id, en] of Object.entries(enEras)) eraByName[en] = langEras[id] || en;
+  const walk = o => {
+    if (Array.isArray(o)) { o.forEach(walk); return; }
+    if (!o || typeof o !== 'object') return;
+    if (typeof o.name === 'string') {
+      if (typeof o.key === 'string' && langNames[o.key]) o.name = langNames[o.key];
+      else if (typeof o.type === 'string' && langNames[o.type] && !('key' in o)) o.name = langNames[o.type];
+      else if (typeof o.id === 'string' && langNames[o.id]) o.name = langNames[o.id];
+    }
+    if (typeof o.era === 'string') o.era = eraByName[o.era] || langEras[o.era] || o.era;
+    for (const k of Object.keys(o)) { const v = o[k]; if (v && typeof v === 'object') walk(v); }
+  };
+  walk(g);
+  if (typeof g.era === 'string') g.era = eraByName[g.era] || g.era;
+  if (Array.isArray(g.log)) g.log = g.log.map(locText);
+  (g.notices || []).forEach(n => { if (Array.isArray(n.lines)) n.lines = n.lines.map(locText); });
+  return g;
+}
+async function setupLangSelect() {
+  const sel = $('langSel');
+  try {
+    const list = await (await fetch('lang/languages.json')).json();
+    sel.innerHTML = list.map(l => `<option value="${l.code}">${esc(l.name)}</option>`).join('');
+  } catch (e) { sel.hidden = true; return; }
+  sel.value = userLang;
+  await loadLang(langWanted);
+  sel.onchange = () => {
+    userLang = sel.value;
+    try { localStorage.setItem('dawnLang', userLang); } catch (e) {}
+    if (lastMsg) render(JSON.parse(lastMsg));
+  };
+  if (lastMsg) render(JSON.parse(lastMsg));
+}
+
 function render(m) {
+  lastMsg = JSON.stringify(m);
+  // an admin can give a room a special language (Mundana); it overrides the player's own choice there
+  const wanted = (m.room && m.room.language) || userLang;
+  const sel = $('langSel');
+  if (sel) { sel.disabled = !!(m.room && m.room.language); sel.title = sel.disabled ? 'This room uses its own language' : 'Language: the names of all cards, wonders, buildings and eras'; }
+  if (wanted !== langWanted) {
+    langWanted = wanted;
+    loadLang(wanted).then(() => { if (lastMsg) render(JSON.parse(lastMsg)); });
+  }
   tipCards = [];
   room = m.room;
-  state = m.game;
+  state = localize(m.game);
   renderChat(m.chat);
   if (!room.started) return renderLobby();
   show('game');
@@ -132,10 +199,12 @@ function render(m) {
   renderWonders();
   renderEvents();
   renderCiv();
+  markFreeSlots();
   checkPickReveal();
   checkNotices();
   checkEraSplash();
   checkTurnDraw();
+  checkLostCards();
   renderStarvation();
   renderSetup();
   renderTechs();
@@ -301,7 +370,7 @@ $('queuePanel').onclick = e => {
   const b = e.target.closest('[data-pick]'); if (!b) return;
   const card = state.queue[+b.dataset.pick];
   if (card && card.type === 'event') {
-    pickWatch = { ids: new Set((me().hand || []).map(c => c.id)), event: card.name, at: Date.now() , leader: me().leader && me().leader.name};
+    pickWatch = { seq: me().faceDownSeq || 0, event: card.name, at: Date.now() };
   }
   send({ type: 'pick', slot: +b.dataset.pick });
 };
@@ -323,6 +392,20 @@ function checkEraSplash() {
   splashTimer = setTimeout(() => { $('eraSplash').hidden = true; }, 6000);
 }
 $('eraSplash').onclick = () => { $('eraSplash').hidden = true; clearTimeout(splashTimer); };
+// A face-down card whose event left the queue untaken is lost: say which card it was (once per card, also after a reload).
+function checkLostCards() {
+  if (!room || !(state.lostCards || []).length) return;
+  const key = 'dawnLost-' + room.code;
+  let last = 0;
+  try { last = +sessionStorage.getItem(key) || 0; } catch (e) {}
+  const fresh = state.lostCards.filter(l => l.seq > last);
+  if (!fresh.length) return;
+  try { sessionStorage.setItem(key, String(fresh[fresh.length - 1].seq)); } catch (e) {}
+  $('lostBox').innerHTML = `<h2>${fresh.length > 1 ? 'Face-down cards lost' : 'A face-down card was lost'}</h2>` + fresh.map(l =>
+    `<p class="muted small">${esc(l.event)} left the queue untaken. Under it lay:</p><div class="cards">${cardHtml(l.card)}</div>`).join('') + '<div class="row"><button class="primary" data-lostok>OK</button></div>';
+  $('lostModal').hidden = false;
+}
+$('lostModal').onclick = e => { if (e.target.closest('[data-lostok]') || e.target === $('lostModal')) $('lostModal').hidden = true; };
 // The card drawn blind at the start of your turn is shown in a pop-up (once per turn, also after a reload).
 function checkTurnDraw() {
   const m = me();
@@ -334,7 +417,7 @@ function checkTurnDraw() {
   try { sessionStorage.setItem(key, String(m.turnSeq)); } catch (e) {}
   const ev = m.turnEvents ? `<p class="muted small">${m.turnEvents} event${m.turnEvents > 1 ? 's' : ''} came up first and went face down into the future deck.</p>` : '';
   const body = m.turnDraw
-    ? `<div class="cards">${cardHtml(m.turnDraw)}</div>${m.turnDraw.type === 'great_wonder' ? '<p class="muted small">A great wonder: it goes on the board for the whole tribe to build.</p>' : ''}${m.turnDraw.type === 'leader' ? '<p class="muted small">A great person: they take over at once (or you choose, if you already have one) and leave when the era ends.</p>' : ''}`
+    ? `<div class="cards">${cardHtml(m.turnDraw)}</div>${m.turnDraw.type === 'great_wonder' ? '<p class="muted small">A great wonder: it goes on the board for the whole tribe to build.</p>' : ''}${m.turnDraw.type === 'city_state' ? '<p class="muted small">A city state: it now waits among the lands to settle.</p>' : ''}${m.turnDraw.type === 'leader' ? '<p class="muted small">A great person: they take over at once (or you choose, if you already have one) and leave when the era ends.</p>' : ''}`
     : '<p class="muted">The era deck is empty: nothing to draw.</p>';
   $('gotBox').innerHTML = `<h2>Round ${state.round}: your turn. You drew</h2>${ev}${body}<div class="row"><button class="primary" data-gotok>OK</button></div>`;
   $('gotModal').hidden = false;
@@ -414,13 +497,12 @@ $('noticeModal').onclick = e => {
 function checkPickReveal() {
   if (!pickWatch) return;
   if (Date.now() - pickWatch.at > 5000) { pickWatch = null; return; }
-  const got = (me().hand || []).filter(c => !pickWatch.ids.has(c.id));
-  if (me().leader && me().leader.name !== pickWatch.leader) got.push(me().leader);      // a great person plays at once
-  if (!got.length) return;
-  const ev = pickWatch.event;
+  if ((me().faceDownSeq || 0) <= pickWatch.seq) return;
+  const ev = pickWatch.event, c = me().faceDown;
   pickWatch = null;
+  const note = !c ? '' : c.type === 'city_state' ? '<p class="muted small">A city state: it now waits among the lands to settle.</p>' : c.type === 'great_wonder' ? '<p class="muted small">A great wonder: it goes on the board for the whole tribe to build.</p>' : c.type === 'leader' ? '<p class="muted small">A great person: they take over at once (or you choose, if you already have one).</p>' : '';
   $('gotBox').innerHTML = `<h2>The face-down card</h2><p class="muted small">You took on <b>${esc(ev)}</b> and got:</p>
-    <div class="cards">${got.map(c => cardHtml(c)).join('')}</div><div class="row"><button class="primary" data-gotok>OK</button></div>`;
+    ${c ? `<div class="cards">${cardHtml(c)}</div>${note}` : '<p class="muted">The era deck was empty: nothing under it.</p>'}<div class="row"><button class="primary" data-gotok>OK</button></div>`;
   $('gotModal').hidden = false;
 }
 $('gotModal').onclick = e => { if (e.target.closest('[data-gotok]') || e.target === $('gotModal')) $('gotModal').hidden = true; };
@@ -560,6 +642,9 @@ function renderEvents() {
       if (p.kind === 'opportunity' && p.target === s.you) {
         controls += `<button data-decide="1" class="${p.accept === true ? 'primary' : ''}">Accept</button><button data-decide="0" class="${p.accept === false ? 'primary' : ''}">Decline</button>`;
       }
+      if (p.giftOptions) {
+        controls += p.giftOptions.length ? `<span class="small">Great Work gives 6 of:</span>` + p.giftOptions.map(r => `<button data-gift="${r}" class="${p.giftChoice === r ? 'primary' : ''}">${r}</button>`).join('') : '<span class="small muted">No great wonder is being built: every player gets +1 production and the card returns to the future events.</span>';
+      }
       controls += `<button class="primary" data-ready>Done — resolve</button><button data-hidepop title="Look at the board first; it stays pending">Look at the board</button>`;
     } else {
       controls = '<span class="muted small">You are done. Waiting for the others…</span>';
@@ -599,6 +684,7 @@ $('eventPanel').onclick = e => {
   else if ('showpop' in t.dataset) { popupHiddenFor = null; renderEvents(); renderRealm(); }
   else if (t.dataset.respond) send({ type: 'respond', card: +t.dataset.respond });
   else if ('troops' in t.dataset) send({ type: 'troops', troops: +$('troopIn').value || 0 });
+  else if (t.dataset.gift) send({ type: 'decide', resource: t.dataset.gift });
   else if (t.dataset.decide) send({ type: 'decide', accept: t.dataset.decide === '1' });
   else if ('ready' in t.dataset) {
     const tin = $('troopIn');
@@ -676,7 +762,7 @@ function renderCiv() {
       <span class="slots">${dots}</span>${controls}
       ${b.id != null ? `<span class="makes" title="${esc(Object.entries(b.each || {}).map(([r, n]) => `${n} ${r} per worker`).join(', ') || 'makes nothing')} (technologies included)">${Object.keys(b.makes || {}).length ? resList(b.makes, { signed: true }) : '<span class="muted">—</span>'}</span>` : ''}
       ${cap != null ? `<span class="small muted">${b.slots}/${cap} slots built</span>` : ''}${b.inactive ? `<span class="small bad">${b.inactive} inactive (over the land limit)</span>` : ''}
-      ${b.id != null ? `<div class="upgrades">${(b.upgrades || []).map(u => `<div class="uslot full">${miniCard(u, `<button class="tiny uout" ${act ? '' : 'disabled'} data-unslot="${u.key}" title="Take it out (1 action)">×</button>`)}</div>`).join('')}${Array.from({ length: Math.max(0, (b.upgradeSlots || 0) - (b.upgrades || []).length) }, () => `<div class="uslot" data-slot-into="${b.id}" title="Upgrade slot: drop a technology or minor wonder here (free). Taking it out later costs 1 action."><span>＋<br>upgrade slot</span></div>`).join('')}</div>` : ''}</div>`;
+      ${b.id != null ? `<div class="upgrades">${(b.upgrades || []).map(u => `<div class="uslot full">${miniCard(u, `<button class="tiny uout" ${act ? '' : 'disabled'} data-unslot="${u.key}" title="Take it out (1 action)">×</button>`)}</div>`).join('')}${Array.from({ length: Math.max(0, (b.upgradeSlots || 0) - (b.upgrades || []).length) }, () => `<div class="uslot" data-slot-into="${b.id}" data-btype="${b.type}" title="Upgrade slot: drop a technology or minor wonder here (free). Taking it out later costs 1 action."><span>＋<br>upgrade slot</span></div>`).join('')}</div>` : ''}</div>`;
   }).join('');
   const unitSlot = (key, u) => `${(u.upgrades || []).map(x => `<div class="uslot full">${miniCard(x, `<button class="tiny uout" ${act ? '' : 'disabled'} data-unslot="${x.key}" title="Take it out (1 action)">×</button>`)}</div>`).join('')}${Array.from({ length: Math.max(0, (u.slots || 0) - (u.upgrades || []).length) }, () => `<div class="uslot" data-slot-into="${key}" title="Bonus slot: drop a card here (free). Taking it out later costs 1 action."><span>＋<br>bonus slot</span></div>`).join('')}`;
   const units = p.units || {};
@@ -699,7 +785,7 @@ function renderCiv() {
     <div class="row small">Net per round, after upkeep: ${resList(p.net, { signed: true, src: true })}</div>
     <div class="row small">Population <b>${p.population}</b> · idle ${p.idle} · Army <b>${p.army}</b>${p.strength !== p.army ? ` (strength ${p.strength})` : ''}${p.committed ? ` (${p.committed} away at war)` : ''} · raid defense +${p.raidDefense} · hand ${p.handSize}/${p.handLimit}</div>
     ${(() => { const techs = s.players.flatMap(o => o.techs); return techs.length ? `<div class="small">Technologies (they help everyone): ${techs.map(t => `<span class="chip"${tipAttr(t)}>${esc(t.name)}</span>`).join('')}</div>` : ''; })()}
-    ${p.wonderUpkeep ? `<div class="small">Upkeep for wonders of earlier eras: <b>${p.wonderUpkeep} production</b> every round.</div>` : ''}
+    ${p.wonderUpkeep ? `<div class="small">Upkeep for great wonders of earlier eras: <b>${p.wonderUpkeep} production</b> every round.</div>` : ''}
     ${p.minorWonders.length ? `<div class="small">${p.minorWonders.map(t => `<span class="chip"${tipAttr(t)}>★ ${esc(t.name)}</span>`).join('')}</div>` : ''}
     ${s.strengthPerTwoTroops || s.freeSettlers ? `<div class="small muted">${s.strengthPerTwoTroops ? `Military strength +${s.strengthPerTwoTroops} per 2 troops. ` : ''}${s.freeSettlers ? `Settling takes ${s.freeSettlers} settler${s.freeSettlers > 1 ? 's' : ''} less.` : ''}</div>` : ''}
     <h3 style="margin-top:.5rem">Buildings</h3><p class="small muted" style="margin:0">● worker · ○ empty slot · <span style="opacity:.5">●</span> room on your land, not built yet</p>${blds}
@@ -716,8 +802,21 @@ function renderCiv() {
       <div class="row small">${RES.map(k => `<label class="res r-${k}" style="margin:0">${RES_SHORT[k]} <input type="number" min="0" value="0" data-keep="pool-${k}" data-pres="${k}"></label>`).join('')}</div>
       <div class="row"><button data-deposit>Put in</button><button data-withdraw>Take out</button></div>` : ''}`;
 }
+// An empty slot glows gold (pulsing) while you hold a bonus card that fits it.
+function markFreeSlots() {
+  const cards = (me() || {}).slotCards || [];
+  document.querySelectorAll('.uslot[data-slot-into]').forEach(el => el.classList.toggle('avail', cards.some(c => slotFits(c.key, el))));
+}
 // Putting a card in an upgrade slot: drag it there, or click the card and then the slot.
 let pickedCard = null, dragCard = null;
+// Some cards fit only certain buildings (Fire: hunters or gatherers): the card def says which.
+function slotFits(key, slotEl) {
+  const def = ((me() || {}).slotCards || []).find(c => c.key === key);
+  const unit = slotEl.dataset.slotInto === 'warriors' || slotEl.dataset.slotInto === 'population';
+  if (def && def.slotsInto === 'warriors') return slotEl.dataset.slotInto === 'warriors';      // Spearmen go only into the warriors
+  if (unit) return false;                                                                       // building bonuses never go into the units
+  return !def || !def.slotIn || !slotEl.dataset.btype || def.slotIn.includes(slotEl.dataset.btype);
+}
 function putInSlot(key, building) {
   const el = document.querySelector(`#techPanel .minicard[data-key="${key}"], #bonusPanel .minicard[data-key="${key}"]`);
   if (el) techRects[key] = el.getBoundingClientRect();
@@ -730,19 +829,19 @@ document.addEventListener('dragstart', e => {
   dragCard = c.dataset.key;
   e.dataTransfer.setData('text/plain', dragCard);
   e.dataTransfer.effectAllowed = 'move';
-  document.querySelectorAll('.uslot[data-slot-into]').forEach(x => x.classList.add('ready'));
+  document.querySelectorAll('.uslot[data-slot-into]').forEach(x => { if (slotFits(dragCard, x)) x.classList.add('ready'); });
 });
 document.addEventListener('dragend', () => { dragCard = null; document.querySelectorAll('.uslot.ready, .uslot.over').forEach(x => x.classList.remove('ready', 'over')); });
-document.addEventListener('dragover', e => { const sl = e.target.closest && e.target.closest('.uslot[data-slot-into]'); if (sl && dragCard) { e.preventDefault(); sl.classList.add('over'); } });
+document.addEventListener('dragover', e => { const sl = e.target.closest && e.target.closest('.uslot[data-slot-into]'); if (sl && dragCard && slotFits(dragCard, sl)) { e.preventDefault(); sl.classList.add('over'); } });
 document.addEventListener('dragleave', e => { const sl = e.target.closest && e.target.closest('.uslot[data-slot-into]'); if (sl) sl.classList.remove('over'); });
 document.addEventListener('drop', e => {
-  const sl = e.target.closest && e.target.closest('.uslot[data-slot-into]'); if (!sl || !dragCard) return;
+  const sl = e.target.closest && e.target.closest('.uslot[data-slot-into]'); if (!sl || !dragCard || !slotFits(dragCard, sl)) return;
   e.preventDefault();
   putInSlot(dragCard, sl.dataset.slotInto);
 });
 document.addEventListener('click', e => {
   const sl = e.target.closest && e.target.closest('.uslot[data-slot-into]');
-  if (sl && pickedCard) return putInSlot(pickedCard, sl.dataset.slotInto);
+  if (sl && pickedCard) return slotFits(pickedCard, sl) ? putInSlot(pickedCard, sl.dataset.slotInto) : undefined;
   const c = e.target.closest && e.target.closest('#techPanel .minicard.draggable, #bonusPanel .minicard.draggable');
   if (c) { pickedCard = pickedCard === c.dataset.key ? null : c.dataset.key; document.querySelectorAll('.picked').forEach(x => x.classList.remove('picked')); if (pickedCard) c.classList.add('picked'); }
 });
@@ -791,7 +890,7 @@ function renderHand() {
     }
     const opts = c.target === 'territory' ? s.realm.filter(t => !t.cored).map(t => [t.id, t.name])
       : c.target === 'player' ? others.map(o => [o.seat, o.name]) : null;
-    const tradeText = o => `pay ${resList(o.give)} → your teammate gets ${resList(o.get)}`;
+    const tradeText = o => `every round pay ${resList(o.give)} → your teammate gets ${resList(o.get)} every round`;
     const tradeInputs = c.trade ? `<div class="row small"><select id="opt-${c.id}" data-keep="opt-${c.id}">${c.trade.map((o, k) => `<option value="${k}">${RES.filter(r => o.give[r]).map(r => o.give[r] + ' ' + r).join(', ')} → ${RES.filter(r => o.get[r]).map(r => '+' + o.get[r] + ' ' + r).join(', ')} for them</option>`).join('')}</select></div>` : '';
     const pickTarget = opts ? `<select id="tgt-${c.id}" data-keep="tgt-${c.id}">${opts.map(([v, t]) => `<option value="${v}">${esc(t)}</option>`).join('')}</select>` : '';
     return cardHtml(c, `${tradeInputs}<div class="actions">${pickTarget}${playable ? `<button ${act && (affordable(c.cost) || (c.type === 'tech' && me().freeTech)) && (!opts || opts.length) ? '' : 'disabled'} data-play="${c.id}" data-target="${c.target || ''}">Play (1 action)</button>` : '<span class="small muted">Play it when an event strikes.</span>'}
@@ -918,7 +1017,7 @@ let catalogue = null;
 
 // ------------------------------------------------------------------ keywords: hover a marked word to see its rule
 let kwRe = null, kwById = {}, kwLoading = false;
-const KW_ROOTS = '#game, #setupModal, #noticeModal, #gotModal, #starveModal, #growModal, #over, #cardsModal, #eventBackdrop';
+const KW_ROOTS = '#game, #setupModal, #noticeModal, #lostModal, #gotModal, #starveModal, #growModal, #over, #cardsModal, #eventBackdrop';
 const KW_SKIP = 'button, input, select, textarea, option, script, style, label, h1, h2, h3, .kw, .name, .nm, .type, #chat, .chat, .readylist';
 async function loadKeywords() {
   if (kwRe || kwLoading) return;
@@ -1069,3 +1168,5 @@ $('adminLogs').onclick = async () => {
     toast('Downloaded. The saved logs are now deleted from the server.', true);
   } catch (e) { toast('Could not fetch the logs.'); }
 };
+
+setupLangSelect();

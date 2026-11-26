@@ -62,6 +62,9 @@ public final class Player {
     public final List<CardDef> warriorUpgrades = new ArrayList<>(), populationUpgrades = new ArrayList<>();
     public boolean done;
     public Game.CardInst turnDraw;
+    /** The face-down card taken with the last event picked, and a counter so the client shows it once. */
+    public Game.CardInst faceDown;
+    public int faceDownSeq;
     public int turnEvents, turnSeq;
 
     Player(int seat, String name) {

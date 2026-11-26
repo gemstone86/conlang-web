@@ -31,23 +31,23 @@ rules:
   startStability: 10
   startHealth: 2
   queueExtra: 4                           # queue size = players + 4
-  removedPerRound: {1: 2, 2: 2, 3: 1, 4: 1, 5: 1, 6: 1}
+  removedPerRound: {1: 1, 2: 1, 3: 1, 4: 1, 5: 1, 6: 1}       # one card leaves the queue each round, whatever the number of players
   startingEventsPerPlayer: 2
   # what an era deck holds: base + perPlayer × players cards of each kind, drawn at random from that era's list below
   eraDeck:
-    leader: {base: 1, perPlayer: 1}
-    great_wonder: {base: 0, perPlayer: 1}
+    leader: {base: 2, perPlayer: 1}
+    great_wonder: {base: 1, perPlayer: 1}
     minor_wonder: {base: 1, perPlayer: 1}
     hostility: {base: 0, perPlayer: 2}
     tech: {base: 6, perPlayer: 1}
     city_state: {base: 1, perPlayer: 0}
-    action: {base: 24, perPlayer: 2}
-    response: {base: 0, perPlayer: 1}
+    action: {base: 20, perPlayer: 2}
+    response: {base: 2, perPlayer: 1}
     event: {base: 12, perPlayer: 1}
-    era_trigger: {base: 3, perPlayer: 0}       # the three end-of-era cards; when the third is turned up the era ends
+    era_trigger: {base: 1, perPlayer: 0}       # the last era only: one end card at the bottom of the deck; when it is turned up the game is won
   # the enemy deck at the start (strength: number of cards); raids and invasions draw from it, the cards go back after
   enemyDeck: {"1": 6, "2": 4}
-  eraTriggerBottomPercent: 100            # the end-of-era cards are shuffled into the whole era deck (100%), not just the bottom part
+  eraTriggerBottomPercent: 0              # the end card goes at the very bottom of the era deck
   # fights: troops spent (up to the enemy's strength) must reach that strength (response cards add to it);
   # the troops spent settling a land are all lost; in invasions half of them, rounded up
 
@@ -198,28 +198,28 @@ greatWonders:
   stonehenge:
     name: Stonehenge
     era: prehistoric
-    costPerPlayer: {production: 6, culture: 3}
+    costPerPlayer: {production: 3, culture: 1}
     effects: [{actionsPerTurn: 1}]
     victoryPoints: 2
     text: Every player gets +1 action per turn.
   gobekli_tepe:
     name: Göbekli Tepe
     era: prehistoric
-    costPerPlayer: {production: 6, culture: 3, research: 2}
+    costPerPlayer: {production: 3, culture: 2, research: 1}
     effects: [{income: {culture: 2}}, {growthDiscount: 1}, {maxSlots: {farm: 1}}]
     victoryPoints: 2
     text: Every player gets +2 culture per turn, growing costs 1 less food, and +1 farm slot.
   ggantija_temples:
     name: Ġgantija Temples
     era: prehistoric
-    costPerPlayer: {production: 6, culture: 3}
+    costPerPlayer: {production: 3, culture: 1}
     effects: [{wonderDouble: 1}, {maxSlots: {mine: 1}}]
     victoryPoints: 2
     text: Resources given to other great wonders count double. Every player gets +1 mine slot.
   skara_brae:
     name: Skara Brae
     era: prehistoric
-    costPerPlayer: {production: 5, food: 6}
+    costPerPlayer: {production: 3, food: 4}
     effects: [{incomePerTerritory: {food: 1}}]
     victoryPoints: 2
     text: Every player gets +1 food per turn for each territory in the realm.
@@ -394,7 +394,7 @@ keywords:
   upkeep:
     name: "Upkeep"
     match: [upkeep]
-    text: "A cost paid every round. Wonders of earlier eras cost 1 production per era they are removed from (wonders of the current era are free). Some techs add food upkeep for troops."
+    text: "A cost paid every round. Great wonders of earlier eras cost 1 production per era they are removed from (wonders of the current era are free; minor wonders never cost upkeep). Some techs add food upkeep for troops."
   obsolete:
     name: "Fades"
     match: [fades, obsolete]
@@ -498,6 +498,7 @@ eras:
       tribal_quarrel: 1
       bad_omen: 1
       bountiful_season: 2
+      great_work: 1
       wandering_sage: 1
       strangers_at_the_fire: 1
       scouts_return: 1
@@ -507,8 +508,7 @@ eras:
       wondrous_land_found: 1
       hostile_tribes: 2
       rivals_claim: 1
-      end_of_prehistoric: 3
-    # when the third end card is turned up, one of these strikes; its effects last through the next era
+    # one of these is the bottom card of the era deck; when it is turned up the era ends and its effects last through the next era
     endEvents: [dawn_of_agriculture, climate_crisis, cult_of_ancestors]
   - id: ancient
     name: Ancient
@@ -591,8 +591,8 @@ eras:
       warlord: 2
       rivals_claim: 1
       pharaohs_curse: 1
+      great_work: 1
       volcano_of_thera: 1
-      end_of_ancient: 3
     # when the third end card is turned up, one of these strikes; its effects last through the next era
     endEvents: [bronze_age_collapse, iron_age_dawns, age_of_philosophers]
   - id: classical
@@ -679,7 +679,8 @@ eras:
       rivals_claim: 1
       hannibal_at_the_gates: 1
       pax_romana: 1
-      end_of_classical: 3
+      great_work: 1
+      end_of_classical: 1
 # The starting event deck: 2 per player, drawn from these (number = copies in the pool).
 startingEvents:
   wolf_pack: 2
@@ -714,8 +715,8 @@ cards:
   great_hunter:
     name: The Great Hunter
     type: leader
-    effects: [{income: {food: 1}}, {maxSlots: {farm: 1}}]
-    text: +1 food per turn and +1 max farm slot.
+    effects: [{income: {food: 2}}, {maxSlots: {farm: 1}}]
+    text: +2 food per turn and +1 max farm slot.
   storyteller:
     name: The Storyteller
     type: leader
@@ -782,45 +783,56 @@ cards:
     name: Fire
     type: tech
     cost: {research: 2}
-    effects: [{health: 1}, {raidDefense: 1}]
-    text: +1 Health. Your camp is +1 defense against raids.
+    effects: [{army: 1}]
+    bonus: [{healthMod: 2}, {raidDefense: 2}]
+    slotIn: [hunter, gatherer]
+    text: "When played: you gain 1 troop. Bonus slot (Hunters or Gatherers only): +2 Health and +2 defense against raids."
   stone_tools:
     name: Stone Tools
     type: tech
     cost: {research: 2, production: 1}
-    effects: [{perWorker: {building: hunter, production: 1}}]
-    text: Your hunters produce +1 production.
+    bonus: [{perWorker: {building: hunter, production: 1}}]
+    slotIn: [hunter, gatherer]
+    text: "Bonus slot (Hunters or Gatherers only): your hunters produce +1 production."
     required: true                       # always in the Prehistoric era deck
   lithic_art:
     name: Lithic Art
     type: tech
     cost: {research: 2, production: 1}
-    effects: [{perWorker: {building: hunter, culture: 1}}]
-    text: Your hunters produce +1 culture. Put it in a Hunters slot (competes with Stone Tools for the one slot).
+    effects: [{gain: {influence: 2}}]
+    bonus: [{perWorker: {building: hunter, culture: 1}}]
+    slotIn: [hunter, gatherer]
+    text: "When played: +2 influence. Bonus slot (Hunters or Gatherers only): your hunters produce +1 culture."
   hunting:
     name: Hunting
     type: tech
     cost: {research: 2}
-    effects: [{income: {food: 1}}, {army: 1}]
-    text: +1 food per turn and 1 troop.
+    effects: [{army: 1}]
+    global: [{income: {food: 1}}]
+    text: "When played: you gain 1 troop. Always on: +1 food per turn."
   animal_husbandry:
     name: Animal Husbandry
     type: tech
     cost: {research: 3, food: 2}
-    effects: [{perWorker: {building: farm, food: 1}}]
-    text: Your farmers produce +1 food.
+    effects: [{gain: {production: 2}}]
+    bonus: [{perWorker: {building: farm, food: 1}}]
+    slotIn: [farm]
+    text: "When played: +2 production. Bonus slot (Farm only): your farmers produce +1 food."
   pottery:
     name: Pottery
     type: tech
     cost: {research: 3, production: 1}
-    effects: [{handLimit: 1}, {income: {food: 1}}]
-    text: +1 max hand size, +1 food per turn.
+    effects: [{gain: {food: 2}}]
+    global: [{income: {food: 1}}, {handLimit: 1}]
+    bonus: [{perWorker: {building: gatherer, food: 1}}]
+    slotIn: [hunter, gatherer]
+    text: "When played: +2 food. Always on: +1 food per turn and +1 max hand size. Bonus slot (Hunters or Gatherers only): your gatherers produce +1 food."
   mysticism:
     name: Mysticism
     type: tech
     cost: {research: 3, culture: 1}
-    effects: [{perWorker: {building: temple, culture: 1}}]
-    text: Your temple workers produce +1 culture.
+    global: [{income: {culture: 1}}]
+    text: "Always on: +1 culture per turn."
   wanderlust:
     name: Wanderlust
     type: tech
@@ -1157,7 +1169,7 @@ cards:
       - trade:
           - {give: {food: 1}, get: {production: 2}}
           - {give: {production: 1}, get: {food: 2}}
-    text: Choose a teammate, then either pay 1 food so they get 2 production, or pay 1 production so they get 2 food.
+    text: Choose a teammate. Every round you pay 1 food and they get 2 production, or you pay 1 production and they get 2 food.
   roman_roads:
     name: Roman Roads
     type: minor_wonder
@@ -1252,6 +1264,15 @@ cards:
       ongoing: [{income: {culture: -1}}, {stability: -1}]
       cleanse: {culture: 3}
     text: Until lifted (3 culture, 1 action), every player produces 1 less culture per turn and Stability drops by 1 each round.
+  great_work:
+    name: Great Work
+    type: event
+    category: boon
+    target: civ
+    required: true
+    requiredCopies: 2                    # two copies in every era deck
+    effects: [{wonderGift: 6}]
+    text: "Choose one resource when it strikes: 6 of it go into the great wonder nearest completion that needs it. What the wonder does not need is lost. With no great wonder being built, every player gets +1 production instead, and the card goes back into the future events."
   bountiful_season:
     name: Bountiful Season
     type: event
@@ -1300,14 +1321,6 @@ cards:
     category: era
     effects: [{income: {culture: 1}}, {handLimit: -1}]
     text: "Era end. For the whole next era: every player gets +1 culture per turn, but hand size is 1 smaller."
-  end_of_prehistoric:
-    name: End of an Era
-    type: era_end
-    text: "The Prehistoric era is coming to an end. This card can't be taken. When the third one is turned up, a special event ends the era, and its effects last through the next one."
-  end_of_ancient:
-    name: End of an Era
-    type: era_end
-    text: "The Ancient era is coming to an end. This card can't be taken. When the third one is turned up, a special event ends the era, and its effects last through the next one."
   iron_working:
     name: Iron Working
     type: tech
@@ -1363,7 +1376,7 @@ cards:
   end_of_classical:
     name: End of an Era
     type: era_end
-    text: "The Classical era is coming to an end. This card can't be taken. When the third one is turned up, the civilization has endured and the game is won at the end of the round."
+    text: "The Classical era is coming to an end. This card can't be taken. It is the last card of the deck. When it is turned up, the civilization has endured and the game is won at the end of the round."
   gallic_warband:
     name: Gallic Warband
     type: event

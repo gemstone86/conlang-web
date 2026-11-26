@@ -17,6 +17,7 @@
   <button id="gameLog" class="allcards" type="button" title="Download everything that happened, to send for review">Game log</button>
   <button id="adminLogs" class="allcards" type="button" hidden title="Admin: download every saved game log as a zip (they are deleted from the server afterwards)">All game logs</button>
   <button id="cheatMode" class="allcards" type="button" hidden title="Admin: play everything for free with unlimited actions">Cheat mode: off</button>
+  <select id="langSel" class="allcards" title="Language: the names of all cards, wonders, buildings and eras"></select>
   <button id="allCards" class="allcards" type="button">All cards</button>
 </header>
 
@@ -30,6 +31,10 @@
     <input id="name" maxlength="24" autocomplete="nickname">
     <p id="loggedIn" class="muted small" hidden></p>
     <p id="loginHint" class="muted small" hidden>Not logged in. <a id="loginLink" href="/">Log in</a> to play under your account name.</p>
+    <div id="adminLangRow" hidden>
+      <label for="newLang">Language (admin)</label>
+      <select id="newLang"><option value="">Standard</option><option value="mundana">Mundana</option></select>
+    </div>
     <div class="row">
       <button id="create" class="primary">Create a room</button>
     </div>
@@ -94,6 +99,7 @@
 <div id="setupModal" class="modal" hidden><div class="card wide" id="setupBox"></div></div>
 <div id="noticeModal" class="modal" hidden><div class="card narrow" id="noticeBox"></div></div>
 <div id="starveModal" class="modal" hidden><div class="card narrow" id="starveBox"></div></div>
+<div id="lostModal" class="modal" hidden><div class="card narrow" id="lostBox"></div></div>
 <div id="gotModal" class="modal" hidden><div class="card narrow" id="gotBox"></div></div>
 <div id="growModal" class="modal" hidden><div class="card narrow" id="growBox"></div></div>
 <div id="eraSplash" class="erasplash" hidden><div id="eraSplashBox"></div></div>

@@ -50,7 +50,14 @@ public class RoomService {
         return create(name, false);
     }
 
+    /** Special languages only an admin may pick for a room. */
+    private static final java.util.Set<String> ADMIN_LANGUAGES = java.util.Set.of("mundana");
+
     public Joined create(String name, boolean admin) {
+        return create(name, admin, null);
+    }
+
+    public Joined create(String name, boolean admin, String language) {
         if (rooms.size() > 2000) throw new GameException("Too many rooms are open right now. Try again later.");
         String code;
         Room room;
@@ -58,6 +65,7 @@ public class RoomService {
             code = newCode();
             room = new Room(code, content, json::writeValueAsString, timer, aiDelayMillis);
         } while (rooms.putIfAbsent(code, room) != null);
+        if (admin && language != null && ADMIN_LANGUAGES.contains(language)) room.language = language;
         Room.Seat s = room.join(name, admin);
         return new Joined(code, s.token, 0);
     }

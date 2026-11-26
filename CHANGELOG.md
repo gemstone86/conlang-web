@@ -1,5 +1,70 @@
 # Changes
 
+## v1.96.1 (combined app)
+
+- Dawn: a hidden language, Mundana, that only an admin can choose on the create-room screen. It renames the 17 great wonders and the great people, for everyone in that room (it overrides their own language choice); everything else keeps its normal name. Not listed in the language dropdown.
+
+## v1.96.0 (combined app)
+
+- Dawn: a language switch in the header renames every card, great wonder, land, building and era (and those names in the game log). English and Swedish are included; the choice is remembered in the browser. To add a language, copy `dawn/lang/en.json` (a template listing every id), translate the names, and add the file to `languages.json`. Card texts are not translated yet.
+
+## v1.95.7 (combined app)
+
+- Dawn: Great Work with no great wonder being built gives every player +1 production, and the card goes back into the future events deck (it no longer banks the gift).
+
+## v1.95.6 (combined app)
+
+- Dawn: an empty bonus slot glows gold, slowly pulsing, while you hold a bonus card that fits it.
+
+## v1.95.5 (combined app)
+
+- Dawn: great person cards show their picture from the top, so faces (Ramses) are no longer cut off.
+
+## v1.95.4 (combined app)
+
+- Dawn: Great Work now gives 6 of ONE resource that the players choose when it strikes (a button per resource a wonder still needs); it goes into the great wonder nearest completion that needs it and what the wonder does not need is lost (before, it spilled over into other resources). Fixed a bug where the event resolved without asking.
+- Dawn: Spearmen can only be dropped into the Warriors slot, and building bonuses cannot be dropped into the Warriors or Population slots.
+
+## v1.95.3 (combined app)
+
+- Dawn: The Great Hunter gives +2 food per turn (was +1).
+
+## v1.95.2 (combined app)
+
+- Dawn: only 1 card leaves the queue each round, whatever the number of players.
+
+## v1.95.1 (combined app)
+
+- Dawn: Animal Husbandry only fits a Farm slot; Pottery in a Hunters/Gatherers slot gives gatherers +1 food; Mysticism is now a global +1 culture per turn.
+
+## v1.95.0 (combined app)
+
+- Dawn: when an event leaves the queue untaken, a popup shows the face-down card that was lost.
+- Dawn: era decks hold 2+X great people, 20+2X actions, X+1 great wonders and 2+X responses.
+- Dawn: cards now say what is global (always on), what is a bonus (works only in a slot) and what happens when played. Fire (+2 Health, +2 raid defense in a Hunters/Gatherers slot; 1 troop when played), Stone Tools and Lithic Art (Hunters/Gatherers slots only; Lithic Art also +2 influence when played), Hunting (global +1 food, 1 troop), Animal Husbandry (bonus; +2 production when played), Pottery (global +1 food and +1 hand size; +2 food when played) and Mysticism (bonus). When a retired building disappears, the cards in its slots go back to the tech list.
+- Dawn: the Prehistoric great wonders cost about half as much.
+- Dawn: new required event Great Work (two copies in every era deck): 6 of the resource a great wonder needs most go into the wonder closest to done (kept for the next wonder if none is being built).
+
+## v1.94.1 (combined app)
+
+- Dawn: minor wonders no longer cost production upkeep; only great wonders of earlier eras do.
+
+## v1.94.0 (combined app)
+
+- Dawn: the "End of an Era" cards are gone. One era-end event (chosen at random from the era's list) now lies at the very bottom of each era deck, and the era ends when it is turned up; its effects still last through the next era. The last era has a single end card at the bottom that wins the game. Eras now last until the deck is nearly used up, so required cards (Agriculture, Metalworking, Markets) always come up.
+
+## v1.93.11 (combined app)
+
+- Dawn: the face-down card you get with an event is always shown (it used to be skipped when it was a city state or great wonder, which never reach the hand); the turn-start draw pop-up also says what a city state does.
+
+## v1.93.10 (combined app)
+
+- Dawn: New Trading Route is now a standing route: every round you pay 1 of one resource and your ally gets 2 of the other (shown in both players' per-round income).
+
+## v1.93.9 (combined app)
+
+- Dawn: cards with art now show the picture as a banner on top and the text on a solid dark panel below, so it is readable everywhere (hand, queue, event popup, catalogue).
+
 ## v1.93.8 (combined app)
 
 - Dawn: card art for the 22 Classical cards: Iron Working, Philosophy, Mathematics, Engineering, Roman Concrete, Pericles, Hannibal, Cleopatra, Cyrus, Augustus, Legion Tactics, Aqueducts, The Forum, Pax Romana, Gallic Warband, The Goths Invade, Hannibal at the Gates, End of an Era (Classical), The Parthenon, The Colosseum, The Pantheon and The Great Wall.

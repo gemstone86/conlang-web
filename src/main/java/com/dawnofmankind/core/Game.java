@@ -9,12 +9,15 @@ import com.dawnofmankind.core.Content.WonderDef;
 import com.dawnofmankind.core.Effects.Mods;
 import com.dawnofmankind.core.Player.Building;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.EnumMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * One game of Dawn of Mankind: the whole state and every rule. Not thread-safe; the caller (a room) serialises calls.
@@ -132,6 +135,8 @@ public final class Game {
         public int defenseBonus, healthBonus;
         public boolean halve, cancel;
         public Boolean accept;
+        /** Great Work: the resource the players chose for the gift (none: the kind a wonder needs most). */
+        public Res giftChoice;
         /** Sent by a crisis, not drawn from the event deck. */
         boolean fromCrisis;
 
@@ -177,6 +182,14 @@ public final class Game {
     public final EnumMap<Res, Integer> pool = Res.empty();
     public final List<Territory> worldDeck = new ArrayList<>();
     public final List<Territory> realm = new ArrayList<>();
+    /** Standing trading routes: every round `from` pays `give` and `to` receives `get`. */
+    public record Route(int from, int to, EnumMap<Res, Integer> give, EnumMap<Res, Integer> get) { }
+    public final List<Route> routes = new ArrayList<>();
+    /** A face-down card that was lost when its event left the queue untaken. */
+    public record LostCard(int seq, String event, CardDef card) { }
+    public final List<LostCard> lostCards = new ArrayList<>();
+    /** Great Work found no great wonder to help: the card goes back into the future events instead of the past ones. */
+    private boolean greatWorkReturns;
     public final List<Frontier> frontier = new ArrayList<>();
 
     private List<CardInst> drawn = new ArrayList<>();
@@ -184,6 +197,8 @@ public final class Game {
     public Pending pending;
     public int eventsDrawnThisRound;
     private boolean eraEnding;
+    /** The era-end event at the bottom of the era deck (not in the last era): turned up, it ends the era. */
+    private CardInst eraEndCard;
     /** End-of-era cards placed on the queue in this era; the era-end event strikes when the last one is. */
     private int endCardsPlaced;
     /** The era-end events in force: their effects last through the era after the one they ended. */
@@ -334,7 +349,7 @@ public final class Game {
             boolean cycle = !kind.equals("great_wonder") && !kind.equals("hostility");
             List<CardInst> picked = new ArrayList<>(), bag = new ArrayList<>();
             // required cards (the Markets tech) are always in the deck, one copy each
-            for (CardInst c : pool) if (c.def.required && picked.stream().noneMatch(x -> x.def == c.def)) picked.add(inst(c.def));
+            for (CardInst c : pool) if (c.def.required && picked.stream().noneMatch(x -> x.def == c.def)) for (int k = 0; k < c.def.requiredCopies; k++) picked.add(inst(c.def));
             boolean bagUsed = false;
             while (picked.size() < want && !pool.isEmpty()) {
                 if (bag.isEmpty()) {
@@ -349,11 +364,16 @@ public final class Game {
             if (kind.equals("era_trigger")) triggers.addAll(picked); else eraDeck.addAll(picked);
         });
         Collections.shuffle(eraDeck, rng);
+        eraEndCard = null;
+        if (eraIndex + 1 < content.eras.size() && !e.endEvents.isEmpty()) {          // one of the era-end events lies at the very bottom of the deck
+            eraEndCard = inst(content.cards.get(e.endEvents.get(rng.nextInt(e.endEvents.size()))));
+        }
         // era-trigger events go into the bottom part of the deck: they can end the era early, but not at once
         for (CardInst t : triggers) {
             int from = eraDeck.size() * (100 - content.rules.eraTriggerBottomShare) / 100;
             eraDeck.add(from + rng.nextInt(eraDeck.size() - from + 1), t);
         }
+        if (eraEndCard != null) eraDeck.add(eraEndCard);
         if (!keepQueue) {
             queue.clear();
             refillQueue();
@@ -497,6 +517,17 @@ public final class Game {
                 else starving.put(p.seat, starve);
             }
             log(msg);
+        }
+        for (Route r : routes) {                          // trading routes run once everyone has produced; a payer who can't afford it skips the round
+            Player from = players.get(r.from()), to = players.get(r.to());
+            boolean can = Arrays.stream(Res.values()).allMatch(x -> from.res.get(x) >= r.give().get(x));
+            if (!can) {
+                log(from.name + " cannot afford the trading route to " + to.name + " this round.");
+                continue;
+            }
+            r.give().forEach((x, v) -> from.res.merge(x, -v, Integer::sum));
+            r.get().forEach((x, v) -> to.res.merge(x, v, Integer::sum));
+            log("Trading route: " + from.name + " pays " + Res.describe(r.give()) + ", " + to.name + " gets " + Res.describe(r.get()) + ".");
         }
         // a leader like Ramses makes every unfinished great wonder grow by itself
         for (Player p : players) {
@@ -666,6 +697,7 @@ public final class Game {
         if ("invasion".equals(d.kind)) return players.stream().anyMatch(p -> !p.away && p.army - p.committed > 0)
                 || anyResponseCard(d);
         if ("opportunity".equals(d.kind)) return !players.get(pending.target).away;
+        if (d.effects.stream().anyMatch(e -> e.containsKey("wonderGift")) && nearestWonder(null) != null && players.stream().anyMatch(p -> !p.away)) return true;      // Great Work: the players choose the resource
         return anyResponseCard(d);
     }
 
@@ -719,7 +751,13 @@ public final class Game {
 
     private void pruneRetired() {
         Mods m = civMods();
-        for (Player p : players) p.buildings.removeIf(b -> m.retired.contains(b.def.id) && b.workers == 0 && b.upgrades.isEmpty());
+        for (Player p : players) {
+            for (Building b : List.copyOf(p.buildings)) {
+                if (!m.retired.contains(b.def.id) || b.workers != 0) continue;
+                for (CardDef c : b.upgrades) log(c.name + " goes back to " + p.name + "'s techs: the " + b.def.name + " is no more.");
+                p.buildings.remove(b);
+            }
+        }
     }
 
     private void endRound() {
@@ -735,6 +773,10 @@ public final class Game {
                 Player teller = leaderWith("eventUnder");
                 String tellerLeader = teller == null ? null : teller.leader.name;      // an era could end while cards are drawn
                 CardInst under = s.under;
+                if (under != null && teller == null) {
+                    lostCards.add(new LostCard(lostCards.size() + 1, s.card.def.name, under.def));
+                    log("The face-down card under " + s.card.def.name + " is lost: " + under.def.name + ".");
+                }
                 if (teller != null && under != null) {
                     while (under != null && under.def.isEvent()) {
                         futureEvents.add(under);
@@ -797,27 +839,12 @@ public final class Game {
         return null;
     }
 
-    /** Counts an end-of-era card; the third one brings the era-end event, and the next era's cards are drawn from then on. */
+    /** The last era's end card is turned up: the civilization has endured, and the game is won at the end of the round. */
     private void endCardPlaced(CardInst c) {
-        endCardsPlaced++;
-        int needed = content.rules.eraDeck.get("era_trigger")[0];
-        log(c.def.name + " is turned up on the queue (" + Math.min(endCardsPlaced, needed) + " of " + needed + ").");
-        if (endCardsPlaced < needed) return;
+        log(c.def.name + " is turned up on the queue.");
         endCardsPlaced = 0;
-        boolean lastEra = eraIndex + 1 >= content.eras.size();
-        if (lastEra) {
-            eraEnding = true;                              // the game is won at the end of the round
-            log("The " + era().name + " era draws to its close.");
-            return;
-        }
-        List<String> options = era().endEvents;
-        if (!options.isEmpty()) {
-            CardDef d = content.cards.get(options.get(rng.nextInt(options.size())));
-            log("THE ERA ENDS: " + d.name + " — " + d.text);
-            eraBoons.add(new EraBoon(d, eraIndex + 1));
-            pastEvents.add(inst(d));
-        }
-        advanceEra(true);
+        eraEnding = true;
+        log("The " + era().name + " era draws to its close.");
     }
 
     private CardInst nextFromEraDeck() {
@@ -830,6 +857,15 @@ public final class Game {
                 if (eraDeck.isEmpty()) return null;
             }
             CardInst c = eraDeck.remove(0);
+            if (c == eraEndCard) {                            // the bottom card: this event ends the era
+                eraEndCard = null;
+                log("THE ERA ENDS: " + c.def.name + " — " + c.def.text);
+                eraBoons.add(new EraBoon(c.def, eraIndex + 1));
+                pastEvents.add(c);
+                advanceEra(true);
+                if (result != null) return null;
+                continue;
+            }
             if (c.def.type != CardType.HOSTILITY) return c;
             int n = c.def.effects.stream().filter(e -> e.containsKey("hostility")).mapToInt(e -> Y.toInt(e.get("hostility"))).sum();
             threat += n;
@@ -1075,6 +1111,8 @@ public final class Game {
             under = nextCard();
         }
         if (under != null) take(p, under);
+        p.faceDown = under;                               // shown to the player whatever it was: a city state or a great wonder never reaches the hand
+        p.faceDownSeq++;
     }
 
     private void installLeader(Player p, CardDef d) {
@@ -1125,6 +1163,7 @@ public final class Game {
         if (known) return;
         greatWonders.add(new WonderProgress(w));
         log(p.name + " brings the great wonder " + w.name + " to the tribe: everyone can now help build it.");
+
     }
 
     private CardInst handCard(Player p, Map<String, Object> a) {
@@ -1191,7 +1230,7 @@ public final class Game {
             tradeAmounts = Res.parse(o.get("give"));
             tradeGets = Res.parse(o.get("get"));
             for (Res r : Res.values()) {
-                if (p.res.get(r) < tradeAmounts.get(r) + d.cost.get(r)) throw new GameException("Not enough " + r.key() + ".");
+                if (p.res.get(r) < d.cost.get(r)) throw new GameException("Not enough " + r.key() + ".");
             }
         }
         final EnumMap<Res, Integer> tradeGet = tradeGets;
@@ -1236,10 +1275,8 @@ public final class Game {
             if (!Res.isZero(now.res()) || now.troops() > 0 || now.settlers() > 0) payLand(p, now);
         }
         if (tradeTo != null) {
-            pay(p, tradeAmounts);
-            Player to = tradeTo;
-            tradeGet.forEach((r, v) -> to.res.merge(r, v, Integer::sum));
-            log(p.name + " pays " + Res.describe(tradeAmounts) + " and " + to.name + " gets " + Res.describe(tradeGet) + " along a new trading route.");
+            routes.add(new Route(p.seat, tradeTo.seat, tradeAmounts, tradeGet));
+            log(p.name + " opens a trading route: every round they pay " + Res.describe(tradeAmounts) + " and " + tradeTo.name + " gets " + Res.describe(tradeGet) + ".");
         }
         if (core != null) {
             core.cored = true;
@@ -1290,7 +1327,6 @@ public final class Game {
     public int wonderUpkeep(Player p) {
         int total = 0;
         for (WonderDef w : builtWonders) if (!obsolete(w)) total += eraAge(w.era);
-        for (CardDef c : p.minorWonders) if (!obsolete(c)) total += eraAge(c.era);
         if (mods(p).halveWonderUpkeep) total = (total + 1) / 2;
         return total;
     }
@@ -1706,6 +1742,14 @@ public final class Game {
 
     private void decide(Player p, Map<String, Object> a) {
         Pending pe = pendingFor(p);
+        if (pe.event.def.effects.stream().anyMatch(e -> e.containsKey("wonderGift"))) {
+            try {
+                pe.giftChoice = Res.of(Y.s(a, "resource", ""));
+            } catch (IllegalArgumentException e) {
+                throw new GameException("Choose one of the resources.");
+            }
+            return;
+        }
         if (!"opportunity".equals(pe.event.def.kind) || pe.target != p.seat) throw new GameException("This choice isn't yours.");
         pe.accept = Y.b(a, "accept");
     }
@@ -1801,6 +1845,9 @@ public final class Game {
         if (d.persistent) {
             persistentEvents.add(ev);
             log(d.name + " lingers until lifted (" + Res.describe(d.cleanseCost) + ").");
+        } else if (greatWorkReturns) {
+            greatWorkReturns = false;
+            futureEvents.add(ev);
         } else if (!d.helper) {
             pastEvents.add(ev);
         }
@@ -1944,6 +1991,48 @@ public final class Game {
      * Applies immediate effects. Losses are multiplied by {@code factor} (rounded down). With {@code civWide},
      * Population losses are spread over the civilization (largest first) instead of hitting each target.
      */
+    /** The great wonder nearest completion that still needs {@code r} (null {@code r}: any resource), or null. */
+    private WonderProgress nearestWonder(Res r) {
+        WonderProgress best = null;
+        int bestLeft = Integer.MAX_VALUE;
+        for (WonderProgress w : greatWonders) {
+            if (w.done) continue;
+            EnumMap<Res, Integer> need = w.def.cost(players.size());
+            int left = 0;
+            for (Res x : Res.values()) left += Math.max(0, need.get(x) - w.paid.get(x));
+            if (left == 0 || (r != null && need.get(r) - w.paid.get(r) <= 0)) continue;
+            if (left < bestLeft) { best = w; bestLeft = left; }
+        }
+        return best;
+    }
+
+    /** Great Work: n of ONE resource into the great wonder nearest completion that needs it; what it does not need is lost. With no wonder being built, every player gets +1 production and the card goes back into the future events. */
+    private void giveToWonder(int n, Res chosen) {
+        if (nearestWonder(null) == null) {
+            for (Player p : players) p.res.merge(Res.PRODUCTION, 1, Integer::sum);
+            greatWorkReturns = true;
+            log("No great wonder is being built: every player gets +1 production, and Great Work goes back into the future events.");
+            return;
+        }
+        Res pick = chosen;
+        if (pick == null) {                                   // no choice made: the kind the nearest wonder needs most
+            WonderProgress w = nearestWonder(null);
+            EnumMap<Res, Integer> need = w.def.cost(players.size());
+            int most = 0;
+            for (Res x : Res.values()) if (need.get(x) - w.paid.get(x) > most) { most = need.get(x) - w.paid.get(x); pick = x; }
+        }
+        WonderProgress best = nearestWonder(pick);
+        if (best == null) {
+            log("Great Work: no great wonder needs " + pick.key() + ", so the " + n + " are lost.");
+            return;
+        }
+        EnumMap<Res, Integer> need = best.def.cost(players.size());
+        int add = Math.min(n, need.get(pick) - best.paid.get(pick));
+        best.paid.merge(pick, add, Integer::sum);
+        log("Great Work: " + add + " " + pick.key() + " go into " + best.def.name + (n > add ? "; the other " + (n - add) + " are lost." : "."));
+        if (best.paid.equals(need)) completeWonder(best, players.get(0), -1);
+    }
+
     private void applyImmediate(List<Map<String, Object>> effects, List<Player> targets, Player actor, double factor, boolean civWide) {
         for (Map<String, Object> e : effects) {
             String k = Effects.key(e);
@@ -2002,6 +2091,7 @@ public final class Game {
                 case "draw" -> {
                     for (Player p : actor == null ? targets : List.of(actor)) for (int i = 0; i < Y.toInt(v); i++) drawFromEraDeck(p);
                 }
+                case "wonderGift" -> giveToWonder(Y.toInt(v), pending == null ? null : pending.giftChoice);
                 case "extraActions" -> {
                     if (actor != null && phase == Phase.TURNS) actor.actions += Y.toInt(v);
                 }
@@ -2215,7 +2305,7 @@ public final class Game {
 
     /** Whether a card's building bonuses (per worker, income) need an upgrade slot to work. */
     public boolean slottable(CardDef c) {
-        return (c.type == CardType.TECH || c.type == CardType.MINOR_WONDER) && c.effects.stream().anyMatch(Effects::needsSlot);
+        return (c.type == CardType.TECH || c.type == CardType.MINOR_WONDER) && (!c.bonus.isEmpty() || c.effects.stream().anyMatch(Effects::needsSlot));
     }
 
     /** The researched techs and the player's own minor wonders that make a building better and are not in a slot yet. */
@@ -2230,7 +2320,7 @@ public final class Game {
 
     /** Where a card's bonus goes: "warriors" (army effects), else "building". */
     public String slotKind(CardDef c) {
-        return c.effects.stream().anyMatch(e -> Effects.UNIT_KEYS.contains(Effects.key(e))) ? "warriors" : "building";
+        return Stream.concat(c.effects.stream(), c.bonus.stream()).anyMatch(e -> Effects.UNIT_KEYS.contains(Effects.key(e))) ? "warriors" : "building";
     }
 
     /** Whether the card sits in any of the player's slots (a building, the warriors or the population). */
@@ -2246,10 +2336,12 @@ public final class Game {
 
     /** The effects of a tech or minor wonder that work for {@code p}: rule changes always, building bonuses only while slotted ({@code p == null}: rules only). */
     public List<Map<String, Object>> effectsFor(Player p, CardDef c) {
-        if (!slottable(c)) return c.effects;
+        if (!slottable(c)) return c.global.isEmpty() ? c.effects : Stream.concat(c.effects.stream(), c.global.stream()).toList();
         List<Map<String, Object>> out = new ArrayList<>();
         boolean in = p != null && isSlotted(p, c);
         for (Map<String, Object> e : c.effects) if (in || !Effects.needsSlot(e)) out.add(e);
+        out.addAll(c.global);
+        if (in) out.addAll(c.bonus);
         return out;
     }
 
@@ -2275,6 +2367,7 @@ public final class Game {
         if (!slotKind(d).equals("building")) throw new GameException(d.name + " is for your warriors, not a building.");
         Building b = p.buildings.stream().filter(x -> x.id == Y.i(a, "building", -1)).findFirst().orElseThrow(() -> new GameException("You have no such building."));
         if (b.upgrades.size() >= b.def.upgradeSlots) throw new GameException("The " + b.def.name + " has no free upgrade slot.");
+        if (!d.slotIn.isEmpty() && !d.slotIn.contains(b.def.id)) throw new GameException(d.name + " only fits " + d.slotIn.stream().map(x -> content.buildings.get(x).name).collect(Collectors.joining(" or ")) + ".");
         b.upgrades.add(d);
         log(p.name + " puts " + d.name + " into the " + b.def.name + ".");
     }
@@ -2315,6 +2408,13 @@ public final class Game {
         for (WonderDef w : builtWonders) if (!obsolete(w)) m.add(w.effects);
         for (EraBoon b : eraBoons) m.add(b.def().effects);
         for (Territory t : realm) m.add(t.def.effects);
+        // the health of the world also counts what a slotted card gives (Fire)
+        for (Player p : players) {
+            List<CardDef> slotted = new ArrayList<>(p.warriorUpgrades);
+            slotted.addAll(p.populationUpgrades);
+            for (Building b : p.buildings) slotted.addAll(b.upgrades);
+            for (CardDef c : slotted) for (Map<String, Object> e : c.bonus) if (e.containsKey("healthMod")) m.add(e);
+        }
         return m;
     }
 

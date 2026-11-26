@@ -13,6 +13,7 @@ import java.util.EnumMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Stream;
 import java.util.TreeMap;
 
 /**
@@ -195,6 +196,10 @@ public final class View {
             Map<String, Integer> net = new LinkedHashMap<>(inc);          // after what the round takes: upkeep for wonders of earlier eras
             net.merge(Res.PRODUCTION.key(), -g.wonderUpkeep(p), Integer::sum);
             g.buildingUpkeep(p).forEach((r, amount) -> net.merge(r.key(), -amount, Integer::sum));
+            for (Game.Route rt : g.routes) {
+                if (rt.from() == p.seat) rt.give().forEach((r, n) -> net.merge(r.key(), -n, Integer::sum));
+                if (rt.to() == p.seat) rt.get().forEach((r, n) -> net.merge(r.key(), n, Integer::sum));
+            }
             pm.put("net", net);
             pm.put("incomeSources", incomeSources(g, p));
             pm.put("actionSources", actionSources(g, p));
@@ -247,10 +252,21 @@ public final class View {
                 pm.put("turnSeq", p.turnSeq);
                 pm.put("turnEvents", p.turnEvents);
                 if (p.turnDraw != null) pm.put("turnDraw", card(p.turnDraw));
+                pm.put("faceDownSeq", p.faceDownSeq);
+                if (p.faceDown != null) pm.put("faceDown", card(p.faceDown));
             }
             players.add(pm);
         }
         v.put("players", players);
+        List<Object> lost = new ArrayList<>();
+        for (Game.LostCard l : g.lostCards.subList(Math.max(0, g.lostCards.size() - 4), g.lostCards.size())) {
+            Map<String, Object> lm = new LinkedHashMap<>();
+            lm.put("seq", l.seq());
+            lm.put("event", l.event());
+            lm.put("card", def(l.card()));
+            lost.add(lm);
+        }
+        v.put("lostCards", lost);
 
         if (seat >= 0 && seat < g.players.size()) {
             Player me = g.players.get(seat);
@@ -292,6 +308,12 @@ public final class View {
             pm.put("halve", pe.halve);
             pm.put("cancel", pe.cancel);
             pm.put("accept", pe.accept);
+            if (pe.event.def.effects.stream().anyMatch(e -> e.containsKey("wonderGift"))) {
+                List<String> opts = new ArrayList<>();
+                for (Res r : Res.values()) if (g.greatWonders.stream().anyMatch(w -> !w.done && w.def.cost(g.players.size()).get(r) > w.paid.get(r))) opts.add(r.key());
+                pm.put("giftOptions", opts);
+                pm.put("giftChoice", pe.giftChoice == null ? null : pe.giftChoice.key());
+            }
             if (pe.event.def.offerCost != null && !Res.isZero(pe.event.def.offerCost)) pm.put("offerCost", res(pe.event.def.offerCost));
             pm.put("preview", preview(g, pe));
             v.put("pending", pm);
@@ -377,6 +399,14 @@ public final class View {
             EnumMap<Res, Integer> up = Res.empty();
             b.def.upkeep.forEach((r, n) -> up.put(r, -n));
             add.accept("Upkeep: " + b.def.name, up);
+        }
+        for (Game.Route rt : g.routes) {
+            if (rt.from() == p.seat) {
+                EnumMap<Res, Integer> pay = Res.empty();
+                rt.give().forEach((r, n) -> pay.put(r, -n));
+                add.accept("Trading route to " + g.players.get(rt.to()).name, pay);
+            }
+            if (rt.to() == p.seat) add.accept("Trading route from " + g.players.get(rt.from()).name, rt.get());
         }
         return out;
     }
@@ -527,7 +557,9 @@ public final class View {
         m.put("name", d.name);
         m.put("type", d.type.name().toLowerCase());
         m.put("text", d.text);
-        if ((d.type == CardType.TECH || d.type == CardType.MINOR_WONDER) && d.effects.stream().anyMatch(Effects::needsSlot)) m.put("slottable", true);
+        if ((d.type == CardType.TECH || d.type == CardType.MINOR_WONDER) && (!d.bonus.isEmpty() || d.effects.stream().anyMatch(Effects::needsSlot))) m.put("slottable", true);
+        if (!d.slotIn.isEmpty()) m.put("slotIn", d.slotIn);
+        if (Stream.concat(d.effects.stream(), d.bonus.stream()).anyMatch(e -> Effects.UNIT_KEYS.contains(Effects.key(e)))) m.put("slotsInto", "warriors");
         if (!Res.isZero(d.cost)) m.put("cost", res(d.cost));
         if (d.isEvent()) {
             m.put("category", d.category);
